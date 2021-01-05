@@ -5,6 +5,7 @@ import logging
 import configparser
 from optparse import OptionParser
 import datetime as dt
+import importlib
 
 from match import Match
 
@@ -92,7 +93,7 @@ else:
 
 def main():
     try:
-        Problem = __import__(sys.argv[1])
+        Problem = importlib.import_module(sys.argv[1].replace('/','.'))
         problem = Problem.Problem()
     except Exception as e:
         logger.critical('Importing the given problem failed with the following exception: "{}"'.format(e))
