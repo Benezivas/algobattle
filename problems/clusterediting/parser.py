@@ -53,7 +53,10 @@ class ClustereditingParser(Parser):
                 logger.warning('A solution line does not consist only of positive ints!')
                 removable_lines.append(line)
             elif int(line[2]) > instance_size or int(line[3]) > instance_size:
-                logger.warning('At least one node descriptor is not in allowed range size!')
+                logger.warning('A one node descriptor is not in allowed range size!')
+                removable_lines.append(line)
+            elif int(line[2]) == 0 or int(line[3]) == 0:
+                logger.warning('A node descriptor is zero, but should be at least one!')
                 removable_lines.append(line)
             elif int(line[2]) == int(line[3]):
                 logger.warning('An egde is describing a loop!')
