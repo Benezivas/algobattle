@@ -22,7 +22,7 @@ class PairsumParser(Parser):
 
         for entry in raw_instance:
             if not entry.isdigit():
-                logger.warning('An entry of the instance is not a positive int!')
+                logger.warning('An entry of the instance is not a nonnegative int!')
                 removable_entries.append(entry)
             elif int(entry) >= 2**63:
                 logger.warning('An entry exceeds the required size!')

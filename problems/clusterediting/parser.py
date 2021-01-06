@@ -25,7 +25,7 @@ class ClustereditingParser(Parser):
                 logger.warning('An edge descriptors is not well formatted!')
                 removable_lines.append(line)
             elif (not line[1].isdigit()) or (not line[2].isdigit()):
-                logger.warning('An edge descriptor does not consist only of positive ints!')
+                logger.warning('An edge descriptor does not consist only of nonnegative ints!')
                 removable_lines.append(line)
             elif int(line[1]) > instance_size or int(line[2]) > instance_size:
                 logger.warning('A node descriptor is not in allowed range size!')
