@@ -1,5 +1,3 @@
-from random import *
-
 fin = open("input")
 fout = open("output","w")
 n = int(fin.readline())
