@@ -17,7 +17,7 @@ class ClustereditingParser(Parser):
         return raw_instance, raw_solution
 
     def parse_instance(self, raw_instance, instance_size):
-        raw_solution = list(set(raw_instance)) #Remove duplicate lines
+        raw_instance = list(set(raw_instance)) #Remove duplicate lines
         removable_lines = []
 
         for line in raw_instance:
