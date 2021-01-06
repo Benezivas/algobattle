@@ -30,6 +30,9 @@ class ClustereditingParser(Parser):
             elif int(line[1]) > instance_size or int(line[2]) > instance_size:
                 logger.warning('A node descriptor is not in allowed range size!')
                 removable_lines.append(line)
+            elif int(line[1]) == 0 or int(line[2]) == 0:
+                logger.warning('A node descriptor is zero, but should be at least one!')
+                removable_lines.append(line)
             elif int(line[1]) == int(line[2]):
                 logger.warning('An egde is describing a loop!')
                 removable_lines.append(line)
