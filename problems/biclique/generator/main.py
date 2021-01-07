@@ -1,0 +1,12 @@
+fin = open("input")
+fout = open("output","w")
+n = int(fin.readline())
+
+fout.write("e 1 2\n")
+fout.write("e 1 3\n")
+fout.write("e 1 4\n")
+fout.write("s set1 1\n")
+fout.write("s set2 2\n")
+fout.write("s set2 3\n")
+fout.write("s set2 4\n")
+fout.close()
