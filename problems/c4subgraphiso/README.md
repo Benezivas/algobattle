@@ -7,7 +7,8 @@ induced Circles of length four (`C_4`) in a given graph as possible.
 
 The generator is given an instance size and outputs an undirected graph of at
 most this size. Along with the graph, it outputs a certificate solution
-containing the set of circles as described above.
+containing the set of circles as described above. A certificate solution is only
+valid if there is at least one `C_4` given.
 
 The solver then receives this graph and has to find a set of `C_4` within the
 time limit and output it. The solution is valid if its size is at least as big
@@ -15,7 +16,6 @@ as the certificate solution of the generator.
 
 # I/O
 We use a format similar to the DIMACS-format for this task:
-\begin{itemize}
 * **Edges**: These lines are of the form `e i j`
     for an edge `(i,j) in E(G)`. As we are working on an undirected graph, 
     the symmetrical edge `(j,i)` does not need to be supplied.
