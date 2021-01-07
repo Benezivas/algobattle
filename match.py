@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import sys
 import subprocess
 import signal
@@ -159,7 +157,7 @@ class Match:
             Returns a message about the reason why the solver was unable to solve a bigger instance.
         """
         n = self.problem.n_start
-        maximum_reached_n = -1
+        maximum_reached_n = 0
         i = 0
         n_cap = 50000
         most_recent_failure_message = ''
