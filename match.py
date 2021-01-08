@@ -110,11 +110,9 @@ class Match:
 
             maximum_A, failure_message = self._battle_wrapper(self.teamB, self.teamA)
             failure_messages_A.append(failure_message)
-            logger.info('{}'.format(failure_message))
 
             maximum_B, failure_message = self._battle_wrapper(self.teamA, self.teamB)
             failure_messages_B.append(failure_message)
-            logger.info('{}'.format(failure_message))
 
             results_A.append(maximum_A)
             results_B.append(maximum_B)
@@ -170,8 +168,7 @@ class Match:
             if not alive:
                 #We are only interested in the very last failure message
                 most_recent_failure_message = message
-            
-            #Try to search for the highest n for which the solver still runs through
+
             if not alive and i > 1:
                 #The step size increase was too aggressive, take it back and reset the increment multiplier
                 logger.info('Setting the solution cap to {}...'.format(n))
@@ -196,6 +193,7 @@ class Match:
                 i = 1
             elif n >= n_cap and n_cap == self.iteration_cap:
                 most_recent_failure_message = 'Solver {} exceeded the instance size cap of {}!'.format(solving_team, self.iteration_cap)
+                logger.info(most_recent_failure_message)
                 maximum_reached_n = self.iteration_cap
                 alive = False
         return (maximum_reached_n, most_recent_failure_message)
