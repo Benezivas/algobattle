@@ -1,6 +1,6 @@
 # Algorithmic Battle (Lab course at tcs.rwth-aachen.de)
 
-The lab course "Algorithmic Battle" is offered by the Theory group of RWTH Aachen University since 2019. This repository contains the necessary code and documentation to set up the lab course yourself. 
+The lab course "Algorithmic Battle" is offered by the [Computer Science Theory group of RWTH Aachen University](https://tcs.rwth-aachen.de/) since 2019. This repository contains the necessary code and documentation to set up the lab course yourself. 
 
 The idea of the lab is to pose several, usually NP-complete problems during the semester.  
 Groups of students then write code that generates hard-to-solve instances for these problems and solvers that solve these problems quickly.
