@@ -250,20 +250,9 @@ class Match:
 
         logger.info('Running generator of group {}...\n'.format(generating_team))
 
-        p = subprocess.Popen(generator_run_command, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-        self.latest_running_docker_image = "generator" + str(generating_team)
-        start_time = timeit.default_timer()
-        try:
-            raw_instance_with_solution, _ = p.communicate(input=str(size).encode(), timeout=self.timeout_generator)
-            raw_instance_with_solution = self.problem.parser.decode(raw_instance_with_solution)
-            logger.info('Approximate elapsed runtime: {}/{} seconds.'.format('{:.2f}'.format(timeit.default_timer() - start_time), self.timeout_generator))
-        except subprocess.TimeoutExpired:
-            elapsed_time = '{:.2f}'.format(timeit.default_timer() - start_time)
-            logger.info('Approximate elapsed runtime: {}/{} seconds.'.format(elapsed_time, self.timeout_generator))
-            p.kill()
-            self._kill_spawned_docker_containers()
-            return (True, "Generator {} exceeded the given time limit at instance size {}! ({}s/{}s)".format(solving_team, size, elapsed_time, self.timeout_generator))
-
+        raw_instance_with_solution = self._run_subprocess(generator_run_command, str(size).encode(), self.timeout_generator)
+        if not raw_instance_with_solution:
+            return (True, "Generator {} exceeded the given time limit at instance size {}!".format(solving_team, size))
 
         logger.info('Checking generated instance and certificate...')
 
@@ -277,28 +266,51 @@ class Match:
         logger.info('Generated instance and certificate are valid!\n\n')
 
 
+
         logger.info('Running solver of group {}...\n'.format(solving_team))
 
-        p = subprocess.Popen(solver_run_command, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-        self.latest_running_docker_image = "solver" + str(solving_team)
-        start_time = timeit.default_timer()
-        try:
-            raw_solver_solution, _ = p.communicate(input=self.problem.parser.encode(instance), timeout=self.timeout_solver)
-            logger.info('Approximate elapsed runtime: {}/{} seconds.'.format('{:.2f}'.format(timeit.default_timer() - start_time),self.timeout_solver))
-        except subprocess.TimeoutExpired:
-            elapsed_time = '{:.2f}'.format(timeit.default_timer() - start_time)
-            logger.info('Approximate elapsed runtime: {}/{} seconds.'.format(elapsed_time, self.timeout_solver))
-            p.kill()
-            self._kill_spawned_docker_containers()
-            return (False, "Solver {} exceeded the given time limit at instance size {}! ({}s/{}s)".format(solving_team, size, elapsed_time, self.timeout_solver))
-
+        raw_solver_solution = self._run_subprocess(solver_run_command, self.problem.parser.encode(instance), self.timeout_solver)
+        if not raw_solver_solution:
+            return (False, "Solver {} exceeded the given time limit at instance size {}!".format(solving_team, size))
 
         logger.info('Checking validity of the solvers solution...')
         
-        solver_solution = self.problem.parser.parse_solution(self.problem.parser.decode(raw_solver_solution), size)
+        solver_solution = self.problem.parser.parse_solution(raw_solver_solution, size)
         if not self.problem.verifier.verify_solution_against_instance(instance, solver_solution, size):
             return (False, 'Solver {} yields a wrong answer at instance size {}.'.format(solving_team, size))
         elif not self.problem.verifier.verify_solution_quality(generator_solution, solver_solution):
             return (False, 'The solvers solution does not meet the wanted solution quality!')
         else:
             return (True, 'Solver {} yields a correct answer in the given time limit!\n'.format(solving_team))
+
+    def _run_subprocess(self, run_command, input, timeout):
+        """ Run a given command as a subprocess.
+
+        Parameters:
+        ----------
+        run_command: list 
+            The command that is to be executed.
+        input: bytes
+            Additional input for the subprocess, supplied to it via stdin.
+        timeout: int
+            The timeout for the subprocess in seconds.
+        Returns:
+        ----------
+        any
+            The decoded output that the process returns.
+
+        """
+        p = subprocess.Popen(run_command, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        start_time = timeit.default_timer()
+        try:
+            raw_output, _ = p.communicate(input=input, timeout=timeout)
+            raw_output = self.problem.parser.decode(raw_output)
+            logger.info('Approximate elapsed runtime: {}/{} seconds.'.format('{:.2f}'.format(timeit.default_timer() - start_time), timeout))
+        except subprocess.TimeoutExpired:
+            elapsed_time = '{:.2f}'.format(timeit.default_timer() - start_time)
+            logger.info('Approximate elapsed runtime: {}/{} seconds.'.format(elapsed_time, timeout))
+            p.kill()
+            self._kill_spawned_docker_containers()
+            return None
+        return raw_output
+        
