@@ -13,18 +13,6 @@ class PairsumVerifier(Verifier):
         if not solution:
             logger.error('The solution is empty!')
             return False
-        
-        if len(solution) != 4:
-            logger.error('The solution is not of size 4!')
-            return False
-
-        if len(set(solution)) != 4:
-            logger.error('The solution contains duplicate entries!')
-            return False
-
-        if not all(i < len(instance) and i >= 0 for i in solution):
-            logger.error('The solution contains at least one number that is out of bounds!')
-            return False
 
         if not instance[solution[0]] + instance[solution[1]] == instance[solution[2]] + instance[solution[3]]:
             logger.error('The given solution is not valid!')
