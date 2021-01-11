@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from match import SolutionType
 
 class Verifier(ABC):
 
