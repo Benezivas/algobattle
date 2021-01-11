@@ -5,7 +5,7 @@ from verifier import Verifier
 logger = logging.getLogger('algobattle.verifier')
 
 class PathpackingVerifier(Verifier):
-    def verify_solution_against_instance(self, instance, solution, instance_size):
+    def verify_solution_against_instance(self, instance, solution, instance_size, solution_type):
         if not instance:
             logger.error('The instance is empty!')
             return True
@@ -28,5 +28,5 @@ class PathpackingVerifier(Verifier):
                 return False
         return True
 
-    def verify_solution_quality(self, generator_solution, solver_solution):
-        return super().verify_solution_quality(generator_solution, solver_solution)
+    def verify_solution_quality(self, instance, instance_size, generator_solution, solver_solution):
+        return super().verify_solution_quality(instance, instance_size, generator_solution, solver_solution)
