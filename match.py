@@ -122,8 +122,7 @@ class Match:
     def _kill_spawned_docker_containers(self):
         """Terminates all running docker containers."""
         if self.latest_running_docker_image:
-            if subprocess.check_output("docker ps -a -q", shell=True):
-                subprocess.run('docker ps -a -q --filter ancestor={} | xargs -r docker stop > /dev/null'.format(self.latest_running_docker_image), shell=True)
+            subprocess.run('docker ps -a -q --filter ancestor={} | xargs -r docker kill > /dev/null 2>&1'.format(self.latest_running_docker_image), shell=True)
 
     def _battle_wrapper(self, generating_team, solving_team):
         """Wrapper to execute one round of the number of wanted battles.
@@ -248,6 +247,7 @@ class Match:
 
         logger.info('Running generator of group {}...\n'.format(generating_team))
 
+        self.latest_running_docker_image = "generator" + str(generating_team)
         raw_instance_with_solution = self._run_subprocess(generator_run_command, str(size).encode(), self.timeout_generator)
         if not raw_instance_with_solution:
             return (True, "Generator {} exceeded the given time limit at instance size {}!".format(solving_team, size))
@@ -267,6 +267,7 @@ class Match:
 
         logger.info('Running solver of group {}...\n'.format(solving_team))
 
+        self.latest_running_docker_image = "solver" + str(solving_team)
         raw_solver_solution = self._run_subprocess(solver_run_command, self.problem.parser.encode(instance), self.timeout_solver)
         if not raw_solver_solution:
             return (False, "Solver {} exceeded the given time limit at instance size {}!".format(solving_team, size))
