@@ -21,6 +21,7 @@ class OSCM3Parser(Parser):
         raw_instance = list(set(raw_instance)) #Remove duplicate lines
         removable_lines = []
 
+        seen_nodes = set()
         for line in raw_instance:
             if len(line) < 3 or len(line) > 5:
                 logger.warning('An edge descriptors is not well formatted!')
@@ -32,6 +33,7 @@ class OSCM3Parser(Parser):
                 logger.warning('A node descriptor is out of bounds!')
                 removable_lines.append(line)
             else:
+                seen_nodes.add(int(line[1]))
                 clean = True
                 included_nodes = set()
                 for entry in line[2:]:
@@ -44,12 +46,30 @@ class OSCM3Parser(Parser):
                     elif entry in included_nodes:
                         logger.warning('A node is given twice!')
                         clean = False
-                    included_nodes.add(entry)
+                    else:
+                        included_nodes.add(entry)
                 if not clean:
                     removable_lines.append(line)
 
         for line in removable_lines:
             raw_instance.remove(line)
+
+        """ Fill up the removed node slots with trivial nodes to make 
+        sure the solver always receives an instance of full length.
+        This is a hack to ensure that the solver is never given an instance of
+        too short length and thus returns a solution that is not long enough.
+
+        TODO: This should not be handled in the parser but in the verifier,
+        specifically in the verify_solver_solution.
+        """
+        missing_nodes = set([i for i in range(len(raw_instance))]).difference(seen_nodes)
+        filler_lines = []
+        for node in missing_nodes:
+            filler_lines.append(('n', str(node), str(node)))
+
+        for line in filler_lines:
+            raw_instance.append(line)
+
 
         self.parsed_instance = raw_instance
         return raw_instance
@@ -59,10 +79,10 @@ class OSCM3Parser(Parser):
         if raw_solution:
             raw_solution = raw_solution[0]
         else:
-            return sys.maxsize
-        if len(raw_solution) != instance_size + 1:
-            logger.warning('The solution is of unexpected length!')
             return []
+        if len(raw_solution) > instance_size + 1:
+            logger.warning('The solution is of unexpected length! Cutting off the overlap!')
+            raw_solution = raw_solution[:instance_size + 1]
         
         included_nodes = set()
         for entry in raw_solution[1:]:
