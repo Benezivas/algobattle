@@ -54,15 +54,12 @@ class OSCM3Parser(Parser):
         for line in removable_lines:
             raw_instance.remove(line)
 
-        """ Fill up the removed node slots with trivial nodes to make 
+        """ Fill up the removed or missing node slots with trivial nodes to make 
         sure the solver always receives an instance of full length.
-        This is a hack to ensure that the solver is never given an instance of
-        too short length and thus returns a solution that is not long enough.
-
-        TODO: This should not be handled in the parser but in the verifier,
-        specifically in the verify_solver_solution.
+        This ensures that a solver can always produce a solver permutation of full
+        length, even if some nodes (especially those indexed highest) are missing
         """
-        missing_nodes = set([i for i in range(len(raw_instance))]).difference(seen_nodes)
+        missing_nodes = set([i for i in range(instance_size)]).difference(seen_nodes)
         filler_lines = []
         for node in missing_nodes:
             filler_lines.append(('n', str(node), str(node)))
@@ -80,9 +77,9 @@ class OSCM3Parser(Parser):
             raw_solution = raw_solution[0]
         else:
             return []
-        if len(raw_solution) > instance_size + 1:
-            logger.warning('The solution is of unexpected length! Cutting off the overlap!')
-            raw_solution = raw_solution[:instance_size + 1]
+        if len(raw_solution) != instance_size + 1:
+            logger.warning('The solution is of unexpected length!')
+            return[]
         
         included_nodes = set()
         for entry in raw_solution[1:]:

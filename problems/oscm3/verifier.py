@@ -1,4 +1,5 @@
 import logging
+import copy
 
 from verifier import Verifier
 
@@ -34,6 +35,14 @@ class OSCM3Verifier(Verifier):
                                         crossings += 1
             return crossings
 
+        def reorder_upper_nodes(self, permutation):
+            old_nodes = copy.deepcopy(self.upper_nodes)
+            old_edges = copy.deepcopy(self.edges)
+
+            for i in range(self.size):
+                self.upper_nodes[i] = old_nodes[int(permutation[i])]
+                self.edges[i] = old_edges[int(permutation[i])]
+
     
     def verify_solution_against_instance(self, instance, solution, instance_size, solution_type):
         if not instance:
@@ -49,19 +58,18 @@ class OSCM3Verifier(Verifier):
         return True
 
     def verify_solution_quality(self, instance, instance_size, generator_solution, solver_solution):
-        edges = {}
-        for node in instance:
-            edges[node[1]] = []
-            for entry in node[2:]:
-                edges[node[1]].append(int(entry))
-
+        print(instance)
         g = self.Graph(instance_size)
-        for i in range(1, len(generator_solution)):
-            g.insert_node(generator_solution[i], i-1, edges[generator_solution[i]])
 
-        s = self.Graph(instance_size)
-        for i in range(1, len(solver_solution)):
-            s.insert_node(solver_solution[i], i-1, edges[solver_solution[i]])
+        
+        for element in instance:
+            print(element[1], int(element[1]), [int(entry) for entry in element[2:]])
+            g.insert_node(element[1], int(element[1]), [int(entry) for entry in element[2:]])
 
+        h = copy.deepcopy(g)
+        g.reorder_upper_nodes(generator_solution[1:])
+        h.reorder_upper_nodes(solver_solution[1:])
+        generator_crossings = g.calculate_number_crossings()
+        solver_crossings = g.calculate_number_crossings()
 
-        return s.calculate_number_crossings() <= g.calculate_number_crossings()
+        return solver_crossings <= generator_crossings
