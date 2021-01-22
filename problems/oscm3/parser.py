@@ -33,7 +33,6 @@ class OSCM3Parser(Parser):
                 logger.warning('A node descriptor is out of bounds!')
                 removable_lines.append(line)
             else:
-                seen_nodes.add(int(line[1]))
                 clean = True
                 included_nodes = set()
                 for entry in line[2:]:
@@ -50,6 +49,8 @@ class OSCM3Parser(Parser):
                         included_nodes.add(entry)
                 if not clean:
                     removable_lines.append(line)
+                else:
+                    seen_nodes.add(int(line[1]))
 
         for line in removable_lines:
             raw_instance.remove(line)
