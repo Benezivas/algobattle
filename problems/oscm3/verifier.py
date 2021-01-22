@@ -58,18 +58,16 @@ class OSCM3Verifier(Verifier):
         return True
 
     def verify_solution_quality(self, instance, instance_size, generator_solution, solver_solution):
-        print(instance)
         g = self.Graph(instance_size)
 
         
         for element in instance:
-            print(element[1], int(element[1]), [int(entry) for entry in element[2:]])
             g.insert_node(element[1], int(element[1]), [int(entry) for entry in element[2:]])
 
         h = copy.deepcopy(g)
         g.reorder_upper_nodes(generator_solution[1:])
         h.reorder_upper_nodes(solver_solution[1:])
         generator_crossings = g.calculate_number_crossings()
-        solver_crossings = g.calculate_number_crossings()
+        solver_crossings = h.calculate_number_crossings()
 
         return solver_crossings <= generator_crossings
