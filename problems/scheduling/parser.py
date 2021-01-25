@@ -43,6 +43,10 @@ class SchedulingParser(Parser):
         for line in removable_lines:
             raw_instance.remove(line)
 
+        if sum(int(job[2]) for job in raw_instance) * 5 >= 2 ** 64:
+            logger.warning('The cumulated job sizes exceed the given limit!')
+            return []
+
         return raw_instance
 
     def parse_solution(self, raw_solution, instance_size):
