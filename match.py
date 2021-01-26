@@ -7,6 +7,9 @@ import logging
 logger = logging.getLogger('algobattle.framework')
 
 class Match:
+    """ Match class, responsible for setting up and executing the battles
+    between two given teams. 
+    """
     def __init__(self, problem, config, generator1_path, generator2_path, solver1_path, solver2_path, group_nr_one, group_nr_two):
         self.timeout_build     = int(config['run_parameters']['timeout_build'])
         self.timeout_generator = int(config['run_parameters']['timeout_generator'])
@@ -258,7 +261,7 @@ class Match:
         instance                   = self.problem.parser.parse_instance(raw_instance, size)
         generator_solution         = self.problem.parser.parse_solution(raw_solution, size)
 
-        if not self.problem.verifier.verify_solution_against_instance(instance, generator_solution, size, True):
+        if not self.problem.verifier.verify_solution_against_instance(instance, generator_solution, size, solutiontype=True):
             return (True, 'Generator {} failed at instance size {}!'.format(generating_team, size))
 
         logger.info('Generated instance and certificate are valid!\n\n')

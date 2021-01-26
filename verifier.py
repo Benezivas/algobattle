@@ -1,10 +1,14 @@
 from abc import ABC, abstractmethod
 
 class Verifier(ABC):
-
+    """ Verifier class, responsible for semantically checking parsed instances
+    and solutions, for checking the validity of a solution for a given instance
+    as well as for verifying that a solution is of a demanded quality, which
+    usually refers to the solution size.
+    """
     @abstractmethod
-    def verify_solution_against_instance(self, instance, solution, instance_size, solution_type):
-        """ Check the validity of a solution against an instace.
+    def verify_solution_against_instance(self, instance, solution, instance_size: int, solution_type: bool):
+        """ Check the validity of a solution against an instance.
 
         Parameters:
         ----------
@@ -25,8 +29,13 @@ class Verifier(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def verify_solution_quality(self, instance, instance_size, generator_solution, solver_solution):
-        """ Check if the solvers solution achieves the wanted quality over the generators solution.
+    def verify_solution_quality(self, instance, instance_size: int, generator_solution, solver_solution):
+        """ Check if the solvers solution achieves the wanted quality over the 
+        generators solution.
+
+        The default implementation assumes a maximimazation problem,
+        for which the wanted quality is that the solution size of the solver is
+        at least as big as that of the certificate.
 
         Parameters:
         ----------

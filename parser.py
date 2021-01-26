@@ -1,6 +1,10 @@
 from abc import ABC, abstractmethod
 
 class Parser(ABC):
+    """ Parser class, responsible for decoding and encoding of output sent from
+    and to generators and solvers. Implements methods for syntactical checks
+    of instances and solutions.
+    """
     @abstractmethod
     def split_into_instance_and_solution(self, raw_input):
         """ Splits an input into instance and solution lines, discards anything else.
@@ -62,6 +66,9 @@ class Parser(ABC):
     def encode(self, input):
         """ Encode an input and return it.
 
+        This method is responsible for turning the output of parse_instance back
+        into a string that can be passed to a solver.
+
         Parameters:
         ----------
         raw_input: list
@@ -77,6 +84,10 @@ class Parser(ABC):
     @abstractmethod
     def decode(self, raw_input):
         """ Decode an input and return it.
+
+        This method is responsible for taking the output of a generator or 
+        solver and to transform it in a way that is readable by the
+        split_into_instance_and_solution or parse_solution methods.
 
         Parameters:
         ----------
