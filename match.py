@@ -261,7 +261,7 @@ class Match:
         instance                   = self.problem.parser.parse_instance(raw_instance, size)
         generator_solution         = self.problem.parser.parse_solution(raw_solution, size)
 
-        if not self.problem.verifier.verify_solution_against_instance(instance, generator_solution, size, solutiontype=True):
+        if not self.problem.verifier.verify_solution_against_instance(instance, generator_solution, size, True):
             return (True, 'Generator {} failed at instance size {}!'.format(generating_team, size))
 
         logger.info('Generated instance and certificate are valid!\n\n')
