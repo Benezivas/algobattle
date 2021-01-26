@@ -29,6 +29,52 @@ class Verifier(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def verify_semantics_of_solution(self, instance, solution, instance_size: int, solution_type: bool):
+        """ Check whether a given solution is semantically correct.
+
+        Returns True if the solution is semantically correct enough such that
+        it can be checked against an instance.
+
+        Parameters:
+        ----------
+        instance: list
+            The instance, given as a list of Tuples.
+        solution: list
+            The solution, given as a list of Tuples.
+        instance_size: int
+            The maximum instance size.
+        solution_type: bool
+            Indicates whether the given solution is a certificate (True) or solver solution (False)
+
+        Returns:
+        ----------
+        bool
+            Returns True if the solution is semantically correct.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def verify_semantics_of_instance(self, instance, instance_size: int):
+        """ Check the semantical correctness of an instance.
+
+        If the given instance ist semantically ill-formed in a way that
+        it cannot be passed to a solver, return False.
+
+        Parameters:
+        ----------
+        instance: list
+            The instance, given as a list of Tuples.
+        instance_size: int
+            The maximum instance size.
+
+        Returns:
+        ----------
+        bool
+            Returns True if the instance is processable by a solver.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def verify_solution_quality(self, instance, instance_size: int, generator_solution, solver_solution):
         """ Check if the solvers solution achieves the wanted quality over the 
         generators solution.
