@@ -6,25 +6,25 @@ class Verifier(ABC):
     as well as for verifying that a solution is of a demanded quality, which
     usually refers to the solution size.
     """
+
     @abstractmethod
-    def verify_solution_against_instance(self, instance, solution, instance_size: int, solution_type: bool):
-        """ Check the validity of a solution against an instance.
+    def verify_semantics_of_instance(self, instance, instance_size: int):
+        """ Check the semantical correctness of an instance.
+
+        If the given instance ist semantically ill-formed in a way that
+        it cannot be passed to a solver, return False.
 
         Parameters:
         ----------
         instance: list
             The instance, given as a list of Tuples.
-        solution: list
-            The solution, given as a list of Tuples.
         instance_size: int
             The maximum instance size.
-        solution_type: bool
-            Indicates whether the given solution is a certificate (True) or solver solution (False)
 
         Returns:
         ----------
         bool
-            Returns True if the solution is valid for the given instance.
+            Returns True if the instance is processable by a solver.
         """
         raise NotImplementedError
 
@@ -54,23 +54,24 @@ class Verifier(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def verify_semantics_of_instance(self, instance, instance_size: int):
-        """ Check the semantical correctness of an instance.
-
-        If the given instance ist semantically ill-formed in a way that
-        it cannot be passed to a solver, return False.
+    def verify_solution_against_instance(self, instance, solution, instance_size: int, solution_type: bool):
+        """ Check the validity of a solution against an instance.
 
         Parameters:
         ----------
         instance: list
             The instance, given as a list of Tuples.
+        solution: list
+            The solution, given as a list of Tuples.
         instance_size: int
             The maximum instance size.
+        solution_type: bool
+            Indicates whether the given solution is a certificate (True) or solver solution (False)
 
         Returns:
         ----------
         bool
-            Returns True if the instance is processable by a solver.
+            Returns True if the solution is valid for the given instance.
         """
         raise NotImplementedError
 
