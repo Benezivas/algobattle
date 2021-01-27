@@ -261,8 +261,14 @@ class Match:
         instance                   = self.problem.parser.parse_instance(raw_instance, size)
         generator_solution         = self.problem.parser.parse_solution(raw_solution, size)
 
+        if not self.problem.verifier.verify_semantics_of_instance(instance, size):
+            return (True, 'Generator {} created a malformed instance at instance size {}!'.format(generating_team, size))
+
+        if not self.problem.verifier.verify_semantics_of_solution(instance, generator_solution, size, True):
+            return (True, 'Generator {} created a malformed solution at instance size {}!'.format(generating_team, size))
+
         if not self.problem.verifier.verify_solution_against_instance(instance, generator_solution, size, True):
-            return (True, 'Generator {} failed at instance size {}!'.format(generating_team, size))
+            return (True, 'Generator {} failed at instance size {} due to a wrong certificate for its generated instance!'.format(generating_team, size))
 
         logger.info('Generated instance and certificate are valid!\n\n')
 
@@ -278,10 +284,12 @@ class Match:
         logger.info('Checking validity of the solvers solution...')
         
         solver_solution = self.problem.parser.parse_solution(raw_solver_solution, size)
-        if not self.problem.verifier.verify_solution_against_instance(instance, solver_solution, size, False):
-            return (False, 'Solver {} yields a wrong answer at instance size {}.'.format(solving_team, size))
+        if not self.problem.verifier.verify_semantics_of_solution(instance, generator_solution, size, True):
+            return (False, 'Solver {} created a malformed solution at instance size {}!'.format(generating_team, size))
+        elif not self.problem.verifier.verify_solution_against_instance(instance, solver_solution, size, False):
+            return (False, 'Solver {} yields a wrong solution at instance size {}!'.format(solving_team, size))
         elif not self.problem.verifier.verify_solution_quality(instance, size, generator_solution, solver_solution):
-            return (False, 'The solvers solution does not meet the wanted solution quality!')
+            return (False, 'Solver {} yields a solution of insufficient quality at instance size{}!'.format(solving_team, size))
         else:
             return (True, 'Solver {} yields a correct answer in the given time limit!\n'.format(solving_team))
 
