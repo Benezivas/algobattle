@@ -1,5 +1,4 @@
 import logging
-import sys
 
 from parser import Parser
 logger = logging.getLogger('algobattle.parser')
@@ -23,7 +22,7 @@ class OSCM3Parser(Parser):
 
         seen_nodes = set()
         for line in raw_instance:
-            if len(line) < 3 or len(line) > 5:
+            if len(line) < 2 or len(line) > 5:
                 logger.warning('An edge descriptors is not well formatted!')
                 removable_lines.append(line)
             elif (not line[1].isdigit()):
@@ -35,18 +34,19 @@ class OSCM3Parser(Parser):
             else:
                 clean = True
                 included_nodes = set()
-                for entry in line[2:]:
-                    if not entry.isdigit():
-                        logger.warning('A node descriptor does not consist only of nonnegative ints!')
-                        clean = False
-                    elif int(entry) >= instance_size:
-                        logger.warning('A node descriptor is not in allowed range size!')
-                        clean = False
-                    elif entry in included_nodes:
-                        logger.warning('A node is given twice!')
-                        clean = False
-                    else:
-                        included_nodes.add(entry)
+                if len(line) >= 3:
+                    for entry in line[2:]:
+                        if not entry.isdigit():
+                            logger.warning('A node descriptor does not consist only of nonnegative ints!')
+                            clean = False
+                        elif int(entry) >= instance_size:
+                            logger.warning('A node descriptor is not in allowed range size!')
+                            clean = False
+                        elif entry in included_nodes:
+                            logger.warning('A node is given twice!')
+                            clean = False
+                        else:
+                            included_nodes.add(entry)
                 if not clean:
                     removable_lines.append(line)
                 else:
@@ -55,21 +55,17 @@ class OSCM3Parser(Parser):
         for line in removable_lines:
             raw_instance.remove(line)
 
-        """ Fill up the removed or missing node slots with trivial nodes to make 
+        """ Fill up the removed or missing node slots with nodes of degree 0 to make 
         sure the solver always receives an instance of full length.
-        This ensures that a solver can always produce a solver permutation of full
-        length, even if some nodes (especially those indexed highest) are missing
         """
         missing_nodes = set([i for i in range(instance_size)]).difference(seen_nodes)
         filler_lines = []
         for node in missing_nodes:
-            filler_lines.append(('n', str(node), str(node)))
+            filler_lines.append(('n', str(node)))
 
         for line in filler_lines:
             raw_instance.append(line)
 
-
-        self.parsed_instance = raw_instance
         return raw_instance
 
     def parse_solution(self, raw_solution, instance_size):
