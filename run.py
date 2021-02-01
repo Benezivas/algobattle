@@ -135,6 +135,27 @@ def main():
 
 
 def format_summary_message(results0, results1, messages0, messages1, teamA, teamB):
+    """ Format the results of a battle into a summary message.
+
+        Parameters:
+        ----------
+        results0: list 
+            List of reached instance sizes of teamA.
+        results1: list
+            List of reached instance sizes of teamB.
+        messages0: list
+            Failure messages for each battle of teamA.
+        messages1: list
+            Failure messages for each battle of teamB.
+        teamA: int
+            Group number of teamA.
+        teamB: int
+            Group number of teamB.
+        Returns:
+        ----------
+        str:
+            The formatted summary message.
+    """
     if not len(results0) == len(results1) == len(messages0) == len(messages1) == int(options.battle_iterations):
         return "Number of results and summary messages are not the same!"
     summary = ""
@@ -161,8 +182,14 @@ def format_summary_message(results0, results1, messages0, messages1, teamA, team
     return summary
 
 def calculate_time_tolerance():
-    # TODO: Make paths relative to sys.argv[0]
-    logger.info('Running a delay test to determine runtime overhead...')
+    """ Calculate the I/O delay for starting and stopping docker on the host machine.
+
+        Returns:
+        ----------
+        float:
+            I/O overhead in seconds.
+    """
+    logger.info('Running a benchmark to determine your machines I/O overhead to start and stop docker containers...')
     Problem = importlib.import_module('problems.delaytest') 
     problem = Problem.Problem()
 
@@ -170,20 +197,9 @@ def calculate_time_tolerance():
                     'problems/delaytest/solver', 'problems/delaytest/solver',
                     0, 1)
 
-    generator_run_command = [
-        "docker",
-        "run",
-        "--rm",
-        "--network", "none",
-        "-i",
-        "--memory=" + str(match.space_generator) + "mb",
-        "--cpus=" + str(match.cpus),
-        "generator0"
-    ]
-
     overheads = []
-    for i in range(0,500,20):
-        _, timeout = match._run_subprocess(generator_run_command, str(i).encode(), match.timeout_generator)
+    for i in range(0,501,20):
+        _, timeout = match._run_subprocess(match.base_build_command + ["generator0"], input=str(i).encode(), timeout=match.timeout_generator)
         overheads.append(float(timeout))
 
     max_overhead = max(overheads)
