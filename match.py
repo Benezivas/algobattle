@@ -10,11 +10,11 @@ class Match:
     """ Match class, responsible for setting up and executing the battles
     between two given teams. 
     """
-    def __init__(self, problem, config, generator1_path, generator2_path, solver1_path, solver2_path, group_nr_one, group_nr_two):
-        self.timeout_build     = int(config['run_parameters']['timeout_build'])
-        self.timeout_generator = int(config['run_parameters']['timeout_generator'])
-        self.timeout_solver    = int(config['run_parameters']['timeout_solver'])
-        self.space_generator   = int(config['run_parameters']['space_generator'])
+    def __init__(self, problem, config, generator1_path, generator2_path, solver1_path, solver2_path, group_nr_one, group_nr_two, runtime_overhead=0):
+        self.timeout_build     = int(config['run_parameters']['timeout_build']) + runtime_overhead
+        self.timeout_generator = int(config['run_parameters']['timeout_generator']) + runtime_overhead
+        self.timeout_solver    = int(config['run_parameters']['timeout_solver']) + runtime_overhead
+        self.space_generator   = int(config['run_parameters']['space_generator']) 
         self.space_solver      = int(config['run_parameters']['space_solver'])
         self.cpus              = int(config['run_parameters']['cpus'])
         self.iteration_cap     = int(config['run_parameters']['iteration_cap'])
@@ -72,9 +72,10 @@ class Match:
         success = True
         for command in build_commands:
             logger.debug('Building docker container with the following command: {}'.format(command))
-            process = subprocess.Popen(command)
+            process = subprocess.Popen(command, stdout=subprocess.PIPE)
             try:
-                process.communicate(timeout=self.timeout_build)
+                output, _ = process.communicate(timeout=self.timeout_build)
+                logger.debug(output.decode())
             except subprocess.TimeoutExpired as e:
                 process.kill()
                 success = False
@@ -108,8 +109,8 @@ class Match:
         failure_messages_A = []
         failure_messages_B = []
 
-        for j in range(iterations):
-            logger.info('Running battle {}/{}...'.format(j+1,iterations))
+        for i in range(iterations):
+            logger.info('{}  Running battle {}/{}  {}'.format('#'*20, i+1,iterations, '#'*20))
 
             maximum_A, failure_message = self._battle_wrapper(self.teamB, self.teamA)
             failure_messages_A.append(failure_message)
@@ -251,7 +252,8 @@ class Match:
         logger.info('Running generator of group {}...\n'.format(generating_team))
 
         self.latest_running_docker_image = "generator" + str(generating_team)
-        raw_instance_with_solution = self._run_subprocess(generator_run_command, str(size).encode(), self.timeout_generator)
+        raw_instance_with_solution, elapsed_time = self._run_subprocess(generator_run_command, str(size).encode(), self.timeout_generator)
+        logger.info('Approximate elapsed runtime: {}/{} seconds.'.format(elapsed_time, self.timeout_generator))
         if not raw_instance_with_solution:
             return (True, "Generator {} exceeded the given time limit at instance size {}!".format(solving_team, size))
 
@@ -277,7 +279,8 @@ class Match:
         logger.info('Running solver of group {}...\n'.format(solving_team))
 
         self.latest_running_docker_image = "solver" + str(solving_team)
-        raw_solver_solution = self._run_subprocess(solver_run_command, self.problem.parser.encode(instance), self.timeout_solver)
+        raw_solver_solution, elapsed_time = self._run_subprocess(solver_run_command, self.problem.parser.encode(instance), self.timeout_solver)
+        logger.info('Approximate elapsed runtime: {}/{} seconds.'.format(elapsed_time, self.timeout_solver))
         if not raw_solver_solution:
             return (False, "Solver {} exceeded the given time limit at instance size {}!".format(solving_team, size))
 
@@ -289,7 +292,7 @@ class Match:
         elif not self.problem.verifier.verify_solution_against_instance(instance, solver_solution, size, False):
             return (False, 'Solver {} yields a wrong solution at instance size {}!'.format(solving_team, size))
         elif not self.problem.verifier.verify_solution_quality(instance, size, generator_solution, solver_solution):
-            return (False, 'Solver {} yields a solution of insufficient quality at instance size{}!'.format(solving_team, size))
+            return (False, 'Solver {} yields a solution of insufficient quality at instance size {}!'.format(solving_team, size))
         else:
             return (True, 'Solver {} yields a correct answer in the given time limit!\n'.format(solving_team))
 
@@ -308,19 +311,22 @@ class Match:
         ----------
         any
             The decoded output that the process returns.
-
+        float
+            Running time of the process.
         """
+
         p = subprocess.Popen(run_command, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         start_time = timeit.default_timer()
+        raw_output = None
         try:
             raw_output, _ = p.communicate(input=input, timeout=timeout)
             raw_output = self.problem.parser.decode(raw_output)
-            logger.info('Approximate elapsed runtime: {}/{} seconds.'.format('{:.2f}'.format(timeit.default_timer() - start_time), timeout))
         except subprocess.TimeoutExpired:
-            elapsed_time = '{:.2f}'.format(timeit.default_timer() - start_time)
-            logger.info('Approximate elapsed runtime: {}/{} seconds.'.format(elapsed_time, timeout))
             p.kill()
             self._kill_spawned_docker_containers()
-            return None
-        return raw_output
+        except Exception:
+            raise Exception
         
+        elapsed_time = '{:.2f}'.format(timeit.default_timer() - start_time)
+
+        return raw_output, elapsed_time
