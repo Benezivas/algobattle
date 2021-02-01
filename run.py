@@ -93,7 +93,7 @@ else:
 
 def main():
     try:
-        Problem = importlib.import_module(sys.argv[1].removesuffix('/').replace('/','.'))
+        Problem = importlib.import_module(sys.argv[1].rstrip('/').replace('/','.'))
         problem = Problem.Problem()
     except Exception as e:
         logger.critical('Importing the given problem failed with the following exception: "{}"'.format(e))
