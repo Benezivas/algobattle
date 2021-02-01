@@ -32,6 +32,16 @@ class Match:
 
         self.build_successful = self._build(generator1_path, generator2_path, solver1_path, solver2_path, group_nr_one, group_nr_two)
 
+        self.base_build_command = [
+            "docker",
+            "run",
+            "--rm",
+            "--network", "none",
+            "-i",
+            "--memory=" + str(self.space_solver) + "mb",
+            "--cpus=" + str(self.cpus)
+        ]
+
     def _build(self, generator1_path, generator2_path, solver1_path, solver2_path, group_nr_one, group_nr_two):
         """Builds docker containers for the given generators and solvers.
         
@@ -227,27 +237,9 @@ class Match:
         elif not generating_team >= 0 or not solving_team >= 0:
             logger.error('Solving and generating team are expected to be nonnegative ints, received "{}" and "{}".'.format(generating_team, solving_team))
             raise Exception('Solving and generating team are expected to be nonnegative ints!')
-
-        generator_run_command = [
-            "docker",
-            "run",
-            "--rm",
-            "--network", "none",
-            "-i",
-            "--memory=" + str(self.space_generator) + "mb",
-            "--cpus=" + str(self.cpus),
-            "generator" + str(generating_team)
-        ]
-        solver_run_command = [
-            "docker",
-            "run",
-            "--rm",
-            "--network", "none",
-            "-i",
-            "--memory=" + str(self.space_solver) + "mb",
-            "--cpus=" + str(self.cpus),
-            "solver" + str(solving_team)
-        ]
+        
+        generator_run_command = self.base_build_command + ["generator" + str(generating_team)]
+        solver_run_command    = self.base_build_command + ["solver"    + str(solving_team)]
 
         logger.info('Running generator of group {}...\n'.format(generating_team))
 
