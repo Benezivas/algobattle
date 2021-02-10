@@ -100,9 +100,12 @@ def main():
         logger.critical('Importing the given problem failed with the following exception: "{}"'.format(e))
         sys.exit(1)
 
+
     runtime_overhead = 0
     if not options.no_overhead_calculation:
+        logger.info('Running a benchmark to determine your machines I/O overhead to start and stop docker containers...')
         runtime_overhead = calculate_time_tolerance()
+        logger.info('Maximal measured runtime overhead is at {} seconds. Adding this amount to the configured runtime.'.format(runtime_overhead))
     match = Match(problem, config, options.generator1_path, options.generator2_path,
                     options.solver1_path, options.solver2_path,
                     int(options.group_nr_one), int(options.group_nr_two), runtime_overhead=runtime_overhead)
@@ -189,7 +192,7 @@ def calculate_time_tolerance():
         float:
             I/O overhead in seconds.
     """
-    logger.info('Running a benchmark to determine your machines I/O overhead to start and stop docker containers...')
+
     Problem = importlib.import_module('problems.delaytest') 
     problem = Problem.Problem()
 
@@ -198,12 +201,11 @@ def calculate_time_tolerance():
                     0, 1)
 
     overheads = []
-    for i in range(0,501,20):
-        _, timeout = match._run_subprocess(match.base_build_command + ["generator0"], input=str(i).encode(), timeout=match.timeout_generator)
+    for i in range(10):
+        _, timeout = match._run_subprocess(match.base_build_command + ["generator0"], input=str(50*i).encode(), timeout=match.timeout_generator)
         overheads.append(float(timeout))
 
     max_overhead = max(overheads)
-    logger.info('Maximal measured runtime overhead is at {} seconds. Adding this amount to the configured runtime.'.format(max_overhead))
 
     return max_overhead
 
