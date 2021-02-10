@@ -32,6 +32,7 @@ parser.add_option('--iterations', dest = 'battle_iterations', type=int, default 
 parser.add_option('--points', dest = 'points', type=int, default = '100', help = 'Number of points for which are fought. Default: 100')
 parser.add_option('--do_not_count_points', dest = 'do_not_count_points', action = 'store_true', help = 'If set, points are not calculated for the run.')
 parser.add_option('-c', '--do_not_log_to_console', dest = 'do_not_log_to_console', action = 'store_true', help = 'Disable forking the logging output to stderr.')
+parser.add_option('--no-overhead-calculation', dest = 'no_overhead_calculation', action = 'store_true', help = 'Log all debug messages.')
 
 (options, args) = parser.parse_args()
 
@@ -99,9 +100,15 @@ def main():
         logger.critical('Importing the given problem failed with the following exception: "{}"'.format(e))
         sys.exit(1)
 
+
+    runtime_overhead = 0
+    if not options.no_overhead_calculation:
+        logger.info('Running a benchmark to determine your machines I/O overhead to start and stop docker containers...')
+        runtime_overhead = calculate_time_tolerance()
+        logger.info('Maximal measured runtime overhead is at {} seconds. Adding this amount to the configured runtime.'.format(runtime_overhead))
     match = Match(problem, config, options.generator1_path, options.generator2_path,
                     options.solver1_path, options.solver2_path,
-                    int(options.group_nr_one), int(options.group_nr_two))
+                    int(options.group_nr_one), int(options.group_nr_two), runtime_overhead=runtime_overhead)
 
     if not match.build_successful:
         sys.exit(1)
@@ -131,6 +138,27 @@ def main():
 
 
 def format_summary_message(results0, results1, messages0, messages1, teamA, teamB):
+    """ Format the results of a battle into a summary message.
+
+        Parameters:
+        ----------
+        results0: list 
+            List of reached instance sizes of teamA.
+        results1: list
+            List of reached instance sizes of teamB.
+        messages0: list
+            Failure messages for each battle of teamA.
+        messages1: list
+            Failure messages for each battle of teamB.
+        teamA: int
+            Group number of teamA.
+        teamB: int
+            Group number of teamB.
+        Returns:
+        ----------
+        str:
+            The formatted summary message.
+    """
     if not len(results0) == len(results1) == len(messages0) == len(messages1) == int(options.battle_iterations):
         return "Number of results and summary messages are not the same!"
     summary = ""
@@ -155,6 +183,31 @@ def format_summary_message(results0, results1, messages0, messages1, teamA, team
     summary += 'Average solution size of group {}: {}\n'.format(teamB, sum(results1)//int(options.battle_iterations))
 
     return summary
+
+def calculate_time_tolerance():
+    """ Calculate the I/O delay for starting and stopping docker on the host machine.
+
+        Returns:
+        ----------
+        float:
+            I/O overhead in seconds.
+    """
+
+    Problem = importlib.import_module('problems.delaytest') 
+    problem = Problem.Problem()
+
+    match = Match(problem, config, 'problems/delaytest/generator', 'problems/delaytest/generator',
+                    'problems/delaytest/solver', 'problems/delaytest/solver',
+                    0, 1)
+
+    overheads = []
+    for i in range(10):
+        _, timeout = match._run_subprocess(match.base_build_command + ["generator0"], input=str(50*i).encode(), timeout=match.timeout_generator)
+        overheads.append(float(timeout))
+
+    max_overhead = max(overheads)
+
+    return max_overhead
 
 if __name__ == "__main__":
     main()
