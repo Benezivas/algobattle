@@ -49,5 +49,5 @@ class HikersVerifier(Verifier):
 
         return True
 
-    def verify_solution_quality(self, instance, instance_size, generator_solution, solver_solution):
-        return super().verify_solution_quality(instance, instance_size, generator_solution, solver_solution)
+    def calculate_approximation_ratio(self, instance, instance_size, generator_solution, solver_solution):
+        return float(len(solver_solution)) / float(len(generator_solution))

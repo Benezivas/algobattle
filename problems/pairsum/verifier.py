@@ -19,6 +19,12 @@ class PairsumVerifier(Verifier):
         if not solution:
             logger.error('The solution is empty!')
             return False
+        if len(solution) != 4:
+            logger.warning('The solution is not of size 4!')
+            return False
+        if len(set(solution)) != 4:
+            logger.warning('The solution contains duplicate entries!')
+            return False
         return True
 
     def verify_solution_against_instance(self, instance, solution, instance_size, solution_type):
@@ -28,5 +34,5 @@ class PairsumVerifier(Verifier):
 
         return True
 
-    def verify_solution_quality(self, instance, instance_size, generator_solution, solver_solution):
-        return len(solver_solution) == 4
+    def calculate_approximation_ratio(self, instance, instance_size, generator_solution, solver_solution):
+        return 1.0

@@ -73,7 +73,7 @@ class OSCM3Verifier(Verifier):
 
         return True
 
-    def verify_solution_quality(self, instance, instance_size, generator_solution, solver_solution):
+    def calculate_approximation_ratio(self, instance, instance_size, generator_solution, solver_solution):
         g = self.Graph(instance_size)
 
         
@@ -86,4 +86,4 @@ class OSCM3Verifier(Verifier):
         generator_crossings = g.calculate_number_crossings()
         solver_crossings = h.calculate_number_crossings()
 
-        return solver_crossings <= generator_crossings
+        return float(len(solver_crossings)) / float(len(generator_crossings))

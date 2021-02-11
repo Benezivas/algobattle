@@ -31,7 +31,7 @@ class SchedulingVerifier(Verifier):
         
         return True
 
-    def verify_solution_quality(self, instance, instance_size, generator_solution, solver_solution):
+    def calculate_approximation_ratio(self, instance, instance_size, generator_solution, solver_solution):
         jobs_to_be_scheduled = [job[1] for job in instance]
         # As the instance may have lost some jobs during parsing that were
         # assumed to be present, we may need to cut down the generator solution
@@ -40,8 +40,7 @@ class SchedulingVerifier(Verifier):
         generator_makespan = self.calculate_makespan(instance, generator_solution)
         solver_makespan = self.calculate_makespan(instance, solver_solution)
 
-        return solver_makespan <= generator_makespan
-
+        return float(len(solver_makespan)) / float(len(generator_makespan))
 
     def calculate_makespan(self, jobs, assignments):
         makespans = [0 for i in range(5)]

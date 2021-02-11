@@ -44,5 +44,5 @@ class DsapproxVerifier(Verifier):
 
         return True
 
-    def verify_solution_quality(self, instance, instance_size, generator_solution, solver_solution):
-        return len(solver_solution) <= 2 * len(generator_solution)
+    def calculate_approximation_ratio(self, instance, instance_size, generator_solution, solver_solution):
+        return float(len(solver_solution)) / float(len(generator_solution))
