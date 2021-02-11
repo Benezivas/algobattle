@@ -29,6 +29,7 @@ parser.add_option('--generator2', dest = 'generator2_path', default = sys.argv[1
 parser.add_option('--group_nr_one', dest = 'group_nr_one', type=int, default = '0', help = 'Specify the group number of the first contestant. Default: 0')
 parser.add_option('--group_nr_two', dest = 'group_nr_two', type=int, default = '1', help = 'Specify the group number of the second contestant. Default: 1')
 parser.add_option('--iterations', dest = 'battle_iterations', type=int, default = '5', help = 'Number of fights that are to be made in the battle (points are split between each fight). Default: 5')
+parser.add_option('--approxratio', dest = 'approximation_ratio', type=float, default = '1.0', help = 'Tolerated approximation ratio for a problem, if compatible with approximation. Default: 1.0')
 parser.add_option('--points', dest = 'points', type=int, default = '100', help = 'Number of points for which are fought. Default: 100')
 parser.add_option('--do_not_count_points', dest = 'do_not_count_points', action = 'store_true', help = 'If set, points are not calculated for the run.')
 parser.add_option('-c', '--do_not_log_to_console', dest = 'do_not_log_to_console', action = 'store_true', help = 'Disable forking the logging output to stderr.')
@@ -108,7 +109,7 @@ def main():
         logger.info('Maximal measured runtime overhead is at {} seconds. Adding this amount to the configured runtime.'.format(runtime_overhead))
     match = Match(problem, config, options.generator1_path, options.generator2_path,
                     options.solver1_path, options.solver2_path,
-                    int(options.group_nr_one), int(options.group_nr_two), runtime_overhead=runtime_overhead)
+                    int(options.group_nr_one), int(options.group_nr_two), runtime_overhead=runtime_overhead, approximation_ratio=options.approximation_ratio)
 
     if not match.build_successful:
         sys.exit(1)

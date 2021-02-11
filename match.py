@@ -10,7 +10,7 @@ class Match:
     """ Match class, responsible for setting up and executing the battles
     between two given teams. 
     """
-    def __init__(self, problem, config, generator1_path, generator2_path, solver1_path, solver2_path, group_nr_one, group_nr_two, runtime_overhead=0):
+    def __init__(self, problem, config, generator1_path, generator2_path, solver1_path, solver2_path, group_nr_one, group_nr_two, runtime_overhead=0, approximation_ratio=1.0):
         self.timeout_build     = int(config['run_parameters']['timeout_build']) + runtime_overhead
         self.timeout_generator = int(config['run_parameters']['timeout_generator']) + runtime_overhead
         self.timeout_solver    = int(config['run_parameters']['timeout_solver']) + runtime_overhead
@@ -20,6 +20,7 @@ class Match:
         self.iteration_cap     = int(config['run_parameters']['iteration_cap'])
         self.problem = problem
         self.config = config
+        self.approximation_ratio = approximation_ratio
 
         self.latest_running_docker_image = ""
 
@@ -150,7 +151,7 @@ class Match:
         logger.info('==================== Averaged Battle, Instance Size: {}, Iterations: {} ===================='.format(instance_size, iterations))
         for i in range(iterations):
             logger.info('=============== Iteration: {}/{} ==============='.format(i,iterations))
-            alive, message  = self._one_fight(instance_size, generating_team, solving_team)
+            approx_ratio, message  = self._one_fight(instance_size, generating_team, solving_team)
 
     def _iterative_battle_wrapper(self, generating_team, solving_team):
         """ Wrapper to execute one iterative battle between a generating 
@@ -191,8 +192,14 @@ class Match:
 
         logger.info('==================== Iterative Battle, Instanze Size Cap: {} ===================='.format(n_cap))
         while alive:
-            logger.info('=============== Instance Size: {} ==============='.format(n))
-            alive, message  = self._one_fight(n, generating_team, solving_team)
+            logger.info('=============== Instance Size: {}/{} ==============='.format(n,n_cap))
+            approx_ratio, message  = self._one_fight(n, generating_team, solving_team)
+            if approx_ratio == 0.0:
+                alive = False
+            elif approx_ratio > self.approximation_ratio:
+                logger.info('Solver {} does not meet the required solution quality at instance size {}. ({}/{})'.format(solving_team, n, approx_ratio, self.approximation_ratio))
+                alive = False
+
             logger.info(message)
             if not alive:
                 #We are only interested in the very last failure message
@@ -302,7 +309,7 @@ class Match:
             return (0.0, 'Solver {} yields a wrong solution at instance size {}!'.format(solving_team, size))
         else:
             approximation_ratio = self.problem.verifier.calculate_approximation_ratio(instance, size, generator_solution, solver_solution)
-            return (approximation_ratio, 'Solver {} yields a solution with an approx. ratio of {} at instance size {}!'.format(solving_team, approximation_ratio, size))
+            return (approximation_ratio, 'Solver {} yields a valid solution with an approx. ratio of {} at instance size {}.'.format(solving_team, approximation_ratio, size))
 
     def _run_subprocess(self, run_command, input, timeout):
         """ Run a given command as a subprocess.
