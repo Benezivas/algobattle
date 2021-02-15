@@ -1,12 +1,12 @@
 import logging
 
 from problem import Problem
-from problems.dsapprox.parser import DsapproxParser
-from problems.dsapprox.verifier import DsapproxVerifier
+from problems.domset.parser import DomsetParser
+from problems.domset.verifier import DomsetVerifier
 
-logger = logging.getLogger('algobattle.dsapprox')
+logger = logging.getLogger('algobattle.domset')
 
-class Dsapprox(Problem):
+class Domset(Problem):
     n_start  = 6
-    parser   = DsapproxParser()
-    verifier = DsapproxVerifier()
+    parser   = DomsetParser()
+    verifier = DomsetVerifier()

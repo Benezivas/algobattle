@@ -3,7 +3,7 @@ import logging
 from parser import Parser
 logger = logging.getLogger('algobattle.parser')
 
-class DsapproxParser(Parser):
+class DomsetParser(Parser):
     def split_into_instance_and_solution(self, raw_input):
         raw_instance = []
         raw_solution = []

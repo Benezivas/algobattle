@@ -4,7 +4,7 @@ from verifier import Verifier
 
 logger = logging.getLogger('algobattle.verifier')
 
-class DsapproxVerifier(Verifier):
+class DomsetVerifier(Verifier):
     def verify_semantics_of_instance(self, instance, instance_size: int):
         # Instances for this problem are semantically valid if they are syntactically valid.
         # We only check if the instance is empty.
