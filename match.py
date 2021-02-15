@@ -10,7 +10,7 @@ class Match:
     """ Match class, responsible for setting up and executing the battles
     between two given teams. 
     """
-    def __init__(self, problem, config, generator1_path, generator2_path, solver1_path, solver2_path, group_nr_one, group_nr_two, runtime_overhead=0, approximation_ratio=1.0):
+    def __init__(self, problem, config, generator1_path, generator2_path, solver1_path, solver2_path, group_nr_one, group_nr_two, runtime_overhead=0, approximation_ratio=1.0, approximation_instance_size=10, approximation_iterations=50):
         self.timeout_build     = int(config['run_parameters']['timeout_build']) + runtime_overhead
         self.timeout_generator = int(config['run_parameters']['timeout_generator']) + runtime_overhead
         self.timeout_solver    = int(config['run_parameters']['timeout_solver']) + runtime_overhead
@@ -21,6 +21,8 @@ class Match:
         self.problem = problem
         self.config = config
         self.approximation_ratio = approximation_ratio
+        self.approximation_instance_size = approximation_instance_size
+        self.aproximation_iterations = approximation_iterations
 
         self.latest_running_docker_image = ""
 
@@ -98,13 +100,19 @@ class Match:
 
         return success
 
+    def _kill_spawned_docker_containers(self):
+        """Terminates all running docker containers spawned by this program."""
+        if self.latest_running_docker_image:
+            subprocess.run('docker ps -a -q --filter ancestor={} | xargs -r docker kill > /dev/null 2>&1'.format(self.latest_running_docker_image), shell=True)
 
-    def run(self, iterations=5):
+    def run(self, battle_type='iterated', iterations=5):
         """ Match entry point. Executes iterations fights between two teams and
         returns the results with failure messages of the battles.
 
         Parameters:
         ----------
+        battle_type: str
+            Type of battle that is to be run.
         iterations: int
             Number of Battles between teamA and teamB.
         Returns:
@@ -120,40 +128,64 @@ class Match:
         failure_messages_A = []
         failure_messages_B = []
 
-        for i in range(iterations):
-            logger.info('{}  Running battle {}/{}  {}'.format('#'*20, i+1,iterations, '#'*20))
+        battle_wrapper = None
 
-            maximum_A, failure_message = self._iterative_battle_wrapper(self.teamB, self.teamA)
+        if battle_type == 'iterated':
+            battle_wrapper = self._iterated_battle_wrapper
+        elif battle_type == 'averaged':
+            battle_wrapper = self._averaged_battle_wrapper
+        else:
+            logger.critical('Unrecognized battle_type given: "{}"'.format(battle_type))
+            return [], [], [], []
+
+        for i in range(iterations):
+            logger.info('{}  Running Battle {}/{}  {}'.format('#'*20, i+1,iterations, '#'*20))
+
+            maximum, failure_message = battle_wrapper(self.teamB, self.teamA)
+            results_A.append(maximum)
             failure_messages_A.append(failure_message)
 
-            maximum_B, failure_message = self._iterative_battle_wrapper(self.teamA, self.teamB)
+            maximum, failure_message = battle_wrapper(self.teamA, self.teamB)
             failure_messages_B.append(failure_message)
-
-            results_A.append(maximum_A)
-            results_B.append(maximum_B)
+            results_B.append(maximum)
 
         return results_A, results_B, failure_messages_A, failure_messages_B
 
-    def _kill_spawned_docker_containers(self):
-        """Terminates all running docker containers."""
-        if self.latest_running_docker_image:
-            subprocess.run('docker ps -a -q --filter ancestor={} | xargs -r docker kill > /dev/null 2>&1'.format(self.latest_running_docker_image), shell=True)
 
-    def _averaged_battle_wrapper(self, generating_team, solving_team, instance_size):
+    def _averaged_battle_wrapper(self, generating_team, solving_team):
         """ Wrapper to execute one averaged battle between a generating
         and a solving team.
 
         Execute several fights between two teams on a fixed instance size
-        and determine the average solution quality.
+        and determine the average solution quality. The result
+        is the number of successfully executed battles divided by
+        the average competitive ratio of successful battles,
+        to account for failures on execution. A higher returned number
+        thus means a better overall result.
         
+        Parameters:
+        ----------
+        generating_team: int
+            Group number of the generating team, expected to be a positive int.
+        solving_team: int
+            Group number of the solving team, expected to be a positive int.
+        Returns:
+        ----------
+        (float, str)
+            Returns the number of solved instances divided by the average competitive ratio, 
+            as well as an empty message to comply to the battle wrapper return format.
         """
-        iterations = 100
-        logger.info('==================== Averaged Battle, Instance Size: {}, Iterations: {} ===================='.format(instance_size, iterations))
-        for i in range(iterations):
-            logger.info('=============== Iteration: {}/{} ==============='.format(i,iterations))
-            approx_ratio, message  = self._one_fight(instance_size, generating_team, solving_team)
+        approximation_ratios = []
+        logger.info('==================== Averaged Battle, Instance Size: {}, Iterations: {} ===================='.format(self.approximation_instance_size, self.aproximation_iterations))
+        for i in range(self.aproximation_iterations):
+            logger.info('=============== Iteration: {}/{} ==============='.format(i,self.aproximation_iterations))
+            approx_ratio, message  = self._one_fight(self.approximation_instance_size, generating_team, solving_team)
+            approximation_ratios.append(approx_ratio)
+            logger.info(message)
 
-    def _iterative_battle_wrapper(self, generating_team, solving_team):
+        return len(approximation_ratios) / (sum(approximation_ratios) / len(approximation_ratios)), " "
+
+    def _iterated_battle_wrapper(self, generating_team, solving_team):
         """ Wrapper to execute one iterative battle between a generating 
         and a solving team.
 
