@@ -120,13 +120,13 @@ def main():
     if not match.build_successful:
         sys.exit(1)
 
-    results0, results1, messages0, messages1 = match.run(options.battle_type, battle_iterations)
+    results0, results1 = match.run(options.battle_type, battle_iterations)
 
     logger.info('#'*70)
     if battle_iterations > 0:
         if options.battle_type == 'iterated':
             logger.info('Summary of the battle results: \n{}\n'.format(
-                format_summary_message_iterated(results0, results1, messages0, messages1, int(options.group_nr_one), int(options.group_nr_two))))
+                format_summary_message_iterated(results0, results1, int(options.group_nr_one), int(options.group_nr_two))))
         elif options.battle_type == 'averaged':
             logger.info('Summary of the battle results: \n{}\n'.format(
                 format_summary_message_averaged(results0, results1, int(options.group_nr_one), int(options.group_nr_two))))
@@ -188,7 +188,7 @@ def calculate_time_tolerance():
 
     return max_overhead
 
-def format_summary_message_iterated(results0, results1, messages0, messages1, teamA, teamB):
+def format_summary_message_iterated(results0, results1, teamA, teamB):
     """ Format the results of a battle into a summary message.
 
         Parameters:
@@ -197,10 +197,6 @@ def format_summary_message_iterated(results0, results1, messages0, messages1, te
             List of reached instance sizes of teamA.
         results1: list
             List of reached instance sizes of teamB.
-        messages0: list
-            Failure messages for each battle of teamA.
-        messages1: list
-            Failure messages for each battle of teamB.
         teamA: int
             Group number of teamA.
         teamB: int
@@ -210,7 +206,7 @@ def format_summary_message_iterated(results0, results1, messages0, messages1, te
         str:
             The formatted summary message.
     """
-    if not len(results0) == len(results1) == len(messages0) == len(messages1) == int(options.battle_iterations):
+    if not len(results0) == len(results1) == int(options.battle_iterations):
         return "Number of results and summary messages are not the same!"
     summary = ""
     for i in range(int(options.battle_iterations)):
@@ -221,14 +217,10 @@ def format_summary_message_iterated(results0, results1, messages0, messages1, te
         else:
             summary += 'Solver {} solved all instances up to size {}.\n'.format(teamA, results0[i])
 
-        summary += 'The reason for failing beyond this size is: "{}"\n'.format(messages0[i])
-
         if results1[i] == 0:
             summary += 'Solver {} did not solve a single instance.\n'.format(teamB)
         else:
             summary += 'Solver {} solved all instances up to size {}.\n'.format(teamB, results1[i])
-
-        summary += 'The reason for failing beyond this size is: "{}"\n\n'.format(messages1[i])
 
     summary += 'Average solution size of group {}: {}\n'.format(teamA, sum(results0)//int(options.battle_iterations))
     summary += 'Average solution size of group {}: {}\n'.format(teamB, sum(results1)//int(options.battle_iterations))
@@ -269,7 +261,6 @@ def format_summary_message_averaged(results0, results1, teamA, teamB):
             summary += 'Group {} did not give a correct solution for any of the instances of this battle.'.format(teamA)
 
     return summary
-
 
 
 if __name__ == "__main__":

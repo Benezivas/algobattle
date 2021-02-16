@@ -107,7 +107,7 @@ class Match:
 
     def run(self, battle_type='iterated', iterations=5):
         """ Match entry point. Executes iterations fights between two teams and
-        returns the results with failure messages of the battles.
+        returns the results of the battles.
 
         Parameters:
         ----------
@@ -117,16 +117,11 @@ class Match:
             Number of Battles between teamA and teamB.
         Returns:
         ----------
-        (list, list, list, list) 
-            The first two lists contain the highest n for each iteration for which 
-            the team was still able to solve the opposing instance.  
-            The last two lists contain the failure messages for each of the iterations.
+        (list, list) 
+            The lists contain the results of the battles for each team.
         """
         results_A = []
         results_B = []
-
-        failure_messages_A = []
-        failure_messages_B = []
 
         battle_wrapper = None
 
@@ -141,15 +136,13 @@ class Match:
         for i in range(iterations):
             logger.info('{}  Running Battle {}/{}  {}'.format('#'*20, i+1,iterations, '#'*20))
 
-            maximum, failure_message = battle_wrapper(self.teamB, self.teamA)
-            results_A.append(maximum)
-            failure_messages_A.append(failure_message)
+            result = battle_wrapper(self.teamB, self.teamA)
+            results_A.append(result)
 
-            maximum, failure_message = battle_wrapper(self.teamA, self.teamB)
-            failure_messages_B.append(failure_message)
-            results_B.append(maximum)
+            result = battle_wrapper(self.teamA, self.teamB)
+            results_B.append(result)
 
-        return results_A, results_B, failure_messages_A, failure_messages_B
+        return results_A, results_B
 
 
     def _averaged_battle_wrapper(self, generating_team, solving_team):
@@ -167,19 +160,17 @@ class Match:
             Group number of the solving team, expected to be a positive int.
         Returns:
         ----------
-        (list, str)
-            Returns a list of the computed approximation ratios, 
-            as well as an empty message to comply to the battle wrapper return format.
+        list
+            Returns a list of the computed approximation ratios.
         """
         approximation_ratios = []
         logger.info('==================== Averaged Battle, Instance Size: {}, Iterations: {} ===================='.format(self.approximation_instance_size, self.aproximation_iterations))
         for i in range(self.aproximation_iterations):
             logger.info('=============== Iteration: {}/{} ==============='.format(i+1,self.aproximation_iterations))
-            approx_ratio, message  = self._one_fight(self.approximation_instance_size, generating_team, solving_team)
+            approx_ratio = self._one_fight(self.approximation_instance_size, generating_team, solving_team)
             approximation_ratios.append(approx_ratio)
-            logger.info(message)
 
-        return approximation_ratios, " "
+        return approximation_ratios
 
     def _iterated_battle_wrapper(self, generating_team, solving_team):
         """ Wrapper to execute one iterative battle between a generating 
@@ -207,31 +198,24 @@ class Match:
             Group number of the solving team, expected to be a positive int.
         Returns:
         ----------
-        (int, str)
+        int
             Returns the biggest instance size for which the solving team still found a solution.
-            Returns a message about the reason why the solver was unable to solve a bigger instance.
         """
         n = self.problem.n_start
         maximum_reached_n = 0
         i = 0
         n_cap = 50000
-        most_recent_failure_message = ''
         alive = True
 
         logger.info('==================== Iterative Battle, Instanze Size Cap: {} ===================='.format(n_cap))
         while alive:
             logger.info('=============== Instance Size: {}/{} ==============='.format(n,n_cap))
-            approx_ratio, message  = self._one_fight(n, generating_team, solving_team)
+            approx_ratio = self._one_fight(n, generating_team, solving_team)
             if approx_ratio == 0.0:
                 alive = False
             elif approx_ratio > self.approximation_ratio:
                 logger.info('Solver {} does not meet the required solution quality at instance size {}. ({}/{})'.format(solving_team, n, approx_ratio, self.approximation_ratio))
                 alive = False
-
-            logger.info(message)
-            if not alive:
-                #We are only interested in the very last failure message
-                most_recent_failure_message = message
 
             if not alive and i > 1:
                 #The step size increase was too aggressive, take it back and reset the increment multiplier
@@ -256,11 +240,10 @@ class Match:
                 n -= i * i - 1
                 i = 1
             elif n >= n_cap and n_cap == self.iteration_cap:
-                most_recent_failure_message = 'Solver {} exceeded the instance size cap of {}!'.format(solving_team, self.iteration_cap)
-                logger.info(most_recent_failure_message)
+                logger.info('Solver {} exceeded the instance size cap of {}!'.format(solving_team, self.iteration_cap))
                 maximum_reached_n = self.iteration_cap
                 alive = False
-        return (maximum_reached_n, most_recent_failure_message)
+        return maximum_reached_n
 
 
     def _one_fight(self, size, generating_team, solving_team):
@@ -277,11 +260,10 @@ class Match:
             The group number of the solving team, expected to be nonnegative ints.
         Returns:
         ----------
-        (flaot, str) 
-            The float is the approximation ratio of the solver against 
+        float
+            Returns the approximation ratio of the solver against 
             the generator (1 if optimal, 0 if failed, >1 if the 
-            generator solution is optimal). The string contains a message
-            containing a failure or success message.
+            generator solution is optimal). 
         """
         if not str(generating_team).isdigit() or not str(solving_team).isdigit():
             logger.error('Solving and generating team are expected to be nonnegative ints, received "{}" and "{}".'.format(generating_team, solving_team))
@@ -298,8 +280,12 @@ class Match:
         self.latest_running_docker_image = "generator" + str(generating_team)
         raw_instance_with_solution, elapsed_time = self._run_subprocess(generator_run_command, str(size).encode(), self.timeout_generator)
         logger.info('Approximate elapsed runtime: {}/{} seconds.'.format(elapsed_time, self.timeout_generator))
-        if not raw_instance_with_solution:
-            return (1.0, "Generator {} exceeded the given time limit at instance size {}!".format(solving_team, size))
+        if not raw_instance_with_solution and elapsed_time > self.timeout_generator:
+            logger.warning('Generator {} exceeded the given time limit at instance size {}!'.format(generating_team, size))
+            return 1.0
+        elif not raw_instance_with_solution:
+            logger.warning('Generator {} threw an exception at instance size {}!'.format(generating_team, size))
+            return 1.0
 
         logger.info('Checking generated instance and certificate...')
 
@@ -308,13 +294,16 @@ class Match:
         generator_solution         = self.problem.parser.parse_solution(raw_solution, size)
 
         if not self.problem.verifier.verify_semantics_of_instance(instance, size):
-            return (1.0, 'Generator {} created a malformed instance at instance size {}!'.format(generating_team, size))
+            logger.warning('Generator {} created a malformed instance at instance size {}!'.format(generating_team, size))
+            return 1.0
 
         if not self.problem.verifier.verify_semantics_of_solution(instance, generator_solution, size, True):
-            return (1.0, 'Generator {} created a malformed solution at instance size {}!'.format(generating_team, size))
+            logger.warning('Generator {} created a malformed solution at instance size {}!'.format(generating_team, size))
+            return 1.0
 
         if not self.problem.verifier.verify_solution_against_instance(instance, generator_solution, size, True):
-            return (1.0, 'Generator {} failed at instance size {} due to a wrong certificate for its generated instance!'.format(generating_team, size))
+            logger.warning('Generator {} failed at instance size {} due to a wrong certificate for its generated instance!'.format(generating_team, size))
+            return 1.0
 
         logger.info('Generated instance and certificate are valid!\n\n')
 
@@ -325,19 +314,26 @@ class Match:
         self.latest_running_docker_image = "solver" + str(solving_team)
         raw_solver_solution, elapsed_time = self._run_subprocess(solver_run_command, self.problem.parser.encode(instance), self.timeout_solver)
         logger.info('Approximate elapsed runtime: {}/{} seconds.'.format(elapsed_time, self.timeout_solver))
-        if not raw_solver_solution:
-            return (0.0, "Solver {} exceeded the given time limit at instance size {}!".format(solving_team, size))
+        if not raw_solver_solution and elapsed_time > self.timeout_generator:
+            logger.warning('Solver {} exceeded the given time limit at instance size {}!'.format(solving_team, size))
+            return 0.0
+        elif not raw_instance_with_solution:
+            logger.warning('Solver {} threw an exception at instance size {}!'.format(solving_team, size))
+            return 0.0
 
         logger.info('Checking validity of the solvers solution...')
         
         solver_solution = self.problem.parser.parse_solution(raw_solver_solution, size)
         if not self.problem.verifier.verify_semantics_of_solution(instance, generator_solution, size, True):
-            return (0.0, 'Solver {} created a malformed solution at instance size {}!'.format(generating_team, size))
+            logger.warning('Solver {} created a malformed solution at instance size {}!'.format(generating_team, size))
+            return 0.0
         elif not self.problem.verifier.verify_solution_against_instance(instance, solver_solution, size, False):
-            return (0.0, 'Solver {} yields a wrong solution at instance size {}!'.format(solving_team, size))
+            logger.warning('Solver {} yields a wrong solution at instance size {}!'.format(solving_team, size))
+            return 0.0
         else:
             approximation_ratio = self.problem.verifier.calculate_approximation_ratio(instance, size, generator_solution, solver_solution)
-            return (approximation_ratio, 'Solver {} yields a valid solution with an approx. ratio of {} at instance size {}.'.format(solving_team, approximation_ratio, size))
+            logger.info('Solver {} yields a valid solution with an approx. ratio of {} at instance size {}.'.format(solving_team, approximation_ratio, size))
+            return approximation_ratio
 
     def _run_subprocess(self, run_command, input, timeout):
         """ Run a given command as a subprocess.
@@ -364,7 +360,7 @@ class Match:
         try:
             raw_output, _ = p.communicate(input=input, timeout=timeout)
             raw_output = self.problem.parser.decode(raw_output)
-        except subprocess.TimeoutExpired:
+        except:
             p.kill()
             self._kill_spawned_docker_containers()
         
