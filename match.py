@@ -157,11 +157,7 @@ class Match:
         and a solving team.
 
         Execute several fights between two teams on a fixed instance size
-        and determine the average solution quality. The result
-        is the number of successfully executed battles divided by
-        the average competitive ratio of successful battles,
-        to account for failures on execution. A higher returned number
-        thus means a better overall result.
+        and determine the average solution quality. 
         
         Parameters:
         ----------
@@ -171,19 +167,19 @@ class Match:
             Group number of the solving team, expected to be a positive int.
         Returns:
         ----------
-        (float, str)
-            Returns the number of solved instances divided by the average competitive ratio, 
+        (list, str)
+            Returns a list of the computed approximation ratios, 
             as well as an empty message to comply to the battle wrapper return format.
         """
         approximation_ratios = []
         logger.info('==================== Averaged Battle, Instance Size: {}, Iterations: {} ===================='.format(self.approximation_instance_size, self.aproximation_iterations))
         for i in range(self.aproximation_iterations):
-            logger.info('=============== Iteration: {}/{} ==============='.format(i,self.aproximation_iterations))
+            logger.info('=============== Iteration: {}/{} ==============='.format(i+1,self.aproximation_iterations))
             approx_ratio, message  = self._one_fight(self.approximation_instance_size, generating_team, solving_team)
             approximation_ratios.append(approx_ratio)
             logger.info(message)
 
-        return len(approximation_ratios) / (sum(approximation_ratios) / len(approximation_ratios)), " "
+        return approximation_ratios, " "
 
     def _iterated_battle_wrapper(self, generating_team, solving_team):
         """ Wrapper to execute one iterative battle between a generating 

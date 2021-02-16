@@ -97,6 +97,7 @@ else:
 
 
 def main():
+    battle_iterations = int(options.battle_iterations)
     try:
         Problem = importlib.import_module(sys.argv[1].rstrip('/').replace('/','.'))
         problem = Problem.Problem()
@@ -119,31 +120,71 @@ def main():
     if not match.build_successful:
         sys.exit(1)
 
-    results0, results1, messages0, messages1 = match.run(options.battle_type, int(options.battle_iterations))
+    results0, results1, messages0, messages1 = match.run(options.battle_type, battle_iterations)
 
     logger.info('#'*70)
-    if int(options.battle_iterations) > 0:
-        logger.info('Summary of the battle results: \n{}\n'.format(
-            format_summary_message(results0, results1, messages0, messages1,int(options.group_nr_one), int(options.group_nr_two))))
+    if battle_iterations > 0:
+        if options.battle_type == 'iterated':
+            logger.info('Summary of the battle results: \n{}\n'.format(
+                format_summary_message_iterated(results0, results1, messages0, messages1, int(options.group_nr_one), int(options.group_nr_two))))
+        elif options.battle_type == 'averaged':
+            logger.info('Summary of the battle results: \n{}\n'.format(
+                format_summary_message_averaged(results0, results1, int(options.group_nr_one), int(options.group_nr_two))))
+        else:
+            logger.info('No summary message configured for this type of battle.')
         if not options.do_not_count_points:
             points = options.points #Number of points that are awarded in total
             points0 = 0 #points awarded to the first team
             points1 = 0 #points awarded to the second team
             #Points are awarded for each match individually, as one run reaching the cap poisons the average number of points
-            for i in range(len(results0)):
-                if results0[i] + results1[i] > 0:
-                    points0 += round(points/len(results0) * results0[i] / (results1[i] + results0[i]))
-                    points1 += round(points/len(results0) * results1[i] / (results0[i] + results1[i]))
+            for i in range(battle_iterations):
+                if options.battle_type == 'iterated':
+                    if results0[i] + results1[i] > 0:
+                        valuation0 = results0[i]
+                        valuation1 = results1[i]
+                elif options.battle_type == 'averaged':
+                    # The valuation of an averaged battle
+                    # is the number of successfully executed battles divided by
+                    # the average competitive ratio of successful battles,
+                    # to account for failures on execution. A higher number
+                    # thus means a better overall result. Normalized to the number of configured points.
+                    valuation0 = len(results0[i]) / (sum(results0[i]) / len(results0[i]))
+                    valuation1 = len(results1[i]) / (sum(results1[i]) / len(results1[i]))
                 else:
-                    points0 += round(points/len(results0) / 2)
-                    points1 += round(points/len(results0) / 2)
+                    logger.info('Unclear how to calculate points for this type of battle.')
+                points0 += round(points/battle_iterations * valuation0 / (valuation0 + valuation1))
+                points1 += round(points/battle_iterations * valuation1 / (valuation0 + valuation1))
+
             logger.info('Group {} gained {} points.'.format(options.group_nr_one, str(points0)))
             logger.info('Group {} gained {} points.'.format(options.group_nr_two, str(points1)))
 
     print('You can find the log files for this run in {}'.format(logging_path))
 
+def calculate_time_tolerance():
+    """ Calculate the I/O delay for starting and stopping docker on the host machine.
 
-def format_summary_message(results0, results1, messages0, messages1, teamA, teamB):
+        Returns:
+        ----------
+        float:
+            I/O overhead in seconds.
+    """
+    Problem = importlib.import_module('problems.delaytest') 
+    problem = Problem.Problem()
+
+    match = Match(problem, config, 'problems/delaytest/generator', 'problems/delaytest/generator',
+                    'problems/delaytest/solver', 'problems/delaytest/solver',
+                    0, 1)
+
+    overheads = []
+    for i in range(10):
+        _, timeout = match._run_subprocess(match.base_build_command + ["generator0"], input=str(50*i).encode(), timeout=match.timeout_generator)
+        overheads.append(float(timeout))
+
+    max_overhead = max(overheads)
+
+    return max_overhead
+
+def format_summary_message_iterated(results0, results1, messages0, messages1, teamA, teamB):
     """ Format the results of a battle into a summary message.
 
         Parameters:
@@ -190,30 +231,42 @@ def format_summary_message(results0, results1, messages0, messages1, teamA, team
 
     return summary
 
-def calculate_time_tolerance():
-    """ Calculate the I/O delay for starting and stopping docker on the host machine.
+def format_summary_message_averaged(results0, results1, teamA, teamB):
+    """ Format the results of a battle into a summary message.
 
+        Parameters:
+        ----------
+        results0: list 
+            List of approximation ratios of teamA for each battle.
+        results1: list
+            List of approximation ratios of teamB for each battle.
+        teamA: int
+            Group number of teamA.
+        teamB: int
+            Group number of teamB.
         Returns:
         ----------
-        float:
-            I/O overhead in seconds.
+        str:
+            The formatted summary message.
     """
+    if not len(results0) == len(results1) == int(options.battle_iterations):
+        return "Number of results and summary messages are not the same!"
+    summary = ""
+    for i in range(int(options.battle_iterations)):
+        summary += '='*25
+        summary += '\n\nResults of battle {}:\n'.format(i+1)
+        if len(results0) > 0:
+            summary += 'Average approximation ratio of group {} with {} solved instances: {:.4f}\n'.format(teamA, len(results0[i]), sum(results0[i]) / len(results0[i]))
+        else:
+            summary += 'Group {} did not give a correct solution for any of the instances of this battle.'.format(teamA)
+        if len(results1) > 0:
+            summary += 'Average approximation ratio of group {} with {} solved instances: {:.4f}\n'.format(teamB, len(results1[i]), sum(results1[i]) / len(results1[i]))
+        else:
+            summary += 'Group {} did not give a correct solution for any of the instances of this battle.'.format(teamA)
 
-    Problem = importlib.import_module('problems.delaytest') 
-    problem = Problem.Problem()
+    return summary
 
-    match = Match(problem, config, 'problems/delaytest/generator', 'problems/delaytest/generator',
-                    'problems/delaytest/solver', 'problems/delaytest/solver',
-                    0, 1)
 
-    overheads = []
-    for i in range(10):
-        _, timeout = match._run_subprocess(match.base_build_command + ["generator0"], input=str(50*i).encode(), timeout=match.timeout_generator)
-        overheads.append(float(timeout))
-
-    max_overhead = max(overheads)
-
-    return max_overhead
 
 if __name__ == "__main__":
     main()
