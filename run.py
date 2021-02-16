@@ -139,9 +139,8 @@ def main():
             #Points are awarded for each match individually, as one run reaching the cap poisons the average number of points
             for i in range(battle_iterations):
                 if options.battle_type == 'iterated':
-                    if results0[i] + results1[i] > 0:
-                        valuation0 = results0[i]
-                        valuation1 = results1[i]
+                    valuation0 = results0[i]
+                    valuation1 = results1[i]
                 elif options.battle_type == 'averaged':
                     # The valuation of an averaged battle
                     # is the number of successfully executed battles divided by
@@ -152,8 +151,13 @@ def main():
                     valuation1 = len(results1[i]) / (sum(results1[i]) / len(results1[i]))
                 else:
                     logger.info('Unclear how to calculate points for this type of battle.')
-                points0 += round(points/battle_iterations * valuation0 / (valuation0 + valuation1))
-                points1 += round(points/battle_iterations * valuation1 / (valuation0 + valuation1))
+
+                if valuation0 + valuation1 > 0:
+                    points0 += (points/battle_iterations * valuation0) / (valuation0 + valuation1)
+                    points1 += (points/battle_iterations * valuation1) / (valuation0 + valuation1)
+                else:
+                    points0 += (points/battle_iterations) // 2
+                    points1 += (points/battle_iterations) // 2
 
             logger.info('Group {} gained {} points.'.format(options.group_nr_one, str(points0)))
             logger.info('Group {} gained {} points.'.format(options.group_nr_two, str(points1)))
