@@ -8,16 +8,16 @@ set up the lab course yourself.
 The idea of the lab is to pose several, usually NP-complete problems during the
 semester.  
 Groups of students then write code that generates hard-to-solve instances for
-these problems and solvers that solve these problems quickly. The groups then
-battle against each other, generating instances of increasing size that the
-other group has to solve within a time limit.  
+these problems and solvers that solve these problems quickly. In the default
+setting, the groups then battle against each other, generating instances of
+increasing size that the other group has to solve within a time limit.  
 Points are distributed relative to the biggest instance size for which a group
 was still able to solve an instance.
 
 # Installation and Usage
 `python3` and `docker` are required to run this code. We recommend using the
 latest version of `docker` on your machine, as your students may want to use the
-lastest features for their code.
+latest features for their code.
 
 Adjust the parameters set in the `config.ini` to set which hardware ressources
 you want to assign to the students code.
@@ -31,11 +31,22 @@ The `run.py` offers several options, e.g. to give custom paths for solvers and
 generators. Run `./run.py --help` for all options.
 
 # How does a Battle Between Two Teams Work?
+There are currently two types of battles implemented. The first one is the
+*iterated* version, in which two teams battle against one another up to an 
+instance size at which one of the teams fails. This is the default option.  
+An alternative is the *averaged* battle, which is still relatively new and will
+thus most probably be further adjusted in the future. In this battle, the
+solvers and generators of students battle a fixed number of times on a fixed
+instance size and try to give good approximative solutions. The approximation
+factor is then averaged, with the team having the best average approximation
+ratio winning.
+
 Whenever we run the code as described above, we are supplied a generator and a
 solver for each team, either explicitly via options on the call or implicitely
 from the folders `problems/ProblemName/generator` and
 `problems/ProblemName/solver` if the option is not set.
 
+## The Iterated Battle (default)
 What we are interested in is how good each solver of one group is in solving the
 instances of the other group. Thus, we start by letting the generator of one
 group generate an instance and a certificate for a small instance size (which we
@@ -52,7 +63,7 @@ group.
 
 While this is the general idea of how a battle works, there are some details
 which were introduced to optimize the code and make it fairer.
-## The Step Size Increment
+### The Step Size Increment
 When we want to increment the instance size, we can hardly know how big the
 biggest instances are that a solver can solve. This is because we rarely know
 how clever the instances of the generator are designed or how good the solver is
@@ -70,12 +81,12 @@ biggest instance size reached may not exceed that of each failed instance size.
 
 Finally, there is also a cutoff value set in the `config.ini` after which the
 incrementation is automatically stopped.
-## Averaging the Results Over Several Battles
+### Averaging the Results Over Several Battles
 As the machines on which the code is executed cannot be guaranteed to be free of
 load at every time and since randomized approaches may fail due to outliers, we
 are executing several battles in a row and report back the results of each battle
 such that an average number of points can be computed.
-## Handling Malformed Inputs
+### Handling Malformed Inputs
 We are very lenient with malformed instances: If an output line does not follow
 the problem specification, the parser is tasked with discarding it and logging a
 warning.  
@@ -83,6 +94,22 @@ If the verifier gets an empty instance or the certificate of the generator is
 not valid, the solver automatically wins for this instance size. This usually
 happens due to the generator timing out before writing the instance and
 certificate out.
+### Optional Approximative Battles
+It is possible to allow for approximative solutions up to a fixed factor to be
+a solution criteria. This can be easily set using the `--approx_ratio` option,
+provided the problem is compatible with the notion of approximation.  
+A solver then only fails if its solution is either invalid or outside the given
+approximation ratio.
+
+## The Averaged Battle
+In this alternative battle version, we are interested in the students ability
+to write good approximation algorithms. For a fixed instance size set with the
+option `-approx_inst_size`, the students generate a number of instances set by
+the option `--approx_iterations`. The task is then to provide an approximative
+solution that is as close to the optimal solution as possible within the solver
+time limit.  
+The approximation ratios are then averaged, and points are awarded relative to
+the averaged ratio of the other team.
 
 # Creating a New Task
 Tasks are created as packages and are automatically imported by supplying their

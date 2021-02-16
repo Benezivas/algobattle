@@ -4,7 +4,7 @@ from verifier import Verifier
 
 logger = logging.getLogger('algobattle.verifier')
 
-class DsapproxVerifier(Verifier):
+class DomsetVerifier(Verifier):
     def verify_semantics_of_instance(self, instance, instance_size: int):
         # Instances for this problem are semantically valid if they are syntactically valid.
         # We only check if the instance is empty.
@@ -44,5 +44,5 @@ class DsapproxVerifier(Verifier):
 
         return True
 
-    def verify_solution_quality(self, instance, instance_size, generator_solution, solver_solution):
-        return len(solver_solution) <= 2 * len(generator_solution)
+    def calculate_approximation_ratio(self, instance, instance_size, generator_solution, solver_solution):
+        return float(len(solver_solution)) / float(len(generator_solution))

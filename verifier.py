@@ -8,7 +8,7 @@ class Verifier(ABC):
     """
 
     @abstractmethod
-    def verify_semantics_of_instance(self, instance, instance_size: int):
+    def verify_semantics_of_instance(self, instance, instance_size: int) -> bool:
         """ Check the semantical correctness of an instance.
 
         If the given instance ist semantically ill-formed in a way that
@@ -29,7 +29,7 @@ class Verifier(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def verify_semantics_of_solution(self, instance, solution, instance_size: int, solution_type: bool):
+    def verify_semantics_of_solution(self, instance, solution, instance_size: int, solution_type: bool )-> bool:
         """ Check whether a given solution is semantically correct.
 
         Returns True if the solution is semantically correct enough such that
@@ -54,7 +54,7 @@ class Verifier(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def verify_solution_against_instance(self, instance, solution, instance_size: int, solution_type: bool):
+    def verify_solution_against_instance(self, instance, solution, instance_size: int, solution_type: bool) -> bool:
         """ Check the validity of a solution against an instance.
 
         Parameters:
@@ -76,13 +76,11 @@ class Verifier(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def verify_solution_quality(self, instance, instance_size: int, generator_solution, solver_solution):
-        """ Check if the solvers solution achieves the wanted quality over the 
-        generators solution.
+    def calculate_approximation_ratio(self, instance, instance_size: int, generator_solution, solver_solution) -> float:
+        """ Calculates how good a solvers solution is compared to a generators solution.
 
-        The default implementation assumes a maximimazation problem,
-        for which the wanted quality is that the solution size of the solver is
-        at least as big as that of the certificate.
+        Assuming an approximation problem, this method returns the approximation 
+        factor of the solvers solution to the generators solution.
 
         Parameters:
         ----------
@@ -97,7 +95,9 @@ class Verifier(ABC):
 
         Returns:
         ----------
-        bool
-            Returns True if the solvers solution has the wanted quality over the generators solution.
+        float
+            Returns the solution quality of the solver solution relative to the generator solution.
+            The return value is the approximation ratio of the solver against 
+            the generator (1 if optimal, 0 if failed, else >1).
         """
-        return len(solver_solution) >= len(generator_solution)
+        raise NotImplementedError

@@ -14,5 +14,5 @@ class DelaytestVerifier(Verifier):
     def verify_solution_against_instance(self, instance, solution, instance_size, solution_type):
         return True
 
-    def verify_solution_quality(self, instance, instance_size, generator_solution, solver_solution):
-        return True
+    def calculate_approximation_ratio(self, instance, instance_size, generator_solution, solver_solution):
+        return 1.0

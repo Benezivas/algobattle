@@ -4,13 +4,6 @@ given a graph and are supposed to find a minimum number of nodes such that
 the selected nodes and all their direct neighbors cover the complete vertice set
 of the graph.
 
-An interesting property of this problem is that there is no polynomial time
-approximation algorithm for any constant approximation ratio (assuming P!=NP).
-
-This means that for this task, students have to heavily rely on heuristics to
-solve the problem, however, creating instances that cannot be solved by simple
-heuristics isn't trivial either.
-
 **Given**: Undirected graph `G = (V,E)` with `|V(G)| = n`  
 **Problem**: If `S` is a dominating set for `G`, find a dominating set 
 `S' subseteq V(G)`, with `2|S| >= |S'|`
@@ -19,7 +12,7 @@ The generator is given an integer `n` and tasked with creating a graph and a
 certificate solution which is a dominating set in this graph.
 
 The solver is given this graph and has to find a dominating set in it. The 
-solution is valid if its size deviates by at most a factor of 2 from that of the
+solution is valid if its size is at least as big as the
 certificate solution.
 # I/O
 We use a format similar to the DIMACS-format for this task:
@@ -61,8 +54,6 @@ above to `stdout`. The solution may deviate from that of the generator.
 
 For the instance above, a valid output of the solver may look like this:
 ```
-    s ds 2\n
-    s ds 3\n
-    s ds 5\n
-    s ds 6
+    s ds 1\n
+    s ds 4\n
 ```

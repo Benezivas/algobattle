@@ -55,14 +55,6 @@ class PairsumParser(Parser):
         for i in range(len(raw_solution)):
             raw_solution[i] = int(raw_solution[i])
 
-        if len(raw_solution) != 4:
-            logger.warning('The solution is not of size 4!')
-            return []
-
-        if len(set(raw_solution)) != 4:
-            logger.warning('The solution contains duplicate entries!')
-            return []
-
         return raw_solution
 
 
