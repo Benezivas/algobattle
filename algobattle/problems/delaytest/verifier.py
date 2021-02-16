@@ -1,6 +1,6 @@
 import logging
 
-from verifier import Verifier
+from algobattle.verifier import Verifier
 
 logger = logging.getLogger('algobattle.verifier')
 

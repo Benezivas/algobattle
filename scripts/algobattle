@@ -5,9 +5,10 @@ import logging
 import configparser
 from optparse import OptionParser
 import datetime as dt
-import importlib
+import importlib.util
+import pkgutil
 
-from match import Match
+from algobattle.match import Match
 
 # Timestamp format: YYYY-MM-DD_HH:MM:SS
 _now = dt.datetime.now()
@@ -21,7 +22,7 @@ usage = 'usage: ./%prog FILE [options]\nExpecting (relative) path to the parent 
 parser = OptionParser(usage=usage)
 parser.add_option('--verbose', dest = 'verbose_logging', action = 'store_true', help = 'Log all debug messages.')
 parser.add_option('--output_folder', dest = 'folder_name', default = 'logs/', help = 'Specify the folder into which all logging files are written to. Default: logs/')
-parser.add_option('--config_file', dest = 'config_file', default = 'config.ini', help = 'Path to a .ini configuration file to be used for the run. Default: config.ini')
+parser.add_option('--config_file', dest = 'config_file', help = 'Path to a .ini configuration file to be used for the run. Defaults to the packages config.ini')
 parser.add_option('--solver1', dest = 'solver1_path', default = sys.argv[1].strip('/') + '/solver/', help = 'Specify the folder name containing the solver of the first contestant. Default: arg1/solver/')
 parser.add_option('--solver2', dest = 'solver2_path', default = sys.argv[1].strip('/') + '/solver/', help = 'Specify the folder name containing the solver of the second contestant. Default: arg1/solver/')
 parser.add_option('--generator1', dest = 'generator1_path', default = sys.argv[1].strip('/') + '/generator/', help = 'Specify the folder name containing the generator of the first contestant. Default: arg1/generator/')
@@ -80,16 +81,17 @@ if not options.do_not_log_to_console:
 
     logger.addHandler(_consolehandler)
 
-logger.info('Options for this run: {}'.format(options))
-logger.info('Contents of sys.argv: {}'.format(sys.argv))
+logger.debug('Options for this run: {}'.format(options))
+logger.debug('Contents of sys.argv: {}'.format(sys.argv))
 
 # Read in config file specifying problem parameters.
 config = configparser.ConfigParser()
 if not options.config_file:
-    logger.info('No config file specified for this run, terminating!')
-    sys.exit(1)
+    logger.info('No config file provided, using the default config.ini')
+    config_data = pkgutil.get_data('algobattle', 'config/config.ini').decode()
+    config.read_string(config_data)
 elif not os.path.isfile(options.config_file):
-    logger.error('Config file "%s" could not be found, terminating!', options.config_file)
+    logger.error('Given path to config file "%s" could not be found, terminating!', options.config_file)
     sys.exit(1)
 else:
     logger.info('Using additional configuration options from file "%s".', options.config_file)
@@ -99,7 +101,11 @@ else:
 def main():
     battle_iterations = int(options.battle_iterations)
     try:
-        Problem = importlib.import_module(sys.argv[1].rstrip('/').replace('/','.'))
+        spec = importlib.util.spec_from_file_location("name", sys.argv[1] + "__init__.py")
+        Problem = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = Problem 
+        spec.loader.exec_module(Problem)
+
         problem = Problem.Problem()
     except Exception as e:
         logger.critical('Importing the given problem failed with the following exception: "{}"'.format(e))
@@ -172,7 +178,7 @@ def calculate_time_tolerance():
         float:
             I/O overhead in seconds.
     """
-    Problem = importlib.import_module('problems.delaytest') 
+    Problem = importlib.import_module('algobattle.problems.delaytest') 
     problem = Problem.Problem()
 
     match = Match(problem, config, 'problems/delaytest/generator', 'problems/delaytest/generator',

@@ -1,6 +1,6 @@
 import logging
 
-from parser import Parser
+from algobattle.parser import Parser
 logger = logging.getLogger('algobattle.parser')
 
 class BicliqueParser(Parser):

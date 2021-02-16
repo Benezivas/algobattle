@@ -1,8 +1,8 @@
 import logging
 
-from problem import Problem
-from problems.biclique.parser import BicliqueParser
-from problems.biclique.verifier import BicliqueVerifier
+from algobattle.problem import Problem
+from algobattle.problems.biclique.parser import BicliqueParser
+from algobattle.problems.biclique.verifier import BicliqueVerifier
 
 logger = logging.getLogger('algobattle.biclique')
 
