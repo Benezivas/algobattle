@@ -280,7 +280,7 @@ class Match:
         self.latest_running_docker_image = "generator" + str(generating_team)
         raw_instance_with_solution, elapsed_time = self._run_subprocess(generator_run_command, str(size).encode(), self.timeout_generator)
         logger.info('Approximate elapsed runtime: {}/{} seconds.'.format(elapsed_time, self.timeout_generator))
-        if not raw_instance_with_solution and elapsed_time > self.timeout_generator:
+        if not raw_instance_with_solution and float(elapsed_time) > self.timeout_generator:
             logger.warning('Generator {} exceeded the given time limit at instance size {}!'.format(generating_team, size))
             return 1.0
         elif not raw_instance_with_solution:
@@ -314,7 +314,7 @@ class Match:
         self.latest_running_docker_image = "solver" + str(solving_team)
         raw_solver_solution, elapsed_time = self._run_subprocess(solver_run_command, self.problem.parser.encode(instance), self.timeout_solver)
         logger.info('Approximate elapsed runtime: {}/{} seconds.'.format(elapsed_time, self.timeout_solver))
-        if not raw_solver_solution and elapsed_time > self.timeout_generator:
+        if not raw_solver_solution and float(elapsed_time) > self.timeout_generator:
             logger.warning('Solver {} exceeded the given time limit at instance size {}!'.format(solving_team, size))
             return 0.0
         elif not raw_instance_with_solution:
