@@ -14,7 +14,7 @@ from algobattle.match import Match
 _now = dt.datetime.now()
 current_timestamp = '{:04d}-{:02d}-{:02d}_{:02d}:{:02d}:{:02d}'.format(_now.year, _now.month, _now.day, _now.hour, _now.minute, _now.second)
 
-package_path = os.path.dirname(os.path.abspath(__file__)).strip('scripts')
+package_path = os.path.dirname(os.path.abspath(__file__)).strip('/scripts')
 
 if len(sys.argv) < 2:
     sys.exit('Expecting (relative) path to the parent directory of the problem file as argument. Use ./run.py --help for more information on usage and options.')
@@ -23,7 +23,7 @@ if len(sys.argv) < 2:
 usage = 'usage: ./%prog FILE [options]\nExpecting (relative) path to the parent directory of the problem file as first argument.'
 parser = OptionParser(usage=usage)
 parser.add_option('--verbose', dest = 'verbose_logging', action = 'store_true', help = 'Log all debug messages.')
-parser.add_option('--output_folder', dest = 'folder_name', default = 'logs/', help = 'Specify the folder into which all logging files are written to. Default: logs/')
+parser.add_option('--output_folder', dest = 'folder_name', default = package_path + '/logs/', help = 'Specify the folder into which all logging files are written to. Default: logs/')
 parser.add_option('--config_file', dest = 'config_file', help = 'Path to a .ini configuration file to be used for the run. Defaults to the packages config.ini')
 parser.add_option('--solver1', dest = 'solver1_path', default = sys.argv[1].strip('/') + '/solver/', help = 'Specify the folder name containing the solver of the first contestant. Default: arg1/solver/')
 parser.add_option('--solver2', dest = 'solver2_path', default = sys.argv[1].strip('/') + '/solver/', help = 'Specify the folder name containing the solver of the second contestant. Default: arg1/solver/')
@@ -93,7 +93,7 @@ if not options.config_file:
     config_data = pkgutil.get_data('algobattle', 'config/config.ini').decode()
     config.read_string(config_data)
 elif not os.path.isfile(options.config_file):
-    logger.error('Given path to config file "%s" could not be found, terminating!', options.config_file)
+    logger.error('Config file at path "%s" could not be found, terminating!', options.config_file)
     sys.exit(1)
 else:
     logger.info('Using additional configuration options from file "%s".', options.config_file)
@@ -101,9 +101,8 @@ else:
 
 
 def main():
-    battle_iterations = int(options.battle_iterations)
     try:
-        spec = importlib.util.spec_from_file_location("name", sys.argv[1].strip('/') + "/__init__.py")
+        spec = importlib.util.spec_from_file_location("problem", sys.argv[1].strip('/') + "/__init__.py")
         Problem = importlib.util.module_from_spec(spec)
         sys.modules[spec.name] = Problem 
         spec.loader.exec_module(Problem)
@@ -129,10 +128,10 @@ def main():
         logger.critical('Building the match object failed, exiting!')
         sys.exit(1)
 
-    results0, results1 = match.run(options.battle_type, battle_iterations)
+    results0, results1 = match.run(options.battle_type, options.battle_iterations)
 
     logger.info('#'*70)
-    if battle_iterations > 0:
+    if options.battle_iterations > 0:
         if options.battle_type == 'iterated':
             logger.info('Summary of the battle results: \n{}\n'.format(
                 format_summary_message_iterated(results0, results1, int(options.group_nr_one), int(options.group_nr_two))))
@@ -146,7 +145,7 @@ def main():
             points0 = 0 #points awarded to the first team
             points1 = 0 #points awarded to the second team
             #Points are awarded for each match individually, as one run reaching the cap poisons the average number of points
-            for i in range(battle_iterations):
+            for i in range(options.battle_iterations):
                 if options.battle_type == 'iterated':
                     valuation0 = results0[i]
                     valuation1 = results1[i]
@@ -162,11 +161,11 @@ def main():
                     logger.info('Unclear how to calculate points for this type of battle.')
 
                 if valuation0 + valuation1 > 0:
-                    points0 += (points/battle_iterations * valuation0) / (valuation0 + valuation1)
-                    points1 += (points/battle_iterations * valuation1) / (valuation0 + valuation1)
+                    points0 += (points/options.battle_iterations * valuation0) / (valuation0 + valuation1)
+                    points1 += (points/options.battle_iterations * valuation1) / (valuation0 + valuation1)
                 else:
-                    points0 += (points/battle_iterations) // 2
-                    points1 += (points/battle_iterations) // 2
+                    points0 += (points/options.battle_iterations) // 2
+                    points1 += (points/options.battle_iterations) // 2
 
             logger.info('Group {} gained {} points.'.format(options.group_nr_one, str(points0)))
             logger.info('Group {} gained {} points.'.format(options.group_nr_two, str(points1)))
@@ -181,10 +180,10 @@ def calculate_time_tolerance():
         float:
             I/O overhead in seconds.
     """
-    Problem = importlib.import_module('algobattle.problems.delaytest') 
+    Problem = importlib.import_module('algobattle.problems.delaytest')
     problem = Problem.Problem()
-    delaytest_path = package_path + 'algobattle/problems/delaytest'
 
+    delaytest_path = Problem.__file__.removesuffix('/__init__.py')
     match = Match(problem, config, delaytest_path + '/generator', delaytest_path + '/generator',
                     delaytest_path + '/solver', delaytest_path + '/solver',
                     0, 1)
