@@ -1,0 +1,3 @@
+include README.md
+include algobattle/config/*
+recursive-include algobattle/problems **/*
