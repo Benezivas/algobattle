@@ -14,6 +14,8 @@ from algobattle.match import Match
 _now = dt.datetime.now()
 current_timestamp = '{:04d}-{:02d}-{:02d}_{:02d}:{:02d}:{:02d}'.format(_now.year, _now.month, _now.day, _now.hour, _now.minute, _now.second)
 
+package_path = os.path.dirname(os.path.abspath(__file__)).strip('scripts')
+
 if len(sys.argv) < 2:
     sys.exit('Expecting (relative) path to the parent directory of the problem file as argument. Use ./run.py --help for more information on usage and options.')
 
@@ -101,7 +103,7 @@ else:
 def main():
     battle_iterations = int(options.battle_iterations)
     try:
-        spec = importlib.util.spec_from_file_location("name", sys.argv[1] + "__init__.py")
+        spec = importlib.util.spec_from_file_location("name", sys.argv[1].strip('/') + "/__init__.py")
         Problem = importlib.util.module_from_spec(spec)
         sys.modules[spec.name] = Problem 
         spec.loader.exec_module(Problem)
@@ -124,6 +126,7 @@ def main():
                     approximation_iterations=options.approximation_iterations)
 
     if not match.build_successful:
+        logger.critical('Building the match object failed, exiting!')
         sys.exit(1)
 
     results0, results1 = match.run(options.battle_type, battle_iterations)
@@ -180,11 +183,15 @@ def calculate_time_tolerance():
     """
     Problem = importlib.import_module('algobattle.problems.delaytest') 
     problem = Problem.Problem()
+    delaytest_path = package_path + 'algobattle/problems/delaytest'
 
-    match = Match(problem, config, 'problems/delaytest/generator', 'problems/delaytest/generator',
-                    'problems/delaytest/solver', 'problems/delaytest/solver',
+    match = Match(problem, config, delaytest_path + '/generator', delaytest_path + '/generator',
+                    delaytest_path + '/solver', delaytest_path + '/solver',
                     0, 1)
 
+    if not match.build_successful:
+        logger.warning('Building a match for the time tolerance calculation failed!')
+        return 0
     overheads = []
     for i in range(10):
         _, timeout = match._run_subprocess(match.base_build_command + ["generator0"], input=str(50*i).encode(), timeout=match.timeout_generator)
