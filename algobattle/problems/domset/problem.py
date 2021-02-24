@@ -1,8 +1,8 @@
 import logging
 
-from problem import Problem
-from problems.domset.parser import DomsetParser
-from problems.domset.verifier import DomsetVerifier
+from algobattle.problem import Problem
+from .parser import DomsetParser
+from .verifier import DomsetVerifier
 
 logger = logging.getLogger('algobattle.domset')
 

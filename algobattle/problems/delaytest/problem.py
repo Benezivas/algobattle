@@ -1,8 +1,8 @@
 import logging
 
 from algobattle.problem import Problem
-from algobattle.problems.delaytest.parser import DelaytestParser
-from algobattle.problems.delaytest.verifier import DelaytestVerifier
+from .parser import DelaytestParser
+from .verifier import DelaytestVerifier
 
 logger = logging.getLogger('algobattle.delaytest')
 

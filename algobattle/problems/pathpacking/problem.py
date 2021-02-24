@@ -1,8 +1,8 @@
 import logging
 
-from problem import Problem
-from problems.pathpacking.parser import PathpackingParser
-from problems.pathpacking.verifier import PathpackingVerifier
+from algobattle.problem import Problem
+from .parser import PathpackingParser
+from .verifier import PathpackingVerifier
 
 logger = logging.getLogger('algobattle.pathpacking')
 

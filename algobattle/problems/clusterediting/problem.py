@@ -1,8 +1,8 @@
 import logging
 
-from problem import Problem
-from problems.clusterediting.parser import ClustereditingParser
-from problems.clusterediting.verifier import ClustereditingVerifier
+from algobattle.problem import Problem
+from .parser import ClustereditingParser
+from .verifier import ClustereditingVerifier
 
 logger = logging.getLogger('algobattle.clusterediting')
 

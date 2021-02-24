@@ -1,8 +1,9 @@
 import logging
 
-from problems.pairsum.parser import PairsumParser
-from problems.pairsum.verifier import PairsumVerifier
-from problem import Problem
+from algobattle.problem import Problem
+from .parser import PairsumParser
+from .verifier import PairsumVerifier
+
 
 logger = logging.getLogger('algobattle.pairsum')
 

@@ -7,6 +7,7 @@ from optparse import OptionParser
 import datetime as dt
 import importlib.util
 import pkgutil
+from pathlib import Path
 
 from algobattle.match import Match
 
@@ -14,21 +15,23 @@ from algobattle.match import Match
 _now = dt.datetime.now()
 current_timestamp = '{:04d}-{:02d}-{:02d}_{:02d}:{:02d}:{:02d}'.format(_now.year, _now.month, _now.day, _now.hour, _now.minute, _now.second)
 
-package_path = os.path.dirname(os.path.abspath(__file__)).strip('/scripts')
-
 if len(sys.argv) < 2:
     sys.exit('Expecting (relative) path to the parent directory of the problem file as argument. Use ./run.py --help for more information on usage and options.')
+
+package_path = '/' + str(Path(__file__).resolve()).strip('/scripts')
+problem_path = str(Path(sys.argv[1]).resolve())
+default_logging_path = str(Path.home()) + '/.algobattle_logs/'
 
 ##Option parser to process arguments from the console.
 usage = 'usage: ./%prog FILE [options]\nExpecting (relative) path to the parent directory of the problem file as first argument.'
 parser = OptionParser(usage=usage)
 parser.add_option('--verbose', dest = 'verbose_logging', action = 'store_true', help = 'Log all debug messages.')
-parser.add_option('--output_folder', dest = 'folder_name', default = package_path + '/logs/', help = 'Specify the folder into which all logging files are written to. Default: logs/')
+parser.add_option('--output_folder', dest = 'folder_name', default = default_logging_path, help = 'Specify the folder into which all logging files are written to. Default: ~/.algobattle_logs/')
 parser.add_option('--config_file', dest = 'config_file', help = 'Path to a .ini configuration file to be used for the run. Defaults to the packages config.ini')
-parser.add_option('--solver1', dest = 'solver1_path', default = sys.argv[1].strip('/') + '/solver/', help = 'Specify the folder name containing the solver of the first contestant. Default: arg1/solver/')
-parser.add_option('--solver2', dest = 'solver2_path', default = sys.argv[1].strip('/') + '/solver/', help = 'Specify the folder name containing the solver of the second contestant. Default: arg1/solver/')
-parser.add_option('--generator1', dest = 'generator1_path', default = sys.argv[1].strip('/') + '/generator/', help = 'Specify the folder name containing the generator of the first contestant. Default: arg1/generator/')
-parser.add_option('--generator2', dest = 'generator2_path', default = sys.argv[1].strip('/') + '/generator/', help = 'Specify the folder name containing the generator of the second contestant. Default: arg1/generator/')
+parser.add_option('--solver1', dest = 'solver1_path', default = problem_path + '/solver/', help = 'Specify the folder name containing the solver of the first contestant. Default: arg1/solver/')
+parser.add_option('--solver2', dest = 'solver2_path', default = problem_path + '/solver/', help = 'Specify the folder name containing the solver of the second contestant. Default: arg1/solver/')
+parser.add_option('--generator1', dest = 'generator1_path', default = problem_path + '/generator/', help = 'Specify the folder name containing the generator of the first contestant. Default: arg1/generator/')
+parser.add_option('--generator2', dest = 'generator2_path', default = problem_path + '/generator/', help = 'Specify the folder name containing the generator of the second contestant. Default: arg1/generator/')
 parser.add_option('--group_nr_one', dest = 'group_nr_one', type=int, default = '0', help = 'Specify the group number of the first contestant. Default: 0')
 parser.add_option('--group_nr_two', dest = 'group_nr_two', type=int, default = '1', help = 'Specify the group number of the second contestant. Default: 1')
 parser.add_option('--iterations', dest = 'battle_iterations', type=int, default = '5', help = 'Number of fights that are to be made in the battle (points are split between each fight). Default: 5')
@@ -44,8 +47,8 @@ parser.add_option('--no-overhead-calculation', dest = 'no_overhead_calculation',
 (options, args) = parser.parse_args()
 
 # Validate that all paths given by options exist
-if not os.path.exists(sys.argv[1]):
-    sys.exit('Input path "{}" does not exist in the file system! Use ./run.py --help for more information on usage and options.'.format(sys.argv[1]))
+if not os.path.exists(problem_path):
+    sys.exit('Input path "{}" does not exist in the file system! Use ./run.py --help for more information on usage and options.'.format(problem_path))
 if not os.path.exists(options.solver1_path):
     sys.exit('The given path for option --solver1 "{}" does not exist in the file system! Use ./run.py --help for more information on usage and options.'.format(options.solver1_path))
 if not os.path.exists(options.solver2_path):
@@ -102,9 +105,9 @@ else:
 
 def main():
     try:
-        spec = importlib.util.spec_from_file_location("problem", sys.argv[1].strip('/') + "/__init__.py")
+        spec = importlib.util.spec_from_file_location("problem", problem_path + "/__init__.py")
         Problem = importlib.util.module_from_spec(spec)
-        sys.modules[spec.name] = Problem 
+        sys.modules[spec.name] = Problem
         spec.loader.exec_module(Problem)
 
         problem = Problem.Problem()
@@ -196,7 +199,7 @@ def calculate_time_tolerance():
         _, timeout = match._run_subprocess(match.base_build_command + ["generator0"], input=str(50*i).encode(), timeout=match.timeout_generator)
         overheads.append(float(timeout))
 
-    max_overhead = max(overheads)
+    max_overhead = round(max(overheads), 2)
 
     return max_overhead
 

@@ -1,8 +1,8 @@
 import logging
 
-from problem import Problem
-from problems.scheduling.parser import SchedulingParser
-from problems.scheduling.verifier import SchedulingVerifier
+from algobattle.problem import Problem
+from .parser import SchedulingParser
+from .verifier import SchedulingVerifier
 
 logger = logging.getLogger('algobattle.scheduling')
 

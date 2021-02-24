@@ -1,8 +1,8 @@
 import logging
 
-from problem import Problem
-from problems.c4subgraphiso.parser import C4subgraphisoParser
-from problems.c4subgraphiso.verifier import C4subgraphisoVerifier
+from algobattle.problem import Problem
+from .parser import C4subgraphisoParser
+from .verifier import C4subgraphisoVerifier
 
 logger = logging.getLogger('algobattle.c4subgraphiso')
 

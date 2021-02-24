@@ -1,8 +1,8 @@
 import logging
 
-from problem import Problem
-from problems.oscm3.parser import OSCM3Parser
-from problems.oscm3.verifier import OSCM3Verifier
+from algobattle.problem import Problem
+from .parser import OSCM3Parser
+from .verifier import OSCM3Verifier
 
 logger = logging.getLogger('algobattle.oscm3')
 
