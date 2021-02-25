@@ -1,8 +1,8 @@
-import sys
 import subprocess
-import signal
 import timeit
 import logging
+
+import algobattle.sighandler as sigh
 
 logger = logging.getLogger('algobattle.framework')
 
@@ -23,15 +23,6 @@ class Match:
         self.approximation_ratio = approximation_ratio
         self.approximation_instance_size = approximation_instance_size
         self.aproximation_iterations = approximation_iterations
-
-        self.latest_running_docker_image = ""
-
-        def signal_handler(sig, frame):
-                print('You pressed Ctrl+C!')
-                self._kill_spawned_docker_containers()
-                logger.info('Received SIGINT.')
-                sys.exit(0)
-        signal.signal(signal.SIGINT, signal_handler)
 
         self.build_successful = self._build(generator1_path, generator2_path, solver1_path, solver2_path, group_nr_one, group_nr_two)
 
@@ -99,11 +90,6 @@ class Match:
                 logger.error('Build process for {} failed!'.format(command[5]))
 
         return success
-
-    def _kill_spawned_docker_containers(self):
-        """Terminates all running docker containers spawned by this program."""
-        if self.latest_running_docker_image:
-            subprocess.run('docker ps -a -q --filter ancestor={} | xargs -r docker kill > /dev/null 2>&1'.format(self.latest_running_docker_image), shell=True)
 
     def run(self, battle_type='iterated', iterations=5):
         """ Match entry point. Executes iterations fights between two teams and
@@ -277,7 +263,7 @@ class Match:
 
         logger.info('Running generator of group {}...\n'.format(generating_team))
 
-        self.latest_running_docker_image = "generator" + str(generating_team)
+        sigh.latest_running_docker_image = "generator" + str(generating_team)
         raw_instance_with_solution, elapsed_time = self._run_subprocess(generator_run_command, str(size).encode(), self.timeout_generator)
         logger.info('Approximate elapsed runtime: {}/{} seconds.'.format(elapsed_time, self.timeout_generator))
         if not raw_instance_with_solution and elapsed_time > self.timeout_generator:
@@ -311,13 +297,13 @@ class Match:
 
         logger.info('Running solver of group {}...\n'.format(solving_team))
 
-        self.latest_running_docker_image = "solver" + str(solving_team)
+        sigh.latest_running_docker_image = "solver" + str(solving_team)
         raw_solver_solution, elapsed_time = self._run_subprocess(solver_run_command, self.problem.parser.encode(instance), self.timeout_solver)
         logger.info('Approximate elapsed runtime: {}/{} seconds.'.format(elapsed_time, self.timeout_solver))
         if not raw_solver_solution and elapsed_time > self.timeout_generator:
             logger.warning('Solver {} exceeded the given time limit at instance size {}!'.format(solving_team, size))
             return 0.0
-        elif not raw_instance_with_solution:
+        elif not raw_solver_solution:
             logger.warning('Solver {} threw an exception at instance size {}!'.format(solving_team, size))
             return 0.0
 
@@ -362,8 +348,8 @@ class Match:
             raw_output = self.problem.parser.decode(raw_output)
         except:
             p.kill()
-            self._kill_spawned_docker_containers()
+            sigh._kill_spawned_docker_containers()
         
-        elapsed_time = '{:.2f}'.format(timeit.default_timer() - start_time)
+        elapsed_time = round(timeit.default_timer() - start_time, 2)
 
         return raw_output, elapsed_time

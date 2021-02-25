@@ -10,6 +10,7 @@ import pkgutil
 from pathlib import Path
 
 from algobattle.match import Match
+import algobattle.sighandler as sigh
 
 # Timestamp format: YYYY-MM-DD_HH:MM:SS
 _now = dt.datetime.now()
@@ -57,6 +58,7 @@ if not os.path.exists(options.generator1_path):
     sys.exit('The given path for option --generator1 "{}" does not exist in the file system! Use ./run.py --help for more information on usage and options.'.format(options.generator1_path))
 if not os.path.exists(options.generator2_path):
     sys.exit('The given path for option --generator2 "{}" does not exist in the file system! Use ./run.py --help for more information on usage and options.'.format(options.generator2_path))
+
 
 # Logging level below which no logs are supposed to be written out.
 common_logging_level = logging.INFO
@@ -196,6 +198,7 @@ def calculate_time_tolerance():
         return 0
     overheads = []
     for i in range(10):
+        sigh.latest_running_docker_image = "generator0"
         _, timeout = match._run_subprocess(match.base_build_command + ["generator0"], input=str(50*i).encode(), timeout=match.timeout_generator)
         overheads.append(float(timeout))
 
