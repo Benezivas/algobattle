@@ -18,10 +18,14 @@ class BicliqueVerifier(Verifier):
             logger.error('The solution is empty!')
             return False
 
-        solution_set1 = [line for line in solution if line[1] == 'set1']
-        solution_set2 = [line for line in solution if line[1] == 'set2']
+        solution_set1 = [line[2] for line in solution if line[1] == 'set1']
+        solution_set2 = [line[2] for line in solution if line[1] == 'set2']
         if (not solution_set1) or (not solution_set2):
             logger.error('At least one node set of the solution is empty!')
+            return False
+
+        if set(solution_set1).intersection(set(solution_set2)) or set(solution_set2).intersection(set(solution_set1)):
+            logger.error('At least one node is in both solution sets!')
             return False
         return True
 
@@ -47,4 +51,4 @@ class BicliqueVerifier(Verifier):
         return True
 
     def calculate_approximation_ratio(self, instance, instance_size, generator_solution, solver_solution):
-        return float(len(solver_solution)) / float(len(generator_solution))
+        return float(len(generator_solution)) / float(len(solver_solution))
