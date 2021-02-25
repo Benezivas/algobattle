@@ -19,7 +19,9 @@ current_timestamp = '{:04d}-{:02d}-{:02d}_{:02d}:{:02d}:{:02d}'.format(_now.year
 if len(sys.argv) < 2:
     sys.exit('Expecting (relative) path to the parent directory of the problem file as argument. Use ./run.py --help for more information on usage and options.')
 
-package_path = '/' + str(Path(__file__).resolve()).strip('/scripts')
+package_path = '/' + str(Path(__file__).resolve())
+if package_path.endswith('/scripts'):
+    package_path = package_path [:-8]
 problem_path = str(Path(sys.argv[1]).resolve())
 default_logging_path = str(Path.home()) + '/.algobattle_logs/'
 
@@ -188,7 +190,7 @@ def calculate_time_tolerance():
     Problem = importlib.import_module('algobattle.problems.delaytest')
     problem = Problem.Problem()
 
-    delaytest_path = Problem.__file__.removesuffix('/__init__.py')
+    delaytest_path = Problem.__file__[:-12] #remove /__init__.py
     match = Match(problem, config, delaytest_path + '/generator', delaytest_path + '/generator',
                     delaytest_path + '/solver', delaytest_path + '/solver',
                     0, 1)
