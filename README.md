@@ -15,20 +15,32 @@ Points are distributed relative to the biggest instance size for which a group
 was still able to solve an instance.
 
 # Installation and Usage
-`python3` and `docker` are required to run this code. We recommend using the
-latest version of `docker` on your machine, as your students may want to use the
-latest features for their code.
+This project has been delevoped to run on Linux and may not work on other
+platforms. Support for other platforms may be implemented in the future.
 
-Adjust the parameters set in the `config.ini` to set which hardware ressources
-you want to assign to the students code.
+`python3` in version at least `3.6` and `docker` are required.
 
-To start a basic run on a given problem, using the `solver` and `generator` that
+We recommend installing the package as a user using `pip`
+```
+pip install . --user
+```
+
+Adjust the parameters set in the `algobattle/configs/config.ini` file to set
+which hardware resources you want to assign. You can pass alternative
+configuration files to the script using the `--config_file` option.
+
+To start a basic run on the `pairsum` problem, using the `solver` and `generator` that
 are part of the problem directory, execute
 ```
-./run.py /path/to/problem
+battle algobattle/problems/pairsum
 ```
-The `run.py` offers several options, e.g. to give custom paths for solvers and
-generators. Run `./run.py --help` for all options.
+or provide any alternative problem folder path.
+
+Read the section *Creating a New Task* to learn about the expected
+structure of a problem.
+
+The `battle` script offers several options, e.g. to give custom paths for
+solvers and generators. Run `battle --help` for all options.
 
 # How does a Battle Between Two Teams Work?
 There are currently two types of battles implemented. The first one is the
@@ -43,8 +55,12 @@ ratio winning.
 
 Whenever we run the code as described above, we are supplied a generator and a
 solver for each team, either explicitly via options on the call or implicitely
-from the folders `problems/ProblemName/generator` and
-`problems/ProblemName/solver` if the option is not set.
+from the folders `path/to/problem/generator` and
+`path/to/problem/solver` if the option is not set.
+
+Log files are automatically generated for each run and saved to
+`~/.algobattle_logs` by default. You can change this path with the
+`--output_folder` option.
 
 ## The Iterated Battle (default)
 What we are interested in is how good each solver of one group is in solving the
@@ -113,7 +129,7 @@ the averaged ratio of the other team.
 
 # Creating a New Task
 Tasks are created as packages and are automatically imported by supplying their
-path to `run.py` if the `__init__.py` of the task is correctly configured.
+path to the `battle` executable.
 
 The basic directory structure of a task is the following:
 <pre>
@@ -160,7 +176,8 @@ is given.
 
 If you want to execute a run on your newly created problem, execute
 ```
-./run.py /path/to/newtask
+battle /path/to/newtask
 ```
-There are a few example tasks in the `problems` directory of this repository
-with task descriptions, if you want a reference for creating your own tasks.
+There are a few example tasks in the `algobattle/problems` directory of this
+repository with task descriptions, if you want a reference for creating your own
+tasks.
