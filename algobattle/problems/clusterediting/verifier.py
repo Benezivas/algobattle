@@ -14,11 +14,15 @@ class ClustereditingVerifier(Verifier):
         return True
 
     def verify_semantics_of_solution(self, instance, solution, instance_size: int, solution_type: bool):
-        # Solutions for this problem are semantically valid if they are syntactically valid.
-        # We only check if the solution is empty.
         if not solution:
             logger.error('The solution is empty!')
             return False
+
+        solution_del = [line for line in solution if (line[0] == 's' and line[1] == 'del')]
+        for edge in solution_del:
+            if ('e', edge[2], edge[3]) not in instance or ('e', edge[3], edge[2]) not in instance:
+                logger.error('The solution tries to delete an edge that is not part of the instance!')
+                return False
         return True
 
     def verify_solution_against_instance(self, instance, solution, instance_size, solution_type):
@@ -47,4 +51,4 @@ class ClustereditingVerifier(Verifier):
         return True
 
     def calculate_approximation_ratio(self, instance, instance_size, generator_solution, solver_solution):
-        return float(len(generator_solution)) / float(len(solver_solution))
+        return float(len(solver_solution)) / float(len(generator_solution))
