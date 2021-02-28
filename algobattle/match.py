@@ -10,7 +10,7 @@ class Match:
     """ Match class, responsible for setting up and executing the battles
     between two given teams. 
     """
-    def __init__(self, problem, config, generator1_path, generator2_path, solver1_path, solver2_path, group_nr_one, group_nr_two, runtime_overhead=0, approximation_ratio=1.0, approximation_instance_size=10, approximation_iterations=50, redirect_stderr_for_tests=False):
+    def __init__(self, problem, config, generator1_path, generator2_path, solver1_path, solver2_path, group_nr_one, group_nr_two, runtime_overhead=0, approximation_ratio=1.0, approximation_instance_size=10, approximation_iterations=50, testing=False):
         self.timeout_build     = int(config['run_parameters']['timeout_build']) + runtime_overhead
         self.timeout_generator = int(config['run_parameters']['timeout_generator']) + runtime_overhead
         self.timeout_solver    = int(config['run_parameters']['timeout_solver']) + runtime_overhead
@@ -23,7 +23,7 @@ class Match:
         self.approximation_ratio = approximation_ratio
         self.approximation_instance_size = approximation_instance_size
         self.aproximation_iterations = approximation_iterations
-        self.redirect_stderr_for_tests = redirect_stderr_for_tests
+        self.testing = testing
 
         self.build_successful = self._build(generator1_path, generator2_path, solver1_path, solver2_path, group_nr_one, group_nr_two)
 
@@ -62,6 +62,7 @@ class Match:
         docker_build_base = [
             "docker",
             "build",
+        ] + (["--no-cache"] if self.testing else []) + [
             "--network=host",
             "-t"
         ]
@@ -351,7 +352,7 @@ class Match:
         raw_output = None
 
         stderr = None
-        if self.redirect_stderr_for_tests:
+        if self.testing:
             stderr = subprocess.PIPE
         with subprocess.Popen(run_command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=stderr) as p:
             try:

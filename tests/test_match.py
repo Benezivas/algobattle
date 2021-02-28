@@ -29,7 +29,7 @@ class Matchtests(unittest.TestCase):
 
         match_malformed_docker_names = Match(self.problem, self.config, 
           self.tests_path + '/generator', self.tests_path + '/generator',
-          self.tests_path + '/solver', self.tests_path + '/solver', 0, 1)
+          self.tests_path + '/solver', self.tests_path + '/solver', 0, 1, testing=True)
         self.assertFalse(match_malformed_docker_names._build('foo', 'foo', 'bar', 'bar', 0, 1))
 
         config_short_build_timeout = configparser.ConfigParser()
@@ -37,12 +37,12 @@ class Matchtests(unittest.TestCase):
         config_short_build_timeout.read_string(config_data)
         match_build_timeout = Match(self.problem, config_short_build_timeout, 
           self.tests_path + '/generator_build_timeout', self.tests_path + '/generator',
-          self.tests_path + '/solver', self.tests_path + '/solver', 0, 1)
+          self.tests_path + '/solver', self.tests_path + '/solver', 0, 1, testing=True)
         self.assertFalse(match_build_timeout.build_successful)
 
         match_build_fail = Match(self.problem, config_short_build_timeout, 
           self.tests_path + '/generator_build_error', self.tests_path + '/generator',
-          self.tests_path + '/solver', self.tests_path + '/solver', 0, 1)
+          self.tests_path + '/solver', self.tests_path + '/solver', 0, 1, testing=True)
         self.assertFalse(match_build_fail.build_successful)
 
     def test_run(self):
@@ -76,7 +76,7 @@ class Matchtests(unittest.TestCase):
 
         match_broken_generator = Match(self.problem, self.config, 
           self.tests_path + '/generator_execution_error', self.tests_path + '/generator',
-          self.tests_path + '/solver', self.tests_path + '/solver', 0, 1, redirect_stderr_for_tests=True)
+          self.tests_path + '/solver', self.tests_path + '/solver', 0, 1, testing=True)
         self.assertEqual(match_broken_generator._one_fight(1, 0, 1), 1.0)
 
         match_wrong_generator_instance = Match(self.problem, self.config, 
@@ -101,7 +101,7 @@ class Matchtests(unittest.TestCase):
 
         match_broken_solver = Match(self.problem, self.config, 
           self.tests_path + '/generator', self.tests_path + '/generator',
-          self.tests_path + '/solver', self.tests_path + '/solver_execution_error', 0, 1, redirect_stderr_for_tests=True)
+          self.tests_path + '/solver', self.tests_path + '/solver_execution_error', 0, 1, testing=True)
         self.assertEqual(match_broken_solver._one_fight(1, 0, 1), 0.0)
 
         match_malformed_solution = Match(self.problem, self.config, 
