@@ -6,7 +6,7 @@ of the graph.
 
 **Given**: Undirected graph `G = (V,E)` with `|V(G)| = n`  
 **Problem**: If `S` is a dominating set for `G`, find a dominating set 
-`S' subseteq V(G)`, with `2|S| >= |S'|`
+`S' subseteq V(G)`, with `|S| >= |S'|`
 
 The generator is given an integer `n` and tasked with creating a graph and a 
 certificate solution which is a dominating set in this graph.
