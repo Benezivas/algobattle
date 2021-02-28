@@ -43,4 +43,4 @@ class C4subgraphisoVerifier(Verifier):
         return True
 
     def calculate_approximation_ratio(self, instance, instance_size, generator_solution, solver_solution):
-        return float(len(solver_solution)) / float(len(generator_solution))
+        return float(len(generator_solution)) / float(len(solver_solution))

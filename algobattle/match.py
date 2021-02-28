@@ -10,7 +10,7 @@ class Match:
     """ Match class, responsible for setting up and executing the battles
     between two given teams. 
     """
-    def __init__(self, problem, config, generator1_path, generator2_path, solver1_path, solver2_path, group_nr_one, group_nr_two, runtime_overhead=0, approximation_ratio=1.0, approximation_instance_size=10, approximation_iterations=50):
+    def __init__(self, problem, config, generator1_path, generator2_path, solver1_path, solver2_path, group_nr_one, group_nr_two, runtime_overhead=0, approximation_ratio=1.0, approximation_instance_size=10, approximation_iterations=50, testing=False):
         self.timeout_build     = int(config['run_parameters']['timeout_build']) + runtime_overhead
         self.timeout_generator = int(config['run_parameters']['timeout_generator']) + runtime_overhead
         self.timeout_solver    = int(config['run_parameters']['timeout_solver']) + runtime_overhead
@@ -23,6 +23,7 @@ class Match:
         self.approximation_ratio = approximation_ratio
         self.approximation_instance_size = approximation_instance_size
         self.aproximation_iterations = approximation_iterations
+        self.testing = testing
 
         self.build_successful = self._build(generator1_path, generator2_path, solver1_path, solver2_path, group_nr_one, group_nr_two)
 
@@ -61,6 +62,7 @@ class Match:
         docker_build_base = [
             "docker",
             "build",
+        ] + (["--no-cache"] if self.testing else []) + [
             "--network=host",
             "-t"
         ]
@@ -73,23 +75,24 @@ class Match:
         build_commands.append(docker_build_base + ["generator"+str(group_nr_one), generator1_path])
         build_commands.append(docker_build_base + ["generator"+str(group_nr_two), generator2_path])
 
-        success = True
         for command in build_commands:
             logger.debug('Building docker container with the following command: {}'.format(command))
-            process = subprocess.Popen(command, stdout=subprocess.PIPE)
-            try:
-                output, _ = process.communicate(timeout=self.timeout_build)
-                logger.debug(output.decode())
-            except subprocess.TimeoutExpired as e:
-                process.kill()
-                success = False
-                logger.error('Build process for {} ran into a timeout!'.format(command[5]))
-            if process.returncode != 0:
-                process.kill()
-                success = False
-                logger.error('Build process for {} failed!'.format(command[5]))
+            with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as process:
+                try:
+                    output, _ = process.communicate(timeout=self.timeout_build)
+                    logger.debug(output.decode())
+                except subprocess.TimeoutExpired as e:
+                    process.kill()
+                    process.wait()
+                    logger.error('Build process for {} ran into a timeout!'.format(command[5]))
+                    return False
+                if process.returncode != 0:
+                    process.kill()
+                    process.wait()
+                    logger.error('Build process for {} failed!'.format(command[5]))
+                    return False
 
-        return success
+        return True
 
     def run(self, battle_type='iterated', iterations=5):
         """ Match entry point. Executes iterations fights between two teams and
@@ -116,7 +119,7 @@ class Match:
         elif battle_type == 'averaged':
             battle_wrapper = self._averaged_battle_wrapper
         else:
-            logger.critical('Unrecognized battle_type given: "{}"'.format(battle_type))
+            logger.error('Unrecognized battle_type given: "{}"'.format(battle_type))
             return [], [], [], []
 
         for i in range(iterations):
@@ -251,12 +254,18 @@ class Match:
             the generator (1 if optimal, 0 if failed, >1 if the 
             generator solution is optimal). 
         """
-        if not str(generating_team).isdigit() or not str(solving_team).isdigit():
+        if not isinstance(generating_team, int) or not isinstance(solving_team, int):
             logger.error('Solving and generating team are expected to be nonnegative ints, received "{}" and "{}".'.format(generating_team, solving_team))
             raise Exception('Solving and generating team are expected to be nonnegative ints!')
         elif not generating_team >= 0 or not solving_team >= 0:
             logger.error('Solving and generating team are expected to be nonnegative ints, received "{}" and "{}".'.format(generating_team, solving_team))
             raise Exception('Solving and generating team are expected to be nonnegative ints!')
+        if not isinstance(size, int) or not size > 0:
+            logger.error('Expected an instance size to be an int of size at least 1, received: {}'.format(size))
+            raise Exception('Expected the instance size to be a positive integer.')
+        
+        if generating_team == solving_team:
+            logger.warning('Solving and generating team are equal ({}). Execution will continue.'.format(solving_team))
         
         generator_run_command = self.base_build_command + ["generator" + str(generating_team)]
         solver_run_command    = self.base_build_command + ["solver"    + str(solving_team)]
@@ -310,8 +319,8 @@ class Match:
         logger.info('Checking validity of the solvers solution...')
         
         solver_solution = self.problem.parser.parse_solution(raw_solver_solution, size)
-        if not self.problem.verifier.verify_semantics_of_solution(instance, generator_solution, size, True):
-            logger.warning('Solver {} created a malformed solution at instance size {}!'.format(generating_team, size))
+        if not self.problem.verifier.verify_semantics_of_solution(instance, solver_solution, size, True):
+            logger.warning('Solver {} created a malformed solution at instance size {}!'.format(solving_team, size))
             return 0.0
         elif not self.problem.verifier.verify_solution_against_instance(instance, solver_solution, size, False):
             logger.warning('Solver {} yields a wrong solution at instance size {}!'.format(solving_team, size))
@@ -339,17 +348,21 @@ class Match:
         float
             Running time of the process.
         """
-
-        p = subprocess.Popen(run_command, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         start_time = timeit.default_timer()
         raw_output = None
-        try:
-            raw_output, _ = p.communicate(input=input, timeout=timeout)
-            raw_output = self.problem.parser.decode(raw_output)
-        except:
-            p.kill()
-            sigh._kill_spawned_docker_containers()
-        
+
+        stderr = None
+        if self.testing:
+            stderr = subprocess.PIPE
+        with subprocess.Popen(run_command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=stderr) as p:
+            try:
+                raw_output, _ = p.communicate(input=input, timeout=timeout)
+                raw_output = self.problem.parser.decode(raw_output)
+            except:
+                p.kill()
+                p.wait()
+                sigh._kill_spawned_docker_containers()
+            
         elapsed_time = round(timeit.default_timer() - start_time, 2)
 
         return raw_output, elapsed_time
