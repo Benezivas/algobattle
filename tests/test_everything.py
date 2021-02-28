@@ -5,6 +5,7 @@ import unittest
 import tests.test_match as match
 import tests.test_problem_biclique as biclique
 import tests.test_problem_c4subgprahiso as c4subgraphiso
+import tests.test_problem_clusterediting as clusterediting
 
 def suites():
     suites = []
@@ -13,6 +14,8 @@ def suites():
     suites.append(unittest.defaultTestLoader.loadTestsFromTestCase(biclique.Verifiertests))
     suites.append(unittest.defaultTestLoader.loadTestsFromTestCase(c4subgraphiso.Parsertests))
     suites.append(unittest.defaultTestLoader.loadTestsFromTestCase(c4subgraphiso.Verifiertests))
+    suites.append(unittest.defaultTestLoader.loadTestsFromTestCase(clusterediting.Parsertests))
+    suites.append(unittest.defaultTestLoader.loadTestsFromTestCase(clusterediting.Verifiertests))
     return suites
 
 if __name__ == '__main__':
