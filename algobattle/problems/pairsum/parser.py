@@ -41,13 +41,14 @@ class PairsumParser(Parser):
 
         if raw_solution:
             raw_solution = raw_solution[0].split()
-
+        
         for entry in raw_solution:
             if not entry.isdigit():
                 logger.warning('An entry of the solution is not a positive int!')
                 removable_entries.append(entry)
-            if int(entry) > instance_size:
+            elif int(entry) > instance_size:
                 logger.warning('An entry of the solution refers to an index out of bounds!')
+                removable_entries.append(entry)
 
         for entry in removable_entries:
             raw_solution.remove(entry)
