@@ -54,7 +54,7 @@ class HikersParser(Parser):
             elif not line[1].isdigit() or not line[2].isdigit():
                 logger.warning('A solution line has a negative or non-int entry!')
                 removable_lines.append(line)
-            elif int(line[1]) > instance_size or int(line[2]) == 0:
+            elif int(line[1]) > instance_size or int(line[1]) == 0:
                 logger.warning('A solution line contains a hiker identifier outside of {1,...,n}!')
                 removable_lines.append(line)
 
