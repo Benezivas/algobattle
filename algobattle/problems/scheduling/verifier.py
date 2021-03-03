@@ -28,7 +28,18 @@ class SchedulingVerifier(Verifier):
         if len(solution) < len(instance):
             logger.error('The solution does not schedule all jobs!')
             return False
+
+        all_jobs = set()
+        for job in instance:
+            all_jobs.add(job[1])
         
+        all_assigned_jobs = set()
+        for assignment in solution:
+            all_assigned_jobs.add(assignment[1])
+
+        if all_jobs != all_assigned_jobs:
+            logger.error('The set of jobs of the instance and the set of jobs of the solution differ!')
+            return False
         return True
 
     def calculate_approximation_ratio(self, instance, instance_size, generator_solution, solver_solution):
@@ -40,7 +51,7 @@ class SchedulingVerifier(Verifier):
         generator_makespan = self.calculate_makespan(instance, generator_solution)
         solver_makespan = self.calculate_makespan(instance, solver_solution)
 
-        return float(len(solver_makespan)) / float(len(generator_makespan))
+        return float(solver_makespan) / float(generator_makespan)
 
     def calculate_makespan(self, jobs, assignments):
         makespans = [0 for i in range(5)]
