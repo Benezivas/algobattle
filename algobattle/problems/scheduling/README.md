@@ -21,7 +21,7 @@ minimizing the *makespan* as well. Its solution is valid if the *makespan* its
 assignment produces is at most as high as that of the generator.
 
 # I/O
-We use the following syntax for this problem:
+We use the following format for this problem:
 * **Jobs**: These lines have the form `j i l` for job `i` of length `l`.
 * **Permutation**: These lines have the form `a i j` to assign job `i` to 
 machine `j`.

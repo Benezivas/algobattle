@@ -17,12 +17,12 @@ time limit and output it. The solution is valid if its size is at least as big
 as the certificate solution of the generator.
 
 # I/O-Formate
-We use a format similar to the DIMACS-format for this task:
+We use the following format for this problem:
 * **Edges**: These lines are of the form `e i j`
     for an edge `(i,j) in E(G)`. As we are working on an undirected graph, 
     the symmetrical edge `(j,i)` does not need to be supplied.
 * **Solution lines**: For each of the `P_3` of the solution with nodes
-  `{i,j,k}` add a line `s path i j k`. It is important that these nodes
+  `{i,j,k}` add a line `s i j k`. It is important that these nodes
   have to be listed *in order*, i.e. that there is an edge between 
   `i j` and `j k`, otherwise the verifier does not accept them as valid paths.
 
@@ -38,9 +38,9 @@ The following output is a valid stream to stdout for the generator, given
 `n >= 9` (line breaks inserted for better readability):
 ```
     We can pack exactly 3 paths with 3 vertices each into the following graph\n
-    s path 2 3 6\n
-    s path 2 4 7\n
-    s path 5 8 9\n
+    s 2 3 6\n
+    s 2 4 7\n
+    s 5 8 9\n
     e 1 2\n
     e 2 3\n
     e 1 4\n
@@ -61,7 +61,7 @@ via `stdin`. It is then supposed to output the paths that it found to
 
 For the instance above, a valid output of the solver may look like this:
 ```
-    s path 6 3 2\n
-    s path 2 4 7\n
-    s path 9 8 5
+    s 6 3 2\n
+    s 2 4 7\n
+    s 9 8 5
 ```

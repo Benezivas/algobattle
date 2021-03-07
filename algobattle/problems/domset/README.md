@@ -20,7 +20,7 @@ We use a format similar to the DIMACS-format for this task:
     for an edge `(i,j) in E(G)`. As we are working on an undirected graph, 
     the symmetrical edge `(j,i)` does not need to be supplied.
 * **Solution lines**: For each vertex `i` that is part of the dominating set, add
-    a line `s ds i`.
+    a line `s i`.
 
 Since every isolated node needs to be added to every dominating set, they are
 unable to be part of an instance with our format.
@@ -37,8 +37,8 @@ The following output is a valid stream to stdout for the generator, given
 ```
     c The graph below has a Dominating Set of size 2\n
     c consisting e.g. of the nodes {1,4}\n
-    s ds 1\n
-    s ds 4\n
+    s 1\n
+    s 4\n
     e 1 2\n
     e 2 3\n
     e 3 4\n
@@ -54,6 +54,6 @@ above to `stdout`. The solution may deviate from that of the generator.
 
 For the instance above, a valid output of the solver may look like this:
 ```
-    s ds 1\n
-    s ds 4\n
+    s 1\n
+    s 4
 ```

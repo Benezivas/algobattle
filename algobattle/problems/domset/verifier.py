@@ -36,7 +36,7 @@ class DomsetVerifier(Verifier):
 
         dominated_nodes = set()
         for node in solution:
-            dominated_nodes.update(domination[node[2]])
+            dominated_nodes.update(domination[node[1]])
 
         if all_nodes != dominated_nodes:
             logger.error('The solution set does not dominate all nodes!')

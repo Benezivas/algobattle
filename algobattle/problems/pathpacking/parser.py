@@ -11,7 +11,7 @@ class PathpackingParser(Parser):
         for line in raw_input:
             if line[0] == 'e':
                 raw_instance.append(line)
-            elif line[0] == 's' and line[1] == 'path':
+            elif line[0] == 's':
                 raw_solution.append(line)
 
         return raw_instance, raw_solution
@@ -46,19 +46,19 @@ class PathpackingParser(Parser):
         raw_solution = list(set(raw_solution)) #Remove duplicate lines
         removable_lines = []
         for line in raw_solution:
-            if len(line) != 5:
+            if len(line) != 4:
                 logger.warning('A solution line is of unexpected length!')
                 removable_lines.append(line)
-            elif not line[2].isdigit() or not line[3].isdigit()or not line[4].isdigit():
+            elif not line[1].isdigit() or not line[2].isdigit()or not line[3].isdigit():
                 logger.warning('A solution line does not consist only of positive ints!')
                 removable_lines.append(line)
-            elif int(line[2]) > instance_size or int(line[3]) > instance_size or int(line[4]) > instance_size:
+            elif int(line[1]) > instance_size or int(line[2]) > instance_size or int(line[3]) > instance_size:
                 logger.warning('A one node descriptor is not in allowed range size!')
                 removable_lines.append(line)
-            elif int(line[2]) == 0 or int(line[3]) == 0 or int(line[4]) == 0:
+            elif int(line[1]) == 0 or int(line[2]) == 0 or int(line[3]) == 0:
                 logger.warning('A node descriptor is zero, but should be at least one!')
                 removable_lines.append(line)
-            elif int(line[2]) == int(line[3]) or int(line[2]) == int(line[4]) or int(line[3]) == int(line[4]):
+            elif int(line[1]) == int(line[2]) or int(line[1]) == int(line[3]) or int(line[2]) == int(line[3]):
                 logger.warning('A path descriptor does not describe a proper path!')
                 removable_lines.append(line)
 

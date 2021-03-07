@@ -11,7 +11,7 @@ class DomsetParser(Parser):
         for line in raw_input:
             if line[0] == 'e':
                 raw_instance.append(line)
-            elif line[0] == 's' and line[1] == 'ds':
+            elif line[0] == 's':
                 raw_solution.append(line)
 
         return raw_instance, raw_solution
@@ -45,13 +45,13 @@ class DomsetParser(Parser):
         raw_solution = list(set(raw_solution)) #Remove duplicate lines
         removable_lines = []
         for line in raw_solution:
-            if len(line) != 3:
+            if len(line) != 2:
                 logger.warning('A solution line is of unexpected length!')
                 removable_lines.append(line)
-            elif not line[2].isdigit():
+            elif not line[1].isdigit():
                 logger.warning('A solution descriptor is not a positive int!')
                 removable_lines.append(line)
-            elif int(line[2]) == 0 or int(line[2]) > instance_size:
+            elif int(line[1]) == 0 or int(line[1]) > instance_size:
                 logger.warning('One solution descriptor is out of bounds!')
                 removable_lines.append(line)
 

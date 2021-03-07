@@ -12,9 +12,9 @@ class Parsertests(unittest.TestCase):
         self.parser = parser.C4subgraphisoParser()
 
     def test_split_into_instance_and_solution(self):
-        raw_input = [('e', '1', '2'), ('s', 'square', '5', '6', '7', '8'), ('s', 'square', '2'), ('foo', 'bar')]
+        raw_input = [('e', '1', '2'), ('s', '5', '6', '7', '8'), ('s', '2'), ('foo', 'bar')]
         self.assertEqual(self.parser.split_into_instance_and_solution(raw_input), 
-        ([('e', '1', '2')], [('s', 'square', '5', '6', '7', '8'), ('s', 'square', '2')]))
+        ([('e', '1', '2')], [('s', '5', '6', '7', '8'), ('s', '2')]))
 
         #empty inputs should be handled
         self.assertEqual(self.parser.split_into_instance_and_solution([]), ([],[]))
@@ -53,32 +53,32 @@ class Parsertests(unittest.TestCase):
 
     def test_parse_solution(self):
         #lines with too many entries should be removed
-        raw_solution = [('s', 'square', '1', '2', '9', '10', '1'), ('s', 'square', '5', '6', '7', '8')]
-        self.assertEqual(self.parser.parse_solution(raw_solution, instance_size=10), [('s', 'square', '5', '6', '7', '8')])
+        raw_solution = [('s', '1', '2', '9', '10', '1'), ('s', '5', '6', '7', '8')]
+        self.assertEqual(self.parser.parse_solution(raw_solution, instance_size=10), [('s', '5', '6', '7', '8')])
 
         #lines with too few entries should be removed
-        raw_solution = [('s', 'square', '1', '2', '9')]
+        raw_solution = [('s', '1', '2', '9')]
         self.assertEqual(self.parser.parse_solution(raw_solution, instance_size=10), [])
 
         #Lines that use labels higher than instance_size should be removed
-        raw_solution = [('s', 'square', '1', '2', '9', '10')]
+        raw_solution = [('s', '1', '2', '9', '10')]
         self.assertEqual(self.parser.parse_solution(raw_solution, instance_size=9), [])
 
         #Lines with letters should be removed
-        raw_solution = [('s', 'square', '1', 'foo', '9', '10')]
+        raw_solution = [('s', '1', 'foo', '9', '10')]
         self.assertEqual(self.parser.parse_solution(raw_solution, instance_size=10), [])
 
         #0 label lines should be removed
-        raw_solution = [('s', 'square', '1', '0', '9', '10')]
+        raw_solution = [('s', '1', '0', '9', '10')]
         self.assertEqual(self.parser.parse_solution(raw_solution, instance_size=10), [])
 
         #empty inputs should be handled
         self.assertEqual(self.parser.parse_solution([], instance_size=2), [])
 
     def test_encode(self):
-        self.assertEqual(self.parser.encode([('s', 'square', '1', '2', '9', '10'), ('s', 'square', '5', '6', '7', '8'), ('e', '1', '2'), ('e', '2', '3'), ('e', '3', '4'), ('e', '3', '5'), ('e', '5', '6'), ('e', '6', '7'), ('e', '7', '8'), ('e', '8', '9'), ('e', '9', '10'), ('e', '10', '1'), ('e', '2', '9'), ('e', '5', '9'), ('e', '5', '8')]), 
-"""s square 1 2 9 10
-s square 5 6 7 8
+        self.assertEqual(self.parser.encode([('s', '1', '2', '9', '10'), ('s', '5', '6', '7', '8'), ('e', '1', '2'), ('e', '2', '3'), ('e', '3', '4'), ('e', '3', '5'), ('e', '5', '6'), ('e', '6', '7'), ('e', '7', '8'), ('e', '8', '9'), ('e', '9', '10'), ('e', '10', '1'), ('e', '2', '9'), ('e', '5', '9'), ('e', '5', '8')]), 
+"""s 1 2 9 10
+s 5 6 7 8
 e 1 2
 e 2 3
 e 3 4
@@ -95,8 +95,8 @@ e 5 8""".encode())
 
     def test_decode(self):
         self.assertEqual(self.parser.decode(
-"""s square 1 2 9 10
-s square 5 6 7 8
+"""s 1 2 9 10
+s 5 6 7 8
 e 1 2
 e 2 3
 e 3 4
@@ -110,7 +110,7 @@ e 10 1
 e 2 9
 e 5 9
 e 5 8
-""".encode()), [('s', 'square', '1', '2', '9', '10'), ('s', 'square', '5', '6', '7', '8'), ('e', '1', '2'), ('e', '2', '3'), ('e', '3', '4'), ('e', '3', '5'), ('e', '5', '6'), ('e', '6', '7'), ('e', '7', '8'), ('e', '8', '9'), ('e', '9', '10'), ('e', '10', '1'), ('e', '2', '9'), ('e', '5', '9'), ('e', '5', '8')])
+""".encode()), [('s', '1', '2', '9', '10'), ('s', '5', '6', '7', '8'), ('e', '1', '2'), ('e', '2', '3'), ('e', '3', '4'), ('e', '3', '5'), ('e', '5', '6'), ('e', '6', '7'), ('e', '7', '8'), ('e', '8', '9'), ('e', '9', '10'), ('e', '10', '1'), ('e', '2', '9'), ('e', '5', '9'), ('e', '5', '8')])
 
 
 class Verifiertests(unittest.TestCase):
@@ -123,20 +123,20 @@ class Verifiertests(unittest.TestCase):
 
     def test_verify_semantics_of_solution(self):
         self.assertFalse(self.verifier.verify_semantics_of_solution([('e', '1', '2')], [], 10, solution_type=False))
-        self.assertFalse(self.verifier.verify_semantics_of_solution([], [('s', 'square', '5', '6', '7', '8'), ('s', 'square', '5', '2', '9', '10')], instance_size=10, solution_type=False))
+        self.assertFalse(self.verifier.verify_semantics_of_solution([], [('s', '5', '6', '7', '8'), ('s', '5', '2', '9', '10')], instance_size=10, solution_type=False))
 
     def test_verify_solution_against_instance(self):
         instance = [('e', '1', '2'), ('e', '2', '3'), ('e', '3', '4'), ('e', '3', '5'), ('e', '5', '6'), ('e', '6', '7'), ('e', '7', '8'), ('e', '8', '9'), ('e', '9', '10'), ('e', '10', '1'), ('e', '2', '9'), ('e', '5', '9'), ('e', '5', '8')]
-        solution = [('s', 'square', '1', '2', '9', '10'), ('s', 'square', '5', '6', '7', '8')]
+        solution = [('s', '1', '2', '9', '10'), ('s', '5', '6', '7', '8')]
         self.assertTrue(self.verifier.verify_solution_against_instance(instance, solution, instance_size=10, solution_type=False))
 
-        solution = [('s', 'square', '1', '2', '9', '10'), ('s', 'square', '5', '6', '7', '3')]
+        solution = [('s', '1', '2', '9', '10'), ('s', '5', '6', '7', '3')]
         self.assertFalse(self.verifier.verify_solution_against_instance(instance, solution, instance_size=10, solution_type=False))
 
     def test_calculate_approximation_ratio(self):
         instance = [('e', '1', '2'), ('e', '2', '3'), ('e', '3', '4'), ('e', '3', '5'), ('e', '5', '6'), ('e', '6', '7'), ('e', '7', '8'), ('e', '8', '9'), ('e', '9', '10'), ('e', '10', '1'), ('e', '2', '9'), ('e', '5', '9'), ('e', '5', '8')]
-        solution_full = [('s', 'square', '1', '2', '9', '10'), ('s', 'square', '5', '6', '7', '8')]
-        solution_small = [('s', 'square', '1', '2', '9', '10')]
+        solution_full = [('s', '1', '2', '9', '10'), ('s', '5', '6', '7', '8')]
+        solution_small = [('s', '1', '2', '9', '10')]
         self.assertEqual(self.verifier.calculate_approximation_ratio(instance, 10, solution_full, solution_small), 2.0)
         self.assertEqual(self.verifier.calculate_approximation_ratio(instance, 10, solution_full, solution_full), 1.0)
 

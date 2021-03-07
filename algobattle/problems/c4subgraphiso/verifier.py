@@ -17,7 +17,7 @@ class C4subgraphisoVerifier(Verifier):
         if not solution:
             logger.error('The solution is empty!')
             return False
-        solution = [line[2:] for line in solution]
+        solution = [line[1:] for line in solution]
         used_nodes = set()
         for sol_square in solution:
             for sol_node in sol_square:
@@ -28,7 +28,7 @@ class C4subgraphisoVerifier(Verifier):
         return True
 
     def verify_solution_against_instance(self, instance, solution, instance_size, solution_type):
-        solution = [line[2:] for line in solution]
+        solution = [line[1:] for line in solution]
         for sol_square in solution:
             if  (not (('e', sol_square[0], sol_square[1]) in instance or ('e', sol_square[1], sol_square[0]) in instance)
             or not (('e', sol_square[1], sol_square[2]) in instance or ('e', sol_square[2], sol_square[1]) in instance)

@@ -18,7 +18,7 @@ class PathpackingVerifier(Verifier):
             logger.error('The solution is empty!')
             return False
 
-        solution = [line[2:] for line in solution]
+        solution = [line[1:] for line in solution]
         used_nodes = set([])
         for sol_path in solution:
             for sol_node in sol_path:
@@ -30,7 +30,7 @@ class PathpackingVerifier(Verifier):
         return True
 
     def verify_solution_against_instance(self, instance, solution, instance_size, solution_type):
-        solution = [line[2:] for line in solution]
+        solution = [line[1:] for line in solution]
         for sol_path in solution:
             if (not (('e', sol_path[0], sol_path[1]) in instance or ('e', sol_path[1], sol_path[0]) in instance)
              or not (('e', sol_path[1], sol_path[2]) in instance or ('e', sol_path[2], sol_path[1]) in instance)

@@ -20,7 +20,7 @@ We use a format similar to the DIMACS-format for this task:
     for an edge `(i,j) in E(G)`. As we are working on an undirected graph, 
     the symmetrical edge `(j,i)` does not need to be supplied.
 * **Solution lines**: For each of the `C_4` of the solution with nodes
-  `{i,j,k,l}` add a line `s square i j k l`. It is important that these nodes
+  `{i,j,k,l}` add a line `s i j k l`. It is important that these nodes
   have to be listed *in order*, i.e. that there is an edge between 
   `i j, j k,..., l i`, otherwise the verifier does not accept them as valid squares.
 
@@ -36,8 +36,8 @@ The following output is a valid stream to stdout for the generator, given
 `n >= 10` (line breaks inserted for better readability):
 ```
     The graph below contains no more than 2 induced C_4\n
-    s square 1 2 9 10\n
-    s square 5 6 7 8\n
+    s 1 2 9 10\n
+    s 5 6 7 8\n
     e 1 2\n
     e 2 3\n
     e 3 4\n
@@ -59,6 +59,6 @@ via `stdin`. It is then supposed to output the squares that it found to
 
 For the instance above, a valid output of the solver may look like this:
 ```
-    s square 5 6 7 8\n
-    s square 9 2 1 10
+    s 5 6 7 8\n
+    s 9 2 1 10
 ```
