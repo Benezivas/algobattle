@@ -1,5 +1,6 @@
 import logging
 import copy
+import sys
 
 from algobattle.verifier import Verifier
 
@@ -78,5 +79,10 @@ class OSCM3Verifier(Verifier):
         h.reorder_upper_nodes(solver_solution[1:])
         generator_crossings = g.calculate_number_crossings()
         solver_crossings = h.calculate_number_crossings()
+
+        if generator_crossings == solver_crossings:
+            return 1.0
+        elif generator_crossings == 0:
+            return sys.maxsize
 
         return solver_crossings / generator_crossings

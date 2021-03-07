@@ -119,5 +119,11 @@ class Verifiertests(unittest.TestCase):
         self.assertEqual(self.verifier.calculate_approximation_ratio(instance, 3, solution_sufficient, solution_too_little), 9/2)
         self.assertEqual(self.verifier.calculate_approximation_ratio(instance, 3, solution_sufficient, solution_sufficient), 1.0)
 
+        instance = [('n', '0', '0'), ('n', '1', '1')]
+        solution_no_crossings = ('s', '0', '1')
+        solution_one_crossing = ('s', '1', '0')
+        self.assertEqual(self.verifier.calculate_approximation_ratio(instance, 2, solution_no_crossings, solution_no_crossings), 1.0)
+        self.assertGreater(self.verifier.calculate_approximation_ratio(instance, 2, solution_no_crossings, solution_one_crossing), 1.0)
+
 if __name__ == '__main__':
     unittest.main()
