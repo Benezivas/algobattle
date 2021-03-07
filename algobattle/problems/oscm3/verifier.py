@@ -61,13 +61,6 @@ class OSCM3Verifier(Verifier):
 
     
     def verify_solution_against_instance(self, instance, solution, instance_size, solution_type):
-        if not instance:
-            logger.error('The instance is empty!')
-            return True
-        if not solution:
-            logger.error('The solution is empty!')
-            return False
-
         # For this problem, no further verification is needed: If the Syntax is
         # correct, a solution string is automatically a valid solution
 
@@ -86,4 +79,4 @@ class OSCM3Verifier(Verifier):
         generator_crossings = g.calculate_number_crossings()
         solver_crossings = h.calculate_number_crossings()
 
-        return float(len(solver_crossings)) / float(len(generator_crossings))
+        return solver_crossings / generator_crossings
