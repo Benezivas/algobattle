@@ -17,7 +17,6 @@ class SchedulingParser(Parser):
         return raw_instance, raw_solution
 
     def parse_instance(self, raw_instance, instance_size):
-        raw_instance = list(set(raw_instance)) #Remove duplicate lines
         removable_lines = []
 
         given_jobs = set()
@@ -46,7 +45,6 @@ class SchedulingParser(Parser):
         return raw_instance
 
     def parse_solution(self, raw_solution, instance_size):
-        raw_solution = list(set(raw_solution)) #Remove duplicate lines
         removable_lines = []
 
         scheduled_jobs = set()
