@@ -20,7 +20,7 @@ class ClustereditingVerifier(Verifier):
 
         solution_del = [line for line in solution if (line[0] == 's' and line[1] == 'del')]
         for edge in solution_del:
-            if ('e', edge[2], edge[3]) not in instance or ('e', edge[3], edge[2]) not in instance:
+            if ('e', edge[2], edge[3]) not in instance and ('e', edge[3], edge[2]) not in instance:
                 logger.error('The solution tries to delete an edge that is not part of the instance!')
                 return False
         return True
