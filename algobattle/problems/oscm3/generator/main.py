@@ -2,5 +2,9 @@ fin = open("input")
 fout = open("output","w")
 n = int(fin.readline())
 
-fout.write("n 0 1 2\nn 1 0 1 2\nn 2 0 1\ns 2 1 0")
+for i in range(n):
+    fout.write("n {}\n".format(i))
+fout.write("s ")
+for i in range(n):
+    fout.write("{} ".format(i))
 fout.close()
