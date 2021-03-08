@@ -8,6 +8,7 @@ import datetime as dt
 import importlib.util
 import pkgutil
 from pathlib import Path
+import subprocess
 
 from algobattle.match import Match
 import algobattle.sighandler as sigh
@@ -18,6 +19,11 @@ current_timestamp = '{:04d}-{:02d}-{:02d}_{:02d}:{:02d}:{:02d}'.format(_now.year
 
 if len(sys.argv) < 2:
     sys.exit('Expecting (relative) path to the parent directory of the problem file as argument. Use ./run.py --help for more information on usage and options.')
+
+docker_running = subprocess.Popen(['docker', 'info'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+_ = docker_running.communicate()
+if docker_running.returncode:
+    sys.exit('Could not connect to the docker daemon. Is docker running?')
 
 package_path = '/' + str(Path(__file__).resolve())
 if package_path.endswith('/scripts'):
