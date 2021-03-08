@@ -10,3 +10,4 @@ class Domset(Problem):
     n_start  = 6
     parser   = DomsetParser()
     verifier = DomsetVerifier()
+    approximable = True

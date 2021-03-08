@@ -10,3 +10,4 @@ class Scheduling(Problem):
     n_start = 5
     parser = SchedulingParser()
     verifier = SchedulingVerifier()
+    approximable = False

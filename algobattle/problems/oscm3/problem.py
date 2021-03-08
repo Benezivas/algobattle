@@ -10,3 +10,4 @@ class OSCM3(Problem):
     n_start = 3
     parser = OSCM3Parser()
     verifier = OSCM3Verifier()
+    approximable = True

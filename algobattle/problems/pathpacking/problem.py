@@ -10,3 +10,4 @@ class Pathpacking(Problem):
     n_start = 4
     parser = PathpackingParser()
     verifier = PathpackingVerifier()
+    approximable = True

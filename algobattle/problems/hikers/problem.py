@@ -10,3 +10,4 @@ class Hikers(Problem):
     n_start  = 5
     parser   = HikersParser()
     verifier = HikersVerifier()
+    approximable = True

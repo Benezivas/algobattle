@@ -10,3 +10,4 @@ class Delaytest(Problem):
     n_start = 1
     parser = DelaytestParser()
     verifier = DelaytestVerifier()
+    approximable = False

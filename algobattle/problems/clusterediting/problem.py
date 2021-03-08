@@ -10,3 +10,4 @@ class Clusterediting(Problem):
     n_start = 4
     parser = ClustereditingParser()
     verifier = ClustereditingVerifier()
+    approximable = True

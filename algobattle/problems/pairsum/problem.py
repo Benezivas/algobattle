@@ -11,3 +11,4 @@ class Pairsum(Problem):
     n_start = 4
     parser = PairsumParser()
     verifier = PairsumVerifier()
+    approximable = False

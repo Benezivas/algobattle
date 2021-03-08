@@ -119,6 +119,9 @@ def main():
         logger.critical('Importing the given problem failed with the following exception: "{}"'.format(e))
         sys.exit(1)
 
+    if options.approximation_ratio != 1.0 and not problem.approximable:
+        logger.critical('The selected problem cannot be approximated! Run it without the approximation ratio flag or pick a problem that is approximable!')
+        sys.exit(1)
 
     runtime_overhead = 0
     if not options.no_overhead_calculation:

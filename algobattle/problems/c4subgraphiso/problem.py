@@ -10,3 +10,4 @@ class C4subgraphiso(Problem):
     n_start = 4
     parser = C4subgraphisoParser()
     verifier = C4subgraphisoVerifier()
+    approximable = True

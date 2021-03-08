@@ -10,3 +10,4 @@ class Tests(Problem):
     n_start = 1
     parser = TestsParser()
     verifier = TestsVerifier()
+    approximable = False

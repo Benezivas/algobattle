@@ -10,3 +10,4 @@ class Biclique(Problem):
     n_start = 5
     parser = BicliqueParser()
     verifier = BicliqueVerifier()
+    approximable = True
