@@ -3,6 +3,8 @@ import timeit
 import logging
 
 import algobattle.sighandler as sigh
+from algobattle.team import Team
+from algobattle.problem import Problem
 
 logger = logging.getLogger('algobattle.framework')
 
@@ -10,7 +12,7 @@ class Match:
     """ Match class, responsible for setting up and executing the battles
     between two given teams. 
     """
-    def __init__(self, problem, config, generator1_path, generator2_path, solver1_path, solver2_path, group_nr_one, group_nr_two, runtime_overhead=0, approximation_ratio=1.0, approximation_instance_size=10, approximation_iterations=50, testing=False):
+    def __init__(self, problem: Problem, config: any, teams: list, runtime_overhead=0, approximation_ratio=1.0, approximation_instance_size=10, approximation_iterations=50, testing=False):
         self.timeout_build     = int(config['run_parameters']['timeout_build']) + runtime_overhead
         self.timeout_generator = int(config['run_parameters']['timeout_generator']) + runtime_overhead
         self.timeout_solver    = int(config['run_parameters']['timeout_solver']) + runtime_overhead
@@ -27,7 +29,7 @@ class Match:
 
         self.generating_team = None
         self.solving_team = None
-        self.build_successful = self._build(generator1_path, generator2_path, solver1_path, solver2_path, group_nr_one, group_nr_two)
+        self.build_successful = self._build(teams)
 
         self.base_build_command = [
             "docker",
@@ -40,7 +42,8 @@ class Match:
         ]
 
     def build_successful(function):
-        """ Decorator that ensures that internal methods are only callable after a successful build.
+        """ Decorator that ensures that internal methods are only callable after
+            a successful build.
         """
         def wrapper(self, *args, **kwargs):
             if not self.build_successful:
@@ -50,26 +53,28 @@ class Match:
                 return function(self, *args, **kwargs)
         return wrapper
 
-    def _build(self, generator1_path, generator2_path, solver1_path, solver2_path, group_nr_one, group_nr_two):
-        """Builds docker containers for the given generators and solvers.
-        
+    def team_roles_set(function):
+        """ Decorator that ensures that internal methods are only callable after
+            the generating_team and solving_team have been set.
+        """
+        def wrapper(self, *args, **kwargs):
+            if not self.generating_team or not self.solving_team:
+                logger.error('Generating or solving team have not been set!')
+                return None
+            else:
+                return function(self, *args, **kwargs)
+        return wrapper
+
+    def _build(self, teams):
+        """ Builds docker containers for the given generators and solvers of each
+            team.
+
         Parameters:
         ----------
-        generator1_path: str
-            Path to the generator of the first team.
-        generator1_path: str
-            Path to the generator of the second team.
-        solver1_path: str
-            Path to the solver of the first team.
-        solver2_path: str
-            Path to the solver of the second team.
-        group_nr_one: int
-            Group number of the first team.
-        group_nr_two: int
-            Group number of the second team.
-        Returns:
+        teams: list 
+            List of Team objects. Returns:
         ----------
-        Bool:
+        Bool: 
             Boolean indicating whether the build process succeeded.
         """
         docker_build_base = [
@@ -80,24 +85,32 @@ class Match:
             "-t"
         ]
 
-        if not isinstance(group_nr_one, int) or not isinstance(group_nr_two, int):
-            logger.error('Team numbers are expected to be nonnegative ints, received "{}" and "{}".'.format(group_nr_one, group_nr_two))
-            return False
-        elif not group_nr_one >= 0 or not group_nr_two >= 0:
-            logger.error('Team numbers are expected to be nonnegative ints, received "{}" and "{}".'.format(group_nr_one, group_nr_two))
-            return False
-        if group_nr_one == group_nr_two:
-            logger.error('Team numbers are equal ({}).'.format(group_nr_two))
+        if not isinstance(teams, list) or any(not isinstance(team, Team) for team in teams):
+            logger.error('Teams argument is expected to be a list of Team objects!')
             return False
 
-        self.teamA = group_nr_one
-        self.teamB = group_nr_two
-
+        self.team_numbers = [team.group_number for team in teams]
         build_commands = []
-        build_commands.append(docker_build_base + ["solver"+str(group_nr_one), solver1_path])
-        build_commands.append(docker_build_base + ["solver"+str(group_nr_two), solver2_path])
-        build_commands.append(docker_build_base + ["generator"+str(group_nr_one), generator1_path])
-        build_commands.append(docker_build_base + ["generator"+str(group_nr_two), generator2_path])
+        if len(self.team_numbers) != len(list(set(self.team_numbers))):
+            logger.error('At least one team number is used twice!')
+            return False
+
+
+        self.single_player = False
+        if len(teams) == 1:
+            self.single_player = True
+
+        for team in teams:
+            if not isinstance(team.group_number, int):
+                logger.error('Team numbers are expected to be nonnegative ints, received "{}".'.format(team.group_number))
+                return False
+            elif not team.group_number >= 0:
+                logger.error('Team numbers are expected to be nonnegative ints, received "{}".'.format(team.group_number))
+                return False
+
+        
+            build_commands.append(docker_build_base + ["solver" +   str(team.group_number), team.solver_path])
+            build_commands.append(docker_build_base + ["generator"+ str(team.group_number), team.generator_path])
 
         for command in build_commands:
             logger.debug('Building docker container with the following command: {}'.format(command))
@@ -119,6 +132,20 @@ class Match:
         return True
 
     @build_successful
+    def _all_battle_pairs(self):
+        """ Returns a list of all team pairings for battles.
+        """
+        battle_pairs = []
+        for i in range(len(self.team_numbers)):
+            for j in range(len(self.team_numbers)):
+                battle_pairs.append((self.team_numbers[i], self.team_numbers[j]))
+
+        if not self.single_player:
+            battle_pairs = [pair for pair in battle_pairs if pair[0] != pair[1]]
+
+        return battle_pairs
+
+    @build_successful
     def run(self, battle_type='iterated', iterations=5):
         """ Match entry point. Executes iterations fights between two teams and
         returns the results of the battles.
@@ -131,11 +158,10 @@ class Match:
             Number of Battles between teamA and teamB.
         Returns:
         ----------
-        (list, list) 
-            The lists contain the results of the battles for each team.
+        list
+            The lists contain the results of the battles for each team, each as a list.
         """
-        results_A = []
-        results_B = []
+        results = []
 
         battle_wrapper = None
 
@@ -147,20 +173,20 @@ class Match:
             logger.error('Unrecognized battle_type given: "{}"'.format(battle_type))
             return [], [], [], []
 
-        for i in range(iterations):
-            logger.info('{}  Running Battle {}/{}  {}'.format('#'*20, i+1,iterations, '#'*20))
+        for pair in self._all_battle_pairs():
+            pair_results = []
+            for i in range(iterations):
+                logger.info('{}  Running Battle {}/{}  {}'.format('#'*20, i+1,iterations, '#'*20))
 
-            self.generating_team = self.teamB
-            self.solving_team = self.teamA
-            results_A.append(battle_wrapper())
+                self.generating_team = pair[0]
+                self.solving_team = pair[1]
+                pair_results.append(battle_wrapper())
+            results.append(pair_results)
 
-            self.generating_team = self.teamA
-            self.solving_team = self.teamB
-            results_B.append(battle_wrapper())
-
-        return results_A, results_B
+        return results
 
     @build_successful
+    @team_roles_set
     def _averaged_battle_wrapper(self):
         """ Wrapper to execute one averaged battle between a generating
         and a solving team.
@@ -183,28 +209,29 @@ class Match:
         return approximation_ratios
 
     @build_successful
+    @team_roles_set
     def _iterated_battle_wrapper(self):
-        """ Wrapper to execute one iterative battle between a generating 
-        and a solving team.
+        """ Wrapper to execute one iterative battle between a generating and a
+        solving team.
 
-        Incrementally try to search for the highest n for which the solver
-        is still able to solve instances.  The base increment value is
-        multiplied with the square of the iterations since the last
-        unsolvable instance.  Only once the solver fails after the
-        multiplier is reset, it counts as failed. Since this would heavily
-        favour probabilistic algorithms (That may have only failed by chance
-        and are able to solve a certain instance size on a second try), we
-        cap the maximum solution size by the first value that an algorithm
-        has failed on.
+        Incrementally try to search for the highest n for which the solver is
+        still able to solve instances.  The base increment value is multiplied
+        with the square of the iterations since the last unsolvable instance.
+        Only once the solver fails after the multiplier is reset, it counts as
+        failed. Since this would heavily favour probabilistic algorithms (That
+        may have only failed by chance and are able to solve a certain instance
+        size on a second try), we cap the maximum solution size by the first
+        value that an algorithm has failed on.
 
-        The wrapper automatically ends the battle and declares the solver
-        as the winner once the iteration cap is reached, which is set
-        in the config.ini.
+        The wrapper automatically ends the battle and declares the solver as the
+        winner once the iteration cap is reached, which is set in the
+        config.ini.
 
         Returns:
         ----------
-        int
-            Returns the biggest instance size for which the solving team still found a solution.
+        int 
+            Returns the biggest instance size for which the solving team still
+            found a solution.
         """
         n = self.problem.n_start
         maximum_reached_n = 0
@@ -251,6 +278,7 @@ class Match:
         return maximum_reached_n
 
     @build_successful
+    @team_roles_set
     def _one_fight(self, instance_size):
         """Executes a single fight of a battle between a given generator and
         solver for a given instance size.
@@ -269,7 +297,7 @@ class Match:
         if not isinstance(instance_size, int) or not instance_size > 0:
             logger.error('Expected an instance size to be an int of size at least 1, received: {}'.format(instance_size))
             raise Exception('Expected the instance size to be a positive integer.')
-        
+
         generator_run_command = self.base_build_command + ["generator" + str(self.generating_team)]
         solver_run_command    = self.base_build_command + ["solver"    + str(self.solving_team)]
 
