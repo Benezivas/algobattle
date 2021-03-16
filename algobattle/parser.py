@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Tuple
 
 class Parser(ABC):
     """ Parser class, responsible for decoding and encoding of output sent from
@@ -6,7 +7,7 @@ class Parser(ABC):
     of instances and solutions.
     """
     @abstractmethod
-    def split_into_instance_and_solution(self, raw_input: any) -> Tuple(list, list):
+    def split_into_instance_and_solution(self, raw_input: any) -> Tuple[list, list]:
         """ Splits an input into instance and solution lines, discards anything else.
         
         The validity is only checked by grouping together lines with the same
