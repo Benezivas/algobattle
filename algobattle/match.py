@@ -58,7 +58,7 @@ class Match:
             the generating_team and solving_team have been set.
         """
         def wrapper(self, *args, **kwargs):
-            if not self.generating_team or not self.solving_team:
+            if not isinstance(self.generating_team, int) or not isinstance(self.solving_team, int):
                 logger.error('Generating or solving team have not been set!')
                 return None
             else:
@@ -72,7 +72,8 @@ class Match:
         Parameters:
         ----------
         teams: list 
-            List of Team objects. Returns:
+            List of Team objects. 
+        Returns:
         ----------
         Bool: 
             Boolean indicating whether the build process succeeded.
@@ -132,7 +133,7 @@ class Match:
         return True
 
     @build_successful
-    def _all_battle_pairs(self):
+    def all_battle_pairs(self):
         """ Returns a list of all team pairings for battles.
         """
         battle_pairs = []
@@ -147,7 +148,7 @@ class Match:
 
     @build_successful
     def run(self, battle_type='iterated', iterations=5):
-        """ Match entry point. Executes iterations fights between two teams and
+        """ Match entry point. Executes iterations fights between all teams and
         returns the results of the battles.
 
         Parameters:
@@ -155,13 +156,14 @@ class Match:
         battle_type: str
             Type of battle that is to be run.
         iterations: int
-            Number of Battles between teamA and teamB.
+            Number of Battles between each pair of teams (used for averaging results).
         Returns:
         ----------
-        list
-            The lists contain the results of the battles for each team, each as a list.
+        dict
+            A dictionary containing the results of the battles for each team with 
+            the team number as a key.
         """
-        results = []
+        results = dict()
 
         battle_wrapper = None
 
@@ -171,9 +173,10 @@ class Match:
             battle_wrapper = self._averaged_battle_wrapper
         else:
             logger.error('Unrecognized battle_type given: "{}"'.format(battle_type))
-            return [], [], [], []
+            return []
 
-        for pair in self._all_battle_pairs():
+        for pair in self.all_battle_pairs():
+            results[pair] = results.get(pair, [])
             pair_results = []
             for i in range(iterations):
                 logger.info('{}  Running Battle {}/{}  {}'.format('#'*20, i+1,iterations, '#'*20))
@@ -181,7 +184,7 @@ class Match:
                 self.generating_team = pair[0]
                 self.solving_team = pair[1]
                 pair_results.append(battle_wrapper())
-            results.append(pair_results)
+            results[pair] = pair_results
 
         return results
 
@@ -236,7 +239,7 @@ class Match:
         n = self.problem.n_start
         maximum_reached_n = 0
         i = 0
-        n_cap = 50000
+        n_cap = self.iteration_cap
         alive = True
 
         logger.info('==================== Iterative Battle, Instanze Size Cap: {} ===================='.format(n_cap))
