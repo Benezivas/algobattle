@@ -2,16 +2,16 @@ from abc import ABC, abstractmethod
 
 class Verifier(ABC):
     """ Verifier class, responsible for semantically checking parsed instances
-    and solutions, for checking the validity of a solution for a given instance
+    and solutions, for checking the validity of a solution against a given instance
     as well as for verifying that a solution is of a demanded quality, which
     usually refers to the solution size.
     """
 
     @abstractmethod
-    def verify_semantics_of_instance(self, instance, instance_size: int) -> bool:
+    def verify_semantics_of_instance(self, instance: any, instance_size: int) -> bool:
         """ Check the semantical correctness of an instance.
 
-        If the given instance ist semantically ill-formed in a way that
+        If the given instance is semantically ill-formed in a way that
         it cannot be passed to a solver, return False.
 
         Parameters:
@@ -29,11 +29,8 @@ class Verifier(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def verify_semantics_of_solution(self, instance, solution, instance_size: int, solution_type: bool )-> bool:
+    def verify_semantics_of_solution(self, instance: any, solution: any, instance_size: int, solution_type: bool )-> bool:
         """ Check whether a given solution is semantically correct.
-
-        Returns True if the solution is semantically correct enough such that
-        it can be checked against an instance.
 
         Parameters:
         ----------
@@ -54,7 +51,7 @@ class Verifier(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def verify_solution_against_instance(self, instance, solution, instance_size: int, solution_type: bool) -> bool:
+    def verify_solution_against_instance(self, instance: any, solution: any, instance_size: int, solution_type: bool) -> bool:
         """ Check the validity of a solution against an instance.
 
         Parameters:
@@ -76,7 +73,7 @@ class Verifier(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def calculate_approximation_ratio(self, instance, instance_size: int, generator_solution, solver_solution) -> float:
+    def calculate_approximation_ratio(self, instance: any, instance_size: int, generator_solution: any, solver_solution: any) -> float:
         """ Calculates how good a solvers solution is compared to a generators solution.
 
         Assuming an approximation problem, this method returns the approximation 
