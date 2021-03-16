@@ -11,6 +11,7 @@ from pathlib import Path
 import subprocess
 
 from algobattle.match import Match
+from algobattle.team import Team
 import algobattle.sighandler as sigh
 
 # Timestamp format: YYYY-MM-DD_HH:MM:SS
@@ -32,17 +33,14 @@ problem_path = str(Path(sys.argv[1]).resolve())
 default_logging_path = str(Path.home()) + '/.algobattle_logs/'
 
 ##Option parser to process arguments from the console.
-usage = 'usage: ./%prog FILE [options]\nExpecting (relative) path to the parent directory of the problem file as first argument.'
+usage = 'usage: ./%prog FILE [options]\nExpecting (relative) path to the parent directory of the problem file as first argument.\nIf you provide generators, solvers and group numbers for multiple teams, make sure that the order is the same for all three arguments!'
 parser = OptionParser(usage=usage)
 parser.add_option('--verbose', dest = 'verbose_logging', action = 'store_true', help = 'Log all debug messages.')
 parser.add_option('--output_folder', dest = 'folder_name', default = default_logging_path, help = 'Specify the folder into which all logging files are written to. Default: ~/.algobattle_logs/')
 parser.add_option('--config_file', dest = 'config_file', help = 'Path to a .ini configuration file to be used for the run. Defaults to the packages config.ini')
-parser.add_option('--solver1', dest = 'solver1_path', default = problem_path + '/solver/', help = 'Specify the folder name containing the solver of the first contestant. Default: arg1/solver/')
-parser.add_option('--solver2', dest = 'solver2_path', default = problem_path + '/solver/', help = 'Specify the folder name containing the solver of the second contestant. Default: arg1/solver/')
-parser.add_option('--generator1', dest = 'generator1_path', default = problem_path + '/generator/', help = 'Specify the folder name containing the generator of the first contestant. Default: arg1/generator/')
-parser.add_option('--generator2', dest = 'generator2_path', default = problem_path + '/generator/', help = 'Specify the folder name containing the generator of the second contestant. Default: arg1/generator/')
-parser.add_option('--group_nr_one', dest = 'group_nr_one', type=int, default = '0', help = 'Specify the group number of the first contestant. Default: 0')
-parser.add_option('--group_nr_two', dest = 'group_nr_two', type=int, default = '1', help = 'Specify the group number of the second contestant. Default: 1')
+parser.add_option('--solvers', dest = 'solvers', default = problem_path + '/solver/', help = 'Specify the folder names containing the solvers of all involved teams as a comma-seperated list. Default: arg1/solver/')
+parser.add_option('--generators', dest = 'generators', default = problem_path + '/generator/', help = 'Specify the folder names containing the generators of all involved teams as a comma-seperated list. Default: arg1/generator/')
+parser.add_option('--group_numbers', dest = 'group_nrs', default = '0', help = 'Specify the group numbers all involved teams as a list of nonnegative integers as a comma-seperated list. Default: 0')
 parser.add_option('--iterations', dest = 'battle_iterations', type=int, default = '5', help = 'Number of fights that are to be made in the battle (points are split between each fight). Default: 5')
 parser.add_option('--battle_type', dest = 'battle_type', choices=['iterated', 'averaged'], default = 'iterated', help = 'Selected battle type. Possible options: iterated, averaged. Default: iterated')
 parser.add_option('--approx_ratio', dest = 'approximation_ratio', type=float, default = '1.0', help = 'Tolerated approximation ratio for a problem, if compatible with approximation. Default: 1.0')
@@ -55,17 +53,26 @@ parser.add_option('--no-overhead-calculation', dest = 'no_overhead_calculation',
 
 (options, args) = parser.parse_args()
 
+solvers = options.solvers.split(',')
+generators = options.generators.split(',')
+group_numbers = options.group_nrs.split(',')
+
+if len(solvers) != len(generators) or len(solvers) != len(group_numbers) or len(group_numbers) != len(generators):
+    sys.exit('The number of provided generator paths ({}), solver paths ({}) and group numbers ({}) is not equal!'.format(len(generators), len(solvers), len(group_numbers)))
+
+if any(not group_nr.isdigit() for group_nr in group_numbers):
+    sys.exit('The group numbers are expected to be nonnegative integers!')
+group_numbers = [int(group_nr) for group_nr in group_numbers]
+
 # Validate that all paths given by options exist
 if not os.path.exists(problem_path):
     sys.exit('Input path "{}" does not exist in the file system! Use ./run.py --help for more information on usage and options.'.format(problem_path))
-if not os.path.exists(options.solver1_path):
-    sys.exit('The given path for option --solver1 "{}" does not exist in the file system! Use ./run.py --help for more information on usage and options.'.format(options.solver1_path))
-if not os.path.exists(options.solver2_path):
-    sys.exit('The given path for option --solver2 "{}" does not exist in the file system! Use ./run.py --help for more information on usage and options.'.format(options.solver2_path))
-if not os.path.exists(options.generator1_path):
-    sys.exit('The given path for option --generator1 "{}" does not exist in the file system! Use ./run.py --help for more information on usage and options.'.format(options.generator1_path))
-if not os.path.exists(options.generator2_path):
-    sys.exit('The given path for option --generator2 "{}" does not exist in the file system! Use ./run.py --help for more information on usage and options.'.format(options.generator2_path))
+for solver_path in solvers:
+    if not os.path.exists(solver_path):
+        sys.exit('The given path for option --solver "{}" does not exist in the file system! Use ./run.py --help for more information on usage and options.'.format(solver_path))
+for generator_path in generators:
+    if not os.path.exists(generator_path):
+        sys.exit('The given path for option --generator1 "{}" does not exist in the file system! Use ./run.py --help for more information on usage and options.'.format(generator_path))
 
 
 # Logging level below which no logs are supposed to be written out.
@@ -79,8 +86,7 @@ if not os.path.exists(options.folder_name):
     os.makedirs(options.folder_name)
 
 # Strings to build the logfile name
-group_stamp = '_{}v{}'.format(options.group_nr_one,options.group_nr_two)
-logging_path = options.folder_name + current_timestamp + group_stamp + '.log'
+logging_path = options.folder_name + current_timestamp + '.log'
 
 # Initialize logger
 logging.basicConfig(filename=logging_path, level=common_logging_level, format='%(asctime)s %(levelname)s: %(message)s', datefmt='%H:%M:%S')
@@ -129,14 +135,15 @@ def main():
         logger.critical('The selected problem cannot be approximated! Run it without the approximation ratio flag or pick a problem that is approximable!')
         sys.exit(1)
 
+    teams = []
+    for i in range(len(generators)):
+        teams.append(Team(group_numbers[i], generators[i], solvers[i]))
     runtime_overhead = 0
     if not options.no_overhead_calculation:
         logger.info('Running a benchmark to determine your machines I/O overhead to start and stop docker containers...')
         runtime_overhead = calculate_time_tolerance()
         logger.info('Maximal measured runtime overhead is at {} seconds. Adding this amount to the configured runtime.'.format(runtime_overhead))
-    match = Match(problem, config, options.generator1_path, options.generator2_path,
-                    options.solver1_path, options.solver2_path,
-                    int(options.group_nr_one), int(options.group_nr_two), runtime_overhead=runtime_overhead, 
+    match = Match(problem, config, teams, runtime_overhead=runtime_overhead, 
                     approximation_ratio=options.approximation_ratio, approximation_instance_size=options.approximation_instance_size,
                     approximation_iterations=options.approximation_iterations)
 
@@ -144,49 +151,65 @@ def main():
         logger.critical('Building the match object failed, exiting!')
         sys.exit(1)
 
-    results0, results1 = match.run(options.battle_type, options.battle_iterations)
+    results = match.run(options.battle_type, options.battle_iterations)
 
     logger.info('#'*70)
     if options.battle_iterations > 0:
         if options.battle_type == 'iterated':
             logger.info('Summary of the battle results: \n{}\n'.format(
-                format_summary_message_iterated(results0, results1, int(options.group_nr_one), int(options.group_nr_two))))
+                format_summary_message_iterated(results, match.all_battle_pairs())))
         elif options.battle_type == 'averaged':
             logger.info('Summary of the battle results: \n{}\n'.format(
-                format_summary_message_averaged(results0, results1, int(options.group_nr_one), int(options.group_nr_two))))
+                format_summary_message_averaged(results, match.all_battle_pairs())))
         else:
             logger.info('No summary message configured for this type of battle.')
+
         if not options.do_not_count_points:
-            points = options.points #Number of points that are awarded in total
-            points0 = 0 #points awarded to the first team
-            points1 = 0 #points awarded to the second team
+            points = calculate_points(results, options.points, group_numbers, options.battle_iterations ,options.battle_type)
+
+
+
+        for group_nr in group_numbers:
+            logger.info('Group {} gained {} points.'.format(group_nr, points[group_nr]))
+
+    print('You can find the log files for this run in {}'.format(logging_path))
+
+
+def calculate_points(results, achievable_points, group_numbers, battle_iterations, battle_type):
+    """ Calculate the number of achieved points, given results.
+    """
+    points = dict()
+    # We want all groups to be able to achieve the same number of total points, regardless of the number of teams
+    normalizer = (len(group_numbers) - 1) if len(group_numbers) > 1 else 1
+    for i in range(len(group_numbers)):
+        for j in range(i+1, len(group_numbers)):
+            points[group_numbers[i]] = points.get(group_numbers[i], 0)
+            points[group_numbers[j]] = points.get(group_numbers[j], 0)
             #Points are awarded for each match individually, as one run reaching the cap poisons the average number of points
-            for i in range(options.battle_iterations):
-                if options.battle_type == 'iterated':
-                    valuation0 = results0[i]
-                    valuation1 = results1[i]
-                elif options.battle_type == 'averaged':
+            for k in range(battle_iterations):
+                results[(group_numbers[i], group_numbers[j])][i]
+                if battle_type == 'iterated':
+                    valuation0 = results[(group_numbers[i], group_numbers[j])][k]
+                    valuation1 = results[(group_numbers[j], group_numbers[i])][k]
+                elif battle_type == 'averaged':
                     # The valuation of an averaged battle
                     # is the number of successfully executed battles divided by
                     # the average competitive ratio of successful battles,
                     # to account for failures on execution. A higher number
                     # thus means a better overall result. Normalized to the number of configured points.
-                    valuation0 = len(results0[i]) / (sum(results0[i]) / len(results0[i]))
-                    valuation1 = len(results1[i]) / (sum(results1[i]) / len(results1[i]))
+                    valuation0 = len(results[(group_numbers[i], group_numbers[j])][k]) / (sum(results[(group_numbers[i], group_numbers[j])][k]) / len(results[(group_numbers[i], group_numbers[j])][k]))
+                    valuation1 = len(results[(group_numbers[j], group_numbers[i])][k]) / (sum(results[(group_numbers[j], group_numbers[i])][k]) / len(results[(group_numbers[j], group_numbers[i])][k]))
                 else:
                     logger.info('Unclear how to calculate points for this type of battle.')
 
                 if valuation0 + valuation1 > 0:
-                    points0 += (points/options.battle_iterations * valuation0) / (valuation0 + valuation1)
-                    points1 += (points/options.battle_iterations * valuation1) / (valuation0 + valuation1)
+                    points[group_numbers[i]] += ( (achievable_points/battle_iterations * valuation0) / (valuation0 + valuation1) ) // normalizer
+                    points[group_numbers[j]] += ( (achievable_points/battle_iterations * valuation1) / (valuation0 + valuation1) ) // normalizer
                 else:
-                    points0 += (points/options.battle_iterations) // 2
-                    points1 += (points/options.battle_iterations) // 2
+                    points[group_numbers[i]] += ( (achievable_points/battle_iterations) // 2 ) // normalizer
+                    points[group_numbers[j]] += ( (achievable_points/battle_iterations) // 2 ) // normalizer
 
-            logger.info('Group {} gained {} points.'.format(options.group_nr_one, str(points0)))
-            logger.info('Group {} gained {} points.'.format(options.group_nr_two, str(points1)))
-
-    print('You can find the log files for this run in {}'.format(logging_path))
+    return points
 
 def calculate_time_tolerance():
     """ Calculate the I/O delay for starting and stopping docker on the host machine.
@@ -200,9 +223,8 @@ def calculate_time_tolerance():
     problem = Problem.Problem()
 
     delaytest_path = Problem.__file__[:-12] #remove /__init__.py
-    match = Match(problem, config, delaytest_path + '/generator', delaytest_path + '/generator',
-                    delaytest_path + '/solver', delaytest_path + '/solver',
-                    0, 1)
+    delaytest_team = Team(0, delaytest_path + '/generator', delaytest_path + '/solver')
+    match = Match(problem, config, [delaytest_team])
 
     if not match.build_successful:
         logger.warning('Building a match for the time tolerance calculation failed!')
@@ -217,7 +239,7 @@ def calculate_time_tolerance():
 
     return max_overhead
 
-def format_summary_message_iterated(results0, results1, teamA, teamB):
+def format_summary_message_iterated(results, all_battle_pairs):
     """ Format the results of a battle into a summary message.
 
         Parameters:
@@ -235,8 +257,7 @@ def format_summary_message_iterated(results0, results1, teamA, teamB):
         str:
             The formatted summary message.
     """
-    if not len(results0) == len(results1) == int(options.battle_iterations):
-        return "Number of results and summary messages are not the same!"
+    return ""
     summary = ""
     for i in range(int(options.battle_iterations)):
         summary += '='*25
@@ -256,7 +277,7 @@ def format_summary_message_iterated(results0, results1, teamA, teamB):
 
     return summary
 
-def format_summary_message_averaged(results0, results1, teamA, teamB):
+def format_summary_message_averaged(results, all_battle_pairs):
     """ Format the results of a battle into a summary message.
 
         Parameters:
@@ -274,8 +295,8 @@ def format_summary_message_averaged(results0, results1, teamA, teamB):
         str:
             The formatted summary message.
     """
-    if not len(results0) == len(results1) == int(options.battle_iterations):
-        return "Number of results and summary messages are not the same!"
+    return ""
+
     summary = ""
     for i in range(int(options.battle_iterations)):
         summary += '='*25
