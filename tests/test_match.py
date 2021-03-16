@@ -45,6 +45,27 @@ class Matchtests(unittest.TestCase):
           self.tests_path + '/solver', self.tests_path + '/solver', 0, 1, testing=True)
         self.assertFalse(match_build_fail.build_successful)
 
+        match = Match(self.problem, self.config, 
+          self.tests_path + '/generator', self.tests_path + '/generator',
+          self.tests_path + '/solver', self.tests_path + '/solver', 0, 'foo')
+        self.assertFalse(match.build_successful)
+
+        match = Match(self.problem, self.config, 
+          self.tests_path + '/generator', self.tests_path + '/generator',
+          self.tests_path + '/solver', self.tests_path + '/solver', 'foo', 1)
+        self.assertFalse(match.build_successful)
+
+        match = Match(self.problem, self.config, 
+          self.tests_path + '/generator', self.tests_path + '/generator',
+          self.tests_path + '/solver', self.tests_path + '/solver', 0.1, 1)
+        self.assertFalse(match.build_successful)
+
+        match = Match(self.problem, self.config, 
+          self.tests_path + '/generator', self.tests_path + '/generator',
+          self.tests_path + '/solver', self.tests_path + '/solver', 1, 0.1)
+        self.assertFalse(match.build_successful)
+
+
     def test_run(self):
         self.assertEqual(self.match.run(battle_type='foo'), ([],[],[],[]))
 
@@ -57,14 +78,6 @@ class Matchtests(unittest.TestCase):
     def test_one_fight(self):
         with self.assertRaises(Exception):
             self.match._one_fight(-1, 0, 1)
-        with self.assertRaises(Exception):
-            self.match._one_fight(1, 'foo', 1)
-        with self.assertRaises(Exception):
-            self.match._one_fight(1, 0, 'foo')
-        with self.assertRaises(Exception):
-            self.match._one_fight(1, 0.1, 1)
-        with self.assertRaises(Exception):
-            self.match._one_fight(1, 0, 1.1)
 
         config_short_timeout = configparser.ConfigParser()
         config_data = pkgutil.get_data('algobattle', 'config/config_short_run_timeout.ini').decode()
@@ -72,47 +85,47 @@ class Matchtests(unittest.TestCase):
         match_run_timeout = Match(self.problem, config_short_timeout, 
           self.tests_path + '/generator_timeout', self.tests_path + '/generator',
           self.tests_path + '/solver', self.tests_path + '/solver', 0, 1)
-        self.assertEqual(match_run_timeout._one_fight(1, 0, 1), 1.0)
+        self.assertEqual(match_run_timeout._one_fight(1), 1.0)
 
         match_broken_generator = Match(self.problem, self.config, 
           self.tests_path + '/generator_execution_error', self.tests_path + '/generator',
           self.tests_path + '/solver', self.tests_path + '/solver', 0, 1, testing=True)
-        self.assertEqual(match_broken_generator._one_fight(1, 0, 1), 1.0)
+        self.assertEqual(match_broken_generator._one_fight(1), 1.0)
 
         match_wrong_generator_instance = Match(self.problem, self.config, 
           self.tests_path + '/generator_wrong_instance', self.tests_path + '/generator',
           self.tests_path + '/solver', self.tests_path + '/solver', 0, 1)
-        self.assertEqual(match_wrong_generator_instance._one_fight(1, 0, 1), 1.0)
+        self.assertEqual(match_wrong_generator_instance._one_fight(1), 1.0)
 
         match_malformed_generator_solution = Match(self.problem, self.config, 
           self.tests_path + '/generator_malformed_solution', self.tests_path + '/generator',
           self.tests_path + '/solver', self.tests_path + '/solver', 0, 1)
-        self.assertEqual(match_malformed_generator_solution._one_fight(1, 0, 1), 1.0)
+        self.assertEqual(match_malformed_generator_solution._one_fight(1), 1.0)
 
         match_wrong_generator_certificate = Match(self.problem, self.config, 
           self.tests_path + '/generator_wrong_certificate', self.tests_path + '/generator',
           self.tests_path + '/solver', self.tests_path + '/solver', 0, 1)
-        self.assertEqual(match_wrong_generator_certificate._one_fight(1, 0, 1), 1.0)
+        self.assertEqual(match_wrong_generator_certificate._one_fight(1), 1.0)
 
         match_solver_timeout = Match(self.problem, config_short_timeout, 
           self.tests_path + '/generator', self.tests_path + '/generator',
           self.tests_path + '/solver', self.tests_path + '/solver_timeout', 0, 1)
-        self.assertEqual(match_solver_timeout._one_fight(1, 0, 1), 0.0)
+        self.assertEqual(match_solver_timeout._one_fight(1), 0.0)
 
         match_broken_solver = Match(self.problem, self.config, 
           self.tests_path + '/generator', self.tests_path + '/generator',
           self.tests_path + '/solver', self.tests_path + '/solver_execution_error', 0, 1, testing=True)
-        self.assertEqual(match_broken_solver._one_fight(1, 0, 1), 0.0)
+        self.assertEqual(match_broken_solver._one_fight(1), 0.0)
 
         match_malformed_solution = Match(self.problem, self.config, 
           self.tests_path + '/generator', self.tests_path + '/generator',
           self.tests_path + '/solver', self.tests_path + '/solver_malformed_solution', 0, 1)
-        self.assertEqual(match_malformed_solution._one_fight(1, 0, 1), 0.0)
+        self.assertEqual(match_malformed_solution._one_fight(1), 0.0)
 
         match_wrong_certificate = Match(self.problem, self.config, 
           self.tests_path + '/generator', self.tests_path + '/generator',
           self.tests_path + '/solver', self.tests_path + '/solver_wrong_certificate', 0, 1)
-        self.assertEqual(match_wrong_certificate._one_fight(1, 0, 1), 0.0)
+        self.assertEqual(match_wrong_certificate._one_fight(1), 0.0)
 
         self.config = configparser.ConfigParser()
         config_data = pkgutil.get_data('algobattle', 'config/config.ini').decode()
@@ -120,7 +133,7 @@ class Matchtests(unittest.TestCase):
         successful_match = Match(self.problem, self.config, 
           self.tests_path + '/generator', self.tests_path + '/generator',
           self.tests_path + '/solver', self.tests_path + '/solver', 0, 1)
-        self.assertEqual(successful_match._one_fight(1, 0, 1), 1.0)
+        self.assertEqual(successful_match._one_fight(1), 1.0)
 
     def test_run_subprocess(self):
         match_run_timeout = Match(self.problem, self.config, 
