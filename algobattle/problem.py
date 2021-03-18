@@ -8,6 +8,11 @@ class Problem(metaclass=ABCMeta):
     """
     @property
     @abstractmethod
+    def name(self):
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
     def n_start(self):
         raise NotImplementedError
 
@@ -25,3 +30,6 @@ class Problem(metaclass=ABCMeta):
     @abstractmethod
     def approximable(self):
         raise NotImplementedError
+
+    def __str__(self) -> str:
+        return self.name

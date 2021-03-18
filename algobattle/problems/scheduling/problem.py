@@ -7,6 +7,7 @@ from .verifier import SchedulingVerifier
 logger = logging.getLogger('algobattle.scheduling')
 
 class Scheduling(Problem):
+    name = 'Scheduling'
     n_start = 5
     parser = SchedulingParser()
     verifier = SchedulingVerifier()
