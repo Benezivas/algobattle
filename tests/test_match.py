@@ -5,7 +5,9 @@ import logging
 import importlib
 import configparser
 import pkgutil
+import os
 
+import algobattle
 from algobattle.match import Match
 from algobattle.team import Team
 
@@ -17,9 +19,8 @@ class Matchtests(unittest.TestCase):
         self.problem = Problem.Problem()
         self.tests_path = Problem.__file__[:-12] #remove /__init__.py
 
-        self.config = configparser.ConfigParser()
-        config_data = pkgutil.get_data('algobattle', 'config/config.ini').decode()
-        self.config.read_string(config_data)
+        self.config_directory = os.path.join(os.path.dirname(os.path.abspath(algobattle.__file__)), 'config')
+        self.config = os.path.join(self.config_directory, 'config.ini')
 
         self.team = Team(0, self.tests_path + '/generator', self.tests_path + '/solver')
 
@@ -31,9 +32,7 @@ class Matchtests(unittest.TestCase):
         match_malformed_docker_names = Match(self.problem, self.config, self.team, testing=True)
         self.assertFalse(match_malformed_docker_names._build((1,0)))
 
-        config_short_build_timeout = configparser.ConfigParser()
-        config_data = pkgutil.get_data('algobattle', 'config/config_short_build_timeout.ini').decode()
-        config_short_build_timeout.read_string(config_data)
+        config_short_build_timeout = os.path.join(self.config_directory, 'config_short_build_timeout.ini')
         team = Team(0, self.tests_path + '/generator_build_timeout', self.tests_path + '/solver')
         match_build_timeout = Match(self.problem, config_short_build_timeout, [team], testing=True)
         self.assertFalse(match_build_timeout.build_successful)
@@ -77,9 +76,7 @@ class Matchtests(unittest.TestCase):
         pass
 
     def test_one_fight(self):
-        config_short_timeout = configparser.ConfigParser()
-        config_data = pkgutil.get_data('algobattle', 'config/config_short_run_timeout.ini').decode()
-        config_short_timeout.read_string(config_data)
+        config_short_timeout = os.path.join(self.config_directory, 'config_short_run_timeout.ini')
         team = Team(0, self.tests_path + '/generator_timeout', self.tests_path + '/solver')
         match_run_timeout = Match(self.problem, config_short_timeout, [team])
         match_run_timeout.generating_team = 0
@@ -134,9 +131,6 @@ class Matchtests(unittest.TestCase):
         match_wrong_certificate.solving_team = 0
         self.assertEqual(match_wrong_certificate._one_fight(1), 0.0)
 
-        self.config = configparser.ConfigParser()
-        config_data = pkgutil.get_data('algobattle', 'config/config.ini').decode()
-        self.config.read_string(config_data)
         successful_match = Match(self.problem, self.config, [self.team])
         successful_match.generating_team = 0
         successful_match.solving_team = 0

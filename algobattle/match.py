@@ -1,6 +1,9 @@
 import subprocess
 import timeit
 import logging
+import configparser
+import pkgutil
+import os
 
 import algobattle.sighandler as sigh
 from algobattle.team import Team
@@ -12,7 +15,17 @@ class Match:
     """ Match class, responsible for setting up and executing the battles
     between two given teams. 
     """
-    def __init__(self, problem: Problem, config: any, teams: list, runtime_overhead=0, approximation_ratio=1.0, approximation_instance_size=10, approximation_iterations=50, testing=False):
+    def __init__(self, problem: Problem, config_path: str, teams: list, runtime_overhead=0, approximation_ratio=1.0, approximation_instance_size=10, approximation_iterations=50, testing=False):
+
+        config = configparser.ConfigParser()
+        if not config_path or not os.path.isfile(config_path):
+            logger.info('Config file not given or not found, using the default config/config.ini')
+            config_data = pkgutil.get_data('algobattle', 'config/config.ini').decode()
+            config.read_string(config_data)
+        else:
+            logger.info('Using additional configuration options from file "%s".', config_path)
+            config.read(config_path)
+
         self.timeout_build     = int(config['run_parameters']['timeout_build']) + runtime_overhead
         self.timeout_generator = int(config['run_parameters']['timeout_generator']) + runtime_overhead
         self.timeout_solver    = int(config['run_parameters']['timeout_solver']) + runtime_overhead
