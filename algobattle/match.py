@@ -7,30 +7,30 @@ import algobattle.sighandler as sigh
 from algobattle.team import Team
 from algobattle.problem import Problem
 
-logger = logging.getLogger('algobattle.framework')
+logger = logging.getLogger('algobattle.match')
 
 class Match:
-    """ Match class, responsible for setting up and executing the battles
+    """ Match class, provides functionality for setting up and executing battles
     between given teams. 
     """
-    def __init__(self, problem: Problem, config_path: str, teams: list, runtime_overhead=0, approximation_ratio=1.0, approximation_instance_size=10, approximation_iterations=50, testing=False):
+    def __init__(self, problem: Problem, config_path: str, teams: list, runtime_overhead=0, approximation_ratio=1.0, testing=False):
 
         config = configparser.ConfigParser()
         logger.info('Using additional configuration options from file "%s".', config_path)
         config.read(config_path)
 
-        self.timeout_build     = int(config['run_parameters']['timeout_build']) + runtime_overhead
-        self.timeout_generator = int(config['run_parameters']['timeout_generator']) + runtime_overhead
-        self.timeout_solver    = int(config['run_parameters']['timeout_solver']) + runtime_overhead
-        self.space_generator   = int(config['run_parameters']['space_generator']) 
-        self.space_solver      = int(config['run_parameters']['space_solver'])
-        self.cpus              = int(config['run_parameters']['cpus'])
-        self.iteration_cap     = int(config['run_parameters']['iteration_cap'])
+        self.timeout_build           = int(config['run_parameters']['timeout_build']) + runtime_overhead
+        self.timeout_generator       = int(config['run_parameters']['timeout_generator']) + runtime_overhead
+        self.timeout_solver          = int(config['run_parameters']['timeout_solver']) + runtime_overhead
+        self.space_generator         = int(config['run_parameters']['space_generator']) 
+        self.space_solver            = int(config['run_parameters']['space_solver'])
+        self.cpus                    = int(config['run_parameters']['cpus'])
+        self.iteration_cap           = int(config['run_parameters']['iteration_cap'])
+        self.aproximation_iterations = int(config['run_parameters']['aproximation_iterations'])
         self.problem = problem
         self.config = config
         self.approximation_ratio = approximation_ratio
-        self.approximation_instance_size = approximation_instance_size
-        self.aproximation_iterations = approximation_iterations
+        
         self.testing = testing
 
         self.generating_team = None
@@ -67,7 +67,7 @@ class Match:
             the generating_team and solving_team have been set.
         """
         def wrapper(self, *args, **kwargs):
-            if not isinstance(self.generating_team, int) or not isinstance(self.solving_team, int):
+            if not self.generating_team or not self.solving_team:
                 logger.error('Generating or solving team have not been set!')
                 return None
             else:
@@ -99,10 +99,10 @@ class Match:
             logger.error('Teams argument is expected to be a list of Team objects!')
             return False
 
-        self.team_numbers = [team.group_number for team in teams]
+        self.team_names = [team.name for team in teams]
         build_commands = []
-        if len(self.team_numbers) != len(list(set(self.team_numbers))):
-            logger.error('At least one team number is used twice!')
+        if len(self.team_names) != len(list(set(self.team_names))):
+            logger.error('At least one team name is used twice!')
             return False
 
 
@@ -111,16 +111,8 @@ class Match:
             self.single_player = True
 
         for team in teams:
-            if not isinstance(team.group_number, int):
-                logger.error('Team numbers are expected to be nonnegative ints, received "{}".'.format(team.group_number))
-                return False
-            elif not team.group_number >= 0:
-                logger.error('Team numbers are expected to be nonnegative ints, received "{}".'.format(team.group_number))
-                return False
-
-        
-            build_commands.append(docker_build_base + ["solver" +   str(team.group_number), team.solver_path])
-            build_commands.append(docker_build_base + ["generator"+ str(team.group_number), team.generator_path])
+            build_commands.append(docker_build_base + ["solver-" +   str(team.name), team.solver_path])
+            build_commands.append(docker_build_base + ["generator-"+ str(team.name), team.generator_path])
 
         for command in build_commands:
             logger.debug('Building docker container with the following command: {}'.format(command))
@@ -146,9 +138,9 @@ class Match:
         """ Returns a list of all team pairings for battles.
         """
         battle_pairs = []
-        for i in range(len(self.team_numbers)):
-            for j in range(len(self.team_numbers)):
-                battle_pairs.append((self.team_numbers[i], self.team_numbers[j]))
+        for i in range(len(self.team_names)):
+            for j in range(len(self.team_names)):
+                battle_pairs.append((self.team_names[i], self.team_names[j]))
 
         if not self.single_player:
             battle_pairs = [pair for pair in battle_pairs if pair[0] != pair[1]]
@@ -156,7 +148,7 @@ class Match:
         return battle_pairs
 
     @build_successful
-    def run(self, battle_type='iterated', iterations=5):
+    def run(self, battle_type='iterated', iterations=5, approximation_instance_size=10):
         """ Match entry point. Executes iterations fights between all teams and
         returns the results of the battles.
 
@@ -173,8 +165,8 @@ class Match:
             the team number as a key.
         """
         results = dict()
-
         battle_wrapper = None
+        self.approximation_instance_size = approximation_instance_size
 
         if battle_type == 'iterated':
             battle_wrapper = self._iterated_battle_wrapper
@@ -310,12 +302,12 @@ class Match:
             logger.error('Expected an instance size to be an int of size at least 1, received: {}'.format(instance_size))
             raise Exception('Expected the instance size to be a positive integer.')
 
-        generator_run_command = self.base_build_command + ["generator" + str(self.generating_team)]
-        solver_run_command    = self.base_build_command + ["solver"    + str(self.solving_team)]
+        generator_run_command = self.base_build_command + ["generator-" + str(self.generating_team)]
+        solver_run_command    = self.base_build_command + ["solver-"    + str(self.solving_team)]
 
         logger.info('Running generator of group {}...\n'.format(self.generating_team))
 
-        sigh.latest_running_docker_image = "generator" + str(self.generating_team)
+        sigh.latest_running_docker_image = "generator-" + str(self.generating_team)
         raw_instance_with_solution, elapsed_time = self._run_subprocess(generator_run_command, str(instance_size).encode(), self.timeout_generator)
         logger.info('Approximate elapsed runtime: {}/{} seconds.'.format(elapsed_time, self.timeout_generator))
         if not raw_instance_with_solution and float(elapsed_time) > self.timeout_generator:
@@ -349,7 +341,7 @@ class Match:
 
         logger.info('Running solver of group {}...\n'.format(self.solving_team))
 
-        sigh.latest_running_docker_image = "solver" + str(self.solving_team)
+        sigh.latest_running_docker_image = "solver-" + str(self.solving_team)
         raw_solver_solution, elapsed_time = self._run_subprocess(solver_run_command, self.problem.parser.encode(instance), self.timeout_solver)
         logger.info('Approximate elapsed runtime: {}/{} seconds.'.format(elapsed_time, self.timeout_solver))
         if not raw_solver_solution and float(elapsed_time) > self.timeout_generator:

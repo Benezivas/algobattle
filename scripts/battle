@@ -32,19 +32,18 @@ default_logging_path = str(Path.home()) + '/.algobattle_logs/'
 default_config = os.path.join(os.path.dirname(os.path.abspath(algobattle.__file__)), 'config', 'config.ini')
 
 ##Option parser to process arguments from the console.
-usage = 'usage: ./%prog FILE [options]\nExpecting (relative) path to the parent directory of the problem file as first argument.\nIf you provide generators, solvers and group numbers for multiple teams, make sure that the order is the same for all three arguments!'
+usage = 'usage: %prog FILE [options]\nExpecting (relative) path to the parent directory of the problem file as first argument.\nIf you provide generators, solvers and group numbers for multiple teams, make sure that the order is the same for all three arguments!'
 parser = OptionParser(usage=usage)
 parser.add_option('--verbose', dest = 'verbose_logging', action = 'store_true', help = 'Log all debug messages.')
 parser.add_option('--output_folder', dest = 'folder_name', default = default_logging_path, help = 'Specify the folder into which all logging files are written to. Default: ~/.algobattle_logs/')
 parser.add_option('--config_file', dest = 'config', default = default_config, help = 'Path to a .ini configuration file to be used for the run. Defaults to the packages config.ini')
 parser.add_option('--solvers', dest = 'solvers', default = problem_path + '/solver/', help = 'Specify the folder names containing the solvers of all involved teams as a comma-seperated list. Default: arg1/solver/')
 parser.add_option('--generators', dest = 'generators', default = problem_path + '/generator/', help = 'Specify the folder names containing the generators of all involved teams as a comma-seperated list. Default: arg1/generator/')
-parser.add_option('--group_numbers', dest = 'group_nrs', default = '0', help = 'Specify the group numbers all involved teams as a list of nonnegative integers as a comma-seperated list. Default: 0')
+parser.add_option('--group_names', dest = 'group_names', default = '0', help = 'Specify the group names of all involved teams as a list strings as a comma-seperated list. Default: "0"')
 parser.add_option('--iterations', dest = 'battle_iterations', type=int, default = '5', help = 'Number of fights that are to be made in the battle (points are split between each fight). Default: 5')
 parser.add_option('--battle_type', dest = 'battle_type', choices=['iterated', 'averaged'], default = 'iterated', help = 'Selected battle type. Possible options: iterated, averaged. Default: iterated')
 parser.add_option('--approx_ratio', dest = 'approximation_ratio', type=float, default = '1.0', help = 'Tolerated approximation ratio for a problem, if compatible with approximation. Default: 1.0')
 parser.add_option('--approx_inst_size', dest = 'approximation_instance_size', type=int, default = '10', help = 'If --battle_type=averaged, the instance size on which the averaged run is to be made . Default: 10')
-parser.add_option('--approx_iterations', dest = 'approximation_iterations', type=int, default = '50', help = 'If --battle_type=averaged, number of iteration over which the approximation ratio is averaged. Default: 50')
 parser.add_option('--points', dest = 'points', type=int, default = '100', help = 'Number of points for which are fought. Default: 100')
 parser.add_option('--do_not_count_points', dest = 'do_not_count_points', action = 'store_true', help = 'If set, points are not calculated for the run.')
 parser.add_option('-c', '--do_not_log_to_console', dest = 'do_not_log_to_console', action = 'store_true', help = 'Disable forking the logging output to stderr.')
@@ -52,16 +51,12 @@ parser.add_option('--no-overhead-calculation', dest = 'no_overhead_calculation',
 
 (options, args) = parser.parse_args()
 
-solvers = options.solvers.split(',')
-generators = options.generators.split(',')
-group_numbers = options.group_nrs.split(',')
+solvers       = options.solvers.split(',')
+generators    = options.generators.split(',')
+group_names = options.group_names.split(',')
 
-if len(solvers) != len(generators) or len(solvers) != len(group_numbers) or len(group_numbers) != len(generators):
-    sys.exit('The number of provided generator paths ({}), solver paths ({}) and group numbers ({}) is not equal!'.format(len(generators), len(solvers), len(group_numbers)))
-
-if any(not group_nr.isdigit() for group_nr in group_numbers):
-    sys.exit('The group numbers are expected to be nonnegative integers!')
-group_numbers = [int(group_nr) for group_nr in group_numbers]
+if len(solvers) != len(generators) or len(solvers) != len(group_names) or len(group_names) != len(generators):
+    sys.exit('The number of provided generator paths ({}), solver paths ({}) and group numbers ({}) is not equal!'.format(len(generators), len(solvers), len(group_names)))
 
 # Validate that all paths given by options exist
 if not os.path.exists(problem_path):
@@ -122,65 +117,63 @@ def main():
 
     teams = []
     for i in range(len(generators)):
-        teams.append(Team(group_numbers[i], generators[i], solvers[i]))
+        teams.append(Team(group_names[i], generators[i], solvers[i]))
     runtime_overhead = 0
     if not options.no_overhead_calculation:
         logger.info('Running a benchmark to determine your machines I/O overhead to start and stop docker containers...')
         runtime_overhead = calculate_time_tolerance(options.config)
         logger.info('Maximal measured runtime overhead is at {} seconds. Adding this amount to the configured runtime.'.format(runtime_overhead))
-    match = Match(problem, options.config, teams, runtime_overhead=runtime_overhead, 
-                    approximation_ratio=options.approximation_ratio, approximation_instance_size=options.approximation_instance_size,
-                    approximation_iterations=options.approximation_iterations)
+    match = Match(problem, options.config, teams, runtime_overhead=runtime_overhead, approximation_ratio=options.approximation_ratio)
 
     if not match.build_successful:
         logger.critical('Building the match object failed, exiting!')
         sys.exit(1)
 
-    results = match.run(options.battle_type, options.battle_iterations)
+    results = match.run(options.battle_type, options.battle_iterations, approximation_instance_size=options.approximation_instance_size)
 
     logger.info('#'*70)
     if not options.do_not_count_points:
-        points = calculate_points(results, options.points, group_numbers, options.battle_iterations ,options.battle_type)
+        points = calculate_points(results, options.points, group_names, options.battle_iterations ,options.battle_type)
 
-    for group_nr in group_numbers:
-        logger.info('Group {} gained {} points.'.format(group_nr, points[group_nr]))
+    for group_name in group_names:
+        logger.info('Group {} gained {} points.'.format(group_names, points[group_names]))
 
     print('You can find the log files for this run in {}'.format(logging_path))
 
 
-def calculate_points(results, achievable_points, group_numbers, battle_iterations, battle_type):
+def calculate_points(results, achievable_points, group_names, battle_iterations, battle_type):
     """ Calculate the number of achieved points, given results.
     """
     points = dict()
     # We want all groups to be able to achieve the same number of total points, regardless of the number of teams
-    normalizer = max(len(group_numbers) - 1, 1)
-    for i in range(len(group_numbers)):
-        for j in range(i+1, len(group_numbers)):
-            points[group_numbers[i]] = points.get(group_numbers[i], 0)
-            points[group_numbers[j]] = points.get(group_numbers[j], 0)
+    normalizer = max(len(group_names) - 1, 1)
+    for i in range(len(group_names)):
+        for j in range(i+1, len(group_names)):
+            points[group_names[i]] = points.get(group_names[i], 0)
+            points[group_names[j]] = points.get(group_names[j], 0)
             #Points are awarded for each match individually, as one run reaching the cap poisons the average number of points
             for k in range(battle_iterations):
-                results[(group_numbers[i], group_numbers[j])][i]
+                results[(group_names[i], group_names[j])][i]
                 if battle_type == 'iterated':
-                    valuation0 = results[(group_numbers[i], group_numbers[j])][k]
-                    valuation1 = results[(group_numbers[j], group_numbers[i])][k]
+                    valuation0 = results[(group_names[i], group_names[j])][k]
+                    valuation1 = results[(group_names[j], group_names[i])][k]
                 elif battle_type == 'averaged':
                     # The valuation of an averaged battle
                     # is the number of successfully executed battles divided by
                     # the average competitive ratio of successful battles,
                     # to account for failures on execution. A higher number
                     # thus means a better overall result. Normalized to the number of configured points.
-                    valuation0 = len(results[(group_numbers[i], group_numbers[j])][k]) / (sum(results[(group_numbers[i], group_numbers[j])][k]) / len(results[(group_numbers[i], group_numbers[j])][k]))
-                    valuation1 = len(results[(group_numbers[j], group_numbers[i])][k]) / (sum(results[(group_numbers[j], group_numbers[i])][k]) / len(results[(group_numbers[j], group_numbers[i])][k]))
+                    valuation0 = len(results[(group_names[i], group_names[j])][k]) / (sum(results[(group_names[i], group_names[j])][k]) / len(results[(group_names[i], group_names[j])][k]))
+                    valuation1 = len(results[(group_names[j], group_names[i])][k]) / (sum(results[(group_names[j], group_names[i])][k]) / len(results[(group_names[j], group_names[i])][k]))
                 else:
                     logger.info('Unclear how to calculate points for this type of battle.')
 
                 if valuation0 + valuation1 > 0:
-                    points[group_numbers[i]] += ( (achievable_points/battle_iterations * valuation0) / (valuation0 + valuation1) ) // normalizer
-                    points[group_numbers[j]] += ( (achievable_points/battle_iterations * valuation1) / (valuation0 + valuation1) ) // normalizer
+                    points[group_names[i]] += ( (achievable_points/battle_iterations * valuation0) / (valuation0 + valuation1) ) // normalizer
+                    points[group_names[j]] += ( (achievable_points/battle_iterations * valuation1) / (valuation0 + valuation1) ) // normalizer
                 else:
-                    points[group_numbers[i]] += ( (achievable_points/battle_iterations) // 2 ) // normalizer
-                    points[group_numbers[j]] += ( (achievable_points/battle_iterations) // 2 ) // normalizer
+                    points[group_names[i]] += ( (achievable_points/battle_iterations) // 2 ) // normalizer
+                    points[group_names[j]] += ( (achievable_points/battle_iterations) // 2 ) // normalizer
 
     return points
 
