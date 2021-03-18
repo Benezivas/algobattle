@@ -154,23 +154,11 @@ def main():
     results = match.run(options.battle_type, options.battle_iterations)
 
     logger.info('#'*70)
-    if options.battle_iterations > 0:
-        if options.battle_type == 'iterated':
-            logger.info('Summary of the battle results: \n{}\n'.format(
-                format_summary_message_iterated(results, match.all_battle_pairs())))
-        elif options.battle_type == 'averaged':
-            logger.info('Summary of the battle results: \n{}\n'.format(
-                format_summary_message_averaged(results, match.all_battle_pairs())))
-        else:
-            logger.info('No summary message configured for this type of battle.')
+    if not options.do_not_count_points:
+        points = calculate_points(results, options.points, group_numbers, options.battle_iterations ,options.battle_type)
 
-        if not options.do_not_count_points:
-            points = calculate_points(results, options.points, group_numbers, options.battle_iterations ,options.battle_type)
-
-
-
-        for group_nr in group_numbers:
-            logger.info('Group {} gained {} points.'.format(group_nr, points[group_nr]))
+    for group_nr in group_numbers:
+        logger.info('Group {} gained {} points.'.format(group_nr, points[group_nr]))
 
     print('You can find the log files for this run in {}'.format(logging_path))
 
@@ -180,7 +168,7 @@ def calculate_points(results, achievable_points, group_numbers, battle_iteration
     """
     points = dict()
     # We want all groups to be able to achieve the same number of total points, regardless of the number of teams
-    normalizer = (len(group_numbers) - 1) if len(group_numbers) > 1 else 1
+    normalizer = max(len(group_numbers) - 1, 1)
     for i in range(len(group_numbers)):
         for j in range(i+1, len(group_numbers)):
             points[group_numbers[i]] = points.get(group_numbers[i], 0)
@@ -238,79 +226,6 @@ def calculate_time_tolerance():
     max_overhead = round(max(overheads), 2)
 
     return max_overhead
-
-def format_summary_message_iterated(results, all_battle_pairs):
-    """ Format the results of a battle into a summary message.
-
-        Parameters:
-        ----------
-        results0: list 
-            List of reached instance sizes of teamA.
-        results1: list
-            List of reached instance sizes of teamB.
-        teamA: int
-            Group number of teamA.
-        teamB: int
-            Group number of teamB.
-        Returns:
-        ----------
-        str:
-            The formatted summary message.
-    """
-    return ""
-    summary = ""
-    for i in range(int(options.battle_iterations)):
-        summary += '='*25
-        summary += '\n\nResults of battle {}:\n'.format(i+1)
-        if results0[i] == 0:
-            summary += 'Solver {} did not solve a single instance.\n'.format(teamA)
-        else:
-            summary += 'Solver {} solved all instances up to size {}.\n'.format(teamA, results0[i])
-
-        if results1[i] == 0:
-            summary += 'Solver {} did not solve a single instance.\n'.format(teamB)
-        else:
-            summary += 'Solver {} solved all instances up to size {}.\n'.format(teamB, results1[i])
-
-    summary += 'Average solution size of group {}: {}\n'.format(teamA, sum(results0)//int(options.battle_iterations))
-    summary += 'Average solution size of group {}: {}\n'.format(teamB, sum(results1)//int(options.battle_iterations))
-
-    return summary
-
-def format_summary_message_averaged(results, all_battle_pairs):
-    """ Format the results of a battle into a summary message.
-
-        Parameters:
-        ----------
-        results0: list 
-            List of approximation ratios of teamA for each battle.
-        results1: list
-            List of approximation ratios of teamB for each battle.
-        teamA: int
-            Group number of teamA.
-        teamB: int
-            Group number of teamB.
-        Returns:
-        ----------
-        str:
-            The formatted summary message.
-    """
-    return ""
-
-    summary = ""
-    for i in range(int(options.battle_iterations)):
-        summary += '='*25
-        summary += '\n\nResults of battle {}:\n'.format(i+1)
-        if len(results0) > 0:
-            summary += 'Average approximation ratio of group {} with {} solved instances: {:.4f}\n'.format(teamA, len(results0[i]), sum(results0[i]) / len(results0[i]))
-        else:
-            summary += 'Group {} did not give a correct solution for any of the instances of this battle.'.format(teamA)
-        if len(results1) > 0:
-            summary += 'Average approximation ratio of group {} with {} solved instances: {:.4f}\n'.format(teamB, len(results1[i]), sum(results1[i]) / len(results1[i]))
-        else:
-            summary += 'Group {} did not give a correct solution for any of the instances of this battle.'.format(teamA)
-
-    return summary
 
 
 if __name__ == "__main__":
