@@ -3,8 +3,6 @@
 import unittest
 import logging
 import importlib
-import configparser
-import pkgutil
 import os
 
 import algobattle

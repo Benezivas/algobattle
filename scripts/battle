@@ -9,6 +9,7 @@ import datetime as dt
 import importlib.util
 from pathlib import Path
 
+import algobattle
 from algobattle.match import Match
 from algobattle.team import Team
 import algobattle.sighandler as sigh
@@ -18,25 +19,24 @@ _now = dt.datetime.now()
 current_timestamp = '{:04d}-{:02d}-{:02d}_{:02d}:{:02d}:{:02d}'.format(_now.year, _now.month, _now.day, _now.hour, _now.minute, _now.second)
 
 if len(sys.argv) < 2:
-    sys.exit('Expecting (relative) path to the parent directory of the problem file as argument. Use ./run.py --help for more information on usage and options.')
+    sys.exit('Expecting (relative) path to the parent directory of a problem file as argument. Use ./run.py --help for more information on usage and options.')
 
 docker_running = subprocess.Popen(['docker', 'info'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 _ = docker_running.communicate()
 if docker_running.returncode:
     sys.exit('Could not connect to the docker daemon. Is docker running?')
 
-package_path = '/' + str(Path(__file__).resolve())
-if package_path.endswith('/scripts'):
-    package_path = package_path [:-8]
 problem_path = str(Path(sys.argv[1]).resolve())
+
 default_logging_path = str(Path.home()) + '/.algobattle_logs/'
+default_config = os.path.join(os.path.dirname(os.path.abspath(algobattle.__file__)), 'config', 'config.ini')
 
 ##Option parser to process arguments from the console.
 usage = 'usage: ./%prog FILE [options]\nExpecting (relative) path to the parent directory of the problem file as first argument.\nIf you provide generators, solvers and group numbers for multiple teams, make sure that the order is the same for all three arguments!'
 parser = OptionParser(usage=usage)
 parser.add_option('--verbose', dest = 'verbose_logging', action = 'store_true', help = 'Log all debug messages.')
 parser.add_option('--output_folder', dest = 'folder_name', default = default_logging_path, help = 'Specify the folder into which all logging files are written to. Default: ~/.algobattle_logs/')
-parser.add_option('--config_file', dest = 'config', help = 'Path to a .ini configuration file to be used for the run. Defaults to the packages config.ini')
+parser.add_option('--config_file', dest = 'config', default = default_config, help = 'Path to a .ini configuration file to be used for the run. Defaults to the packages config.ini')
 parser.add_option('--solvers', dest = 'solvers', default = problem_path + '/solver/', help = 'Specify the folder names containing the solvers of all involved teams as a comma-seperated list. Default: arg1/solver/')
 parser.add_option('--generators', dest = 'generators', default = problem_path + '/generator/', help = 'Specify the folder names containing the generators of all involved teams as a comma-seperated list. Default: arg1/generator/')
 parser.add_option('--group_numbers', dest = 'group_nrs', default = '0', help = 'Specify the group numbers all involved teams as a list of nonnegative integers as a comma-seperated list. Default: 0')
