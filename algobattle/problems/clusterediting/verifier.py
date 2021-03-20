@@ -13,21 +13,20 @@ class ClustereditingVerifier(Verifier):
             return False
         return True
 
-    def verify_semantics_of_solution(self, instance, solution, instance_size: int, solution_type: bool):
+    def verify_semantics_of_solution(self, solution, instance_size: int, solution_type: bool):
         if not solution:
             logger.error('The solution is empty!')
             return False
-
-        solution_del = [line for line in solution if (line[0] == 's' and line[1] == 'del')]
-        for edge in solution_del:
-            if ('e', edge[2], edge[3]) not in instance and ('e', edge[3], edge[2]) not in instance:
-                logger.error('The solution tries to delete an edge that is not part of the instance!')
-                return False
         return True
 
     def verify_solution_against_instance(self, instance, solution, instance_size, solution_type):
         solution_add = [line for line in solution if (line[0] == 's' and line[1] == 'add')]
         solution_del = [line for line in solution if (line[0] == 's' and line[1] == 'del')]
+
+        for edge in solution_del:
+            if ('e', edge[2], edge[3]) not in instance and ('e', edge[3], edge[2]) not in instance:
+                logger.error('The solution tries to delete an edge that is not part of the instance!')
+                return False
 
         all_edges = set()
         for edge in instance:

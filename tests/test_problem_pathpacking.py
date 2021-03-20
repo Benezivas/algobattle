@@ -100,9 +100,9 @@ class Verifiertests(unittest.TestCase):
         self.assertFalse(self.verifier.verify_semantics_of_instance([], instance_size=10))
 
     def test_verify_semantics_of_solution(self):
-        self.assertFalse(self.verifier.verify_semantics_of_solution([('e', '1', '2'), ('e', '3', '1'), ('e', '3', '2')], [], 10, solution_type=False))
-        self.assertFalse(self.verifier.verify_semantics_of_solution([('e', '1', '2'), ('e', '3', '1'), ('e', '3', '2')], [('s', '1', '2', '1')], 10, solution_type=False))
-        self.assertTrue(self.verifier.verify_semantics_of_solution([('e', '1', '2'), ('e', '3', '1'), ('e', '3', '2')], [('s', '1', '2', '3')], 10, solution_type=False))
+        self.assertFalse(self.verifier.verify_semantics_of_solution([], 10, solution_type=False))
+        self.assertFalse(self.verifier.verify_semantics_of_solution([('s', '1', '2', '1')], 10, solution_type=False))
+        self.assertTrue(self.verifier.verify_semantics_of_solution([('s', '1', '2', '3')], 10, solution_type=False))
 
     def test_verify_solution_against_instance(self):
         #Valid solutions should be accepted

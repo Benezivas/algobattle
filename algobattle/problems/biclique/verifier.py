@@ -13,7 +13,7 @@ class BicliqueVerifier(Verifier):
             return False
         return True
 
-    def verify_semantics_of_solution(self, instance, solution, instance_size: int, solution_type: bool):
+    def verify_semantics_of_solution(self, solution, instance_size: int, solution_type: bool):
         if not solution:
             logger.error('The solution is empty!')
             return False

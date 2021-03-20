@@ -102,11 +102,11 @@ class Verifiertests(unittest.TestCase):
         self.assertFalse(self.verifier.verify_semantics_of_instance([], instance_size=2))
 
     def test_verify_semantics_of_solution(self):
-        self.assertFalse(self.verifier.verify_semantics_of_solution([('e', '1', '2')], [], 2, solution_type=False))
-        self.assertFalse(self.verifier.verify_semantics_of_solution([('e', '1', '2')], [('s', 'set1', '1')], 2, solution_type=False))
-        self.assertFalse(self.verifier.verify_semantics_of_solution([('e', '1', '2')], [('s', 'set2', '1')], 2, solution_type=False))
-        self.assertFalse(self.verifier.verify_semantics_of_solution([('e', '1', '2')], [('s', 'set1', '1'), ('s', 'set2', '1')], 2, solution_type=False))
-        self.assertTrue(self.verifier.verify_semantics_of_solution([('e', '1', '2')], [('s', 'set1', '1'), ('s', 'set2', '2')], 2, solution_type=False))
+        self.assertFalse(self.verifier.verify_semantics_of_solution([], 2, solution_type=False))
+        self.assertFalse(self.verifier.verify_semantics_of_solution([('s', 'set1', '1')], 2, solution_type=False))
+        self.assertFalse(self.verifier.verify_semantics_of_solution([('s', 'set2', '1')], 2, solution_type=False))
+        self.assertFalse(self.verifier.verify_semantics_of_solution([('s', 'set1', '1'), ('s', 'set2', '1')], 2, solution_type=False))
+        self.assertTrue(self.verifier.verify_semantics_of_solution([('s', 'set1', '1'), ('s', 'set2', '2')], 2, solution_type=False))
 
     def test_verify_solution_against_instance(self):
         instance = [('e', '1', '3'), ('e', '1', '4'), ('e', '2', '3'), ('e', '2', '4'), ('e', '2', '5')]

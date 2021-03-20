@@ -19,9 +19,9 @@ class Match:
         logger.info('Using additional configuration options from file "%s".', config_path)
         config.read(config_path)
 
-        self.timeout_build           = int(config['run_parameters']['timeout_build']) + runtime_overhead
+        self.timeout_build           = int(config['run_parameters']['timeout_build'])     + runtime_overhead
         self.timeout_generator       = int(config['run_parameters']['timeout_generator']) + runtime_overhead
-        self.timeout_solver          = int(config['run_parameters']['timeout_solver']) + runtime_overhead
+        self.timeout_solver          = int(config['run_parameters']['timeout_solver'])    + runtime_overhead
         self.space_generator         = int(config['run_parameters']['space_generator']) 
         self.space_solver            = int(config['run_parameters']['space_solver'])
         self.cpus                    = int(config['run_parameters']['cpus'])
@@ -39,6 +39,7 @@ class Match:
 
         if approximation_ratio != 1.0 and not problem.approximable:
             logger.error('The given problem is not approximable and can only be run with an approximation ratio of 1.0!')
+            self.build_successful = False
 
         self.base_build_command = [
             "docker",
@@ -174,7 +175,7 @@ class Match:
             battle_wrapper = self._averaged_battle_wrapper
         else:
             logger.error('Unrecognized battle_type given: "{}"'.format(battle_type))
-            return []
+            return {'Error': 'Unrecognized battle type'}
 
         for pair in self.all_battle_pairs():
             results[pair] = results.get(pair, [])
@@ -327,7 +328,7 @@ class Match:
             logger.warning('Generator {} created a malformed instance at instance size {}!'.format(self.generating_team, instance_size))
             return 1.0
 
-        if not self.problem.verifier.verify_semantics_of_solution(instance, generator_solution, instance_size, True):
+        if not self.problem.verifier.verify_semantics_of_solution(generator_solution, instance_size, True):
             logger.warning('Generator {} created a malformed solution at instance size {}!'.format(self.generating_team, instance_size))
             return 1.0
 
@@ -354,7 +355,7 @@ class Match:
         logger.info('Checking validity of the solvers solution...')
         
         solver_solution = self.problem.parser.parse_solution(raw_solver_solution, instance_size)
-        if not self.problem.verifier.verify_semantics_of_solution(instance, solver_solution, instance_size, True):
+        if not self.problem.verifier.verify_semantics_of_solution(solver_solution, instance_size, True):
             logger.warning('Solver {} created a malformed solution at instance size {}!'.format(self.solving_team, instance_size))
             return 0.0
         elif not self.problem.verifier.verify_solution_against_instance(instance, solver_solution, instance_size, False):

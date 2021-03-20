@@ -29,7 +29,7 @@ class Verifier(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def verify_semantics_of_solution(self, instance: any, solution: any, instance_size: int, solution_type: bool )-> bool:
+    def verify_semantics_of_solution(self, solution: any, instance_size: int, solution_type: bool )-> bool:
         """ Check whether a given solution is semantically correct.
 
         Parameters:

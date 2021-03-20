@@ -16,7 +16,7 @@ class SchedulingVerifier(Verifier):
 
         return True
 
-    def verify_semantics_of_solution(self, instance, solution, instance_size: int, solution_type: bool):
+    def verify_semantics_of_solution(self, solution, instance_size: int, solution_type: bool):
         # Solutions for this problem are semantically valid if they are syntactically valid.
         # We only check if the solution is empty.
         if not solution:

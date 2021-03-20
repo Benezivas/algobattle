@@ -98,11 +98,14 @@ class Verifiertests(unittest.TestCase):
         self.assertFalse(self.verifier.verify_semantics_of_instance([], instance_size=10))
 
     def test_verify_semantics_of_solution(self):
-        self.assertFalse(self.verifier.verify_semantics_of_solution([('e', '1', '2')], [], 10, solution_type=False))
-        self.assertFalse(self.verifier.verify_semantics_of_solution([('e', '1', '2')], [('s', 'del', '1', '3')], 10, solution_type=False))
-        self.assertTrue(self.verifier.verify_semantics_of_solution([('e', '1', '2')], [('s', 'add', '1', '3')], 10, solution_type=False))
+        self.assertFalse(self.verifier.verify_semantics_of_solution([], 10, solution_type=False))
 
     def test_verify_solution_against_instance(self):
+        #Deleting a nonexisting label should not be accepted
+        instance = [('e', '1', '2')]
+        solution = [('s', 'del', '1', '3')]
+        self.assertFalse(self.verifier.verify_solution_against_instance(instance, solution, instance_size=10, solution_type=False))
+
         #Deleting a label to make a valid solution should be accepted
         instance = [('e', '1', '2'), ('e', '3', '2'), ('e', '1', '3'), ('e', '1', '4')]
         solution = [('s', 'del', '1', '4')]

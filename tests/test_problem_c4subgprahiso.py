@@ -122,8 +122,8 @@ class Verifiertests(unittest.TestCase):
         self.assertFalse(self.verifier.verify_semantics_of_instance([], instance_size=10))
 
     def test_verify_semantics_of_solution(self):
-        self.assertFalse(self.verifier.verify_semantics_of_solution([('e', '1', '2')], [], 10, solution_type=False))
-        self.assertFalse(self.verifier.verify_semantics_of_solution([], [('s', '5', '6', '7', '8'), ('s', '5', '2', '9', '10')], instance_size=10, solution_type=False))
+        self.assertFalse(self.verifier.verify_semantics_of_solution([], 10, solution_type=False))
+        self.assertFalse(self.verifier.verify_semantics_of_solution([('s', '5', '6', '7', '8'), ('s', '5', '2', '9', '10')], instance_size=10, solution_type=False))
 
     def test_verify_solution_against_instance(self):
         instance = [('e', '1', '2'), ('e', '2', '3'), ('e', '3', '4'), ('e', '3', '5'), ('e', '5', '6'), ('e', '6', '7'), ('e', '7', '8'), ('e', '8', '9'), ('e', '9', '10'), ('e', '10', '1'), ('e', '2', '9'), ('e', '5', '9'), ('e', '5', '8')]
