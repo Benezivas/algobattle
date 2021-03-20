@@ -7,7 +7,7 @@ class Parser(ABC):
     of instances and solutions.
     """
     @abstractmethod
-    def split_into_instance_and_solution(self, raw_input: any) -> Tuple[list, list]:
+    def split_into_instance_and_solution(self, raw_input: any) -> Tuple[any, any]:
         """ Splits an input into instance and solution lines, discards anything else.
         
         The validity is only checked by grouping together lines with the same
@@ -28,7 +28,7 @@ class Parser(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def parse_instance(self, raw_instance: any, instance_size: int) -> list:
+    def parse_instance(self, raw_instance: any, instance_size: int) -> any:
         """ Removes all syntactially wrong lines from the raw instance.
 
         Parameters:
@@ -46,7 +46,7 @@ class Parser(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def parse_solution(self, raw_solution: any, instance_size: int) -> list:
+    def parse_solution(self, raw_solution: any, instance_size: int) -> any:
         """ Removes all syntactially wrong lines from the raw solution.
 
         Parameters:
@@ -64,7 +64,7 @@ class Parser(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def encode(self, input: list) -> bytes:
+    def encode(self, input: any) -> bytes:
         """ Encode an input and return it.
 
         This method is responsible for turning the output of parse_instance back
@@ -83,7 +83,7 @@ class Parser(ABC):
         return "\n".join(str(" ".join(str(element) for element in line)) for line in input).encode()
 
     @abstractmethod
-    def decode(self, raw_input: bytes) -> list:
+    def decode(self, raw_input: bytes) -> any:
         """ Decode an input and return it.
 
         This method is responsible for taking the output of a generator or 
