@@ -11,17 +11,9 @@ class SchedulingVerifier(Verifier):
             return False
 
         if sum(int(job[2]) for job in instance) * 5 >= 2 ** 64:
-            logger.warning('The cumulated job sizes exceed the given limit!')
+            logger.error('The cumulated job sizes exceed the given limit!')
             return False
 
-        return True
-
-    def verify_semantics_of_solution(self, solution, instance_size: int, solution_type: bool):
-        # Solutions for this problem are semantically valid if they are syntactically valid.
-        # We only check if the solution is empty.
-        if not solution:
-            logger.error('The solution is empty!')
-            return False
         return True
 
     def verify_solution_against_instance(self, instance, solution, instance_size, solution_type):

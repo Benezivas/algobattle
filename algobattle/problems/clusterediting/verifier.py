@@ -5,14 +5,6 @@ from algobattle.verifier import Verifier
 logger = logging.getLogger('algobattle.verifier')
 
 class ClustereditingVerifier(Verifier):
-    def verify_semantics_of_instance(self, instance, instance_size: int):
-        # Instances for this problem are semantically valid if they are syntactically valid.
-        # We only check if the instance is empty.
-        if not instance:
-            logger.error('The instance is empty!')
-            return False
-        return True
-
     def verify_semantics_of_solution(self, solution, instance_size: int, solution_type: bool):
         if not solution:
             logger.error('The solution is empty!')

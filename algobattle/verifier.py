@@ -1,4 +1,7 @@
 from abc import ABC, abstractmethod
+import logging
+
+logger = logging.getLogger('algobattle.verifier')
 
 class Verifier(ABC):
     """ Verifier class, responsible for semantically checking parsed instances
@@ -7,9 +10,10 @@ class Verifier(ABC):
     usually refers to the solution size.
     """
 
-    @abstractmethod
     def verify_semantics_of_instance(self, instance: any, instance_size: int) -> bool:
         """ Check the semantical correctness of an instance.
+
+        For most problems, this function does not need to be overwritten.
 
         If the given instance is semantically ill-formed in a way that
         it cannot be passed to a solver, return False.
@@ -26,11 +30,15 @@ class Verifier(ABC):
         bool
             Returns True if the instance is processable by a solver.
         """
-        raise NotImplementedError
+        if not instance:
+            logger.error('The instance is empty!')
+            return False
+        return True
 
-    @abstractmethod
     def verify_semantics_of_solution(self, solution: any, instance_size: int, solution_type: bool )-> bool:
         """ Check whether a given solution is semantically correct.
+
+        For most problems, this function does not need to be overwritten.
 
         Parameters:
         ----------
@@ -48,7 +56,10 @@ class Verifier(ABC):
         bool
             Returns True if the solution is semantically correct.
         """
-        raise NotImplementedError
+        if not solution:
+            logger.error('The solution is empty!')
+            return False
+        return True
 
     @abstractmethod
     def verify_solution_against_instance(self, instance: any, solution: any, instance_size: int, solution_type: bool) -> bool:
