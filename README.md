@@ -36,9 +36,6 @@ battle algobattle/problems/pairsum
 ```
 or provide any alternative problem folder path.
 
-Read the section *Creating a New Task* to learn about the expected
-structure of a problem.
-
 The `battle` script offers several options, e.g. to give custom paths for
 solvers and generators. Run `battle --help` for all options.
 
