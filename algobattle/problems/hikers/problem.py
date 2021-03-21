@@ -6,7 +6,10 @@ from .verifier import HikersVerifier
 
 logger = logging.getLogger('algobattle.hikers')
 
+
 class Hikers(Problem):
-    n_start  = 5
-    parser   = HikersParser()
+    name = 'Hikers'
+    n_start = 5
+    parser = HikersParser()
     verifier = HikersVerifier()
+    approximable = True

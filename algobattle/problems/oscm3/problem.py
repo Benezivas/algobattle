@@ -6,7 +6,10 @@ from .verifier import OSCM3Verifier
 
 logger = logging.getLogger('algobattle.oscm3')
 
+
 class OSCM3(Problem):
+    name = 'One-Sided Crossing Minimization-3'
     n_start = 3
     parser = OSCM3Parser()
     verifier = OSCM3Verifier()
+    approximable = True

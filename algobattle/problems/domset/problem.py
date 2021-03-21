@@ -6,7 +6,10 @@ from .verifier import DomsetVerifier
 
 logger = logging.getLogger('algobattle.domset')
 
+
 class Domset(Problem):
-    n_start  = 6
-    parser   = DomsetParser()
+    name = 'Dominating Set'
+    n_start = 6
+    parser = DomsetParser()
     verifier = DomsetVerifier()
+    approximable = True

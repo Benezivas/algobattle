@@ -4,6 +4,7 @@ from algobattle.verifier import Verifier
 
 logger = logging.getLogger('algobattle.verifier')
 
+
 class TestsVerifier(Verifier):
     def verify_semantics_of_instance(self, instance, instance_size: int):
         if not instance:
@@ -12,7 +13,7 @@ class TestsVerifier(Verifier):
             return False
         return True
 
-    def verify_semantics_of_solution(self, instance, solution, instance_size: int, solution_type: bool):
+    def verify_semantics_of_solution(self, solution, instance_size: int, solution_type: bool):
         if not solution:
             return False
 
@@ -27,4 +28,5 @@ class TestsVerifier(Verifier):
         return True
 
     def calculate_approximation_ratio(self, instance, instance_size, generator_solution, solver_solution):
-        return len([line for line in generator_solution if line[3] == '1']) / len([line for line in solver_solution if line[3] == '1']) 
+        return len([line for line in generator_solution if line[3] == '1']) / \
+               len([line for line in solver_solution if line[3] == '1'])

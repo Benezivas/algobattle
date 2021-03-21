@@ -6,7 +6,10 @@ from .verifier import ClustereditingVerifier
 
 logger = logging.getLogger('algobattle.clusterediting')
 
+
 class Clusterediting(Problem):
+    name = 'Cluster Editing'
     n_start = 4
     parser = ClustereditingParser()
     verifier = ClustereditingVerifier()
+    approximable = True

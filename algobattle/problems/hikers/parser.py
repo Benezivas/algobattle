@@ -1,7 +1,9 @@
 import logging
 
 from algobattle.parser import Parser
+
 logger = logging.getLogger('algobattle.parser')
+
 
 class HikersParser(Parser):
     def split_into_instance_and_solution(self, raw_input):
@@ -43,7 +45,7 @@ class HikersParser(Parser):
         return raw_instance
 
     def parse_solution(self, raw_solution, instance_size):
-        raw_solution = list(set(raw_solution)) #Remove duplicate lines
+        raw_solution = list(set(raw_solution))
         removable_lines = []
 
         for line in raw_solution:

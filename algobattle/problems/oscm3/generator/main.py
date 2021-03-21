@@ -1,5 +1,5 @@
 fin = open("input")
-fout = open("output","w")
+fout = open("output", "w")
 n = int(fin.readline())
 
 for i in range(n):

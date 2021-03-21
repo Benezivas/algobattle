@@ -1,11 +1,13 @@
 import logging
 
 from algobattle.parser import Parser
+
 logger = logging.getLogger('algobattle.parser')
+
 
 class PairsumParser(Parser):
     def split_into_instance_and_solution(self, raw_input):
-        
+
         raw_instance = ""
         raw_solution = [""]
 
@@ -34,14 +36,14 @@ class PairsumParser(Parser):
         for i in range(len(raw_instance)):
             raw_instance[i] = int(raw_instance[i])
 
-        return raw_instance[:min(len(raw_instance),instance_size)]
+        return raw_instance[:min(len(raw_instance), instance_size)]
 
     def parse_solution(self, raw_solution, instance_size):
         removable_entries = []
 
         if raw_solution:
             raw_solution = raw_solution[0].split()
-        
+
         for entry in raw_solution:
             if not entry.isdigit():
                 logger.warning('An entry of the solution is not a positive int!')
@@ -57,7 +59,6 @@ class PairsumParser(Parser):
             raw_solution[i] = int(raw_solution[i])
 
         return raw_solution
-
 
     def encode(self, input):
         return " ".join(str(element) for element in input).encode()

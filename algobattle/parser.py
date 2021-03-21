@@ -1,4 +1,6 @@
 from abc import ABC, abstractmethod
+from typing import Tuple
+
 
 class Parser(ABC):
     """ Parser class, responsible for decoding and encoding of output sent from
@@ -6,9 +8,9 @@ class Parser(ABC):
     of instances and solutions.
     """
     @abstractmethod
-    def split_into_instance_and_solution(self, raw_input):
+    def split_into_instance_and_solution(self, raw_input: any) -> Tuple[any, any]:
         """ Splits an input into instance and solution lines, discards anything else.
-        
+
         The validity is only checked by grouping together lines with the same
         first element as an identifier. No checks are made that test whether
         they are otherwise well formatted or semantically correct.
@@ -27,8 +29,8 @@ class Parser(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def parse_instance(self, raw_instance, instance_size):
-        """ Removes all syntactially and semantically wrong lines from the raw instance.
+    def parse_instance(self, raw_instance: any, instance_size: int) -> any:
+        """ Removes all syntactially wrong lines from the raw instance.
 
         Parameters:
         ----------
@@ -45,8 +47,8 @@ class Parser(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def parse_solution(self, raw_solution, instance_size):
-        """ Removes all syntactially and semantically wrong lines from the raw solution.
+    def parse_solution(self, raw_solution: any, instance_size: int) -> any:
+        """ Removes all syntactially wrong lines from the raw solution.
 
         Parameters:
         ----------
@@ -63,7 +65,7 @@ class Parser(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def encode(self, input):
+    def encode(self, input: any) -> bytes:
         """ Encode an input and return it.
 
         This method is responsible for turning the output of parse_instance back
@@ -82,10 +84,10 @@ class Parser(ABC):
         return "\n".join(str(" ".join(str(element) for element in line)) for line in input).encode()
 
     @abstractmethod
-    def decode(self, raw_input):
+    def decode(self, raw_input: bytes) -> any:
         """ Decode an input and return it.
 
-        This method is responsible for taking the output of a generator or 
+        This method is responsible for taking the output of a generator or
         solver and to transform it in a way that is readable by the
         split_into_instance_and_solution or parse_solution methods.
 

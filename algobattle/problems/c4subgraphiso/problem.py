@@ -6,7 +6,10 @@ from .verifier import C4subgraphisoVerifier
 
 logger = logging.getLogger('algobattle.c4subgraphiso')
 
+
 class C4subgraphiso(Problem):
+    name = 'Square Subgraph Isomorphism'
     n_start = 4
     parser = C4subgraphisoParser()
     verifier = C4subgraphisoVerifier()
+    approximable = True
