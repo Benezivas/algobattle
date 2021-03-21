@@ -206,7 +206,8 @@ class Match:
             Returns a list of the computed approximation ratios.
         """
         approximation_ratios = []
-        logger.info('==================== Averaged Battle, Instance Size: {}, Iterations: {} ===================='.format(self.approximation_instance_size, self.aproximation_iterations))
+        logger.info('==================== Averaged Battle, Instance Size: {}, Iterations: {} ===================='
+                    .format(self.approximation_instance_size, self.aproximation_iterations))
         for i in range(self.aproximation_iterations):
             logger.info('=============== Iteration: {}/{} ==============='.format(i+1, self.aproximation_iterations))
             approx_ratio = self._one_fight(instance_size=self.approximation_instance_size)
@@ -252,7 +253,8 @@ class Match:
             if approx_ratio == 0.0:
                 alive = False
             elif approx_ratio > self.approximation_ratio:
-                logger.info('Solver {} does not meet the required solution quality at instance size {}. ({}/{})'.format(self.solving_team, n, approx_ratio, self.approximation_ratio))
+                logger.info('Solver {} does not meet the required solution quality at instance size {}. ({}/{})'
+                            .format(self.solving_team, n, approx_ratio, self.approximation_ratio))
                 alive = False
 
             if not alive and i > 1:
@@ -305,12 +307,13 @@ class Match:
             raise Exception('Expected the instance size to be a positive integer.')
 
         generator_run_command = self.base_build_command + ["generator-" + str(self.generating_team)]
-        solver_run_command = self.base_build_command + ["solver-" + str(self.solving_team)]
+        solver_run_command    = self.base_build_command + ["solver-"    + str(self.solving_team)]
 
         logger.info('Running generator of group {}...\n'.format(self.generating_team))
 
         sigh.latest_running_docker_image = "generator-" + str(self.generating_team)
-        raw_instance_with_solution = self._run_subprocess(generator_run_command, str(instance_size).encode(), self.timeout_generator)
+        raw_instance_with_solution = self._run_subprocess(generator_run_command, str(instance_size).encode(),
+                                                          self.timeout_generator)
         if not raw_instance_with_solution:
             return 1.0
 
@@ -321,15 +324,18 @@ class Match:
         generator_solution         = self.problem.parser.parse_solution(raw_solution, instance_size)
 
         if not self.problem.verifier.verify_semantics_of_instance(instance, instance_size):
-            logger.warning('Generator {} created a malformed instance at instance size {}!'.format(self.generating_team, instance_size))
+            logger.warning('Generator {} created a malformed instance at instance size {}!'
+                           .format(self.generating_team, instance_size))
             return 1.0
 
         if not self.problem.verifier.verify_semantics_of_solution(generator_solution, instance_size, True):
-            logger.warning('Generator {} created a malformed solution at instance size {}!'.format(self.generating_team, instance_size))
+            logger.warning('Generator {} created a malformed solution at instance size {}!'
+                           .format(self.generating_team, instance_size))
             return 1.0
 
         if not self.problem.verifier.verify_solution_against_instance(instance, generator_solution, instance_size, True):
-            logger.warning('Generator {} failed at instance size {} due to a wrong certificate for its generated instance!'.format(self.generating_team, instance_size))
+            logger.warning('Generator {} failed at instance size {} due to a wrong certificate for its generated instance!'
+                           .format(self.generating_team, instance_size))
             return 1.0
 
         logger.info('Generated instance and certificate are valid!\n\n')
@@ -337,7 +343,8 @@ class Match:
         logger.info('Running solver of group {}...\n'.format(self.solving_team))
 
         sigh.latest_running_docker_image = "solver-" + str(self.solving_team)
-        raw_solver_solution = self._run_subprocess(solver_run_command, self.problem.parser.encode(instance), self.timeout_solver)
+        raw_solver_solution = self._run_subprocess(solver_run_command, self.problem.parser.encode(instance),
+                                                   self.timeout_solver)
         if not raw_solver_solution:
             return 0.0
 
@@ -345,14 +352,18 @@ class Match:
 
         solver_solution = self.problem.parser.parse_solution(raw_solver_solution, instance_size)
         if not self.problem.verifier.verify_semantics_of_solution(solver_solution, instance_size, True):
-            logger.warning('Solver {} created a malformed solution at instance size {}!'.format(self.solving_team, instance_size))
+            logger.warning('Solver {} created a malformed solution at instance size {}!'
+                           .format(self.solving_team, instance_size))
             return 0.0
         elif not self.problem.verifier.verify_solution_against_instance(instance, solver_solution, instance_size, False):
-            logger.warning('Solver {} yields a wrong solution at instance size {}!'.format(self.solving_team, instance_size))
+            logger.warning('Solver {} yields a wrong solution at instance size {}!'
+                           .format(self.solving_team, instance_size))
             return 0.0
         else:
-            approximation_ratio = self.problem.verifier.calculate_approximation_ratio(instance, instance_size, generator_solution, solver_solution)
-            logger.info('Solver {} yields a valid solution with an approx. ratio of {} at instance size {}.'.format(self.solving_team, approximation_ratio, instance_size))
+            approximation_ratio = self.problem.verifier.calculate_approximation_ratio(instance, instance_size,
+                                                                                      generator_solution, solver_solution)
+            logger.info('Solver {} yields a valid solution with an approx. ratio of {} at instance size {}.'
+                        .format(self.solving_team, approximation_ratio, instance_size))
             return approximation_ratio
 
     def run_generator(self):
