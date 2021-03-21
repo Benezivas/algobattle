@@ -310,13 +310,8 @@ class Match:
         logger.info('Running generator of group {}...\n'.format(self.generating_team))
 
         sigh.latest_running_docker_image = "generator-" + str(self.generating_team)
-        raw_instance_with_solution, elapsed_time = self._run_subprocess(generator_run_command, str(instance_size).encode(), self.timeout_generator)
-        logger.info('Approximate elapsed runtime: {}/{} seconds.'.format(elapsed_time, self.timeout_generator))
-        if not raw_instance_with_solution and float(elapsed_time) > self.timeout_generator:
-            logger.warning('Generator {} exceeded the given time limit at instance size {}!'.format(self.generating_team, instance_size))
-            return 1.0
-        elif not raw_instance_with_solution:
-            logger.warning('Generator {} threw an exception at instance size {}!'.format(self.generating_team, instance_size))
+        raw_instance_with_solution = self._run_subprocess(generator_run_command, str(instance_size).encode(), self.timeout_generator)
+        if not raw_instance_with_solution:
             return 1.0
 
         logger.info('Checking generated instance and certificate...')
@@ -339,18 +334,11 @@ class Match:
 
         logger.info('Generated instance and certificate are valid!\n\n')
 
-
-
         logger.info('Running solver of group {}...\n'.format(self.solving_team))
 
         sigh.latest_running_docker_image = "solver-" + str(self.solving_team)
-        raw_solver_solution, elapsed_time = self._run_subprocess(solver_run_command, self.problem.parser.encode(instance), self.timeout_solver)
-        logger.info('Approximate elapsed runtime: {}/{} seconds.'.format(elapsed_time, self.timeout_solver))
-        if not raw_solver_solution and float(elapsed_time) > self.timeout_generator:
-            logger.warning('Solver {} exceeded the given time limit at instance size {}!'.format(self.solving_team, instance_size))
-            return 0.0
-        elif not raw_solver_solution:
-            logger.warning('Solver {} threw an exception at instance size {}!'.format(self.solving_team, instance_size))
+        raw_solver_solution = self._run_subprocess(solver_run_command, self.problem.parser.encode(instance), self.timeout_solver)
+        if not raw_solver_solution:
             return 0.0
 
         logger.info('Checking validity of the solvers solution...')
@@ -366,6 +354,18 @@ class Match:
             approximation_ratio = self.problem.verifier.calculate_approximation_ratio(instance, instance_size, generator_solution, solver_solution)
             logger.info('Solver {} yields a valid solution with an approx. ratio of {} at instance size {}.'.format(self.solving_team, approximation_ratio, instance_size))
             return approximation_ratio
+
+    def run_generator(self):
+        pass
+
+    def validate_generator_output(raw_instance_with_solution, elapsed_time):
+        pass
+
+    def run_solver(self):
+        pass
+
+    def validate_solver_output(self):
+        pass
 
     @build_successful
     def _run_subprocess(self, run_command, input, timeout):
@@ -396,11 +396,18 @@ class Match:
             try:
                 raw_output, _ = p.communicate(input=input, timeout=timeout)
                 raw_output = self.problem.parser.decode(raw_output)
-            except Exception:
+            except subprocess.TimeoutExpired:
+                logger.warning('Time limit exceeded!')
+                return None
+            except Exception as e:
+                logger.warning('An exception was thrown while running the subprocess:\n{}'.format(e))
+                return None
+            finally:
                 p.kill()
                 p.wait()
                 sigh._kill_spawned_docker_containers()
 
         elapsed_time = round(timeit.default_timer() - start_time, 2)
+        logger.info('Approximate elapsed runtime: {}/{} seconds.'.format(elapsed_time, self.timeout_generator))
 
-        return raw_output, elapsed_time
+        return raw_output
