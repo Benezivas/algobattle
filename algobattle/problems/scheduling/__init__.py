@@ -1,1 +1,1 @@
-from .problem import Scheduling as Problem 
+from .problem import Scheduling as Problem

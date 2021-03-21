@@ -1,1 +1,1 @@
-from .problem import Biclique as Problem 
+from .problem import Biclique as Problem

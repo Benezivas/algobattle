@@ -1,7 +1,9 @@
 import logging
 
 from algobattle.parser import Parser
+
 logger = logging.getLogger('algobattle.parser')
+
 
 class DomsetParser(Parser):
     def split_into_instance_and_solution(self, raw_input):
@@ -17,7 +19,7 @@ class DomsetParser(Parser):
         return raw_instance, raw_solution
 
     def parse_instance(self, raw_instance, instance_size):
-        raw_instance = list(set(raw_instance)) #Remove duplicate lines
+        raw_instance = list(set(raw_instance))
         removable_lines = []
         for line in raw_instance:
             if len(line) != 3:
@@ -42,7 +44,7 @@ class DomsetParser(Parser):
         return raw_instance
 
     def parse_solution(self, raw_solution, instance_size):
-        raw_solution = list(set(raw_solution)) #Remove duplicate lines
+        raw_solution = list(set(raw_solution))
         removable_lines = []
         for line in raw_solution:
             if len(line) != 2:

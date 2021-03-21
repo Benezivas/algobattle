@@ -9,20 +9,22 @@ from algobattle.problem import Problem
 
 logger = logging.getLogger('algobattle.match')
 
+
 class Match:
     """ Match class, provides functionality for setting up and executing battles
-    between given teams. 
+    between given teams.
     """
-    def __init__(self, problem: Problem, config_path: str, teams: list, runtime_overhead=0, approximation_ratio=1.0, testing=False):
+    def __init__(self, problem: Problem, config_path: str, teams: list,
+                 runtime_overhead=0, approximation_ratio=1.0, testing=False):
 
         config = configparser.ConfigParser()
         logger.info('Using additional configuration options from file "%s".', config_path)
         config.read(config_path)
 
-        self.timeout_build           = int(config['run_parameters']['timeout_build'])     + runtime_overhead
+        self.timeout_build           = int(config['run_parameters']['timeout_build']) + runtime_overhead
         self.timeout_generator       = int(config['run_parameters']['timeout_generator']) + runtime_overhead
-        self.timeout_solver          = int(config['run_parameters']['timeout_solver'])    + runtime_overhead
-        self.space_generator         = int(config['run_parameters']['space_generator']) 
+        self.timeout_solver          = int(config['run_parameters']['timeout_solver']) + runtime_overhead
+        self.space_generator         = int(config['run_parameters']['space_generator'])
         self.space_solver            = int(config['run_parameters']['space_solver'])
         self.cpus                    = int(config['run_parameters']['cpus'])
         self.iteration_cap           = int(config['run_parameters']['iteration_cap'])
@@ -30,7 +32,7 @@ class Match:
         self.problem = problem
         self.config = config
         self.approximation_ratio = approximation_ratio
-        
+
         self.testing = testing
 
         self.generating_team = None
@@ -81,11 +83,11 @@ class Match:
 
         Parameters:
         ----------
-        teams: list 
-            List of Team objects. 
+        teams: list
+            List of Team objects.
         Returns:
         ----------
-        Bool: 
+        Bool:
             Boolean indicating whether the build process succeeded.
         """
         docker_build_base = [
@@ -106,14 +108,13 @@ class Match:
             logger.error('At least one team name is used twice!')
             return False
 
-
         self.single_player = False
         if len(teams) == 1:
             self.single_player = True
 
         for team in teams:
-            build_commands.append(docker_build_base + ["solver-" +   str(team.name), team.solver_path])
-            build_commands.append(docker_build_base + ["generator-"+ str(team.name), team.generator_path])
+            build_commands.append(docker_build_base + ["solver-" + str(team.name), team.solver_path])
+            build_commands.append(docker_build_base + ["generator-" + str(team.name), team.generator_path])
 
         for command in build_commands:
             logger.debug('Building docker container with the following command: {}'.format(command))
@@ -121,7 +122,7 @@ class Match:
                 try:
                     output, _ = process.communicate(timeout=self.timeout_build)
                     logger.debug(output.decode())
-                except subprocess.TimeoutExpired as e:
+                except subprocess.TimeoutExpired:
                     process.kill()
                     process.wait()
                     logger.error('Build process for {} ran into a timeout!'.format(command[5]))
@@ -162,7 +163,7 @@ class Match:
         Returns:
         ----------
         dict
-            A dictionary containing the results of the battles for each team with 
+            A dictionary containing the results of the battles for each team with
             the team number as a key.
         """
         results = dict()
@@ -181,7 +182,7 @@ class Match:
             results[pair] = results.get(pair, [])
             pair_results = []
             for i in range(iterations):
-                logger.info('{}  Running Battle {}/{}  {}'.format('#'*20, i+1,iterations, '#'*20))
+                logger.info('{}  Running Battle {}/{}  {}'.format('#'*20, i+1, iterations, '#'*20))
 
                 self.generating_team = pair[0]
                 self.solving_team = pair[1]
@@ -197,8 +198,8 @@ class Match:
         and a solving team.
 
         Execute several fights between two teams on a fixed instance size
-        and determine the average solution quality. 
-        
+        and determine the average solution quality.
+
         Returns:
         ----------
         list
@@ -207,7 +208,7 @@ class Match:
         approximation_ratios = []
         logger.info('==================== Averaged Battle, Instance Size: {}, Iterations: {} ===================='.format(self.approximation_instance_size, self.aproximation_iterations))
         for i in range(self.aproximation_iterations):
-            logger.info('=============== Iteration: {}/{} ==============='.format(i+1,self.aproximation_iterations))
+            logger.info('=============== Iteration: {}/{} ==============='.format(i+1, self.aproximation_iterations))
             approx_ratio = self._one_fight(instance_size=self.approximation_instance_size)
             approximation_ratios.append(approx_ratio)
 
@@ -234,7 +235,7 @@ class Match:
 
         Returns:
         ----------
-        int 
+        int
             Returns the biggest instance size for which the solving team still
             found a solution.
         """
@@ -246,7 +247,7 @@ class Match:
 
         logger.info('==================== Iterative Battle, Instanze Size Cap: {} ===================='.format(n_cap))
         while alive:
-            logger.info('=============== Instance Size: {}/{} ==============='.format(n,n_cap))
+            logger.info('=============== Instance Size: {}/{} ==============='.format(n, n_cap))
             approx_ratio = self._one_fight(instance_size=n)
             if approx_ratio == 0.0:
                 alive = False
@@ -255,25 +256,25 @@ class Match:
                 alive = False
 
             if not alive and i > 1:
-                #The step size increase was too aggressive, take it back and reset the increment multiplier
+                # The step size increase was too aggressive, take it back and reset the increment multiplier
                 logger.info('Setting the solution cap to {}...'.format(n))
                 n_cap = n
                 n -= i * i
                 i = 0
                 alive = True
             elif n > maximum_reached_n and alive:
-                #We solved an instance of bigger size than before
+                # We solved an instance of bigger size than before
                 maximum_reached_n = n
 
             if n+1 == n_cap:
                 alive = False
                 break
-            
+
             i += 1
             n += i * i
 
             if n >= n_cap and n_cap != self.iteration_cap:
-                #We have failed at this value of n already, reset the step size!
+                # We have failed at this value of n already, reset the step size!
                 n -= i * i - 1
                 i = 1
             elif n >= n_cap and n_cap == self.iteration_cap:
@@ -290,21 +291,21 @@ class Match:
 
         Parameters:
         ----------
-        instance_size: int 
+        instance_size: int
             The instance size, expected to be a positive int.
         Returns:
         ----------
         float
-            Returns the approximation ratio of the solver against 
-            the generator (1 if optimal, 0 if failed, >=1 if the 
-            generator solution is optimal). 
+            Returns the approximation ratio of the solver against
+            the generator (1 if optimal, 0 if failed, >=1 if the
+            generator solution is optimal).
         """
         if not isinstance(instance_size, int) or not instance_size > 0:
             logger.error('Expected an instance size to be an int of size at least 1, received: {}'.format(instance_size))
             raise Exception('Expected the instance size to be a positive integer.')
 
         generator_run_command = self.base_build_command + ["generator-" + str(self.generating_team)]
-        solver_run_command    = self.base_build_command + ["solver-"    + str(self.solving_team)]
+        solver_run_command = self.base_build_command + ["solver-" + str(self.solving_team)]
 
         logger.info('Running generator of group {}...\n'.format(self.generating_team))
 
@@ -353,7 +354,7 @@ class Match:
             return 0.0
 
         logger.info('Checking validity of the solvers solution...')
-        
+
         solver_solution = self.problem.parser.parse_solution(raw_solver_solution, instance_size)
         if not self.problem.verifier.verify_semantics_of_solution(solver_solution, instance_size, True):
             logger.warning('Solver {} created a malformed solution at instance size {}!'.format(self.solving_team, instance_size))
@@ -372,7 +373,7 @@ class Match:
 
         Parameters:
         ----------
-        run_command: list 
+        run_command: list
             The command that is to be executed.
         input: bytes
             Additional input for the subprocess, supplied to it via stdin.
@@ -395,11 +396,11 @@ class Match:
             try:
                 raw_output, _ = p.communicate(input=input, timeout=timeout)
                 raw_output = self.problem.parser.decode(raw_output)
-            except:
+            except Exception:
                 p.kill()
                 p.wait()
                 sigh._kill_spawned_docker_containers()
-            
+
         elapsed_time = round(timeit.default_timer() - start_time, 2)
 
         return raw_output, elapsed_time

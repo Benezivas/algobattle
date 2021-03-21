@@ -3,6 +3,7 @@ import logging
 
 logger = logging.getLogger('algobattle.verifier')
 
+
 class Verifier(ABC):
     """ Verifier class, responsible for semantically checking parsed instances
     and solutions, for checking the validity of a solution against a given instance
@@ -35,7 +36,7 @@ class Verifier(ABC):
             return False
         return True
 
-    def verify_semantics_of_solution(self, solution: any, instance_size: int, solution_type: bool )-> bool:
+    def verify_semantics_of_solution(self, solution: any, instance_size: int, solution_type: bool) -> bool:
         """ Check whether a given solution is semantically correct.
 
         For most problems, this function does not need to be overwritten.
@@ -84,10 +85,11 @@ class Verifier(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def calculate_approximation_ratio(self, instance: any, instance_size: int, generator_solution: any, solver_solution: any) -> float:
+    def calculate_approximation_ratio(self, instance: any, instance_size: int,
+                                      generator_solution: any, solver_solution: any) -> float:
         """ Calculates how good a solvers solution is compared to a generators solution.
 
-        Assuming an approximation problem, this method returns the approximation 
+        Assuming an approximation problem, this method returns the approximation
         factor of the solvers solution to the generators solution.
 
         Parameters:
@@ -105,7 +107,7 @@ class Verifier(ABC):
         ----------
         float
             Returns the solution quality of the solver solution relative to the generator solution.
-            The return value is the approximation ratio of the solver against 
+            The return value is the approximation ratio of the solver against
             the generator (1 if optimal, 0 if failed, else >1).
         """
         raise NotImplementedError

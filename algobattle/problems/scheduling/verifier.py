@@ -4,6 +4,7 @@ from algobattle.verifier import Verifier
 
 logger = logging.getLogger('algobattle.verifier')
 
+
 class SchedulingVerifier(Verifier):
     def verify_semantics_of_instance(self, instance, instance_size: int):
         if not instance:
@@ -24,7 +25,7 @@ class SchedulingVerifier(Verifier):
         all_jobs = set()
         for job in instance:
             all_jobs.add(job[1])
-        
+
         all_assigned_jobs = set()
         for assignment in solution:
             all_assigned_jobs.add(assignment[1])
@@ -58,4 +59,3 @@ class SchedulingVerifier(Verifier):
             makespans[machine - 1] += base_running_time * machine
 
         return max(makespans)
-

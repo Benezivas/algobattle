@@ -4,6 +4,7 @@ from algobattle.verifier import Verifier
 
 logger = logging.getLogger('algobattle.verifier')
 
+
 class BicliqueVerifier(Verifier):
     def verify_semantics_of_solution(self, solution, instance_size: int, solution_type: bool):
         if not solution:

@@ -4,6 +4,7 @@ from algobattle.verifier import Verifier
 
 logger = logging.getLogger('algobattle.verifier')
 
+
 class DelaytestVerifier(Verifier):
     def verify_semantics_of_instance(self, instance, instance_size: int):
         return True

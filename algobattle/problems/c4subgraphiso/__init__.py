@@ -1,1 +1,1 @@
-from .problem import C4subgraphiso as Problem 
+from .problem import C4subgraphiso as Problem

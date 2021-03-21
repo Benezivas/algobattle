@@ -1,1 +1,1 @@
-from .problem import Pairsum as Problem 
+from .problem import Pairsum as Problem

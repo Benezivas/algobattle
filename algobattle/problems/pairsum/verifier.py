@@ -4,6 +4,7 @@ from algobattle.verifier import Verifier
 
 logger = logging.getLogger('algobattle.verifier')
 
+
 class PairsumVerifier(Verifier):
     def verify_semantics_of_solution(self, solution, instance_size: int, solution_type: bool):
         # Solutions for this problem are semantically valid if they are syntactically valid.

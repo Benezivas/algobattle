@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Tuple
 
+
 class Parser(ABC):
     """ Parser class, responsible for decoding and encoding of output sent from
     and to generators and solvers. Implements methods for syntactical checks
@@ -9,7 +10,7 @@ class Parser(ABC):
     @abstractmethod
     def split_into_instance_and_solution(self, raw_input: any) -> Tuple[any, any]:
         """ Splits an input into instance and solution lines, discards anything else.
-        
+
         The validity is only checked by grouping together lines with the same
         first element as an identifier. No checks are made that test whether
         they are otherwise well formatted or semantically correct.
@@ -86,7 +87,7 @@ class Parser(ABC):
     def decode(self, raw_input: bytes) -> any:
         """ Decode an input and return it.
 
-        This method is responsible for taking the output of a generator or 
+        This method is responsible for taking the output of a generator or
         solver and to transform it in a way that is readable by the
         split_into_instance_and_solution or parse_solution methods.
 

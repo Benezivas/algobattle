@@ -9,13 +9,14 @@ import algobattle
 from algobattle.match import Match
 from algobattle.team import Team
 
-#logging.disable(logging.CRITICAL)
+logging.disable(logging.CRITICAL)
+
 
 class Matchtests(unittest.TestCase):
     def setUp(self) -> None:
         Problem = importlib.import_module('algobattle.problems.testsproblem')
         self.problem = Problem.Problem()
-        self.tests_path = Problem.__file__[:-12] #remove /__init__.py
+        self.tests_path = Problem.__file__[:-12]  # remove /__init__.py
 
         self.config_directory = os.path.join(os.path.dirname(os.path.abspath(algobattle.__file__)), 'config')
         self.config = os.path.join(self.config_directory, 'config.ini')
@@ -28,7 +29,7 @@ class Matchtests(unittest.TestCase):
         self.assertTrue(self.match.build_successful)
 
         match_malformed_docker_names = Match(self.problem, self.config, self.team, testing=True)
-        self.assertFalse(match_malformed_docker_names._build((1,0)))
+        self.assertFalse(match_malformed_docker_names._build((1, 0)))
 
         config_short_build_timeout = os.path.join(self.config_directory, 'config_short_build_timeout.ini')
         team = Team('0', self.tests_path + '/generator_build_timeout', self.tests_path + '/solver')
@@ -47,10 +48,10 @@ class Matchtests(unittest.TestCase):
         team1 = Team('1', self.tests_path + '/generator', self.tests_path + '/solver')
         teams = [team0, team1]
         match = Match(self.problem, self.config, teams)
-        self.assertEqual(match.all_battle_pairs(), [('0','1'), ('1','0')])
-        
+        self.assertEqual(match.all_battle_pairs(), [('0', '1'), ('1', '0')])
+
         match = Match(self.problem, self.config, [team0])
-        self.assertEqual(match.all_battle_pairs(), [('0','0')])
+        self.assertEqual(match.all_battle_pairs(), [('0', '0')])
 
     def test_run(self):
         self.assertEqual(self.match.run(battle_type='foo'), ({'Error': 'Unrecognized battle type'}))
@@ -125,9 +126,11 @@ class Matchtests(unittest.TestCase):
     def test_run_subprocess(self):
         team = Team('0', self.tests_path + '/generator_timeout', self.tests_path + '/solver')
         match_run_timeout = Match(self.problem, self.config, [team])
-        raw_output, elapsed_time = match_run_timeout._run_subprocess(match_run_timeout.base_build_command + ['generator-0'], 0, 2)
+        raw_output, elapsed_time = match_run_timeout._run_subprocess(match_run_timeout.base_build_command + ['generator-0'],
+                                                                     0, 2)
         self.assertGreater(elapsed_time, 1.99)
         self.assertEqual(raw_output, None)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -6,6 +6,7 @@ from .verifier import DelaytestVerifier
 
 logger = logging.getLogger('algobattle.delaytest')
 
+
 class Delaytest(Problem):
     name = 'Runtime Delay Test'
     n_start = 1

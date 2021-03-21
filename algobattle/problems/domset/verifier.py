@@ -4,6 +4,7 @@ from algobattle.verifier import Verifier
 
 logger = logging.getLogger('algobattle.verifier')
 
+
 class DomsetVerifier(Verifier):
     def verify_solution_against_instance(self, instance, solution, instance_size, solution_type):
         all_nodes = set()

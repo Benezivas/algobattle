@@ -1,1 +1,1 @@
-from .problem import Tests as Problem 
+from .problem import Tests as Problem

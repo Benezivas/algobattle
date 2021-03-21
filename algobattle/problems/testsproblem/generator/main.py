@@ -1,6 +1,5 @@
 fin = open("input")
-fout = open("output","w")
-#n = int(fin.readline())
-#fout.write("".join("i " + str(i+1) + "\n" for i in range(n)))
+fout = open("output", "w")
+
 fout.write("i 1\ns 1 1 1")
 fout.close()

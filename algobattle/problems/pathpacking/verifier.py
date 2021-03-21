@@ -4,6 +4,7 @@ from algobattle.verifier import Verifier
 
 logger = logging.getLogger('algobattle.verifier')
 
+
 class PathpackingVerifier(Verifier):
     def verify_semantics_of_solution(self, solution, instance_size: int, solution_type: bool):
         if not solution:
@@ -25,11 +26,11 @@ class PathpackingVerifier(Verifier):
         solution = [line[1:] for line in solution]
         for sol_path in solution:
             if (not (('e', sol_path[0], sol_path[1]) in instance or ('e', sol_path[1], sol_path[0]) in instance)
-             or not (('e', sol_path[1], sol_path[2]) in instance or ('e', sol_path[2], sol_path[1]) in instance)
-            ):
+                or not (('e', sol_path[1], sol_path[2]) in instance or ('e', sol_path[2], sol_path[1]) in instance)
+                ):
                 logger.error('At least one element of the solution is not a path in the input graph!')
                 return False
         return True
 
     def calculate_approximation_ratio(self, instance, instance_size, generator_solution, solver_solution):
-        return  float(len(generator_solution)) / float(len(solver_solution))
+        return float(len(generator_solution)) / float(len(solver_solution))

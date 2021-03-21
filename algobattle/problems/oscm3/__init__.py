@@ -1,1 +1,1 @@
-from .problem import OSCM3 as Problem 
+from .problem import OSCM3 as Problem

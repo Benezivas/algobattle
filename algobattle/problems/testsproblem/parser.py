@@ -1,7 +1,9 @@
 import logging
 
 from algobattle.parser import Parser
+
 logger = logging.getLogger('algobattle.parser')
+
 
 class TestsParser(Parser):
     def split_into_instance_and_solution(self, raw_input):

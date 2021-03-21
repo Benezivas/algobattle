@@ -1,7 +1,9 @@
 import logging
 
 from algobattle.parser import Parser
+
 logger = logging.getLogger('algobattle.parser')
+
 
 class OSCM3Parser(Parser):
     def split_into_instance_and_solution(self, raw_input):
@@ -17,7 +19,7 @@ class OSCM3Parser(Parser):
         return raw_instance, raw_solution
 
     def parse_instance(self, raw_instance, instance_size):
-        raw_instance = list(set(raw_instance)) #Remove duplicate lines
+        raw_instance = list(set(raw_instance))
         removable_lines = []
 
         seen_nodes = set()
@@ -55,7 +57,7 @@ class OSCM3Parser(Parser):
         for line in removable_lines:
             raw_instance.remove(line)
 
-        """ Fill up the removed or missing node slots with nodes of degree 0 to make 
+        """ Fill up the removed or missing node slots with nodes of degree 0 to make
         sure the solver always receives an instance of full length.
         """
         missing_nodes = set([i for i in range(instance_size)]).difference(seen_nodes)
@@ -76,8 +78,8 @@ class OSCM3Parser(Parser):
             return []
         if len(raw_solution) != instance_size + 1:
             logger.warning('The solution is of unexpected length!')
-            return[]
-        
+            return []
+
         included_nodes = set()
         for entry in raw_solution[1:]:
             if not entry.isdigit():
