@@ -14,9 +14,10 @@ from algobattle.problem import Problem
 
 logger = logging.getLogger('algobattle.util')
 
+
 def import_problem_from_path(problem_path: str) -> Problem:
     """ Tries to import and initialize a Problem object from a given path.
-    
+
     Parameters:
     ----------
     problem_path: str

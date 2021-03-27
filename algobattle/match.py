@@ -91,7 +91,7 @@ class Match:
         return wrapper
 
     @docker_running
-    def _build(self, teams, cache_docker_containers):
+    def _build(self, teams, cache_docker_containers=True):
         """ Builds docker containers for the given generators and solvers of each
             team.
 
@@ -328,7 +328,7 @@ class Match:
 
         sigh.latest_running_docker_image = "generator-" + str(self.generating_team)
         encoded_output, _ = run_subprocess(generator_run_command, str(instance_size).encode(),
-                                                             self.timeout_generator)
+                                           self.timeout_generator)
         if not encoded_output:
             return 1.0
 
@@ -361,7 +361,7 @@ class Match:
 
         sigh.latest_running_docker_image = "solver-" + str(self.solving_team)
         encoded_output, _ = run_subprocess(solver_run_command, self.problem.parser.encode(instance),
-                                                      self.timeout_solver)
+                                           self.timeout_solver)
         if not encoded_output:
             return 0.0
 
