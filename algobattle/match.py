@@ -76,6 +76,21 @@ class Match:
                 return function(self, *args, **kwargs)
         return wrapper
 
+    def docker_running(function):
+        """ Decorator that ensures that internal methods are only callable if
+        docker is running.
+        """
+        def wrapper(self, *args, **kwargs):
+            docker_running = subprocess.Popen(['docker', 'info'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            _ = docker_running.communicate()
+            if docker_running.returncode:
+                logger.error('Could not connect to the docker daemon. Is docker running?')
+                return None
+            else:
+                return function(self, *args, **kwargs)
+        return wrapper
+
+    @docker_running
     def _build(self, teams, cache_docker_containers):
         """ Builds docker containers for the given generators and solvers of each
             team.
@@ -284,6 +299,7 @@ class Match:
                 alive = False
         return maximum_reached_n
 
+    @docker_running
     @build_successful
     @team_roles_set
     def _one_fight(self, instance_size):

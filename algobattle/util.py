@@ -3,15 +3,39 @@ import os
 import logging
 import timeit
 import subprocess
+import importlib.util
+import sys
 
 import algobattle
 import algobattle.problems.delaytest as DelaytestProblem
-from algobattle.match import Match
-from algobattle.team import Team
 import algobattle.sighandler as sigh
+from algobattle.problem import Problem
 
 
 logger = logging.getLogger('algobattle.util')
+
+def import_problem_from_path(problem_path: str) -> Problem:
+    """ Tries to import and initialize a Problem object from a given path.
+    
+    Parameters:
+    ----------
+    problem_path: str
+        dict containing the results of match.run().
+    Returns:
+    ----------
+    Problem
+        Returns an object of the problem if successful, None otherwise.
+    """
+    try:
+        spec = importlib.util.spec_from_file_location("problem", problem_path + "/__init__.py")
+        Problem = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = Problem
+        spec.loader.exec_module(Problem)
+
+        return Problem.Problem()
+    except Exception as e:
+        logger.critical('Importing the given problem failed with the following exception: "{}"'.format(e))
+        return None
 
 
 def measure_runtime_overhead() -> float:
@@ -26,10 +50,10 @@ def measure_runtime_overhead() -> float:
     problem = DelaytestProblem.Problem()
 
     delaytest_path = DelaytestProblem.__file__[:-12]  # remove /__init__.py
-    delaytest_team = Team(0, delaytest_path + '/generator', delaytest_path + '/solver')
+    delaytest_team = algobattle.team.Team(0, delaytest_path + '/generator', delaytest_path + '/solver')
 
     config_path = os.path.join(os.path.dirname(os.path.abspath(algobattle.__file__)), 'config', 'config.ini')
-    match = Match(problem, config_path, [delaytest_team])
+    match = algobattle.match.Match(problem, config_path, [delaytest_team])
 
     if not match.build_successful:
         logger.warning('Building a match for the time tolerance calculation failed!')
@@ -37,8 +61,8 @@ def measure_runtime_overhead() -> float:
     overheads = []
     for i in range(10):
         sigh.latest_running_docker_image = "generator0"
-        _, timeout = match._run_subprocess(match.base_build_command + ["generator0"],
-                                           input=str(50*i).encode(), timeout=match.timeout_generator)
+        _, timeout = run_subprocess(match.base_build_command + ["generator0"],
+                                    input=str(50*i).encode(), timeout=match.timeout_generator)
         overheads.append(float(timeout))
 
     max_overhead = round(max(overheads), 2)
@@ -107,7 +131,7 @@ def calculate_points(results: dict, achievable_points: int, team_names: list,
     return points
 
 
-def run_subprocess(self, run_command, input, timeout, suppress_output=False):
+def run_subprocess(run_command: list, input: bytes, timeout: float, suppress_output=False):
     """ Run a given command as a subprocess.
 
     Parameters:
@@ -116,12 +140,14 @@ def run_subprocess(self, run_command, input, timeout, suppress_output=False):
         The command that is to be executed.
     input: bytes
         Additional input for the subprocess, supplied to it via stdin.
-    timeout: int
+    timeout: float
         The timeout for the subprocess in seconds.
+    suppress_output: bool
+        Indicate whether to suppress output to stderr.
     Returns:
     ----------
     any
-        The output that the process returns, decoded by the problem parser.
+        The output that the process returns.
     float
         Actual running time of the process.
     """
