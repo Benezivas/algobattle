@@ -93,7 +93,7 @@ def calculate_points(results: dict, achievable_points: int, team_names: list,
         A mapping between team names and their achieved points.
     """
     points = dict()
-    
+
     if len(team_names) == 1:
         return {team_names[0]: achievable_points}
 
