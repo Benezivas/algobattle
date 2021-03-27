@@ -1,11 +1,12 @@
 import subprocess
-import timeit
+
 import logging
 import configparser
 
 import algobattle.sighandler as sigh
 from algobattle.team import Team
 from algobattle.problem import Problem
+from algobattle.util import run_subprocess
 
 logger = logging.getLogger('algobattle.match')
 
@@ -15,10 +16,10 @@ class Match:
     between given teams.
     """
     def __init__(self, problem: Problem, config_path: str, teams: list,
-                 runtime_overhead=0, approximation_ratio=1.0, testing=False):
+                 runtime_overhead=0, approximation_ratio=1.0, cache_docker_containers=True):
 
         config = configparser.ConfigParser()
-        logger.info('Using additional configuration options from file "%s".', config_path)
+        logger.debug('Using additional configuration options from file "%s".', config_path)
         config.read(config_path)
 
         self.timeout_build           = int(config['run_parameters']['timeout_build']) + runtime_overhead
@@ -33,11 +34,9 @@ class Match:
         self.config = config
         self.approximation_ratio = approximation_ratio
 
-        self.testing = testing
-
         self.generating_team = None
         self.solving_team = None
-        self.build_successful = self._build(teams)
+        self.build_successful = self._build(teams, cache_docker_containers)
 
         if approximation_ratio != 1.0 and not problem.approximable:
             logger.error('The given problem is not approximable and can only be run with an approximation ratio of 1.0!')
@@ -77,7 +76,22 @@ class Match:
                 return function(self, *args, **kwargs)
         return wrapper
 
-    def _build(self, teams):
+    def docker_running(function):
+        """ Decorator that ensures that internal methods are only callable if
+        docker is running.
+        """
+        def wrapper(self, *args, **kwargs):
+            docker_running = subprocess.Popen(['docker', 'info'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            _ = docker_running.communicate()
+            if docker_running.returncode:
+                logger.error('Could not connect to the docker daemon. Is docker running?')
+                return None
+            else:
+                return function(self, *args, **kwargs)
+        return wrapper
+
+    @docker_running
+    def _build(self, teams, cache_docker_containers=True):
         """ Builds docker containers for the given generators and solvers of each
             team.
 
@@ -93,7 +107,7 @@ class Match:
         docker_build_base = [
             "docker",
             "build",
-        ] + (["--no-cache"] if self.testing else []) + [
+        ] + (["--no-cache"] if not cache_docker_containers else []) + [
             "--network=host",
             "-t"
         ]
@@ -285,6 +299,7 @@ class Match:
                 alive = False
         return maximum_reached_n
 
+    @docker_running
     @build_successful
     @team_roles_set
     def _one_fight(self, instance_size):
@@ -312,10 +327,12 @@ class Match:
         logger.info('Running generator of group {}...\n'.format(self.generating_team))
 
         sigh.latest_running_docker_image = "generator-" + str(self.generating_team)
-        raw_instance_with_solution = self._run_subprocess(generator_run_command, str(instance_size).encode(),
-                                                          self.timeout_generator)
-        if not raw_instance_with_solution:
+        encoded_output, _ = run_subprocess(generator_run_command, str(instance_size).encode(),
+                                           self.timeout_generator)
+        if not encoded_output:
             return 1.0
+
+        raw_instance_with_solution = self.problem.parser.decode(encoded_output)
 
         logger.info('Checking generated instance and certificate...')
 
@@ -343,10 +360,12 @@ class Match:
         logger.info('Running solver of group {}...\n'.format(self.solving_team))
 
         sigh.latest_running_docker_image = "solver-" + str(self.solving_team)
-        raw_solver_solution = self._run_subprocess(solver_run_command, self.problem.parser.encode(instance),
-                                                   self.timeout_solver)
-        if not raw_solver_solution:
+        encoded_output, _ = run_subprocess(solver_run_command, self.problem.parser.encode(instance),
+                                           self.timeout_solver)
+        if not encoded_output:
             return 0.0
+
+        raw_solver_solution = self.problem.parser.decode(encoded_output)
 
         logger.info('Checking validity of the solvers solution...')
 
@@ -365,60 +384,3 @@ class Match:
             logger.info('Solver {} yields a valid solution with an approx. ratio of {} at instance size {}.'
                         .format(self.solving_team, approximation_ratio, instance_size))
             return approximation_ratio
-
-    def run_generator(self):
-        pass
-
-    def validate_generator_output(raw_instance_with_solution, elapsed_time):
-        pass
-
-    def run_solver(self):
-        pass
-
-    def validate_solver_output(self):
-        pass
-
-    @build_successful
-    def _run_subprocess(self, run_command, input, timeout):
-        """ Run a given command as a subprocess.
-
-        Parameters:
-        ----------
-        run_command: list
-            The command that is to be executed.
-        input: bytes
-            Additional input for the subprocess, supplied to it via stdin.
-        timeout: int
-            The timeout for the subprocess in seconds.
-        Returns:
-        ----------
-        any
-            The output that the process returns, decoded by the problem parser.
-        float
-            Actual running time of the process.
-        """
-        start_time = timeit.default_timer()
-        raw_output = None
-
-        stderr = None
-        if self.testing:
-            stderr = subprocess.PIPE
-        with subprocess.Popen(run_command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=stderr) as p:
-            try:
-                raw_output, _ = p.communicate(input=input, timeout=timeout)
-                raw_output = self.problem.parser.decode(raw_output)
-            except subprocess.TimeoutExpired:
-                logger.warning('Time limit exceeded!')
-                return None
-            except Exception as e:
-                logger.warning('An exception was thrown while running the subprocess:\n{}'.format(e))
-                return None
-            finally:
-                p.kill()
-                p.wait()
-                sigh._kill_spawned_docker_containers()
-
-        elapsed_time = round(timeit.default_timer() - start_time, 2)
-        logger.info('Approximate elapsed runtime: {}/{} seconds.'.format(elapsed_time, self.timeout_generator))
-
-        return raw_output

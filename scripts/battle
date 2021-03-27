@@ -2,127 +2,111 @@
 import sys
 import os
 import logging
-import subprocess
 
 from optparse import OptionParser
 import datetime as dt
-import importlib.util
 from pathlib import Path
 
 import algobattle
 from algobattle.match import Match
 from algobattle.team import Team
-import algobattle.sighandler as sigh
-
-# Timestamp format: YYYY-MM-DD_HH:MM:SS
-_now = dt.datetime.now()
-current_timestamp = '{:04d}-{:02d}-{:02d}_{:02d}:{:02d}:{:02d}'.format(_now.year, _now.month, _now.day, _now.hour, _now.minute, _now.second)
-
-if len(sys.argv) < 2:
-    sys.exit('Expecting (relative) path to the parent directory of a problem file as argument. Use ./run.py --help for more information on usage and options.')
-
-docker_running = subprocess.Popen(['docker', 'info'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-_ = docker_running.communicate()
-if docker_running.returncode:
-    sys.exit('Could not connect to the docker daemon. Is docker running?')
-
-problem_path = str(Path(sys.argv[1]).resolve())
-
-default_logging_path = str(Path.home()) + '/.algobattle_logs/'
-default_config = os.path.join(os.path.dirname(os.path.abspath(algobattle.__file__)), 'config', 'config.ini')
-
-##Option parser to process arguments from the console.
-usage = 'usage: %prog FILE [options]\nExpecting (relative) path to the parent directory of the problem file as first argument.\nIf you provide generators, solvers and group numbers for multiple teams, make sure that the order is the same for all three arguments!'
-parser = OptionParser(usage=usage)
-parser.add_option('--verbose', dest = 'verbose_logging', action = 'store_true', help = 'Log all debug messages.')
-parser.add_option('--output_folder', dest = 'folder_name', default = default_logging_path, help = 'Specify the folder into which all logging files are written to. Default: ~/.algobattle_logs/')
-parser.add_option('--config_file', dest = 'config', default = default_config, help = 'Path to a .ini configuration file to be used for the run. Defaults to the packages config.ini')
-parser.add_option('--solvers', dest = 'solvers', default = problem_path + '/solver/', help = 'Specify the folder names containing the solvers of all involved teams as a comma-seperated list. Default: arg1/solver/')
-parser.add_option('--generators', dest = 'generators', default = problem_path + '/generator/', help = 'Specify the folder names containing the generators of all involved teams as a comma-seperated list. Default: arg1/generator/')
-parser.add_option('--team_names', dest = 'team_names', default = '0', help = 'Specify the group names of all involved teams as a list strings as a comma-seperated list. Default: "0"')
-parser.add_option('--iterations', dest = 'battle_iterations', type=int, default = '5', help = 'Number of fights that are to be made in the battle (points are split between each fight). Default: 5')
-parser.add_option('--battle_type', dest = 'battle_type', choices=['iterated', 'averaged'], default = 'iterated', help = 'Selected battle type. Possible options: iterated, averaged. Default: iterated')
-parser.add_option('--approx_ratio', dest = 'approximation_ratio', type=float, default = '1.0', help = 'Tolerated approximation ratio for a problem, if compatible with approximation. Default: 1.0')
-parser.add_option('--approx_inst_size', dest = 'approximation_instance_size', type=int, default = '10', help = 'If --battle_type=averaged, the instance size on which the averaged run is to be made . Default: 10')
-parser.add_option('--points', dest = 'points', type=int, default = '100', help = 'Number of points for which are fought. Default: 100')
-parser.add_option('--do_not_count_points', dest = 'do_not_count_points', action = 'store_true', help = 'If set, points are not calculated for the run.')
-parser.add_option('-c', '--do_not_log_to_console', dest = 'do_not_log_to_console', action = 'store_true', help = 'Disable forking the logging output to stderr.')
-parser.add_option('--no-overhead-calculation', dest = 'no_overhead_calculation', action = 'store_true', help = 'If set, the program does not benchmark the I/O of the host system to calculate the runtime overhead when started.')
-
-(options, args) = parser.parse_args()
-
-solvers       = options.solvers.split(',')
-generators    = options.generators.split(',')
-team_names = options.team_names.split(',')
-
-if len(solvers) != len(generators) or len(solvers) != len(team_names) or len(team_names) != len(generators):
-    sys.exit('The number of provided generator paths ({}), solver paths ({}) and group numbers ({}) is not equal!'.format(len(generators), len(solvers), len(team_names)))
-
-# Validate that all paths given by options exist
-if not os.path.exists(problem_path):
-    sys.exit('Input path "{}" does not exist in the file system! Use ./run.py --help for more information on usage and options.'.format(problem_path))
-for solver_path in solvers:
-    if not os.path.exists(solver_path):
-        sys.exit('The given path for option --solver "{}" does not exist in the file system! Use ./run.py --help for more information on usage and options.'.format(solver_path))
-for generator_path in generators:
-    if not os.path.exists(generator_path):
-        sys.exit('The given path for option --generator1 "{}" does not exist in the file system! Use ./run.py --help for more information on usage and options.'.format(generator_path))
+from algobattle.util import calculate_points, measure_runtime_overhead, import_problem_from_path
 
 
-# Logging level below which no logs are supposed to be written out.
-common_logging_level = logging.INFO
+if __name__ == "__main__":
+    def setup_logging(logging_path, verbose_logging, silent):
+        common_logging_level = logging.INFO
 
-# Enable logging of all levels if the option is set
-if options.verbose_logging:
-    common_logging_level = logging.DEBUG
+        if verbose_logging:
+            common_logging_level = logging.DEBUG
 
-if not os.path.exists(options.folder_name):
-    os.makedirs(options.folder_name)
+        if not os.path.exists(logging_path):
+            os.makedirs(logging_path)
 
-# Strings to build the logfile name
-logging_path = options.folder_name + current_timestamp + '.log'
+        _now = dt.datetime.now()
+        current_timestamp = '{:04d}-{:02d}-{:02d}_{:02d}:{:02d}:{:02d}'.format(_now.year, _now.month, _now.day, _now.hour, _now.minute, _now.second)
+        logging_path = logging_path + current_timestamp + '.log'
 
-# Initialize logger
-logging.basicConfig(filename=logging_path, level=common_logging_level, format='%(asctime)s %(levelname)s: %(message)s', datefmt='%H:%M:%S')
-# Parent-logger for the whole program
-logger = logging.getLogger('algobattle')
+        logging.basicConfig(filename=logging_path, level=common_logging_level, format='%(asctime)s %(levelname)s: %(message)s', datefmt='%H:%M:%S')
 
-# Pipe logging out to console if not disabled by option
-if not options.do_not_log_to_console:
-    _consolehandler = logging.StreamHandler(stream=sys.stderr)
-    _consolehandler.setLevel(common_logging_level)
+        logger = logging.getLogger('algobattle')
 
-    _consolehandler.setFormatter(logging.Formatter('%(message)s'))
+        if not silent:
+            # Pipe logging out to console
+            _consolehandler = logging.StreamHandler(stream=sys.stderr)
+            _consolehandler.setLevel(common_logging_level)
 
-    logger.addHandler(_consolehandler)
+            _consolehandler.setFormatter(logging.Formatter('%(message)s'))
 
-logger.debug('Options for this run: {}'.format(options))
-logger.debug('Contents of sys.argv: {}'.format(sys.argv))
+            logger.addHandler(_consolehandler)
 
-def main():
-    try:
-        spec = importlib.util.spec_from_file_location("problem", problem_path + "/__init__.py")
-        Problem = importlib.util.module_from_spec(spec)
-        sys.modules[spec.name] = Problem
-        spec.loader.exec_module(Problem)
+        logger.info('You can find the log files for this run in {}'.format(logging_path))
+        return logger
 
-        problem = Problem.Problem()
-    except Exception as e:
-        logger.critical('Importing the given problem failed with the following exception: "{}"'.format(e))
-        sys.exit(1)
 
-    if options.approximation_ratio != 1.0 and not problem.approximable:
-        logger.critical('The selected problem cannot be approximated! Run it without the approximation ratio flag or pick a problem that is approximable!')
+    if len(sys.argv) < 2:
+        sys.exit('Expecting (relative) path to the parent directory of a problem file as argument. Use "battle --help" for more information on usage and options.')
+
+    problem_path = str(Path(sys.argv[1]).resolve())
+
+    default_logging_path = str(Path.home()) + '/.algobattle_logs/'
+    default_config = os.path.join(os.path.dirname(os.path.abspath(algobattle.__file__)), 'config', 'config.ini')
+
+    # Option parser to process arguments from the console.
+    usage = 'usage: %prog FILE [options]\nExpecting (relative) path to the parent directory of the problem file as first argument.\nIf you provide generators, solvers and group numbers for multiple teams, make sure that the order is the same for all three arguments!'
+    parser = OptionParser(usage=usage)
+    parser.add_option('--verbose', dest='verbose_logging', action='store_true', help='Log all debug messages.')
+    parser.add_option('--output_folder', dest='folder_name', default=default_logging_path, help='Specify the folder into which all logging files are written to. Default: ~/.algobattle_logs/')
+    parser.add_option('--config_file', dest='config', default=default_config, help='Path to a .ini configuration file to be used for the run. Defaults to the packages config.ini')
+    parser.add_option('--solvers', dest='solvers', default=problem_path + '/solver/', help='Specify the folder names containing the solvers of all involved teams as a comma-seperated list. Default: arg1/solver/')
+    parser.add_option('--generators', dest='generators', default=problem_path + '/generator/', help='Specify the folder names containing the generators of all involved teams as a comma-seperated list. Default: arg1/generator/')
+    parser.add_option('--team_names', dest='team_names', default='0', help='Specify the group names of all involved teams as a list strings as a comma-seperated list. Default: "0"')
+    parser.add_option('--iterations', dest='battle_iterations', type=int, default='5', help='Number of fights that are to be made in the battle (points are split between each fight). Default: 5')
+    parser.add_option('--battle_type', dest='battle_type', choices=['iterated', 'averaged'], default='iterated', help='Selected battle type. Possible options: iterated, averaged. Default: iterated')
+    parser.add_option('--approx_ratio', dest='approximation_ratio', type=float, default='1.0', help='Tolerated approximation ratio for a problem, if compatible with approximation. Default: 1.0')
+    parser.add_option('--approx_inst_size', dest='approximation_instance_size', type=int, default='10', help='If --battle_type=averaged, the instance size on which the averaged run is to be made. Default: 10')
+    parser.add_option('--points', dest='points', type=int, default='100', help='Number of points for which are fought. Default: 100')
+    parser.add_option('--do_not_count_points', dest='do_not_count_points', action='store_true', help='If set, points are not calculated for the run.')
+    parser.add_option('--silent', dest='silent', action='store_true', help='Disable forking the logging output to stderr.')
+    parser.add_option('--no-overhead-calculation', dest='no_overhead_calculation', action='store_true', help='If set, the program does not benchmark the I/O of the host system to calculate the runtime overhead when started.')
+
+    (options, args) = parser.parse_args()
+
+    solvers = options.solvers.split(',')
+    generators = options.generators.split(',')
+    team_names = options.team_names.split(',')
+
+    if len(solvers) != len(generators) or len(solvers) != len(team_names) or len(team_names) != len(generators):
+        sys.exit('The number of provided generator paths ({}), solver paths ({}) and group numbers ({}) is not equal!'.format(len(generators), len(solvers), len(team_names)))
+
+    if not os.path.exists(problem_path):
+        sys.exit('Input path "{}" does not exist in the file system! Use "battle --help" for more information on usage and options.'.format(problem_path))
+    for solver_path in solvers:
+        if not os.path.exists(solver_path):
+            sys.exit('The given path for option --solvers "{}" does not exist in the file system! Use "battle --help" for more information on usage and options.'.format(solver_path))
+    for generator_path in generators:
+        if not os.path.exists(generator_path):
+            sys.exit('The given path for option --generators "{}" does not exist in the file system! Use "battle --help" for more information on usage and options.'.format(generator_path))
+
+    logger = setup_logging(options.folder_name, options.verbose_logging, options.silent)
+
+    problem = import_problem_from_path(problem_path)
+    if not problem:
         sys.exit(1)
 
     teams = []
     for i in range(len(generators)):
         teams.append(Team(team_names[i], generators[i], solvers[i]))
+
+    logger.debug('Options for this run: {}'.format(options))
+    logger.debug('Contents of sys.argv: {}'.format(sys.argv))
+
     runtime_overhead = 0
     if not options.no_overhead_calculation:
         logger.info('Running a benchmark to determine your machines I/O overhead to start and stop docker containers...')
-        runtime_overhead = calculate_time_tolerance()
+        runtime_overhead = measure_runtime_overhead()
         logger.info('Maximal measured runtime overhead is at {} seconds. Adding this amount to the configured runtime.'.format(runtime_overhead))
+
     match = Match(problem, options.config, teams, runtime_overhead=runtime_overhead, approximation_ratio=options.approximation_ratio)
 
     if not match.build_successful:
@@ -133,80 +117,7 @@ def main():
 
     logger.info('#'*70)
     if not options.do_not_count_points:
-        points = calculate_points(results, options.points, team_names, options.battle_iterations ,options.battle_type)
+        points = calculate_points(results, options.points, team_names, options.battle_iterations, options.battle_type)
 
-    for team_name in [team.name for team in teams]:
-        logger.info('Group {} gained {} points.'.format(team_name, points[team_name]))
-
-    print('You can find the log files for this run in {}'.format(logging_path))
-
-
-def calculate_points(results, achievable_points, team_names, battle_iterations, battle_type):
-    """ Calculate the number of achieved points, given results.
-    """
-    points = dict()
-    # We want all groups to be able to achieve the same number of total points, regardless of the number of teams
-    normalizer = max(len(team_names) - 1, 1)
-    for i in range(len(team_names)):
-        for j in range(i+1, len(team_names)):
-            points[team_names[i]] = points.get(team_names[i], 0)
-            points[team_names[j]] = points.get(team_names[j], 0)
-            #Points are awarded for each match individually, as one run reaching the cap poisons the average number of points
-            for k in range(battle_iterations):
-                results[(team_names[i], team_names[j])][i]
-                if battle_type == 'iterated':
-                    valuation0 = results[(team_names[i], team_names[j])][k]
-                    valuation1 = results[(team_names[j], team_names[i])][k]
-                elif battle_type == 'averaged':
-                    # The valuation of an averaged battle
-                    # is the number of successfully executed battles divided by
-                    # the average competitive ratio of successful battles,
-                    # to account for failures on execution. A higher number
-                    # thus means a better overall result. Normalized to the number of configured points.
-                    valuation0 = len(results[(team_names[i], team_names[j])][k]) / (sum(results[(team_names[i], team_names[j])][k]) / len(results[(team_names[i], team_names[j])][k]))
-                    valuation1 = len(results[(team_names[j], team_names[i])][k]) / (sum(results[(team_names[j], team_names[i])][k]) / len(results[(team_names[j], team_names[i])][k]))
-                else:
-                    logger.info('Unclear how to calculate points for this type of battle.')
-
-                if valuation0 + valuation1 > 0:
-                    points[team_names[i]] += ( (achievable_points/battle_iterations * valuation0) / (valuation0 + valuation1) ) // normalizer
-                    points[team_names[j]] += ( (achievable_points/battle_iterations * valuation1) / (valuation0 + valuation1) ) // normalizer
-                else:
-                    points[team_names[i]] += ( (achievable_points/battle_iterations) // 2 ) // normalizer
-                    points[team_names[j]] += ( (achievable_points/battle_iterations) // 2 ) // normalizer
-
-    return points
-
-def calculate_time_tolerance():
-    """ Calculate the I/O delay for starting and stopping docker on the host machine.
-
-        Returns:
-        ----------
-        float:
-            I/O overhead in seconds.
-    """
-    Problem = importlib.import_module('algobattle.problems.delaytest')
-    problem = Problem.Problem()
-
-    delaytest_path = Problem.__file__[:-12] #remove /__init__.py
-    delaytest_team = Team(0, delaytest_path + '/generator', delaytest_path + '/solver')
-
-    config = os.path.join(os.path.dirname(os.path.abspath(algobattle.__file__)), 'config', 'config.ini')
-    match = Match(problem, config, [delaytest_team])
-
-    if not match.build_successful:
-        logger.warning('Building a match for the time tolerance calculation failed!')
-        return 0
-    overheads = []
-    for i in range(10):
-        sigh.latest_running_docker_image = "generator0"
-        _, timeout = match._run_subprocess(match.base_build_command + ["generator0"], input=str(50*i).encode(), timeout=match.timeout_generator)
-        overheads.append(float(timeout))
-
-    max_overhead = round(max(overheads), 2)
-
-    return max_overhead
-
-
-if __name__ == "__main__":
-    main()
+        for team_name in [team.name for team in teams]:
+            logger.info('Group {} gained {} points.'.format(team_name, points[team_name]))
