@@ -1,6 +1,8 @@
 """ Collection of utility functions."""
 import os
 import logging
+import timeit
+import subprocess
 
 import algobattle
 import algobattle.problems.delaytest as DelaytestProblem
@@ -103,3 +105,48 @@ def calculate_points(results: dict, achievable_points: int, team_names: list,
                     points[team_names[j]] += ((achievable_points/battle_iterations) // 2) // normalizer
 
     return points
+
+
+def run_subprocess(self, run_command, input, timeout, suppress_output=False):
+    """ Run a given command as a subprocess.
+
+    Parameters:
+    ----------
+    run_command: list
+        The command that is to be executed.
+    input: bytes
+        Additional input for the subprocess, supplied to it via stdin.
+    timeout: int
+        The timeout for the subprocess in seconds.
+    Returns:
+    ----------
+    any
+        The output that the process returns, decoded by the problem parser.
+    float
+        Actual running time of the process.
+    """
+    start_time = timeit.default_timer()
+    raw_output = None
+
+    stderr = subprocess.PIPE
+    if suppress_output:
+        stderr = None
+
+    with subprocess.Popen(run_command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=stderr) as p:
+        try:
+            raw_output, _ = p.communicate(input=input, timeout=timeout)
+        except subprocess.TimeoutExpired:
+            logger.warning('Time limit exceeded!')
+            return None, None
+        except Exception as e:
+            logger.warning('An exception was thrown while running the subprocess:\n{}'.format(e))
+            return None, None
+        finally:
+            p.kill()
+            p.wait()
+            sigh._kill_spawned_docker_containers()
+
+    elapsed_time = round(timeit.default_timer() - start_time, 2)
+    logger.debug('Approximate elapsed runtime: {}/{} seconds.'.format(elapsed_time, timeout))
+
+    return raw_output, elapsed_time
