@@ -2,6 +2,7 @@ import subprocess
 
 import logging
 import configparser
+from typing import Callable
 
 import algobattle.sighandler as sigh
 from algobattle.team import Team
@@ -16,7 +17,7 @@ class Match:
     between given teams.
     """
     def __init__(self, problem: Problem, config_path: str, teams: list,
-                 runtime_overhead=0, approximation_ratio=1.0, cache_docker_containers=True):
+                 runtime_overhead=0, approximation_ratio=1.0, cache_docker_containers=True) -> None:
 
         config = configparser.ConfigParser()
         logger.debug('Using additional configuration options from file "%s".', config_path)
@@ -52,7 +53,7 @@ class Match:
             "--cpus=" + str(self.cpus)
         ]
 
-    def build_successful(function):
+    def build_successful(function: Callable) -> Callable:
         """ Decorator that ensures that internal methods are only callable after
             a successful build.
         """
@@ -64,7 +65,7 @@ class Match:
                 return function(self, *args, **kwargs)
         return wrapper
 
-    def team_roles_set(function):
+    def team_roles_set(function: Callable) -> Callable:
         """ Decorator that ensures that internal methods are only callable after
             the generating_team and solving_team have been set.
         """
@@ -76,7 +77,7 @@ class Match:
                 return function(self, *args, **kwargs)
         return wrapper
 
-    def docker_running(function):
+    def docker_running(function: Callable) -> Callable:
         """ Decorator that ensures that internal methods are only callable if
         docker is running.
         """
@@ -91,7 +92,7 @@ class Match:
         return wrapper
 
     @docker_running
-    def _build(self, teams, cache_docker_containers=True):
+    def _build(self, teams: list, cache_docker_containers=True) -> bool:
         """ Builds docker containers for the given generators and solvers of each
             team.
 
@@ -99,6 +100,8 @@ class Match:
         ----------
         teams: list
             List of Team objects.
+        cache_docker_containers: bool
+            Flag indicating whether to cache built docker containers.
         Returns:
         ----------
         Bool:
@@ -150,7 +153,7 @@ class Match:
         return True
 
     @build_successful
-    def all_battle_pairs(self):
+    def all_battle_pairs(self) -> list:
         """ Returns a list of all team pairings for battles.
         """
         battle_pairs = []
@@ -164,7 +167,7 @@ class Match:
         return battle_pairs
 
     @build_successful
-    def run(self, battle_type='iterated', iterations=5, approximation_instance_size=10):
+    def run(self, battle_type='iterated', iterations=5, approximation_instance_size=10) -> dict:
         """ Match entry point. Executes iterations fights between all teams and
         returns the results of the battles.
 
@@ -174,6 +177,8 @@ class Match:
             Type of battle that is to be run.
         iterations: int
             Number of Battles between each pair of teams (used for averaging results).
+        approximation_instance_size: int
+            Instance size on which to run an averaged battle.
         Returns:
         ----------
         dict
@@ -207,7 +212,7 @@ class Match:
 
     @build_successful
     @team_roles_set
-    def _averaged_battle_wrapper(self):
+    def _averaged_battle_wrapper(self) -> list:
         """ Wrapper to execute one averaged battle between a generating
         and a solving team.
 
@@ -231,7 +236,7 @@ class Match:
 
     @build_successful
     @team_roles_set
-    def _iterated_battle_wrapper(self):
+    def _iterated_battle_wrapper(self) -> int:
         """ Wrapper to execute one iterative battle between a generating and a
         solving team.
 
@@ -302,7 +307,7 @@ class Match:
     @docker_running
     @build_successful
     @team_roles_set
-    def _one_fight(self, instance_size):
+    def _one_fight(self, instance_size: int) -> float:
         """Executes a single fight of a battle between a given generator and
         solver for a given instance size.
 

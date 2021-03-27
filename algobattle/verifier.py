@@ -21,8 +21,8 @@ class Verifier(ABC):
 
         Parameters:
         ----------
-        instance: list
-            The instance, given as a list of Tuples.
+        instance: any
+            The syntactically checked instance.
         instance_size: int
             The maximum instance size.
 
@@ -43,10 +43,10 @@ class Verifier(ABC):
 
         Parameters:
         ----------
-        instance: list
-            The instance, given as a list of Tuples.
-        solution: list
-            The solution, given as a list of Tuples.
+        instance: any
+            The syntactically checked instance.
+        solution: any
+            The syntactically checked solution.
         instance_size: int
             The maximum instance size.
         solution_type: bool
@@ -68,10 +68,10 @@ class Verifier(ABC):
 
         Parameters:
         ----------
-        instance: list
-            The instance, given as a list of Tuples.
-        solution: list
-            The solution, given as a list of Tuples.
+        instance: any
+            The syntactically checked instance.
+        solution: any
+            The syntactically checked solution.
         instance_size: int
             The maximum instance size.
         solution_type: bool
@@ -94,14 +94,14 @@ class Verifier(ABC):
 
         Parameters:
         ----------
-        instance: list
-            The instance, given as a list of Tuples.
+        instance: any
+            The syntactically checked instance.
         instance_size: int
             The current iteration size.
-        generator_solution: list
-            The generator solution, given as a list of Tuples.
-        solver_solution: list
-            The solvers solution, given as a list of Tuples.
+        generator_solution: any
+            The syntactically checked generator solution.
+        solver_solution: any
+            The syntactically checked solver solution.
 
         Returns:
         ----------

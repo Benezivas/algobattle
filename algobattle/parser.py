@@ -9,7 +9,7 @@ class Parser(ABC):
     """
     @abstractmethod
     def split_into_instance_and_solution(self, raw_input: any) -> Tuple[any, any]:
-        """ Splits an input into instance and solution lines, discards anything else.
+        """ Splits an input into instance and solution, discards anything else.
 
         The validity is only checked by grouping together lines with the same
         first element as an identifier. No checks are made that test whether
@@ -17,32 +17,32 @@ class Parser(ABC):
 
         Parameters:
         ----------
-        raw_input: list
-            The raw input as list of tuples.
+        raw_input: any
+            The raw input.
 
         Returns:
         ----------
-        list, list
-            Returns all instance lines and all solution lines, each as a list of tuples.
+        any, any
+            Returns a tuple containing the instance and the solution.
             The lines may still be syntactially and semantically incorrect.
         """
         raise NotImplementedError
 
     @abstractmethod
     def parse_instance(self, raw_instance: any, instance_size: int) -> any:
-        """ Removes all syntactially wrong lines from the raw instance.
+        """ Removes all syntactially wrong elements from the raw instance.
 
         Parameters:
         ----------
-        raw_input: list
-            The raw instance as list of tuples.
+        raw_input: any
+            The raw instance.
         instance_size: int
             The size of the instance.
 
         Returns:
         ----------
-        list
-            Returns all valid instance lines as a list of tuples.
+        any
+            Returns what is syntactically valid of the instance.
         """
         raise NotImplementedError
 
@@ -52,15 +52,15 @@ class Parser(ABC):
 
         Parameters:
         ----------
-        raw_input: list
-            The raw solution as list of tuples.
+        raw_input: any
+            The raw solution.
         instance_size: int
             The size of the instance.
 
         Returns:
         ----------
-        list
-            Returns all valid solution lines as a list of tuples.
+        any
+            Returns what is syntactically valid of the solution.
         """
         raise NotImplementedError
 
@@ -73,12 +73,12 @@ class Parser(ABC):
 
         Parameters:
         ----------
-        raw_input: list
-            The input that is to be encoded as a list of tuples.
+        raw_input: any
+            The input that is to be encoded.
 
         Returns:
         ----------
-        byte object
+        bytes
             Returns the input as a byte object.
         """
         return "\n".join(str(" ".join(str(element) for element in line)) for line in input).encode()
@@ -93,12 +93,12 @@ class Parser(ABC):
 
         Parameters:
         ----------
-        raw_input: byte object
+        raw_input: bytes
             The raw input as byte code.
 
         Returns:
         ----------
-        list
-            Returns the input as a list of tuples.
+        any
+            Returns the decoded input.
         """
         return [tuple(line.split()) for line in raw_input.decode().splitlines() if line.split()]
