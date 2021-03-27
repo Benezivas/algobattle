@@ -93,15 +93,19 @@ def calculate_points(results: dict, achievable_points: int, team_names: list,
         A mapping between team names and their achieved points.
     """
     points = dict()
+    
+    if len(team_names) == 1:
+        return {team_names[0]: achievable_points}
+
     # We want all groups to be able to achieve the same number of total points, regardless of the number of teams
-    normalizer = max(len(team_names) - 1, 1)
+    normalizer = len(team_names) - 1
+    points_per_iteration = round(achievable_points / battle_iterations, 1)
     for i in range(len(team_names)):
-        for j in range(i+1, len(team_names)):
+        for j in range(i + 1, len(team_names)):
             points[team_names[i]] = points.get(team_names[i], 0)
             points[team_names[j]] = points.get(team_names[j], 0)
             # Points are awarded for each match individually, as one run reaching the cap poisons the average number of points
             for k in range(battle_iterations):
-                results[(team_names[i], team_names[j])][i]
                 if battle_type == 'iterated':
                     valuation0 = results[(team_names[i], team_names[j])][k]
                     valuation1 = results[(team_names[j], team_names[i])][k]
@@ -121,13 +125,13 @@ def calculate_points(results: dict, achievable_points: int, team_names: list,
                     logger.info('Unclear how to calculate points for this type of battle.')
 
                 if valuation0 + valuation1 > 0:
-                    points[team_names[i]] += ((achievable_points/battle_iterations * valuation0) /
-                                              (valuation0 + valuation1)) // normalizer
-                    points[team_names[j]] += ((achievable_points/battle_iterations * valuation1) /
-                                              (valuation0 + valuation1)) // normalizer
+                    points_proportion0 = (valuation0 / (valuation0 + valuation1))
+                    points_proportion1 = (valuation1 / (valuation0 + valuation1))
+                    points[team_names[i]] += round((points_per_iteration * points_proportion1) / normalizer, 1)
+                    points[team_names[j]] += round((points_per_iteration * points_proportion0) / normalizer, 1)
                 else:
-                    points[team_names[i]] += ((achievable_points/battle_iterations) // 2) // normalizer
-                    points[team_names[j]] += ((achievable_points/battle_iterations) // 2) // normalizer
+                    points[team_names[i]] += round((points_per_iteration // 2) / normalizer, 1)
+                    points[team_names[j]] += round((points_per_iteration // 2) / normalizer, 1)
 
     return points
 
