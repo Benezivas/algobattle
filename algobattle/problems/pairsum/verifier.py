@@ -2,18 +2,11 @@ import logging
 
 from algobattle.verifier import Verifier
 
-logger = logging.getLogger('algobattle.verifier')
+logger = logging.getLogger('algobattle.problems.pairsum..verifier')
+
 
 class PairsumVerifier(Verifier):
-    def verify_semantics_of_instance(self, instance, instance_size: int):
-        # Instances for this problem are semantically valid if they are syntactically valid.
-        # We only check if the instance is empty.
-        if not instance:
-            logger.error('The instance is empty!')
-            return False
-        return True
-
-    def verify_semantics_of_solution(self, instance, solution, instance_size: int, solution_type: bool):
+    def verify_semantics_of_solution(self, solution, instance_size: int, solution_type: bool):
         # Solutions for this problem are semantically valid if they are syntactically valid.
         # We only check if the solution is empty.
         if not solution:

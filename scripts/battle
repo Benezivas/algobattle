@@ -2,286 +2,138 @@
 import sys
 import os
 import logging
-import configparser
+
 from optparse import OptionParser
 import datetime as dt
-import importlib.util
-import pkgutil
 from pathlib import Path
 
+import algobattle
 from algobattle.match import Match
-import algobattle.sighandler as sigh
-
-# Timestamp format: YYYY-MM-DD_HH:MM:SS
-_now = dt.datetime.now()
-current_timestamp = '{:04d}-{:02d}-{:02d}_{:02d}:{:02d}:{:02d}'.format(_now.year, _now.month, _now.day, _now.hour, _now.minute, _now.second)
-
-if len(sys.argv) < 2:
-    sys.exit('Expecting (relative) path to the parent directory of the problem file as argument. Use ./run.py --help for more information on usage and options.')
-
-package_path = '/' + str(Path(__file__).resolve())
-if package_path.endswith('/scripts'):
-    package_path = package_path [:-8]
-problem_path = str(Path(sys.argv[1]).resolve())
-default_logging_path = str(Path.home()) + '/.algobattle_logs/'
-
-##Option parser to process arguments from the console.
-usage = 'usage: ./%prog FILE [options]\nExpecting (relative) path to the parent directory of the problem file as first argument.'
-parser = OptionParser(usage=usage)
-parser.add_option('--verbose', dest = 'verbose_logging', action = 'store_true', help = 'Log all debug messages.')
-parser.add_option('--output_folder', dest = 'folder_name', default = default_logging_path, help = 'Specify the folder into which all logging files are written to. Default: ~/.algobattle_logs/')
-parser.add_option('--config_file', dest = 'config_file', help = 'Path to a .ini configuration file to be used for the run. Defaults to the packages config.ini')
-parser.add_option('--solver1', dest = 'solver1_path', default = problem_path + '/solver/', help = 'Specify the folder name containing the solver of the first contestant. Default: arg1/solver/')
-parser.add_option('--solver2', dest = 'solver2_path', default = problem_path + '/solver/', help = 'Specify the folder name containing the solver of the second contestant. Default: arg1/solver/')
-parser.add_option('--generator1', dest = 'generator1_path', default = problem_path + '/generator/', help = 'Specify the folder name containing the generator of the first contestant. Default: arg1/generator/')
-parser.add_option('--generator2', dest = 'generator2_path', default = problem_path + '/generator/', help = 'Specify the folder name containing the generator of the second contestant. Default: arg1/generator/')
-parser.add_option('--group_nr_one', dest = 'group_nr_one', type=int, default = '0', help = 'Specify the group number of the first contestant. Default: 0')
-parser.add_option('--group_nr_two', dest = 'group_nr_two', type=int, default = '1', help = 'Specify the group number of the second contestant. Default: 1')
-parser.add_option('--iterations', dest = 'battle_iterations', type=int, default = '5', help = 'Number of fights that are to be made in the battle (points are split between each fight). Default: 5')
-parser.add_option('--battle_type', dest = 'battle_type', choices=['iterated', 'averaged'], default = 'iterated', help = 'Selected battle type. Possible options: iterated, averaged. Default: iterated')
-parser.add_option('--approx_ratio', dest = 'approximation_ratio', type=float, default = '1.0', help = 'Tolerated approximation ratio for a problem, if compatible with approximation. Default: 1.0')
-parser.add_option('--approx_inst_size', dest = 'approximation_instance_size', type=int, default = '10', help = 'If --battle_type=averaged, the instance size on which the averaged run is to be made . Default: 10')
-parser.add_option('--approx_iterations', dest = 'approximation_iterations', type=int, default = '50', help = 'If --battle_type=averaged, number of iteration over which the approximation ratio is averaged. Default: 50')
-parser.add_option('--points', dest = 'points', type=int, default = '100', help = 'Number of points for which are fought. Default: 100')
-parser.add_option('--do_not_count_points', dest = 'do_not_count_points', action = 'store_true', help = 'If set, points are not calculated for the run.')
-parser.add_option('-c', '--do_not_log_to_console', dest = 'do_not_log_to_console', action = 'store_true', help = 'Disable forking the logging output to stderr.')
-parser.add_option('--no-overhead-calculation', dest = 'no_overhead_calculation', action = 'store_true', help = 'If set, the program does not benchmark the I/O of the host system to calculate the runtime overhead when started.')
-
-(options, args) = parser.parse_args()
-
-# Validate that all paths given by options exist
-if not os.path.exists(problem_path):
-    sys.exit('Input path "{}" does not exist in the file system! Use ./run.py --help for more information on usage and options.'.format(problem_path))
-if not os.path.exists(options.solver1_path):
-    sys.exit('The given path for option --solver1 "{}" does not exist in the file system! Use ./run.py --help for more information on usage and options.'.format(options.solver1_path))
-if not os.path.exists(options.solver2_path):
-    sys.exit('The given path for option --solver2 "{}" does not exist in the file system! Use ./run.py --help for more information on usage and options.'.format(options.solver2_path))
-if not os.path.exists(options.generator1_path):
-    sys.exit('The given path for option --generator1 "{}" does not exist in the file system! Use ./run.py --help for more information on usage and options.'.format(options.generator1_path))
-if not os.path.exists(options.generator2_path):
-    sys.exit('The given path for option --generator2 "{}" does not exist in the file system! Use ./run.py --help for more information on usage and options.'.format(options.generator2_path))
+from algobattle.team import Team
+from algobattle.util import calculate_points, measure_runtime_overhead, import_problem_from_path
 
 
-# Logging level below which no logs are supposed to be written out.
-common_logging_level = logging.INFO
+if __name__ == "__main__":
+    def setup_logging(logging_path, verbose_logging, silent):
+        """ Creates and returns a parent logger.
 
-# Enable logging of all levels if the option is set
-if options.verbose_logging:
-    common_logging_level = logging.DEBUG
+        Parameters:
+        ----------
+        logging_path : str
+            Path where the logfile should be stored at.
+        verbose_logging : bool
+            Flag indicating whether to include debug messages in the output
+        silent : bool
+            Flag indicating whether not to pipe the logging output to stderr.
 
-if not os.path.exists(options.folder_name):
-    os.makedirs(options.folder_name)
+        Returns:
+        ----------
+        Logger:
+            The Logger object.
+        """
+        common_logging_level = logging.INFO
 
-# Strings to build the logfile name
-group_stamp = '_{}v{}'.format(options.group_nr_one,options.group_nr_two)
-logging_path = options.folder_name + current_timestamp + group_stamp + '.log'
+        if verbose_logging:
+            common_logging_level = logging.DEBUG
 
-# Initialize logger
-logging.basicConfig(filename=logging_path, level=common_logging_level, format='%(asctime)s %(levelname)s: %(message)s', datefmt='%H:%M:%S')
-# Parent-logger for the whole program
-logger = logging.getLogger('algobattle')
+        if not os.path.exists(logging_path):
+            os.makedirs(logging_path)
 
-# Pipe logging out to console if not disabled by option
-if not options.do_not_log_to_console:
-    _consolehandler = logging.StreamHandler(stream=sys.stderr)
-    _consolehandler.setLevel(common_logging_level)
+        _now = dt.datetime.now()
+        current_timestamp = '{:04d}-{:02d}-{:02d}_{:02d}:{:02d}:{:02d}'.format(_now.year, _now.month, _now.day, _now.hour, _now.minute, _now.second)
+        logging_path = logging_path + current_timestamp + '.log'
 
-    _consolehandler.setFormatter(logging.Formatter('%(message)s'))
+        logging.basicConfig(filename=logging_path, level=common_logging_level, format='%(asctime)s %(levelname)s: %(message)s', datefmt='%H:%M:%S')
 
-    logger.addHandler(_consolehandler)
+        logger = logging.getLogger('algobattle')
 
-logger.debug('Options for this run: {}'.format(options))
-logger.debug('Contents of sys.argv: {}'.format(sys.argv))
+        if not silent:
+            # Pipe logging out to console
+            _consolehandler = logging.StreamHandler(stream=sys.stderr)
+            _consolehandler.setLevel(common_logging_level)
 
-# Read in config file specifying problem parameters.
-config = configparser.ConfigParser()
-if not options.config_file:
-    logger.info('No config file provided, using the default config.ini')
-    config_data = pkgutil.get_data('algobattle', 'config/config.ini').decode()
-    config.read_string(config_data)
-elif not os.path.isfile(options.config_file):
-    logger.error('Config file at path "%s" could not be found, terminating!', options.config_file)
-    sys.exit(1)
-else:
-    logger.info('Using additional configuration options from file "%s".', options.config_file)
-    config.read(options.config_file)
+            _consolehandler.setFormatter(logging.Formatter('%(message)s'))
+
+            logger.addHandler(_consolehandler)
+
+        logger.info('You can find the log files for this run in {}'.format(logging_path))
+        return logger
 
 
-def main():
-    try:
-        spec = importlib.util.spec_from_file_location("problem", problem_path + "/__init__.py")
-        Problem = importlib.util.module_from_spec(spec)
-        sys.modules[spec.name] = Problem
-        spec.loader.exec_module(Problem)
+    if len(sys.argv) < 2:
+        sys.exit('Expecting (relative) path to the parent directory of a problem file as argument. Use "battle --help" for more information on usage and options.')
 
-        problem = Problem.Problem()
-    except Exception as e:
-        logger.critical('Importing the given problem failed with the following exception: "{}"'.format(e))
+    problem_path = str(Path(sys.argv[1]).resolve())
+
+    default_logging_path = str(Path.home()) + '/.algobattle_logs/'
+    default_config = os.path.join(os.path.dirname(os.path.abspath(algobattle.__file__)), 'config', 'config.ini')
+
+    # Option parser to process arguments from the console.
+    usage = 'usage: %prog FILE [options]\nExpecting (relative) path to the parent directory of the problem file as first argument.\nIf you provide generators, solvers and group numbers for multiple teams, make sure that the order is the same for all three arguments!'
+    parser = OptionParser(usage=usage)
+    parser.add_option('--verbose', dest='verbose_logging', action='store_true', help='Log all debug messages.')
+    parser.add_option('--output_folder', dest='folder_name', default=default_logging_path, help='Specify the folder into which all logging files are written to. Default: ~/.algobattle_logs/')
+    parser.add_option('--config_file', dest='config', default=default_config, help='Path to a .ini configuration file to be used for the run. Defaults to the packages config.ini')
+    parser.add_option('--solvers', dest='solvers', default=problem_path + '/solver/', help='Specify the folder names containing the solvers of all involved teams as a comma-seperated list. Default: arg1/solver/')
+    parser.add_option('--generators', dest='generators', default=problem_path + '/generator/', help='Specify the folder names containing the generators of all involved teams as a comma-seperated list. Default: arg1/generator/')
+    parser.add_option('--team_names', dest='team_names', default='0', help='Specify the group names of all involved teams as a list strings as a comma-seperated list. Default: "0"')
+    parser.add_option('--iterations', dest='battle_iterations', type=int, default='5', help='Number of fights that are to be made in the battle (points are split between each fight). Default: 5')
+    parser.add_option('--battle_type', dest='battle_type', choices=['iterated', 'averaged'], default='iterated', help='Selected battle type. Possible options: iterated, averaged. Default: iterated')
+    parser.add_option('--approx_ratio', dest='approximation_ratio', type=float, default='1.0', help='Tolerated approximation ratio for a problem, if compatible with approximation. Default: 1.0')
+    parser.add_option('--approx_inst_size', dest='approximation_instance_size', type=int, default='10', help='If --battle_type=averaged, the instance size on which the averaged run is to be made. Default: 10')
+    parser.add_option('--points', dest='points', type=int, default='100', help='Number of points for which are fought. Default: 100')
+    parser.add_option('--do_not_count_points', dest='do_not_count_points', action='store_true', help='If set, points are not calculated for the run.')
+    parser.add_option('--silent', dest='silent', action='store_true', help='Disable forking the logging output to stderr.')
+    parser.add_option('--no-overhead-calculation', dest='no_overhead_calculation', action='store_true', help='If set, the program does not benchmark the I/O of the host system to calculate the runtime overhead when started.')
+
+    (options, args) = parser.parse_args()
+
+    solvers = options.solvers.split(',')
+    generators = options.generators.split(',')
+    team_names = options.team_names.split(',')
+
+    if len(solvers) != len(generators) or len(solvers) != len(team_names) or len(team_names) != len(generators):
+        sys.exit('The number of provided generator paths ({}), solver paths ({}) and group numbers ({}) is not equal!'.format(len(generators), len(solvers), len(team_names)))
+
+    if not os.path.exists(problem_path):
+        sys.exit('Input path "{}" does not exist in the file system! Use "battle --help" for more information on usage and options.'.format(problem_path))
+    for solver_path in solvers:
+        if not os.path.exists(solver_path):
+            sys.exit('The given path for option --solvers "{}" does not exist in the file system! Use "battle --help" for more information on usage and options.'.format(solver_path))
+    for generator_path in generators:
+        if not os.path.exists(generator_path):
+            sys.exit('The given path for option --generators "{}" does not exist in the file system! Use "battle --help" for more information on usage and options.'.format(generator_path))
+
+    logger = setup_logging(options.folder_name, options.verbose_logging, options.silent)
+
+    problem = import_problem_from_path(problem_path)
+    if not problem:
         sys.exit(1)
 
+    teams = []
+    for i in range(len(generators)):
+        teams.append(Team(team_names[i], generators[i], solvers[i]))
+
+    logger.debug('Options for this run: {}'.format(options))
+    logger.debug('Contents of sys.argv: {}'.format(sys.argv))
 
     runtime_overhead = 0
     if not options.no_overhead_calculation:
         logger.info('Running a benchmark to determine your machines I/O overhead to start and stop docker containers...')
-        runtime_overhead = calculate_time_tolerance()
+        runtime_overhead = measure_runtime_overhead()
         logger.info('Maximal measured runtime overhead is at {} seconds. Adding this amount to the configured runtime.'.format(runtime_overhead))
-    match = Match(problem, config, options.generator1_path, options.generator2_path,
-                    options.solver1_path, options.solver2_path,
-                    int(options.group_nr_one), int(options.group_nr_two), runtime_overhead=runtime_overhead, 
-                    approximation_ratio=options.approximation_ratio, approximation_instance_size=options.approximation_instance_size,
-                    approximation_iterations=options.approximation_iterations)
+
+    match = Match(problem, options.config, teams, runtime_overhead=runtime_overhead, approximation_ratio=options.approximation_ratio)
 
     if not match.build_successful:
         logger.critical('Building the match object failed, exiting!')
         sys.exit(1)
 
-    results0, results1 = match.run(options.battle_type, options.battle_iterations)
+    results = match.run(options.battle_type, options.battle_iterations, approximation_instance_size=options.approximation_instance_size)
 
     logger.info('#'*70)
-    if options.battle_iterations > 0:
-        if options.battle_type == 'iterated':
-            logger.info('Summary of the battle results: \n{}\n'.format(
-                format_summary_message_iterated(results0, results1, int(options.group_nr_one), int(options.group_nr_two))))
-        elif options.battle_type == 'averaged':
-            logger.info('Summary of the battle results: \n{}\n'.format(
-                format_summary_message_averaged(results0, results1, int(options.group_nr_one), int(options.group_nr_two))))
-        else:
-            logger.info('No summary message configured for this type of battle.')
-        if not options.do_not_count_points:
-            points = options.points #Number of points that are awarded in total
-            points0 = 0 #points awarded to the first team
-            points1 = 0 #points awarded to the second team
-            #Points are awarded for each match individually, as one run reaching the cap poisons the average number of points
-            for i in range(options.battle_iterations):
-                if options.battle_type == 'iterated':
-                    valuation0 = results0[i]
-                    valuation1 = results1[i]
-                elif options.battle_type == 'averaged':
-                    # The valuation of an averaged battle
-                    # is the number of successfully executed battles divided by
-                    # the average competitive ratio of successful battles,
-                    # to account for failures on execution. A higher number
-                    # thus means a better overall result. Normalized to the number of configured points.
-                    valuation0 = len(results0[i]) / (sum(results0[i]) / len(results0[i]))
-                    valuation1 = len(results1[i]) / (sum(results1[i]) / len(results1[i]))
-                else:
-                    logger.info('Unclear how to calculate points for this type of battle.')
+    if not options.do_not_count_points:
+        points = calculate_points(results, options.points, team_names, options.battle_iterations, options.battle_type)
 
-                if valuation0 + valuation1 > 0:
-                    points0 += (points/options.battle_iterations * valuation0) / (valuation0 + valuation1)
-                    points1 += (points/options.battle_iterations * valuation1) / (valuation0 + valuation1)
-                else:
-                    points0 += (points/options.battle_iterations) // 2
-                    points1 += (points/options.battle_iterations) // 2
-
-            logger.info('Group {} gained {} points.'.format(options.group_nr_one, str(points0)))
-            logger.info('Group {} gained {} points.'.format(options.group_nr_two, str(points1)))
-
-    print('You can find the log files for this run in {}'.format(logging_path))
-
-def calculate_time_tolerance():
-    """ Calculate the I/O delay for starting and stopping docker on the host machine.
-
-        Returns:
-        ----------
-        float:
-            I/O overhead in seconds.
-    """
-    Problem = importlib.import_module('algobattle.problems.delaytest')
-    problem = Problem.Problem()
-
-    delaytest_path = Problem.__file__[:-12] #remove /__init__.py
-    match = Match(problem, config, delaytest_path + '/generator', delaytest_path + '/generator',
-                    delaytest_path + '/solver', delaytest_path + '/solver',
-                    0, 1)
-
-    if not match.build_successful:
-        logger.warning('Building a match for the time tolerance calculation failed!')
-        return 0
-    overheads = []
-    for i in range(10):
-        sigh.latest_running_docker_image = "generator0"
-        _, timeout = match._run_subprocess(match.base_build_command + ["generator0"], input=str(50*i).encode(), timeout=match.timeout_generator)
-        overheads.append(float(timeout))
-
-    max_overhead = round(max(overheads), 2)
-
-    return max_overhead
-
-def format_summary_message_iterated(results0, results1, teamA, teamB):
-    """ Format the results of a battle into a summary message.
-
-        Parameters:
-        ----------
-        results0: list 
-            List of reached instance sizes of teamA.
-        results1: list
-            List of reached instance sizes of teamB.
-        teamA: int
-            Group number of teamA.
-        teamB: int
-            Group number of teamB.
-        Returns:
-        ----------
-        str:
-            The formatted summary message.
-    """
-    if not len(results0) == len(results1) == int(options.battle_iterations):
-        return "Number of results and summary messages are not the same!"
-    summary = ""
-    for i in range(int(options.battle_iterations)):
-        summary += '='*25
-        summary += '\n\nResults of battle {}:\n'.format(i+1)
-        if results0[i] == 0:
-            summary += 'Solver {} did not solve a single instance.\n'.format(teamA)
-        else:
-            summary += 'Solver {} solved all instances up to size {}.\n'.format(teamA, results0[i])
-
-        if results1[i] == 0:
-            summary += 'Solver {} did not solve a single instance.\n'.format(teamB)
-        else:
-            summary += 'Solver {} solved all instances up to size {}.\n'.format(teamB, results1[i])
-
-    summary += 'Average solution size of group {}: {}\n'.format(teamA, sum(results0)//int(options.battle_iterations))
-    summary += 'Average solution size of group {}: {}\n'.format(teamB, sum(results1)//int(options.battle_iterations))
-
-    return summary
-
-def format_summary_message_averaged(results0, results1, teamA, teamB):
-    """ Format the results of a battle into a summary message.
-
-        Parameters:
-        ----------
-        results0: list 
-            List of approximation ratios of teamA for each battle.
-        results1: list
-            List of approximation ratios of teamB for each battle.
-        teamA: int
-            Group number of teamA.
-        teamB: int
-            Group number of teamB.
-        Returns:
-        ----------
-        str:
-            The formatted summary message.
-    """
-    if not len(results0) == len(results1) == int(options.battle_iterations):
-        return "Number of results and summary messages are not the same!"
-    summary = ""
-    for i in range(int(options.battle_iterations)):
-        summary += '='*25
-        summary += '\n\nResults of battle {}:\n'.format(i+1)
-        if len(results0) > 0:
-            summary += 'Average approximation ratio of group {} with {} solved instances: {:.4f}\n'.format(teamA, len(results0[i]), sum(results0[i]) / len(results0[i]))
-        else:
-            summary += 'Group {} did not give a correct solution for any of the instances of this battle.'.format(teamA)
-        if len(results1) > 0:
-            summary += 'Average approximation ratio of group {} with {} solved instances: {:.4f}\n'.format(teamB, len(results1[i]), sum(results1[i]) / len(results1[i]))
-        else:
-            summary += 'Group {} did not give a correct solution for any of the instances of this battle.'.format(teamA)
-
-    return summary
-
-
-if __name__ == "__main__":
-    main()
+        for team_name in [team.name for team in teams]:
+            logger.info('Group {} gained {} points.'.format(team_name, points[team_name]))

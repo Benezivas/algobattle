@@ -1,5 +1,5 @@
 fin = open("input")
-fout = open("output","w")
+fout = open("output", "w")
 n = int(fin.readline())
 
 fout.write("e 1 2\n")

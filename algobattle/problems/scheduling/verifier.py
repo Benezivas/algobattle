@@ -2,7 +2,8 @@ import logging
 
 from algobattle.verifier import Verifier
 
-logger = logging.getLogger('algobattle.verifier')
+logger = logging.getLogger('algobattle.problems.scheduling.verifier')
+
 
 class SchedulingVerifier(Verifier):
     def verify_semantics_of_instance(self, instance, instance_size: int):
@@ -11,17 +12,9 @@ class SchedulingVerifier(Verifier):
             return False
 
         if sum(int(job[2]) for job in instance) * 5 >= 2 ** 64:
-            logger.warning('The cumulated job sizes exceed the given limit!')
+            logger.error('The cumulated job sizes exceed the given limit!')
             return False
 
-        return True
-
-    def verify_semantics_of_solution(self, instance, solution, instance_size: int, solution_type: bool):
-        # Solutions for this problem are semantically valid if they are syntactically valid.
-        # We only check if the solution is empty.
-        if not solution:
-            logger.error('The solution is empty!')
-            return False
         return True
 
     def verify_solution_against_instance(self, instance, solution, instance_size, solution_type):
@@ -32,7 +25,7 @@ class SchedulingVerifier(Verifier):
         all_jobs = set()
         for job in instance:
             all_jobs.add(job[1])
-        
+
         all_assigned_jobs = set()
         for assignment in solution:
             all_assigned_jobs.add(assignment[1])
@@ -66,4 +59,3 @@ class SchedulingVerifier(Verifier):
             makespans[machine - 1] += base_running_time * machine
 
         return max(makespans)
-

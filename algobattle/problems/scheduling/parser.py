@@ -1,7 +1,9 @@
 import logging
 
 from algobattle.parser import Parser
-logger = logging.getLogger('algobattle.parser')
+
+logger = logging.getLogger('algobattle.problems.scheduling.parser')
+
 
 class SchedulingParser(Parser):
     def split_into_instance_and_solution(self, raw_input):

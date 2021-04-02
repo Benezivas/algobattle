@@ -2,25 +2,10 @@ import logging
 
 from algobattle.verifier import Verifier
 
-logger = logging.getLogger('algobattle.verifier')
+logger = logging.getLogger('algobattle.problems.domset.verifier')
+
 
 class DomsetVerifier(Verifier):
-    def verify_semantics_of_instance(self, instance, instance_size: int):
-        # Instances for this problem are semantically valid if they are syntactically valid.
-        # We only check if the instance is empty.
-        if not instance:
-            logger.error('The instance is empty!')
-            return False
-        return True
-
-    def verify_semantics_of_solution(self, instance, solution, instance_size: int, solution_type: bool):
-        # Solutions for this problem are semantically valid if they are syntactically valid.
-        # We only check if the solution is empty.
-        if not solution:
-            logger.error('The solution is empty!')
-            return False
-        return True
-
     def verify_solution_against_instance(self, instance, solution, instance_size, solution_type):
         all_nodes = set()
         domination = {}

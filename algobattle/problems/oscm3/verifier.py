@@ -4,7 +4,8 @@ import sys
 
 from algobattle.verifier import Verifier
 
-logger = logging.getLogger('algobattle.verifier')
+logger = logging.getLogger('algobattle.problems.oscm3.verifier')
+
 
 class OSCM3Verifier(Verifier):
     class Graph:
@@ -22,7 +23,6 @@ class OSCM3Verifier(Verifier):
                 self.lower_nodes[neighbor].append(str(name) + "_" + str(i))
                 i += 1
                 self.edges[slot].append(neighbor)
-
 
         def calculate_number_crossings(self):
             crossings = 0
@@ -44,23 +44,6 @@ class OSCM3Verifier(Verifier):
                 self.upper_nodes[i] = old_nodes[int(permutation[i])]
                 self.edges[i] = old_edges[int(permutation[i])]
 
-    def verify_semantics_of_instance(self, instance, instance_size: int):
-        # Instances for this problem are semantically valid if they are syntactically valid.
-        # We only check if the instance is empty.
-        if not instance:
-            logger.error('The instance is empty!')
-            return False
-        return True
-
-    def verify_semantics_of_solution(self, instance, solution, instance_size: int, solution_type: bool):
-        # Solutions for this problem are semantically valid if they are syntactically valid.
-        # We only check if the solution is empty.
-        if not solution:
-            logger.error('The solution is empty!')
-            return False
-        return True
-
-    
     def verify_solution_against_instance(self, instance, solution, instance_size, solution_type):
         # For this problem, no further verification is needed: If the Syntax is
         # correct, a solution string is automatically a valid solution
@@ -70,7 +53,6 @@ class OSCM3Verifier(Verifier):
     def calculate_approximation_ratio(self, instance, instance_size, generator_solution, solver_solution):
         g = self.Graph(instance_size)
 
-        
         for element in instance:
             g.insert_node(element[1], int(element[1]), [int(entry) for entry in element[2:]])
 

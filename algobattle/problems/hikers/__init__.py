@@ -1,1 +1,1 @@
-from .problem import Hikers as Problem 
+from .problem import Hikers as Problem

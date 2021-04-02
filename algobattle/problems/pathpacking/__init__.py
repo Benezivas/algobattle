@@ -1,1 +1,1 @@
-from .problem import Pathpacking as Problem 
+from .problem import Pathpacking as Problem

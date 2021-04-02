@@ -1,1 +1,1 @@
-from .problem import Delaytest as Problem 
+from .problem import Delaytest as Problem
