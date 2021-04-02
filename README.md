@@ -29,10 +29,10 @@ Adjust the parameters set in the `algobattle/configs/config.ini` file to set
 which hardware resources you want to assign. You can pass alternative
 configuration files to the script using the `--config_file` option.
 
-To start a basic run on the `pairsum` problem, using the `solver` and `generator` that
+To start a basic run on the `biclique` problem, using the `solver` and `generator` that
 are part of the problem directory, execute
 ```
-battle algobattle/problems/pairsum
+battle algobattle/problems/biclique
 ```
 or provide any alternative problem folder path.
 
