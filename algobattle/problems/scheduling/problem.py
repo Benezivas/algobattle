@@ -4,7 +4,7 @@ from algobattle.problem import Problem
 from .parser import SchedulingParser
 from .verifier import SchedulingVerifier
 
-logger = logging.getLogger('algobattle.scheduling')
+logger = logging.getLogger('algobattle.problems.scheduling')
 
 
 class Scheduling(Problem):

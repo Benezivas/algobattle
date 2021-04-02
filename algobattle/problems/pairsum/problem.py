@@ -4,7 +4,7 @@ from algobattle.problem import Problem
 from .parser import PairsumParser
 from .verifier import PairsumVerifier
 
-logger = logging.getLogger('algobattle.pairsum')
+logger = logging.getLogger('algobattle.problems.pairsum')
 
 
 class Pairsum(Problem):

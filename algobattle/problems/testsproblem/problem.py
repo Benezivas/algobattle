@@ -4,7 +4,7 @@ from algobattle.problem import Problem
 from .parser import TestsParser
 from .verifier import TestsVerifier
 
-logger = logging.getLogger('algobattle.tests')
+logger = logging.getLogger('algobattle.problems.testsproblem')
 
 
 class Tests(Problem):

@@ -4,7 +4,7 @@ from algobattle.problem import Problem
 from .parser import DomsetParser
 from .verifier import DomsetVerifier
 
-logger = logging.getLogger('algobattle.domset')
+logger = logging.getLogger('algobattle.problems.domset')
 
 
 class Domset(Problem):

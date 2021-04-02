@@ -2,7 +2,7 @@ import logging
 
 from algobattle.verifier import Verifier
 
-logger = logging.getLogger('algobattle.verifier')
+logger = logging.getLogger('algobattle.problems.pathpacking.verifier')
 
 
 class PathpackingVerifier(Verifier):
