@@ -1,3 +1,4 @@
+"""Generate a list of random numbers, with 4 random numbers manually set to be a valid solution."""
 import random
 
 fin = open("input")

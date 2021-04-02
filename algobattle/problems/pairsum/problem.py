@@ -1,3 +1,4 @@
+"""Main module of the Pairsum problem."""
 import logging
 
 from algobattle.problem import Problem
@@ -8,6 +9,7 @@ logger = logging.getLogger('algobattle.problems.pairsum')
 
 
 class Pairsum(Problem):
+    """The pairsum problem class."""
     name = 'Pairsum'
     n_start = 4
     parser = PairsumParser()

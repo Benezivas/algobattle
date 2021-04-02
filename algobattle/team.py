@@ -1,5 +1,5 @@
 class Team:
-    """ Team class responsible for holding basic information of a specific team."""
+    """Team class responsible for holding basic information of a specific team."""
 
     def __init__(self, team_name: str, generator_path: str, solver_path: str) -> None:
         self.name = str(team_name).replace(' ', '_')

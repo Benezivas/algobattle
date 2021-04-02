@@ -13,9 +13,8 @@ logger = logging.getLogger('algobattle.match')
 
 
 class Match:
-    """ Match class, provides functionality for setting up and executing battles
-    between given teams.
-    """
+    """Match class, provides functionality for setting up and executing battles between given teams."""
+
     def __init__(self, problem: Problem, config_path: str, teams: list,
                  runtime_overhead=0, approximation_ratio=1.0, cache_docker_containers=True) -> None:
 
@@ -54,9 +53,7 @@ class Match:
         ]
 
     def build_successful(function: Callable) -> Callable:
-        """ Decorator that ensures that internal methods are only callable after
-            a successful build.
-        """
+        """Ensure that internal methods are only callable after a successful build."""
         def wrapper(self, *args, **kwargs):
             if not self.build_successful:
                 logger.error('Trying to call Match object which failed to build!')
@@ -66,9 +63,7 @@ class Match:
         return wrapper
 
     def team_roles_set(function: Callable) -> Callable:
-        """ Decorator that ensures that internal methods are only callable after
-            the generating_team and solving_team have been set.
-        """
+        """Ensure that internal methods are only callable after the team roles have been set."""
         def wrapper(self, *args, **kwargs):
             if not self.generating_team or not self.solving_team:
                 logger.error('Generating or solving team have not been set!')
@@ -78,9 +73,7 @@ class Match:
         return wrapper
 
     def docker_running(function: Callable) -> Callable:
-        """ Decorator that ensures that internal methods are only callable if
-        docker is running.
-        """
+        """Ensure that internal methods are only callable if docker is running."""
         def wrapper(self, *args, **kwargs):
             docker_running = subprocess.Popen(['docker', 'info'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             _ = docker_running.communicate()
@@ -93,18 +86,18 @@ class Match:
 
     @docker_running
     def _build(self, teams: list, cache_docker_containers=True) -> bool:
-        """ Builds docker containers for the given generators and solvers of each
-            team.
+        """Build docker containers for the given generators and solvers of each team.
 
-        Parameters:
+        Parameters
         ----------
-        teams: list
+        teams : list
             List of Team objects.
-        cache_docker_containers: bool
+        cache_docker_containers : bool
             Flag indicating whether to cache built docker containers.
-        Returns:
-        ----------
-        Bool:
+
+        Returns
+        -------
+        Bool
             Boolean indicating whether the build process succeeded.
         """
         docker_build_base = [
@@ -154,8 +147,7 @@ class Match:
 
     @build_successful
     def all_battle_pairs(self) -> list:
-        """ Returns a list of all team pairings for battles.
-        """
+        """Generate and return a list of all team pairings for battles."""
         battle_pairs = []
         for i in range(len(self.team_names)):
             for j in range(len(self.team_names)):
@@ -168,19 +160,19 @@ class Match:
 
     @build_successful
     def run(self, battle_type='iterated', iterations=5, approximation_instance_size=10) -> dict:
-        """ Match entry point. Executes iterations fights between all teams and
-        returns the results of the battles.
+        """Match entry point, executes iterations fights between all teams and returns the results of the battles.
 
-        Parameters:
+        Parameters
         ----------
-        battle_type: str
+        battle_type : str
             Type of battle that is to be run.
-        iterations: int
+        iterations : int
             Number of Battles between each pair of teams (used for averaging results).
-        approximation_instance_size: int
+        approximation_instance_size : int
             Instance size on which to run an averaged battle.
-        Returns:
-        ----------
+
+        Returns
+        -------
         dict
             A dictionary containing the results of the battles for each team with
             the team number as a key.
@@ -201,7 +193,7 @@ class Match:
             results[pair] = results.get(pair, [])
             pair_results = []
             for i in range(iterations):
-                logger.info('{}  Running Battle {}/{}  {}'.format('#'*20, i+1, iterations, '#'*20))
+                logger.info('{}  Running Battle {}/{}  {}'.format('#' * 20, i + 1, iterations, '#' * 20))
 
                 self.generating_team = pair[0]
                 self.solving_team = pair[1]
@@ -213,14 +205,13 @@ class Match:
     @build_successful
     @team_roles_set
     def _averaged_battle_wrapper(self) -> list:
-        """ Wrapper to execute one averaged battle between a generating
-        and a solving team.
+        """Execute one averaged battle between a generating and a solving team.
 
         Execute several fights between two teams on a fixed instance size
         and determine the average solution quality.
 
-        Returns:
-        ----------
+        Returns
+        -------
         list
             Returns a list of the computed approximation ratios.
         """
@@ -228,7 +219,7 @@ class Match:
         logger.info('==================== Averaged Battle, Instance Size: {}, Iterations: {} ===================='
                     .format(self.approximation_instance_size, self.aproximation_iterations))
         for i in range(self.aproximation_iterations):
-            logger.info('=============== Iteration: {}/{} ==============='.format(i+1, self.aproximation_iterations))
+            logger.info('=============== Iteration: {}/{} ==============='.format(i + 1, self.aproximation_iterations))
             approx_ratio = self._one_fight(instance_size=self.approximation_instance_size)
             approximation_ratios.append(approx_ratio)
 
@@ -237,8 +228,7 @@ class Match:
     @build_successful
     @team_roles_set
     def _iterated_battle_wrapper(self) -> int:
-        """ Wrapper to execute one iterative battle between a generating and a
-        solving team.
+        """Execute one iterative battle between a generating and a solving team.
 
         Incrementally try to search for the highest n for which the solver is
         still able to solve instances.  The base increment value is multiplied
@@ -250,11 +240,10 @@ class Match:
         value that an algorithm has failed on.
 
         The wrapper automatically ends the battle and declares the solver as the
-        winner once the iteration cap is reached, which is set in the
-        config.ini.
+        winner once the iteration cap is reached, which is set in the config.ini.
 
-        Returns:
-        ----------
+        Returns
+        -------
         int
             Returns the biggest instance size for which the solving team still
             found a solution.
@@ -287,7 +276,7 @@ class Match:
                 # We solved an instance of bigger size than before
                 maximum_reached_n = n
 
-            if n+1 == n_cap:
+            if n + 1 == n_cap:
                 alive = False
                 break
 
@@ -308,15 +297,15 @@ class Match:
     @build_successful
     @team_roles_set
     def _one_fight(self, instance_size: int) -> float:
-        """Executes a single fight of a battle between a given generator and
-        solver for a given instance size.
+        """Execute a single fight of a battle between a given generator and solver for a given instance size.
 
-        Parameters:
+        Parameters
         ----------
-        instance_size: int
+        instance_size : int
             The instance size, expected to be a positive int.
-        Returns:
-        ----------
+
+        Returns
+        -------
         float
             Returns the approximation ratio of the solver against
             the generator (1 if optimal, 0 if failed, >=1 if the

@@ -5,29 +5,30 @@ logger = logging.getLogger('algobattle.verifier')
 
 
 class Verifier(ABC):
-    """ Verifier class, responsible for semantically checking parsed instances
-    and solutions, for checking the validity of a solution against a given instance
-    as well as for verifying that a solution is of a demanded quality, which
+    """Verifier class, responsible for semantically checking parsed instances and solutions.
+
+    Checks the validity of a solution against a given instance
+    as well as verifying that a solution is of a demanded quality, which
     usually refers to the solution size.
     """
 
     def verify_semantics_of_instance(self, instance: any, instance_size: int) -> bool:
-        """ Check the semantical correctness of an instance.
+        """Check the semantical correctness of an instance.
 
         For most problems, this function does not need to be overwritten.
 
         If the given instance is semantically ill-formed in a way that
         it cannot be passed to a solver, return False.
 
-        Parameters:
+        Parameters
         ----------
-        instance: any
+        instance : any
             The syntactically checked instance.
-        instance_size: int
+        instance_size : int
             The maximum instance size.
 
-        Returns:
-        ----------
+        Returns
+        -------
         bool
             Returns True if the instance is processable by a solver.
         """
@@ -37,23 +38,23 @@ class Verifier(ABC):
         return True
 
     def verify_semantics_of_solution(self, solution: any, instance_size: int, solution_type: bool) -> bool:
-        """ Check whether a given solution is semantically correct.
+        """Check whether a given solution is semantically correct.
 
         For most problems, this function does not need to be overwritten.
 
-        Parameters:
+        Parameters
         ----------
-        instance: any
+        instance : any
             The syntactically checked instance.
-        solution: any
+        solution : any
             The syntactically checked solution.
-        instance_size: int
+        instance_size : int
             The maximum instance size.
-        solution_type: bool
+        solution_type : bool
             Indicates whether the given solution is a certificate (True) or solver solution (False)
 
-        Returns:
-        ----------
+        Returns
+        -------
         bool
             Returns True if the solution is semantically correct.
         """
@@ -64,21 +65,21 @@ class Verifier(ABC):
 
     @abstractmethod
     def verify_solution_against_instance(self, instance: any, solution: any, instance_size: int, solution_type: bool) -> bool:
-        """ Check the validity of a solution against an instance.
+        """Check the validity of a solution against an instance.
 
-        Parameters:
+        Parameters
         ----------
-        instance: any
+        instance : any
             The syntactically checked instance.
-        solution: any
+        solution : any
             The syntactically checked solution.
-        instance_size: int
+        instance_size : int
             The maximum instance size.
-        solution_type: bool
+        solution_type : bool
             Indicates whether the given solution is a certificate (True) or solver solution (False)
 
-        Returns:
-        ----------
+        Returns
+        -------
         bool
             Returns True if the solution is valid for the given instance.
         """
@@ -87,24 +88,24 @@ class Verifier(ABC):
     @abstractmethod
     def calculate_approximation_ratio(self, instance: any, instance_size: int,
                                       generator_solution: any, solver_solution: any) -> float:
-        """ Calculates how good a solvers solution is compared to a generators solution.
+        """Calculate how good a solvers solution is compared to a generators solution.
 
         Assuming an approximation problem, this method returns the approximation
         factor of the solvers solution to the generators solution.
 
-        Parameters:
+        Parameters
         ----------
-        instance: any
+        instance : any
             The syntactically checked instance.
-        instance_size: int
+        instance_size : int
             The current iteration size.
-        generator_solution: any
+        generator_solution : any
             The syntactically checked generator solution.
-        solver_solution: any
+        solver_solution : any
             The syntactically checked solver solution.
 
-        Returns:
-        ----------
+        Returns
+        -------
         float
             Returns the solution quality of the solver solution relative to the generator solution.
             The return value is the approximation ratio of the solver against
