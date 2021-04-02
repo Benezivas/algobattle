@@ -2,7 +2,7 @@ import logging
 
 from algobattle.parser import Parser
 
-logger = logging.getLogger('algobattle.parser')
+logger = logging.getLogger('algobattle.problems.delaytest.parser')
 
 
 class DelaytestParser(Parser):

@@ -15,6 +15,22 @@ from algobattle.util import calculate_points, measure_runtime_overhead, import_p
 
 if __name__ == "__main__":
     def setup_logging(logging_path, verbose_logging, silent):
+        """ Creates and returns a parent logger.
+
+        Parameters:
+        ----------
+        logging_path : str
+            Path where the logfile should be stored at.
+        verbose_logging : bool
+            Flag indicating whether to include debug messages in the output
+        silent : bool
+            Flag indicating whether not to pipe the logging output to stderr.
+
+        Returns:
+        ----------
+        Logger:
+            The Logger object.
+        """
         common_logging_level = logging.INFO
 
         if verbose_logging:

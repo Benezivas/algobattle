@@ -1,5 +1,11 @@
+"""Solver that tries to solve a pairsum instance by a random approach.
+
+Shuffles the instance, divides it into two sections and searches a matching pair between both sections.
+"""
+
 import random
 import sys
+
 fin = open("input")
 line = fin.readline()
 

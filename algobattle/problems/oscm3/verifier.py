@@ -4,7 +4,7 @@ import sys
 
 from algobattle.verifier import Verifier
 
-logger = logging.getLogger('algobattle.verifier')
+logger = logging.getLogger('algobattle.problems.oscm3.verifier')
 
 
 class OSCM3Verifier(Verifier):

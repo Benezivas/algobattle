@@ -1,4 +1,4 @@
-""" Collection of utility functions."""
+"""Collection of utility functions."""
 import os
 import logging
 import timeit
@@ -16,14 +16,15 @@ logger = logging.getLogger('algobattle.util')
 
 
 def import_problem_from_path(problem_path: str) -> Problem:
-    """ Tries to import and initialize a Problem object from a given path.
+    """Try to import and initialize a Problem object from a given path.
 
-    Parameters:
+    Parameters
     ----------
-    problem_path: str
+    problem_path : str
         dict containing the results of match.run().
-    Returns:
-    ----------
+
+    Returns
+    -------
     Problem
         Returns an object of the problem if successful, None otherwise.
     """
@@ -40,14 +41,13 @@ def import_problem_from_path(problem_path: str) -> Problem:
 
 
 def measure_runtime_overhead() -> float:
-    """ Calculate the I/O delay for starting and stopping docker on the host machine.
+    """Calculate the I/O delay for starting and stopping docker on the host machine.
 
-        Returns:
-        ----------
-        float:
-            I/O overhead in seconds, rounded to two decimal places.
+    Returns
+    -------
+    float
+        I/O overhead in seconds, rounded to two decimal places.
     """
-
     problem = DelaytestProblem.Problem()
 
     delaytest_path = DelaytestProblem.__file__[:-12]  # remove /__init__.py
@@ -63,7 +63,7 @@ def measure_runtime_overhead() -> float:
     for i in range(10):
         sigh.latest_running_docker_image = "generator0"
         _, timeout = run_subprocess(match.base_build_command + ["generator0"],
-                                    input=str(50*i).encode(), timeout=match.timeout_generator)
+                                    input=str(50 * i).encode(), timeout=match.timeout_generator)
         overheads.append(float(timeout))
 
     max_overhead = round(max(overheads), 2)
@@ -73,23 +73,24 @@ def measure_runtime_overhead() -> float:
 
 def calculate_points(results: dict, achievable_points: int, team_names: list,
                      battle_iterations: int, battle_type: str) -> dict:
-    """ Calculate the number of achieved points, given results.
+    """Calculate the number of achieved points, given results.
 
-    Parameters:
+    Parameters
     ----------
-    results: dict
+    results : dict
         dict containing the results of match.run().
-    achievable_points: int
+    achievable_points : int
         Number of achievable points.
-    team_names: list
+    team_names : list
         List of all team names involved in the match leading to the results parameter.
-    battle_iterations: int
+    battle_iterations : int
         Number of iterations that were made in the match.
-    batte_type: str
+    batte_type : str
         Type of battle that was held.
-    Returns:
-    ----------
-    dict:
+
+    Returns
+    -------
+    dict
         A mapping between team names and their achieved points.
     """
     points = dict()
@@ -106,21 +107,19 @@ def calculate_points(results: dict, achievable_points: int, team_names: list,
             points[team_names[j]] = points.get(team_names[j], 0)
             # Points are awarded for each match individually, as one run reaching the cap poisons the average number of points
             for k in range(battle_iterations):
+                results0 = results[(team_names[i], team_names[j])][k]
+                results1 = results[(team_names[j], team_names[i])][k]
                 if battle_type == 'iterated':
-                    valuation0 = results[(team_names[i], team_names[j])][k]
-                    valuation1 = results[(team_names[j], team_names[i])][k]
+                    valuation0 = results0
+                    valuation1 = results1
                 elif battle_type == 'averaged':
                     # The valuation of an averaged battle
                     # is the number of successfully executed battles divided by
                     # the average competitive ratio of successful battles,
                     # to account for failures on execution. A higher number
                     # thus means a better overall result. Normalized to the number of configured points.
-                    valuation0 = (len(results[(team_names[i], team_names[j])][k]) /
-                                  (sum(results[(team_names[i], team_names[j])][k]) /
-                                   len(results[(team_names[i], team_names[j])][k])))
-                    valuation1 = (len(results[(team_names[j], team_names[i])][k]) /
-                                  (sum(results[(team_names[j], team_names[i])][k]) /
-                                   len(results[(team_names[j], team_names[i])][k])))
+                    valuation0 = (len(results0) / (sum(results0) / len(results0)))
+                    valuation1 = (len(results1) / (sum(results1) / len(results1)))
                 else:
                     logger.info('Unclear how to calculate points for this type of battle.')
 
@@ -137,20 +136,21 @@ def calculate_points(results: dict, achievable_points: int, team_names: list,
 
 
 def run_subprocess(run_command: list, input: bytes, timeout: float, suppress_output=False):
-    """ Run a given command as a subprocess.
+    """Run a given command as a subprocess.
 
-    Parameters:
+    Parameters
     ----------
-    run_command: list
+    run_command : list
         The command that is to be executed.
-    input: bytes
+    input : bytes
         Additional input for the subprocess, supplied to it via stdin.
-    timeout: float
+    timeout : float
         The timeout for the subprocess in seconds.
-    suppress_output: bool
+    suppress_output : bool
         Indicate whether to suppress output to stderr.
-    Returns:
-    ----------
+
+    Returns
+    -------
     any
         The output that the process returns.
     float

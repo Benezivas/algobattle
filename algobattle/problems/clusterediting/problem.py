@@ -4,7 +4,7 @@ from algobattle.problem import Problem
 from .parser import ClustereditingParser
 from .verifier import ClustereditingVerifier
 
-logger = logging.getLogger('algobattle.clusterediting')
+logger = logging.getLogger('algobattle.problems.clusterediting')
 
 
 class Clusterediting(Problem):

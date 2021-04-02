@@ -4,7 +4,7 @@ from algobattle.problem import Problem
 from .parser import DelaytestParser
 from .verifier import DelaytestVerifier
 
-logger = logging.getLogger('algobattle.delaytest')
+logger = logging.getLogger('algobattle.problems.delaytest')
 
 
 class Delaytest(Problem):

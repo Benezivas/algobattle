@@ -4,7 +4,7 @@ from algobattle.problem import Problem
 from .parser import PathpackingParser
 from .verifier import PathpackingVerifier
 
-logger = logging.getLogger('algobattle.pathpacking')
+logger = logging.getLogger('algobattle.problems.pathpacking')
 
 
 class Pathpacking(Problem):
