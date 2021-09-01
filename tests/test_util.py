@@ -48,7 +48,7 @@ class Matchtests(unittest.TestCase):
     def test_run_subprocess(self):
         team = Team('0', self.tests_path + '/generator_timeout', self.tests_path + '/solver')
         match_run_timeout = Match(self.problem, self.config, [team])
-        raw_output, _ = run_subprocess(match_run_timeout.base_build_command + ['generator-0'], 0, 2)
+        raw_output, _ = run_subprocess(match_run_timeout.base_run_command + ['generator-0'], 0, 2)
         self.assertIsNone(raw_output)
 
 

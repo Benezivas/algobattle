@@ -96,7 +96,9 @@ if __name__ == "__main__":
         sys.exit('The number of provided generator paths ({}), solver paths ({}) and group numbers ({}) is not equal!'.format(len(generators), len(solvers), len(team_names)))
 
     if not os.path.exists(problem_path):
-        sys.exit('Input path "{}" does not exist in the file system! Use "battle --help" for more information on usage and options.'.format(problem_path))
+        sys.exit('Problem path "{}" does not exist in the file system! Use "battle --help" for more information on usage and options.'.format(problem_path))
+    if not os.path.exists(options.config):
+        sys.exit('Config path "{}" does not exist in the file system! Use "battle --help" for more information on usage and options.'.format(problem_path))
     for solver_path in solvers:
         if not os.path.exists(solver_path):
             sys.exit('The given path for option --solvers "{}" does not exist in the file system! Use "battle --help" for more information on usage and options.'.format(solver_path))

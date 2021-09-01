@@ -42,7 +42,7 @@ class Match:
             logger.error('The given problem is not approximable and can only be run with an approximation ratio of 1.0!')
             self.build_successful = False
 
-        self.base_build_command = [
+        self.base_run_command = [
             "docker",
             "run",
             "--rm",
@@ -100,7 +100,7 @@ class Match:
         Bool
             Boolean indicating whether the build process succeeded.
         """
-        docker_build_base = [
+        base_build_command = [
             "docker",
             "build",
         ] + (["--no-cache"] if not cache_docker_containers else []) + [
@@ -123,8 +123,8 @@ class Match:
             self.single_player = True
 
         for team in teams:
-            build_commands.append(docker_build_base + ["solver-" + str(team.name), team.solver_path])
-            build_commands.append(docker_build_base + ["generator-" + str(team.name), team.generator_path])
+            build_commands.append(base_build_command + ["solver-" + str(team.name), team.solver_path])
+            build_commands.append(base_build_command + ["generator-" + str(team.name), team.generator_path])
 
         for command in build_commands:
             logger.debug('Building docker container with the following command: {}'.format(command))
@@ -315,8 +315,8 @@ class Match:
             logger.error('Expected an instance size to be an int of size at least 1, received: {}'.format(instance_size))
             raise Exception('Expected the instance size to be a positive integer.')
 
-        generator_run_command = self.base_build_command + ["generator-" + str(self.generating_team)]
-        solver_run_command    = self.base_build_command + ["solver-"    + str(self.solving_team)]
+        generator_run_command = self.base_run_command + ["generator-" + str(self.generating_team)]
+        solver_run_command    = self.base_run_command + ["solver-"    + str(self.solving_team)]
 
         logger.info('Running generator of group {}...\n'.format(self.generating_team))
 
