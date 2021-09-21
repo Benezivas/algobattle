@@ -5,6 +5,7 @@ import timeit
 import subprocess
 import importlib.util
 import sys
+import collections
 
 import algobattle
 import algobattle.problems.delaytest as DelaytestProblem
@@ -183,3 +184,11 @@ def run_subprocess(run_command: list, input: bytes, timeout: float, suppress_out
     logger.debug('Approximate elapsed runtime: {}/{} seconds.'.format(elapsed_time, timeout))
 
     return raw_output, elapsed_time
+
+def update_nested_dict(current_dict, updates):
+    for key, value in updates.items():
+        if isinstance(value, collections.abc.Mapping):
+            current_dict[key] = update_nested_dict(current_dict.get(key, {}), value)
+        else:
+            current_dict[key] = value
+    return current_dict

@@ -11,9 +11,10 @@ import algobattle
 from algobattle.match import Match
 from algobattle.team import Team
 from algobattle.util import calculate_points, measure_runtime_overhead, import_problem_from_path
-
+from algobattle.ui import Ui
 
 if __name__ == "__main__":
+
     def setup_logging(logging_path, verbose_logging, silent):
         """ Creates and returns a parent logger.
 
@@ -85,8 +86,13 @@ if __name__ == "__main__":
     parser.add_option('--do_not_count_points', dest='do_not_count_points', action='store_true', help='If set, points are not calculated for the run.')
     parser.add_option('--silent', dest='silent', action='store_true', help='Disable forking the logging output to stderr.')
     parser.add_option('--no-overhead-calculation', dest='no_overhead_calculation', action='store_true', help='If set, the program does not benchmark the I/O of the host system to calculate the runtime overhead when started.')
+    parser.add_option('--ui', dest='display_ui', action='store_true', help='If set, the program sets the --silent option and displays a small ui on STDOUT that shows the progess of the battles. Currently only works for iterated battles.')
 
     (options, args) = parser.parse_args()
+
+    display_ui = options.display_ui
+    if display_ui:
+        options.silent = True
 
     solvers = options.solvers.split(',')
     generators = options.generators.split(',')
@@ -131,7 +137,14 @@ if __name__ == "__main__":
         logger.critical('Building the match object failed, exiting!')
         sys.exit(1)
 
+    if display_ui:
+        ui = Ui()
+        match.attach(ui)
+
     results = match.run(options.battle_type, options.battle_iterations, approximation_instance_size=options.approximation_instance_size)
+
+    if display_ui:
+        match.detach(ui)
 
     logger.info('#'*70)
     if not options.do_not_count_points:
