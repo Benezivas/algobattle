@@ -1,4 +1,5 @@
 """Collection of utility functions."""
+from algobattle import match
 import os
 import logging
 import timeit
@@ -74,8 +75,7 @@ def measure_runtime_overhead() -> float:
     return max_overhead
 
 
-def calculate_points(results: dict, achievable_points: int, team_names: list,
-                     battle_iterations: int, battle_type: str) -> dict:
+def calculate_points(match_data: dict, achievable_points: int) -> dict:
     """Calculate the number of achieved points, given results.
 
     Parameters
@@ -98,42 +98,69 @@ def calculate_points(results: dict, achievable_points: int, team_names: list,
     """
     points = dict()
 
+
+#        self.match_data = dict()
+#        self.match_data['error'] = None
+#        self.match_data['curr_pair'] = None
+#        self.match_data['iterations'] = iterations
+#        self.match_data['type'] = battle_type
+#        self.match_data['approx_inst_size'] = approximation_instance_size
+#        for pair in self.all_battle_pairs():
+#            self.match_data[pair] = dict()
+#            self.match_data[pair]['curr_iter'] = 0
+#            for i in range(iterations):
+#                self.match_data[pair][i] = dict()
+#                self.match_data[pair][i]['cap'] = self.iteration_cap
+#                self.match_data[pair][i]['solved'] = 0
+#                self.match_data[pair][i]['attempting'] = 0
+#                self.match_data[pair][i]['approx_ratio'] = 0#
+
+    team_pairs = [key for key in match_data.keys() if isinstance(key, tuple)]
+    team_names = set()
+    for pair in team_pairs:
+        team_names = team_names.union(set((pair[0], pair[1])))
+
+    #return (team_pairs, team_names)
+
     if len(team_names) == 1:
         return {team_names[0]: achievable_points}
 
     # We want all groups to be able to achieve the same number of total points, regardless of the number of teams
-    normalizer = len(team_names) - 1
-    points_per_iteration = round(achievable_points / battle_iterations, 1)
-    for i in range(len(team_names)):
-        for j in range(i + 1, len(team_names)):
-            points[team_names[i]] = points.get(team_names[i], 0)
-            points[team_names[j]] = points.get(team_names[j], 0)
-            # Points are awarded for each match individually, as one run reaching the cap poisons the average number of points
-            for k in range(battle_iterations):
-                results0 = results[(team_names[i], team_names[j])][k]
-                results1 = results[(team_names[j], team_names[i])][k]
-                if battle_type == 'iterated':
-                    valuation0 = results0
-                    valuation1 = results1
-                elif battle_type == 'averaged':
-                    # The valuation of an averaged battle
-                    # is the number of successfully executed battles divided by
-                    # the average competitive ratio of successful battles,
-                    # to account for failures on execution. A higher number
-                    # thus means a better overall result. Normalized to the number of configured points.
-                    valuation0 = (len(results0) / (sum(results0) / len(results0)))
-                    valuation1 = (len(results1) / (sum(results1) / len(results1)))
-                else:
-                    logger.info('Unclear how to calculate points for this type of battle.')
+    normalizer = len(team_names)
+    if match_data['iterations'] <= 0:
+        return {}
+    points_per_iteration = round(achievable_points / match_data['iterations'], 1)
+    for pair in team_pairs:
+        # Points are awarded for each match individually, as one run reaching the cap poisons the average number of points
+        for i in range(match_data['iterations']):
+            points[pair[0]] = points.get(pair[0], 0)
+            points[pair[1]] = points.get(pair[1], 0)
 
-                if valuation0 + valuation1 > 0:
-                    points_proportion0 = (valuation0 / (valuation0 + valuation1))
-                    points_proportion1 = (valuation1 / (valuation0 + valuation1))
-                    points[team_names[i]] += round((points_per_iteration * points_proportion1) / normalizer, 1)
-                    points[team_names[j]] += round((points_per_iteration * points_proportion0) / normalizer, 1)
-                else:
-                    points[team_names[i]] += round((points_per_iteration // 2) / normalizer, 1)
-                    points[team_names[j]] += round((points_per_iteration // 2) / normalizer, 1)
+            if match_data['type'] == 'iterated':
+                valuation0 = match_data[pair][i]['solved']
+                valuation1 = match_data[(pair[1], pair[0])][i]['solved']
+            elif match_data['type'] == 'averaged':
+                # The valuation of an averaged battle
+                # is the number of successfully executed battles divided by
+                # the average competitive ratio of successful battles,
+                # to account for failures on execution. A higher number
+                # thus means a better overall result. Normalized to the number of configured points.
+
+                ratios0 = match_data[pair][i]['approx_ratios']
+                ratios1 = match_data[(pair[1], pair[0])][i]['approx_ratios']
+                valuation0 = (len(ratios0) / (sum(ratios0) / len(ratios0)))
+                valuation1 = (len(ratios1) / (sum(ratios1) / len(ratios1)))
+            else:
+                logger.info('Unclear how to calculate points for this type of battle.')
+
+            if valuation0 + valuation1 > 0:
+                points_proportion0 = (valuation0 / (valuation0 + valuation1))
+                points_proportion1 = (valuation1 / (valuation0 + valuation1))
+                points[pair[0]] += round((points_per_iteration * points_proportion1) / normalizer, 1)
+                points[pair[1]] += round((points_per_iteration * points_proportion0) / normalizer, 1)
+            else:
+                points[pair[0]] += round((points_per_iteration // 2) / normalizer, 1)
+                points[pair[1]] += round((points_per_iteration // 2) / normalizer, 1)
 
     return points
 
