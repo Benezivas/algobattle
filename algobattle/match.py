@@ -57,12 +57,15 @@ class Match(Subject):
         ]
 
     def attach(self, observer: Observer) -> None:
+        """Subscribe a new Observer by adding them to the list of observers."""
         self._observers.append(observer)
 
     def detach(self, observer: Observer) -> None:
+        """Unsubscribe an Observer by removing them from the list of observers."""
         self._observers.remove(observer)
 
     def notify(self) -> None:
+        """Notify all subscribed Observers by calling their update() functions."""
         for observer in self._observers:
             observer.update(self)
 
@@ -203,18 +206,19 @@ class Match(Subject):
         self.match_data['error'] = None
         self.match_data['curr_pair'] = None
         self.match_data['iterations'] = iterations
+        self.match_data['type'] = battle_type
+        self.match_data['approx_inst_size'] = approximation_instance_size
         for pair in self.all_battle_pairs():
             self.match_data[pair] = dict()
             self.match_data[pair]['curr_iter'] = 0
-            self.match_data[pair]['type'] = battle_type
             for i in range(iterations):
                 self.match_data[pair][i] = dict()
                 self.match_data[pair][i]['cap'] = self.iteration_cap
                 self.match_data[pair][i]['solved'] = 0
                 self.match_data[pair][i]['attempting'] = 0
+                self.match_data[pair][i]['approx_ratios'] = []
 
         battle_wrapper = None
-        self.approximation_instance_size = approximation_instance_size
 
         if battle_type == 'iterated':
             battle_wrapper = self._iterated_battle_wrapper
@@ -234,17 +238,6 @@ class Match(Subject):
                 self.generating_team = pair[0]
                 self.solving_team = pair[1]
                 _ = battle_wrapper() # We currently update the match_data inside the wrapper
-
-#        for pair in self.all_battle_pairs():
-#            match_data[pair] = match_data.get(pair, [])
-#            pair_results = []
-#            for i in range(iterations):
-#                logger.info('{}  Running Battle {}/{}  {}'.format('#' * 20, i + 1, iterations, '#' * 20))
-#
-#                self.generating_team = pair[0]
-#                self.solving_team = pair[1]
-#                pair_results.append(battle_wrapper())
-#            match_data[pair] = pair_results
 
         return self.match_data
 
@@ -270,12 +263,13 @@ class Match(Subject):
         """
         approximation_ratios = []
         logger.info('==================== Averaged Battle, Instance Size: {}, Iterations: {} ===================='
-                    .format(self.approximation_instance_size, self.aproximation_iterations))
+                    .format(self.match_data['approx_inst_size'], self.aproximation_iterations))
         for i in range(self.aproximation_iterations):
             logger.info('=============== Iteration: {}/{} ==============='.format(i + 1, self.aproximation_iterations))
-            approx_ratio = self._one_fight(instance_size=self.approximation_instance_size)
+            approx_ratio = self._one_fight(instance_size=self.match_data['approx_inst_size'])
             approximation_ratios.append(approx_ratio)
-            #TODO: Averaged battles currently are not compatible with the ui
+            
+            self.update_match_data({self.match_data['curr_pair']: {self.match_data[self.match_data['curr_pair']]['curr_iter']: {'approx_ratio': self.match_data[self.match_data['curr_pair']][self.match_data[self.match_data['curr_pair']]['curr_iter']]['approx_ratios'] + [approx_ratio]}}})
 
         return approximation_ratios
 
