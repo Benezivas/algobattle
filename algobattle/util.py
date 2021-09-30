@@ -1,5 +1,4 @@
 """Collection of utility functions."""
-from algobattle import match
 import os
 import logging
 import timeit
@@ -54,7 +53,7 @@ def measure_runtime_overhead() -> float:
     config_path = os.path.join(os.path.dirname(os.path.abspath(algobattle.__file__)), 'config', 'config_delaytest.ini')
     delaytest_path = DelaytestProblem.__file__[:-12]  # remove /__init__.py
     delaytest_team = algobattle.team.Team(0, delaytest_path + '/generator', delaytest_path + '/solver')
-    
+
     match = algobattle.match.Match(problem, config_path, [delaytest_team])
 
     if not match.build_successful:
@@ -98,29 +97,10 @@ def calculate_points(match_data: dict, achievable_points: int) -> dict:
     """
     points = dict()
 
-
-#        self.match_data = dict()
-#        self.match_data['error'] = None
-#        self.match_data['curr_pair'] = None
-#        self.match_data['iterations'] = iterations
-#        self.match_data['type'] = battle_type
-#        self.match_data['approx_inst_size'] = approximation_instance_size
-#        for pair in self.all_battle_pairs():
-#            self.match_data[pair] = dict()
-#            self.match_data[pair]['curr_iter'] = 0
-#            for i in range(iterations):
-#                self.match_data[pair][i] = dict()
-#                self.match_data[pair][i]['cap'] = self.iteration_cap
-#                self.match_data[pair][i]['solved'] = 0
-#                self.match_data[pair][i]['attempting'] = 0
-#                self.match_data[pair][i]['approx_ratio'] = 0#
-
     team_pairs = [key for key in match_data.keys() if isinstance(key, tuple)]
     team_names = set()
     for pair in team_pairs:
         team_names = team_names.union(set((pair[0], pair[1])))
-
-    #return (team_pairs, team_names)
 
     if len(team_names) == 1:
         return {team_names[0]: achievable_points}
@@ -212,7 +192,22 @@ def run_subprocess(run_command: list, input: bytes, timeout: float, suppress_out
 
     return raw_output, elapsed_time
 
+
 def update_nested_dict(current_dict, updates):
+    """Update a nested dictionary with new data recursively.
+
+    Parameters
+    ----------
+    current_dict : dict
+        The dict to be updated.
+    updates : dict
+        The dict containing the updates
+
+    Returns
+    -------
+    dict
+        The updated dict.
+    """
     for key, value in updates.items():
         if isinstance(value, collections.abc.Mapping):
             current_dict[key] = update_nested_dict(current_dict.get(key, {}), value)

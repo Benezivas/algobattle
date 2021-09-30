@@ -2,7 +2,7 @@ import subprocess
 
 import logging
 import configparser
-from typing import Callable, Collection, List
+from typing import Callable, List
 
 import algobattle.sighandler as sigh
 from algobattle.team import Team
@@ -237,7 +237,7 @@ class Match(Subject):
 
                 self.generating_team = pair[0]
                 self.solving_team = pair[1]
-                _ = battle_wrapper() # We currently update the match_data inside the wrapper
+                _ = battle_wrapper()  # We currently update the match_data inside the wrapper
 
         return self.match_data
 
@@ -246,7 +246,6 @@ class Match(Subject):
         self.match_data = update_nested_dict(self.match_data, new_data)
         self.notify()
         return True
-
 
     @build_successful
     @team_roles_set
@@ -268,8 +267,11 @@ class Match(Subject):
             logger.info('=============== Iteration: {}/{} ==============='.format(i + 1, self.aproximation_iterations))
             approx_ratio = self._one_fight(instance_size=self.match_data['approx_inst_size'])
             approximation_ratios.append(approx_ratio)
-            
-            self.update_match_data({self.match_data['curr_pair']: {self.match_data[self.match_data['curr_pair']]['curr_iter']: {'approx_ratio': self.match_data[self.match_data['curr_pair']][self.match_data[self.match_data['curr_pair']]['curr_iter']]['approx_ratios'] + [approx_ratio]}}})
+
+            curr_pair = self.match_data['curr_pair']
+            curr_iter = self.match_data[curr_pair]['curr_iter']
+            self.update_match_data({curr_pair: {curr_iter: {'approx_ratio':
+                                    self.match_data[curr_pair][curr_pair]['approx_ratios'] + [approx_ratio]}}})
 
         return approximation_ratios
 
@@ -339,7 +341,10 @@ class Match(Subject):
                 logger.info('Solver {} exceeded the instance size cap of {}!'.format(self.solving_team, self.iteration_cap))
                 maximum_reached_n = self.iteration_cap
                 alive = False
-            self.update_match_data({self.match_data['curr_pair']: {self.match_data[self.match_data['curr_pair']]['curr_iter']: {'cap': n_cap, 'solved': maximum_reached_n, 'attempting': n}}})
+
+            curr_pair = self.match_data['curr_pair']
+            curr_iter = self.match_data[curr_pair]['curr_iter']
+            self.update_match_data({curr_pair: {curr_iter: {'cap': n_cap, 'solved': maximum_reached_n, 'attempting': n}}})
         return maximum_reached_n
 
     @docker_running
