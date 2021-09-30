@@ -8,10 +8,8 @@ class Ui(Observer):
         self.stdscr = curses.initscr()
 
     def update(self, match) -> None:
-        """Receive updates by observing the match object.
-        """
+        """Receive updates by observing the match object."""
         self.output_formatted_ascii(match.match_data)
-
 
     def output_formatted_ascii(self, match_data: dict):
         """ Print out the provided match_data in an formatted way to the console.
@@ -33,13 +31,18 @@ class Ui(Observer):
             r'                      |___/                                   '  + '\n\r')
 
         # TODO: Print out version number.
+        # TODO: UI for averaged battles.
+
+        if match_data['type'] != 'iterated':
+            print('Battles of type {} are currently not compatible with the ui.'.format(match_data['type']))
+            raise Exception('The UI can only handle battles of type "iterated"! Incompatible battle type "{}" given!'.format(match_data['type']))
 
         print('╔═════════╦═════════╦' +
               ''.join(['══════╦' for i in range(match_data['iterations'])]) +
               '══════╦══════╦══════╗' + '\n\r' + 
             '║   SOL   ║   GEN   ' +
             ''.join(['║{:^6s}'.format('R' + str(i + 1)) for i in range(match_data['iterations'])]) +
-            '║  CAP ║  AVG ║  TYP ║' + '\n\r' +
+            '║  CAP ║  AVG ║      ║' + '\n\r' +
             '╟─────────╫─────────╫' +
             ''.join(['──────╫' for i in range(match_data['iterations'])]) +
             '──────╫──────╫──────╢' + '\r')
@@ -51,7 +54,7 @@ class Ui(Observer):
 
                 print('║{:>9s}║{:>9s}'.format(match[0],match[1]) + 
                 ''.join(['║{:>6d}'.format(match_data[match][i]['solved']) for i in range(len(match_data[match].keys()) - 2)])
-                + '║{:>6d}║{:>6d}║{:>6s}║'.format(match_data[match][curr_iter]['cap'], average, battle_abrv[match_data[match]['type']]) + '\r')
+                + '║{:>6d}║{:>6d}║{:>6s}║'.format(match_data[match][curr_iter]['cap'], average, "") + '\r')
         print('╚═════════╩═════════╩' +
         ''.join(['══════╩' for i in range(match_data['iterations'])]) +
         '══════╩══════╩══════╝' + '\n\r')

@@ -91,6 +91,9 @@ if __name__ == "__main__":
     (options, args) = parser.parse_args()
 
     display_ui = options.display_ui
+
+    if display_ui and options.battle_type != 'iterated':
+        sys.exit('UI output currently only supported for iterated battles.')
     if display_ui:
         options.silent = True
 
@@ -104,7 +107,7 @@ if __name__ == "__main__":
     if not os.path.exists(problem_path):
         sys.exit('Problem path "{}" does not exist in the file system! Use "battle --help" for more information on usage and options.'.format(problem_path))
     if not os.path.exists(options.config):
-        sys.exit('Config path "{}" does not exist in the file system! Use "battle --help" for more information on usage and options.'.format(problem_path))
+        sys.exit('Config path "{}" does not exist in the file system! Use "battle --help" for more information on usage and options.'.format(options.config))
     for solver_path in solvers:
         if not os.path.exists(solver_path):
             sys.exit('The given path for option --solvers "{}" does not exist in the file system! Use "battle --help" for more information on usage and options.'.format(solver_path))
@@ -137,8 +140,8 @@ if __name__ == "__main__":
         logger.critical('Building the match object failed, exiting!')
         sys.exit(1)
 
+    ui = Ui()
     if display_ui:
-        ui = Ui()
         match.attach(ui)
 
     results = match.run(options.battle_type, options.battle_iterations, approximation_instance_size=options.approximation_instance_size)
@@ -146,8 +149,9 @@ if __name__ == "__main__":
     if display_ui:
         match.detach(ui)
 
-    logger.info('#'*70)
+    logger.info('#'*78 + '\nThe results of this battle are: \n{}'.format(ui.output_formatted_ascii(results)))
     if not options.do_not_count_points:
+        #TODO: Point calculation is currently broken due to new match_data format
         points = calculate_points(results, options.points, team_names, options.battle_iterations, options.battle_type)
 
         for team_name in [team.name for team in teams]:
