@@ -35,7 +35,7 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics \
         --per-file-ignores="__init__.py:F401,D104 */solver_execution_error/main.py:E999 \
         */generator_execution_error/main.py:E999 match.py:E221 */solver/main.py:D100 */generator/main.py:D100" \
-        --docstring-convention numpy --ignore=D100,D105,D102 --exclude tests,algobattle/problems
+        --docstring-convention numpy --ignore=D100,D105,D102,W503 --exclude tests,algobattle/problems
     - name: Test with unittest
       run: |
         python -m unittest
