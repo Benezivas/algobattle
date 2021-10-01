@@ -82,6 +82,8 @@ if __name__ == "__main__":
     parser.add_option('--battle_type', dest='battle_type', choices=['iterated', 'averaged'], default='iterated', help='Selected battle type. Possible options: iterated, averaged. Default: iterated')
     parser.add_option('--approx_ratio', dest='approximation_ratio', type=float, default='1.0', help='Tolerated approximation ratio for a problem, if compatible with approximation. Default: 1.0')
     parser.add_option('--approx_inst_size', dest='approximation_instance_size', type=int, default='10', help='If --battle_type=averaged, the instance size on which the averaged run is to be made. Default: 10')
+    parser.add_option('--approx_iterations', dest='approximation_iterations', type=int, default='25', help='If --battle_type=averaged, the number of iterations that are to be averaged. Default: 25')
+    parser.add_option('--iter_cap', dest='iterated_cap', type=int, default='50000', help='If --battle_type=iterated, the maximum instance size up to which a battle is to be fought.')
     parser.add_option('--points', dest='points', type=int, default='100', help='Number of points for which are fought. Default: 100')
     parser.add_option('--do_not_count_points', dest='do_not_count_points', action='store_true', help='If set, points are not calculated for the run.')
     parser.add_option('--silent', dest='silent', action='store_true', help='Disable forking the logging output to stderr.')
@@ -92,8 +94,6 @@ if __name__ == "__main__":
 
     display_ui = options.display_ui
 
-    if display_ui and options.battle_type != 'iterated':
-        sys.exit('UI output currently only supported for iterated battles.')
     if display_ui:
         options.silent = True
 
@@ -144,15 +144,16 @@ if __name__ == "__main__":
     if display_ui:
         match.attach(ui)
 
-    results = match.run(options.battle_type, options.battle_iterations, approximation_instance_size=options.approximation_instance_size)
+    results = match.run(options.battle_type, options.battle_iterations, options.iterated_cap, 
+                        options.approximation_instance_size, options.approximation_iterations)
 
     if display_ui:
         match.detach(ui)
 
-    logger.info('#'*78 + '\nThe results of this battle are: \n{}'.format(ui.output_formatted_ascii(results)))
+    logger.info('#'*78)
     if not options.do_not_count_points:
         #TODO: Point calculation is currently broken due to new match_data format
-        points = calculate_points(results, options.points, team_names, options.battle_iterations, options.battle_type)
+        points = calculate_points(results, options.points)
 
         for team_name in [team.name for team in teams]:
-            logger.info('Group {} gained {} points.'.format(team_name, points[team_name]))
+            logger.info('Group {} gained {:.1f} points.'.format(team_name, points[team_name]))

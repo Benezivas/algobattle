@@ -79,16 +79,10 @@ def calculate_points(match_data: dict, achievable_points: int) -> dict:
 
     Parameters
     ----------
-    results : dict
+    match_data : dict
         dict containing the results of match.run().
     achievable_points : int
         Number of achievable points.
-    team_names : list
-        List of all team names involved in the match leading to the results parameter.
-    battle_iterations : int
-        Number of iterations that were made in the match.
-    batte_type : str
-        Type of battle that was held.
 
     Returns
     -------
@@ -107,12 +101,12 @@ def calculate_points(match_data: dict, achievable_points: int) -> dict:
 
     # We want all groups to be able to achieve the same number of total points, regardless of the number of teams
     normalizer = len(team_names)
-    if match_data['iterations'] <= 0:
+    if match_data['rounds'] <= 0:
         return {}
-    points_per_iteration = round(achievable_points / match_data['iterations'], 1)
+    points_per_iteration = round(achievable_points / match_data['rounds'], 1)
     for pair in team_pairs:
         # Points are awarded for each match individually, as one run reaching the cap poisons the average number of points
-        for i in range(match_data['iterations']):
+        for i in range(match_data['rounds']):
             points[pair[0]] = points.get(pair[0], 0)
             points[pair[1]] = points.get(pair[1], 0)
 
