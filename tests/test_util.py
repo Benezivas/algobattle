@@ -28,29 +28,29 @@ class Matchtests(unittest.TestCase):
         self.assertGreater(measure_runtime_overhead(), 0)
 
     def test_calculate_points_weird_type(self):
-        match_data = {'iterations': 2, 'type': 'foo'}
+        match_data = {'rounds': 2, 'type': 'foo'}
         self.assertEqual(calculate_points(match_data, 100), {})
 
-    def test_calculate_points_zero_iterations(self):
-        match_data = {'iterations': 0, 'type': 'iterated'}
+    def test_calculate_points_zero_rounds(self):
+        match_data = {'rounds': 0, 'type': 'iterated'}
         self.assertEqual(calculate_points(match_data, 100), {})
 
     def test_calculate_points_iterated_draw(self):
-        match_data = {'iterations': 2,
+        match_data = {'rounds': 2,
                       'type': 'iterated',
                       ('0', '1'): {0: {'solved': 20}, 1: {'solved': 10}},
                       ('1', '0'): {0: {'solved': 10}, 1: {'solved': 20}}}
         self.assertEqual(calculate_points(match_data, 100), {'0': 50, '1': 50})
 
     def test_calculate_points_iterated_domination(self):
-        match_data = {'iterations': 2,
+        match_data = {'rounds': 2,
                       'type': 'iterated',
                       ('0', '1'): {0: {'solved': 10}, 1: {'solved': 10}},
                       ('1', '0'): {0: {'solved': 0}, 1: {'solved': 0}}}
         self.assertEqual(calculate_points(match_data, 100), {'0': 0, '1': 100})
 
     def test_calculate_points_averaged_draw(self):
-        match_data = {'iterations': 2,
+        match_data = {'rounds': 2,
                       'type': 'averaged',
                       ('0', '1'): {0: {'approx_ratios': [1.5, 1.5, 1.5]},
                                    1: {'approx_ratios': [1.5, 1.5, 1.5]}},
@@ -59,7 +59,7 @@ class Matchtests(unittest.TestCase):
         self.assertEqual(calculate_points(match_data, 100), {'0': 50, '1': 50})
 
     def test_calculate_points_averaged_domination(self):
-        match_data = {'iterations': 2,
+        match_data = {'rounds': 2,
                       'type': 'averaged',
                       ('0', '1'): {0: {'approx_ratios': [1.5, 1.5, 1.5]},
                                    1: {'approx_ratios': [1.5, 1.5, 1.5]}},
