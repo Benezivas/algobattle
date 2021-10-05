@@ -140,8 +140,9 @@ if __name__ == "__main__":
         logger.critical('Building the match object failed, exiting!')
         sys.exit(1)
 
-    ui = Ui()
+    ui = None
     if display_ui:
+        ui = Ui()
         match.attach(ui)
 
     results = match.run(options.battle_type, options.battle_iterations, options.iterated_cap, 

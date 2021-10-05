@@ -58,13 +58,13 @@ class Ui(Observer):
         print('Battle Type: Iterated Battle\n\r')
         print('╔═════════╦═════════╦'
               + ''.join(['══════╦' for i in range(match_data['rounds'])])
-              + '══════╦══════╦══════╗' + '\n\r'
+              + '══════╦══════╗' + '\n\r'
               + '║   SOL   ║   GEN   '
               + ''.join(['║{:^6s}'.format('R' + str(i + 1)) for i in range(match_data['rounds'])])
-              + '║  CAP ║  AVG ║      ║' + '\n\r'
+              + '║  CAP ║  AVG ║' + '\n\r'
               + '╟─────────╫─────────╫'
               + ''.join(['──────╫' for i in range(match_data['rounds'])])
-              + '──────╫──────╫──────╢' + '\r')
+              + '──────╫──────╫' + '\r')
 
         for pair in match_data.keys():
             if isinstance(pair, tuple):
@@ -73,10 +73,10 @@ class Ui(Observer):
 
                 print('║{:>9s}║{:>9s}'.format(pair[0], pair[1])
                       + ''.join(['║{:>6d}'.format(match_data[pair][i]['solved']) for i in range(match_data['rounds'])])
-                      + '║{:>6d}║{:>6d}║{:>6s}║'.format(match_data[pair][curr_round]['cap'], avg, "") + '\r')
+                      + '║{:>6d}║{:>6d}║'.format(match_data[pair][curr_round]['cap'], avg) + '\r')
         print('╚═════════╩═════════╩'
               + ''.join(['══════╩' for i in range(match_data['rounds'])])
-              + '══════╩══════╩══════╝' + '\n\r')
+              + '══════╩══════╝' + '\n\r')
 
     def output_formatted_ascii_averaged(self, match_data: dict) -> None:
         """Print out the provided match_data in an formatted way to the console for averaged battles.
