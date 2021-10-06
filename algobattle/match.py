@@ -2,18 +2,22 @@ import subprocess
 
 import logging
 import configparser
-from typing import Callable
+from typing import Callable, List
 
 import algobattle.sighandler as sigh
 from algobattle.team import Team
 from algobattle.problem import Problem
-from algobattle.util import run_subprocess
+from algobattle.util import run_subprocess, update_nested_dict
+from algobattle.subject import Subject
+from algobattle.observer import Observer
 
 logger = logging.getLogger('algobattle.match')
 
 
-class Match:
+class Match(Subject):
     """Match class, provides functionality for setting up and executing battles between given teams."""
+
+    _observers: List[Observer] = []
 
     def __init__(self, problem: Problem, config_path: str, teams: list,
                  runtime_overhead=0, approximation_ratio=1.0, cache_docker_containers=True) -> None:
@@ -28,8 +32,6 @@ class Match:
         self.space_generator         = int(config['run_parameters']['space_generator'])
         self.space_solver            = int(config['run_parameters']['space_solver'])
         self.cpus                    = int(config['run_parameters']['cpus'])
-        self.iteration_cap           = int(config['run_parameters']['iteration_cap'])
-        self.aproximation_iterations = int(config['run_parameters']['aproximation_iterations'])
         self.problem = problem
         self.config = config
         self.approximation_ratio = approximation_ratio
@@ -51,6 +53,19 @@ class Match:
             "--memory=" + str(self.space_solver) + "mb",
             "--cpus=" + str(self.cpus)
         ]
+
+    def attach(self, observer: Observer) -> None:
+        """Subscribe a new Observer by adding them to the list of observers."""
+        self._observers.append(observer)
+
+    def detach(self, observer: Observer) -> None:
+        """Unsubscribe an Observer by removing them from the list of observers."""
+        self._observers.remove(observer)
+
+    def notify(self) -> None:
+        """Notify all subscribed Observers by calling their update() functions."""
+        for observer in self._observers:
+            observer.update(self)
 
     def build_successful(function: Callable) -> Callable:
         """Ensure that internal methods are only callable after a successful build."""
@@ -159,48 +174,90 @@ class Match:
         return battle_pairs
 
     @build_successful
-    def run(self, battle_type='iterated', iterations=5, approximation_instance_size=10) -> dict:
-        """Match entry point, executes iterations fights between all teams and returns the results of the battles.
+    def run(self, battle_type: str = 'iterated', rounds: int = 5, iterated_cap: int = 50000,
+            approximation_instance_size: int = 10, approximation_iterations: int = 25) -> dict:
+        """Match entry point, executes rounds fights between all teams and returns the results of the battles.
 
         Parameters
         ----------
         battle_type : str
             Type of battle that is to be run.
-        iterations : int
+        rounds : int
             Number of Battles between each pair of teams (used for averaging results).
+        iterated_cap : int
+            Iteration cutoff after which an iterated battle is automatically stopped, declaring the solver as the winner
         approximation_instance_size : int
             Instance size on which to run an averaged battle.
+        approximation_iterations : int
+            Number of iterations for an averaged battle between two teams.
 
         Returns
         -------
         dict
-            A dictionary containing the results of the battles for each team with
-            the team number as a key.
+            A dictionary that at least contains an 'error' key. If this key
+            is set to a value other than None, do not expect the rest of the
+            dict to contain coherent data.
+            Contains a dict for each battle pair (as returned from
+            match.all_battle_pairs()) which includes the current round
+            ('curr_round') of the match, the battle type ('type') and a dict for
+            each iteration. This latter dict contains the current cap ('cap')
+            of the iteration, the highest value for which a valid solution was
+            found ('solved') and the current value for a which a solution is
+            currently sought ('attempting').
+            TODO: Update
         """
-        results = dict()
+        self.match_data = dict()
+        self.match_data['error'] = None
+        self.match_data['curr_pair'] = None
+        self.match_data['rounds'] = rounds
+        self.match_data['type'] = battle_type
+        self.match_data['approx_inst_size'] = approximation_instance_size
+        self.match_data['approx_iters'] = approximation_iterations
+        for pair in self.all_battle_pairs():
+            self.match_data[pair] = dict()
+            self.match_data[pair]['curr_round'] = 0
+            for i in range(rounds):
+                self.match_data[pair][i] = dict()
+                self.match_data[pair][i]['cap'] = iterated_cap
+                self.match_data[pair][i]['solved'] = 0
+                self.match_data[pair][i]['attempting'] = 0
+                self.match_data[pair][i]['approx_ratios'] = []
+
         battle_wrapper = None
-        self.approximation_instance_size = approximation_instance_size
 
         if battle_type == 'iterated':
             battle_wrapper = self._iterated_battle_wrapper
         elif battle_type == 'averaged':
             battle_wrapper = self._averaged_battle_wrapper
         else:
-            logger.error('Unrecognized battle_type given: "{}"'.format(battle_type))
-            return {'Error': 'Unrecognized battle type'}
+            self.match_data['error'] = 'Unrecognized battle_type given: "{}"'.format(battle_type)
+            logger.error(self.match_data['error'])
+            return self.match_data
 
         for pair in self.all_battle_pairs():
-            results[pair] = results.get(pair, [])
-            pair_results = []
-            for i in range(iterations):
-                logger.info('{}  Running Battle {}/{}  {}'.format('#' * 20, i + 1, iterations, '#' * 20))
+            self.update_match_data({'curr_pair': pair})
+            for i in range(rounds):
+                logger.info('{}  Running Battle {}/{}  {}'.format('#' * 20, i + 1, rounds, '#' * 20))
+                self.update_match_data({pair: {'curr_round': i}})
 
                 self.generating_team = pair[0]
                 self.solving_team = pair[1]
-                pair_results.append(battle_wrapper())
-            results[pair] = pair_results
+                _ = battle_wrapper()  # We currently update the match_data inside the wrappers
 
-        return results
+        return self.match_data
+
+    @build_successful
+    def update_match_data(self, new_data: dict) -> bool:
+        """Update the internal match dict with new (partial) information.
+
+        Parameters
+        ----------
+        new_data : dict
+            A dict in the same format as match_data that contains new information.
+        """
+        self.match_data = update_nested_dict(self.match_data, new_data)
+        self.notify()
+        return True
 
     @build_successful
     @team_roles_set
@@ -216,12 +273,17 @@ class Match:
             Returns a list of the computed approximation ratios.
         """
         approximation_ratios = []
-        logger.info('==================== Averaged Battle, Instance Size: {}, Iterations: {} ===================='
-                    .format(self.approximation_instance_size, self.aproximation_iterations))
-        for i in range(self.aproximation_iterations):
-            logger.info('=============== Iteration: {}/{} ==============='.format(i + 1, self.aproximation_iterations))
-            approx_ratio = self._one_fight(instance_size=self.approximation_instance_size)
+        logger.info('==================== Averaged Battle, Instance Size: {}, Rounds: {} ===================='
+                    .format(self.match_data['approx_inst_size'], self.match_data['approx_iters']))
+        for i in range(self.match_data['approx_iters']):
+            logger.info('=============== Iteration: {}/{} ==============='.format(i + 1, self.match_data['approx_iters']))
+            approx_ratio = self._one_fight(instance_size=self.match_data['approx_inst_size'])
             approximation_ratios.append(approx_ratio)
+
+            curr_pair = self.match_data['curr_pair']
+            curr_round = self.match_data[curr_pair]['curr_round']
+            self.update_match_data({curr_pair: {curr_round: {'approx_ratios':
+                                    self.match_data[curr_pair][curr_round]['approx_ratios'] + [approx_ratio]}}})
 
         return approximation_ratios
 
@@ -248,10 +310,13 @@ class Match:
             Returns the biggest instance size for which the solving team still
             found a solution.
         """
+        curr_pair = self.match_data['curr_pair']
+        curr_round = self.match_data[curr_pair]['curr_round']
+
         n = self.problem.n_start
         maximum_reached_n = 0
         i = 0
-        n_cap = self.iteration_cap
+        n_max = n_cap = self.match_data[curr_pair][curr_round]['cap']
         alive = True
 
         logger.info('==================== Iterative Battle, Instanze Size Cap: {} ===================='.format(n_cap))
@@ -278,19 +343,20 @@ class Match:
 
             if n + 1 == n_cap:
                 alive = False
-                break
+            else:
+                i += 1
+                n += i * i
 
-            i += 1
-            n += i * i
+                if n >= n_cap and n_cap != n_max:
+                    # We have failed at this value of n already, reset the step size!
+                    n -= i * i - 1
+                    i = 1
+                elif n >= n_cap and n_cap == n_max:
+                    logger.info('Solver {} exceeded the instance size cap of {}!'.format(self.solving_team, n_max))
+                    maximum_reached_n = n_max
+                    alive = False
 
-            if n >= n_cap and n_cap != self.iteration_cap:
-                # We have failed at this value of n already, reset the step size!
-                n -= i * i - 1
-                i = 1
-            elif n >= n_cap and n_cap == self.iteration_cap:
-                logger.info('Solver {} exceeded the instance size cap of {}!'.format(self.solving_team, self.iteration_cap))
-                maximum_reached_n = self.iteration_cap
-                alive = False
+            self.update_match_data({curr_pair: {curr_round: {'cap': n_cap, 'solved': maximum_reached_n, 'attempting': n}}})
         return maximum_reached_n
 
     @docker_running

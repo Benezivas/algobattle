@@ -54,7 +54,7 @@ class Matchtests(unittest.TestCase):
         self.assertEqual(match.all_battle_pairs(), [('0', '0')])
 
     def test_run(self):
-        self.assertEqual(self.match.run(battle_type='foo'), ({'Error': 'Unrecognized battle type'}))
+        self.assertEqual(self.match.run(battle_type='foo')['error'], ('Unrecognized battle_type given: "foo"'))
 
     def test_averaged_battle_wrapper(self):
         pass
