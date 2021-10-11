@@ -14,7 +14,7 @@ increasing size that the other group has to solve within a time limit.
 Points are distributed relative to the biggest instance size for which a group
 was still able to solve an instance.
 
-# Installation and Usage
+# Installation
 This project has been delevoped to run on Linux and may not work on other
 platforms. Support for other platforms may be implemented in the future.
 
@@ -29,12 +29,16 @@ Adjust the parameters set in the `algobattle/configs/config.ini` file to set
 which hardware resources you want to assign. You can pass alternative
 configuration files to the script using the `--config_file` option.
 
-To start a basic run on the `biclique` problem, using the `solver` and `generator` that
-are part of the problem directory, execute
+# Usage
+This repository does not include any practical problems. For a selection of problems
+that have been posed to students in practice, have a look at the
+[algobattle-problems](https://github.com/Benezivas/algobattle-problems) repository.
+
+To start a basic run on a problem, using the `solver` and `generator` that
+are part of the problem directory, use
 ```
-battle algobattle/problems/biclique
+battle path/to/concrecte/problem/folder
 ```
-or provide any alternative problem folder path.
 
 The `battle` script offers several options, e.g. to give custom paths for
 solvers and generators. Run `battle --help` for all options.

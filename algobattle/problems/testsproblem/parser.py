@@ -6,6 +6,8 @@ logger = logging.getLogger('algobattle.problems.testsproblem.parser')
 
 
 class TestsParser(Parser):
+    """Dummy parser."""
+
     def split_into_instance_and_solution(self, raw_input):
         raw_instance = []
         raw_solution = []

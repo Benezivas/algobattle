@@ -6,6 +6,8 @@ logger = logging.getLogger('algobattle.problems.testsproblem.verifier')
 
 
 class TestsVerifier(Verifier):
+    """Dummy verifier."""
+
     def verify_semantics_of_instance(self, instance, instance_size: int):
         if not instance:
             return False
@@ -28,5 +30,5 @@ class TestsVerifier(Verifier):
         return True
 
     def calculate_approximation_ratio(self, instance, instance_size, generator_solution, solver_solution):
-        return len([line for line in generator_solution if line[3] == '1']) / \
-               len([line for line in solver_solution if line[3] == '1'])
+        return len([line for line in generator_solution if line[3] == '1']) \
+            / len([line for line in solver_solution if line[3] == '1'])

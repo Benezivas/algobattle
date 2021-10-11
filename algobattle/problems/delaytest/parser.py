@@ -6,6 +6,8 @@ logger = logging.getLogger('algobattle.problems.delaytest.parser')
 
 
 class DelaytestParser(Parser):
+    """Dummy parser used for testing Docker delays."""
+
     def split_into_instance_and_solution(self, raw_input):
         return raw_input, raw_input
 
