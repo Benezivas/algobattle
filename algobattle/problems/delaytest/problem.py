@@ -8,6 +8,8 @@ logger = logging.getLogger('algobattle.problems.delaytest')
 
 
 class Delaytest(Problem):
+    """Dummy Problem used for testing Docker delays."""
+
     name = 'Runtime Delay Test'
     n_start = 1
     parser = DelaytestParser()

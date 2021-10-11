@@ -1,5 +1,4 @@
-""" Tests for the Match class.
-"""
+"""Tests for the Match class."""
 import unittest
 import logging
 import importlib
@@ -13,6 +12,8 @@ logging.disable(logging.CRITICAL)
 
 
 class Matchtests(unittest.TestCase):
+    """Tests for the match object."""
+
     def setUp(self) -> None:
         Problem = importlib.import_module('algobattle.problems.testsproblem')
         self.problem = Problem.Problem()
@@ -38,7 +39,6 @@ class Matchtests(unittest.TestCase):
 
     def test_build_timeout(self):
         # Build timeout
-        
         team = Team('0', self.tests_path + '/generator_build_timeout', self.tests_path + '/solver')
         match_build_timeout = Match(self.problem, self.config_short_build_timeout, [team], cache_docker_containers=False)
         self.assertFalse(match_build_timeout.build_successful)
@@ -73,7 +73,6 @@ class Matchtests(unittest.TestCase):
         pass
 
     def test_one_fight_gen_timeout(self):
-        
         team = Team('0', self.tests_path + '/generator_timeout', self.tests_path + '/solver')
         match_run_timeout = Match(self.problem, self.config_short_timeout, [team], cache_docker_containers=False)
         match_run_timeout.generating_team = '0'
@@ -108,7 +107,7 @@ class Matchtests(unittest.TestCase):
         match_wrong_generator_certificate.solving_team = '0'
         self.assertEqual(match_wrong_generator_certificate._one_fight(1), 1.0)
 
-    def test_one_fight_gen_exec_error(self):
+    def test_one_fight_sol_timeout(self):
         team = Team('0', self.tests_path + '/generator', self.tests_path + '/solver_timeout')
         match_solver_timeout = Match(self.problem, self.config_short_timeout, [team], cache_docker_containers=False)
         match_solver_timeout.generating_team = '0'

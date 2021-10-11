@@ -8,6 +8,8 @@ logger = logging.getLogger('algobattle.problems.testsproblem')
 
 
 class Tests(Problem):
+    """Artificial problem used for tests."""
+
     name = 'Tests'
     n_start = 1
     parser = TestsParser()
