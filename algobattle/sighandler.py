@@ -9,7 +9,6 @@ logger = logging.getLogger('algobattle.sighandler')
 
 def signal_handler(sig, frame):
     """Handle interrupts and exit the process gracefully."""
-    print('You pressed Ctrl+C!')
     _kill_spawned_docker_containers()
 
     logger.info('Received SIGINT, terminating execution.')

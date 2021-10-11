@@ -1,5 +1,4 @@
-""" Tests for the util.
-"""
+"""Tests for all util functions."""
 import unittest
 import logging
 import importlib
@@ -13,7 +12,9 @@ from algobattle.util import import_problem_from_path, measure_runtime_overhead, 
 logging.disable(logging.CRITICAL)
 
 
-class Matchtests(unittest.TestCase):
+class Utiltests(unittest.TestCase):
+    """Tests for the util functions."""
+
     def setUp(self) -> None:
         Problem = importlib.import_module('algobattle.problems.testsproblem')
         self.problem = Problem.Problem()
