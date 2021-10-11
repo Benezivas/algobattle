@@ -3,6 +3,7 @@ import curses
 
 from algobattle.observer import Observer
 from algobattle.match import Match
+from algobattle import __version__ as version
 
 
 class Ui(Observer):
@@ -19,7 +20,9 @@ class Ui(Observer):
         match : dict
             The observed match object.
         """
-        print(self.formatt_ascii(match.match_data)) # TODO: Refactor s.t. the output stream can be chosen by the user.
+        self.stdscr.refresh()
+        self.stdscr.clear()
+        print(self.formatt_ascii(match.match_data))  # TODO: Refactor s.t. the output stream can be chosen by the user.
 
     def formatt_ascii(self, match_data: dict) -> None:
         """Format the provided match_data for the given battle_type.
@@ -34,16 +37,14 @@ class Ui(Observer):
         str
             A formatted string on the basis of the match_data.
         """
-        self.stdscr.refresh()
-        self.stdscr.clear()
-        print(r'              _    _             _           _   _   _       ' + '\n\r'
-              + r'             / \  | | __ _  ___ | |__   __ _| |_| |_| | ___  ' + '\n\r'
-              + r'            / _ \ | |/ _` |/ _ \| |_ \ / _` | __| __| |/ _ \ ' + '\n\r'
-              + r'           / ___ \| | (_| | (_) | |_) | (_| | |_| |_| |  __/ ' + '\n\r'
-              + r'          /_/   \_\_|\__, |\___/|_.__/ \__,_|\__|\__|_|\___| ' + '\n\r'
-              + r'                      |___/                                  ' + '\n\r')
+        out = r'              _    _             _           _   _   _       ' + '\n\r' \
+              + r'             / \  | | __ _  ___ | |__   __ _| |_| |_| | ___  ' + '\n\r' \
+              + r'            / _ \ | |/ _` |/ _ \| |_ \ / _` | __| __| |/ _ \ ' + '\n\r' \
+              + r'           / ___ \| | (_| | (_) | |_) | (_| | |_| |_| |  __/ ' + '\n\r' \
+              + r'          /_/   \_\_|\__, |\___/|_.__/ \__,_|\__|\__|_|\___| ' + '\n\r' \
+              + r'                      |___/                                  ' + '\n\r'
 
-        # TODO: Print out version number.
+        out += '\nAlgobattle version {}\n\r'.format(version)
 
         formatter = None
         if match_data['type'] == 'iterated':
@@ -53,7 +54,7 @@ class Ui(Observer):
         else:
             formatter = self.formatted_ascii_unknown
 
-        return formatter(match_data)
+        return out + formatter(match_data)
 
     def formatted_ascii_iterated(self, match_data: dict) -> None:
         """Format the provided match_data for iterated battles.
@@ -71,14 +72,14 @@ class Ui(Observer):
         formatted_output_string = ""
         formatted_output_string += 'Battle Type: Iterated Battle\n\r'
         formatted_output_string += '╔═════════╦═════════╦' \
-              + ''.join(['══════╦' for i in range(match_data['rounds'])]) \
-              + '══════╦══════╗' + '\n\r' \
-              + '║   SOL   ║   GEN   ' \
-              + ''.join(['║{:^6s}'.format('R' + str(i + 1)) for i in range(match_data['rounds'])]) \
-              + '║  CAP ║  AVG ║' + '\n\r' \
-              + '╟─────────╫─────────╫' \
-              + ''.join(['──────╫' for i in range(match_data['rounds'])]) \
-              + '──────╫──────╢' + '\n\r'
+                                   + ''.join(['══════╦' for i in range(match_data['rounds'])]) \
+                                   + '══════╦══════╗' + '\n\r' \
+                                   + '║   SOL   ║   GEN   ' \
+                                   + ''.join(['║{:^6s}'.format('R' + str(i + 1)) for i in range(match_data['rounds'])]) \
+                                   + '║  CAP ║  AVG ║' + '\n\r' \
+                                   + '╟─────────╫─────────╫' \
+                                   + ''.join(['──────╫' for i in range(match_data['rounds'])]) \
+                                   + '──────╫──────╢' + '\n\r'
 
         for pair in match_data.keys():
             if isinstance(pair, tuple):
@@ -86,11 +87,12 @@ class Ui(Observer):
                 avg = sum(match_data[pair][i]['solved'] for i in range(match_data['rounds'])) // match_data['rounds']
 
                 formatted_output_string += '║{:>9s}║{:>9s}'.format(pair[0], pair[1]) \
-                      + ''.join(['║{:>6d}'.format(match_data[pair][i]['solved']) for i in range(match_data['rounds'])]) \
-                      + '║{:>6d}║{:>6d}║'.format(match_data[pair][curr_round]['cap'], avg) + '\r'
+                                           + ''.join(['║{:>6d}'.format(match_data[pair][i]['solved'])
+                                                     for i in range(match_data['rounds'])]) \
+                                           + '║{:>6d}║{:>6d}║'.format(match_data[pair][curr_round]['cap'], avg) + '\r'
         formatted_output_string += '\n╚═════════╩═════════╩' \
-              + ''.join(['══════╩' for i in range(match_data['rounds'])]) \
-              + '══════╩══════╝' + '\n\r'
+                                   + ''.join(['══════╩' for i in range(match_data['rounds'])]) \
+                                   + '══════╩══════╝' + '\n\r'
 
         return formatted_output_string
 
@@ -110,14 +112,14 @@ class Ui(Observer):
         formatted_output_string = ""
         formatted_output_string += 'Battle Type: Averaged Battle\n\r'
         formatted_output_string += '╔═════════╦═════════╦' \
-              + ''.join(['══════╦' for i in range(match_data['rounds'])]) \
-              + '══════╦══════╦════════╗' + '\n\r' \
-              + '║   SOL   ║   GEN   ' \
-              + ''.join(['║{:^6s}'.format('R' + str(i + 1)) for i in range(match_data['rounds'])]) \
-              + '║ LAST ║ SIZE ║  ITER  ║' + '\n\r' \
-              + '╟─────────╫─────────╫' \
-              + ''.join(['──────╫' for i in range(match_data['rounds'])]) \
-              + '──────╫──────╫────────╢' + '\n\r'
+                                   + ''.join(['══════╦' for i in range(match_data['rounds'])]) \
+                                   + '══════╦══════╦════════╗' + '\n\r' \
+                                   + '║   SOL   ║   GEN   ' \
+                                   + ''.join(['║{:^6s}'.format('R' + str(i + 1)) for i in range(match_data['rounds'])]) \
+                                   + '║ LAST ║ SIZE ║  ITER  ║' + '\n\r' \
+                                   + '╟─────────╫─────────╫' \
+                                   + ''.join(['──────╫' for i in range(match_data['rounds'])]) \
+                                   + '──────╫──────╫────────╢' + '\n\r'
 
         for pair in match_data.keys():
             if isinstance(pair, tuple):
@@ -138,12 +140,14 @@ class Ui(Observer):
                     latest_approx_ratio = match_data[pair][curr_round]['approx_ratios'][-1]
 
                 formatted_output_string += '║{:>9s}║{:>9s}'.format(pair[0], pair[1]) \
-                      + ''.join(['║{:>6.2f}'.format(avg[i]) for i in range(match_data['rounds'])]) \
-                      + '║{:>6.2f}║{:>6d}║{:>3d}/{:>3d} ║'.format(latest_approx_ratio, match_data['approx_inst_size'], \
-                                                                  curr_iter, match_data['approx_iters']) + '\r'
+                                           + ''.join(['║{:>6.2f}'.format(avg[i]) for i in range(match_data['rounds'])]) \
+                                           + '║{:>6.2f}║{:>6d}║{:>3d}/{:>3d} ║'.format(latest_approx_ratio,
+                                                                                       match_data['approx_inst_size'],
+                                                                                       curr_iter,
+                                                                                       match_data['approx_iters']) + '\r'
         formatted_output_string += '\n╚═════════╩═════════╩' \
-              + ''.join(['══════╩' for i in range(match_data['rounds'])]) \
-              + '══════╩══════╩════════╝' + '\n\r'
+                                   + ''.join(['══════╩' for i in range(match_data['rounds'])]) \
+                                   + '══════╩══════╩════════╝' + '\n\r'
 
         return formatted_output_string
 
@@ -164,5 +168,5 @@ class Ui(Observer):
 
         formatted_output_string += 'Battles of type {} are currently not compatible with the ui.'.format(match_data['type'])
         formatted_output_string += 'Here is a dump of the match_data dict anyway:\n{}'.format(match_data)
-        
+
         return formatted_output_string
