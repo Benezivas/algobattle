@@ -1,10 +1,12 @@
 """UI class, responsible for printing nicely formatted output to STDOUT."""
 import curses
+import logging
 
 from algobattle.observer import Observer
 from algobattle.match import Match
 from algobattle import __version__ as version
 
+logger = logging.getLogger('algobattle.ui')
 
 class Ui(Observer):
     """The UI Class declares methods to output information to STDOUT."""
@@ -13,7 +15,7 @@ class Ui(Observer):
         self.stdscr = curses.initscr()
 
     def update(self, match: Match) -> None:
-        """Receive updates by observing the match object.
+        """Receive updates by observing the match object and prints them out formatted.
 
         Parameters
         ----------
