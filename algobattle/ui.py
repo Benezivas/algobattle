@@ -8,6 +8,7 @@ from algobattle import __version__ as version
 
 logger = logging.getLogger('algobattle.ui')
 
+
 class Ui(Observer):
     """The UI Class declares methods to output information to STDOUT."""
 
