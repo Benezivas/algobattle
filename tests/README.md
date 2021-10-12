@@ -1,6 +1,5 @@
 # Tests for algobattle
-This directory contains a number of tests for the framework as well as for the
- predefined problems of this project. Calling
+This directory contains a number of tests for the framework of this project. Calling
 ```
 python -m unittest
 ```

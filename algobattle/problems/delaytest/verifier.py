@@ -6,6 +6,8 @@ logger = logging.getLogger('algobattle.problems.delaytest.verifier')
 
 
 class DelaytestVerifier(Verifier):
+    """Dummy verifier used for testing Docker delays."""
+
     def verify_semantics_of_instance(self, instance, instance_size: int):
         return True
 
