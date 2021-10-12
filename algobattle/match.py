@@ -194,20 +194,29 @@ class Match(Subject):
         Returns
         -------
         dict
-            A dictionary that at least contains an 'error' key. If this key
-            is set to a value other than None, do not expect the rest of the
-            dict to contain coherent data.
-            Contains a dict for each battle pair (as returned from
-            match.all_battle_pairs()) which includes the current round
-            ('curr_round') of the match, the battle type ('type') and a dict for
-            each iteration. This latter dict contains the current cap ('cap')
-            of the iteration, the highest value for which a valid solution was
-            found ('solved') and the current value for a which a solution is
-            currently sought ('attempting').
-            TODO: Update
+            A dictionary contains the current data of a match. You can subscribe
+            to this data using the observable pattern implemented in the match object.
+            If the 'error' key is set to something other than None, do not expect the
+            data to be consistent.
+            Contains the following keys:
+            error: An error message as a str (default: None).
+            problem: The name of a problem
+            curr_pair: The pair of teams currently fighting.
+            rounds: The number of rounds fought between each pair of teams.
+            type: The battle_type, usually 'iterated' or 'averaged'.
+            approx_inst_size: Assuming 'averaged' battle_type, the constant instanze size.
+            approx_iters: Assuming 'averaged' battle_type, the number of iterations over which to average.
+            For each pair (as 2-tuple), there is a nested dict with the following contents:
+            curr_round: The current round of the battle between the two teams.
+            Each round is a key itself with another nested dict with the following contents:
+            cap: Assuming 'iterated' battle_type, the (updated) cap up to which to fight.
+            solved: Assuming 'iterated' battle_type, the largest instance size for which a solution was found (so far).
+            attempting: Assuming 'iterated' battle_type, the current instanze size for which a solution is sought.
+            approx_ratios: Assuming 'averaged' battle_type, a list of the approximation ratios for each iteration.
         """
         self.match_data = dict()
         self.match_data['error'] = None
+        self.match_data['problem'] = Problem.name
         self.match_data['curr_pair'] = None
         self.match_data['rounds'] = rounds
         self.match_data['type'] = battle_type
