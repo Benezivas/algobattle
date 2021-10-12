@@ -71,14 +71,14 @@ if __name__ == "__main__":
 
     # Option parser to process arguments from the console.
     usage = 'usage: %prog FILE [options]\nExpecting (relative) path to the parent directory of the problem file as first argument.\nIf you provide generators, solvers and group numbers for multiple teams, make sure that the order is the same for all three arguments!'
-    parser = OptionParser(usage=usage)
+    parser = OptionParser(usage=usage, version=algobattle.__version__)
     parser.add_option('--verbose', dest='verbose_logging', action='store_true', help='Log all debug messages.')
     parser.add_option('--output_folder', dest='folder_name', default=default_logging_path, help='Specify the folder into which all logging files are written to. Default: ~/.algobattle_logs/')
     parser.add_option('--config_file', dest='config', default=default_config, help='Path to a .ini configuration file to be used for the run. Defaults to the packages config.ini')
     parser.add_option('--solvers', dest='solvers', default=problem_path + '/solver/', help='Specify the folder names containing the solvers of all involved teams as a comma-seperated list. Default: arg1/solver/')
     parser.add_option('--generators', dest='generators', default=problem_path + '/generator/', help='Specify the folder names containing the generators of all involved teams as a comma-seperated list. Default: arg1/generator/')
     parser.add_option('--team_names', dest='team_names', default='0', help='Specify the group names of all involved teams as a list strings as a comma-seperated list. Default: "0"')
-    parser.add_option('--iterations', dest='battle_iterations', type=int, default='5', help='Number of fights that are to be made in the battle (points are split between each fight). Default: 5')
+    parser.add_option('--rounds', dest='battle_rounds', type=int, default='5', help='Number of rounds that are to be made in the battle (points are split between all rounds). Default: 5')
     parser.add_option('--battle_type', dest='battle_type', choices=['iterated', 'averaged'], default='iterated', help='Selected battle type. Possible options: iterated, averaged. Default: iterated')
     parser.add_option('--approx_ratio', dest='approximation_ratio', type=float, default='1.0', help='Tolerated approximation ratio for a problem, if compatible with approximation. Default: 1.0')
     parser.add_option('--approx_inst_size', dest='approximation_instance_size', type=int, default='10', help='If --battle_type=averaged, the instance size on which the averaged run is to be made. Default: 10')
@@ -145,7 +145,7 @@ if __name__ == "__main__":
         ui = Ui()
         match.attach(ui)
 
-    results = match.run(options.battle_type, options.battle_iterations, options.iterated_cap, 
+    results = match.run(options.battle_type, options.battle_rounds, options.iterated_cap, 
                         options.approximation_instance_size, options.approximation_iterations)
 
     if display_ui:
@@ -153,7 +153,6 @@ if __name__ == "__main__":
 
     logger.info('#'*78)
     if not options.do_not_count_points:
-        #TODO: Point calculation is currently broken due to new match_data format
         points = calculate_points(results, options.points)
 
         for team_name in [team.name for team in teams]:

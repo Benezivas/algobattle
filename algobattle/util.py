@@ -97,7 +97,7 @@ def calculate_points(match_data: dict, achievable_points: int) -> dict:
         team_names = team_names.union(set((pair[0], pair[1])))
 
     if len(team_names) == 1:
-        return {team_names[0]: achievable_points}
+        return {team_names.pop(): achievable_points}
 
     # We want all groups to be able to achieve the same number of total points, regardless of the number of teams
     normalizer = len(team_names)

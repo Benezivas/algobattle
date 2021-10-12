@@ -1,8 +1,12 @@
 """UI class, responsible for printing nicely formatted output to STDOUT."""
 import curses
+import logging
 
 from algobattle.observer import Observer
 from algobattle.match import Match
+from algobattle import __version__ as version
+
+logger = logging.getLogger('algobattle.ui')
 
 
 class Ui(Observer):
@@ -12,13 +16,15 @@ class Ui(Observer):
         self.stdscr = curses.initscr()
 
     def update(self, match: Match) -> None:
-        """Receive updates by observing the match object.
+        """Receive updates by observing the match object and prints them out formatted.
 
         Parameters
         ----------
         match : dict
             The observed match object.
         """
+        self.stdscr.refresh()
+        self.stdscr.clear()
         print(self.formatt_ascii(match.match_data))  # TODO: Refactor s.t. the output stream can be chosen by the user.
 
     def formatt_ascii(self, match_data: dict) -> None:
@@ -34,16 +40,14 @@ class Ui(Observer):
         str
             A formatted string on the basis of the match_data.
         """
-        self.stdscr.refresh()
-        self.stdscr.clear()
-        print(r'              _    _             _           _   _   _       ' + '\n\r'
-              + r'             / \  | | __ _  ___ | |__   __ _| |_| |_| | ___  ' + '\n\r'
-              + r'            / _ \ | |/ _` |/ _ \| |_ \ / _` | __| __| |/ _ \ ' + '\n\r'
-              + r'           / ___ \| | (_| | (_) | |_) | (_| | |_| |_| |  __/ ' + '\n\r'
-              + r'          /_/   \_\_|\__, |\___/|_.__/ \__,_|\__|\__|_|\___| ' + '\n\r'
-              + r'                      |___/                                  ' + '\n\r')
+        out = r'              _    _             _           _   _   _       ' + '\n\r' \
+              + r'             / \  | | __ _  ___ | |__   __ _| |_| |_| | ___  ' + '\n\r' \
+              + r'            / _ \ | |/ _` |/ _ \| |_ \ / _` | __| __| |/ _ \ ' + '\n\r' \
+              + r'           / ___ \| | (_| | (_) | |_) | (_| | |_| |_| |  __/ ' + '\n\r' \
+              + r'          /_/   \_\_|\__, |\___/|_.__/ \__,_|\__|\__|_|\___| ' + '\n\r' \
+              + r'                      |___/                                  ' + '\n\r'
 
-        # TODO: Print out version number.
+        out += '\nAlgobattle version {}\n\r'.format(version)
 
         formatter = None
         if match_data['type'] == 'iterated':
@@ -53,7 +57,7 @@ class Ui(Observer):
         else:
             formatter = self.formatted_ascii_unknown
 
-        return formatter(match_data)
+        return out + formatter(match_data)
 
     def formatted_ascii_iterated(self, match_data: dict) -> None:
         """Format the provided match_data for iterated battles.
