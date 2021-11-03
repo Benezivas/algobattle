@@ -1,3 +1,4 @@
+"""Implementations used to safely kill a running battle, cleaning up possibly running docker containers."""
 import signal
 import sys
 import logging

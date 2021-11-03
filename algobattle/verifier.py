@@ -1,3 +1,4 @@
+"""Abstract base class for verifiers used in concrete problem implementations."""
 from abc import ABC, abstractmethod
 import logging
 

@@ -1,3 +1,4 @@
+"""Dummy parser for delaytest. No actual parsing is done, the input and output are simply forwarded."""
 import logging
 
 from algobattle.parser import Parser

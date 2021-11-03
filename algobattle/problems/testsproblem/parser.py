@@ -1,3 +1,4 @@
+"""Dummy parser built for tests."""
 import logging
 
 from algobattle.parser import Parser

@@ -1,6 +1,3 @@
-fin = open("input")
-line = fin.readline()
-
-fout = open("output", "w")
-fout.write("#")
-fout.close()
+"""Dummy generator for delaytest. Outputs a # sign."""
+with open("output", "w") as out:
+    out.write("#")
