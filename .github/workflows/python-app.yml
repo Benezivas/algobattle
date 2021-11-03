@@ -57,7 +57,6 @@ jobs:
         pip install . --user
     - name: Run short battles with different options as a sanity check
       run: |
-        $HOME/.local/bin/battle algobattle/problems/testsproblem --verbose --iter_cap=5 --rounds=2 --no_overhead_calculation
-        --generators=algobattle/problems/testsproblem/generator,algobattle/problems/testsproblem/generator \
-        --solvers=algobattle/problems/testsproblem/solver,algobattle/problems/testsproblem/solver --team_names=team1,team2
+        $HOME/.local/bin/battle algobattle/problems/testsproblem --verbose --iter_cap=5 --rounds=2
+        $HOME/.local/bin/battle algobattle/problems/testsproblem --verbose --iter_cap=5 --rounds=2 --no_overhead_calculation --generators=algobattle/problems/testsproblem/generator,algobattle/problems/testsproblem/generator --solvers=algobattle/problems/testsproblem/solver,algobattle/problems/testsproblem/solver --team_names=team1,team2
         $HOME/.local/bin/battle algobattle/problems/testsproblem --verbose --battle_type=averaged --approx_ratio=1.5 --approx_inst_size=3 --approx_iterations=3 --round=2
