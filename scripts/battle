@@ -87,7 +87,7 @@ if __name__ == "__main__":
     parser.add_option('--points', dest='points', type=int, default='100', help='Number of points for which are fought. Default: 100')
     parser.add_option('--do_not_count_points', dest='do_not_count_points', action='store_true', help='If set, points are not calculated for the run.')
     parser.add_option('--silent', dest='silent', action='store_true', help='Disable forking the logging output to stderr.')
-    parser.add_option('--no-overhead-calculation', dest='no_overhead_calculation', action='store_true', help='If set, the program does not benchmark the I/O of the host system to calculate the runtime overhead when started.')
+    parser.add_option('--no_overhead_calculation', dest='no_overhead_calculation', action='store_true', help='If set, the program does not benchmark the I/O of the host system to calculate the runtime overhead when started.')
     parser.add_option('--ui', dest='display_ui', action='store_true', help='If set, the program sets the --silent option and displays a small ui on STDOUT that shows the progress of the battles. Currently only works for iterated battles.')
 
     (options, args) = parser.parse_args()
