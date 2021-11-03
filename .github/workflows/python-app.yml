@@ -26,20 +26,20 @@ jobs:
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         pip install . --user
   lint:
-    - name: Lint with flake8
-      run: |
-        flake8 . --count --max-complexity=10  --max-line-length=127  \
-        --per-file-ignores="__init__.py:F401,D104 */solver_execution_error/main.py:E999 \
-        */generator_execution_error/main.py:E999 match.py:E221 setup.py:D102,D100 \
-        */problems/*/verifier.py:D102 */problems/*/parser.py:D102 tests/*:D102 tests/__init__.py:D104 \
-        scripts/battle:E501,C901" \
-        --docstring-convention numpy --show-source --statistics --ignore=D105,D401
+    name: Lint with flake8
+    run: |
+      flake8 . --count --max-complexity=10  --max-line-length=127  \
+      --per-file-ignores="__init__.py:F401,D104 */solver_execution_error/main.py:E999 \
+      */generator_execution_error/main.py:E999 match.py:E221 setup.py:D102,D100 \
+      */problems/*/verifier.py:D102 */problems/*/parser.py:D102 tests/*:D102 tests/__init__.py:D104 \
+      scripts/battle:E501,C901" \
+      --docstring-convention numpy --show-source --statistics --ignore=D105,D401
   test:
-    - name: Test using unittests
-      run: |
-        python -m unittest
+    name: Test using unittests
+    run: |
+      python -m unittest
   execute:
-    -name: Run short battles with different options as a sanity check
+    name: Run short battles with different options as a sanity check
     run: |
       $HOME/.local/bin/battle algobattle/problems/testsproblem --verbose --iter_cap=5 --rounds=2 --no_overhead_calculation
       $HOME/.local/bin/battle algobattle/problems/testsproblem --verbose --iter_cap=5 --rounds=2 --ui \
