@@ -1,5 +1,5 @@
+"""Dummy verifier for the delaytest. Does not verify anything."""
 import logging
-
 from algobattle.verifier import Verifier
 
 logger = logging.getLogger('algobattle.problems.delaytest.verifier')

@@ -1,3 +1,4 @@
+"""Match class, provides functionality for setting up and executing battles between given teams."""
 import subprocess
 
 import logging

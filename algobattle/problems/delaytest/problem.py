@@ -1,3 +1,4 @@
+"""Dummy problem class for delaytest."""
 import logging
 
 from algobattle.problem import Problem
