@@ -12,7 +12,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v2
     - name: Set up Python 3.6
@@ -25,25 +24,50 @@ jobs:
         pip install flake8 flake8-docstrings
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         pip install . --user
+    - uses: actions/upload-artifact@master
+      with:
+        name: algo-artifact
+        path: .
+
   lint:
-    name: Lint with flake8
-    run: |
-      flake8 . --count --max-complexity=10  --max-line-length=127  \
-      --per-file-ignores="__init__.py:F401,D104 */solver_execution_error/main.py:E999 \
-      */generator_execution_error/main.py:E999 match.py:E221 setup.py:D102,D100 \
-      */problems/*/verifier.py:D102 */problems/*/parser.py:D102 tests/*:D102 tests/__init__.py:D104 \
-      scripts/battle:E501,C901" \
-      --docstring-convention numpy --show-source --statistics --ignore=D105,D401
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/download-artifact@master
+      with:
+        name: algo-artifact
+        path: .
+    - name: Lint with flake8
+      run: |
+        flake8 . --count --max-complexity=10  --max-line-length=127  \
+        --per-file-ignores="__init__.py:F401,D104 */solver_execution_error/main.py:E999 \
+        */generator_execution_error/main.py:E999 match.py:E221 setup.py:D102,D100 \
+        */problems/*/verifier.py:D102 */problems/*/parser.py:D102 tests/*:D102 tests/__init__.py:D104 \
+        scripts/battle:E501,C901" \
+        --docstring-convention numpy --show-source --statistics --ignore=D105,D401
+
   test:
-    name: Test using unittests
-    run: |
-      python -m unittest
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/download-artifact@master
+      with:
+        name: algo-artifact
+        path: .
+    - name: Test using unittests
+      run: |
+        python -m unittest
+
   execute:
-    name: Run short battles with different options as a sanity check
-    run: |
-      $HOME/.local/bin/battle algobattle/problems/testsproblem --verbose --iter_cap=5 --rounds=2 --no_overhead_calculation
-      $HOME/.local/bin/battle algobattle/problems/testsproblem --verbose --iter_cap=5 --rounds=2 --ui \
-      --generators=algobattle/problems/testsproblem/generator,algobattle/problems/testsproblem/generator \
-      --solvers=algobattle/problems/testsproblem/solver,algobattle/problems/testsproblem/solver --team_names=team1,team2
-      $HOME/.local/bin/battle algobattle/problems/testsproblem --verbose --battle_type=averaged --approx_ratio=1.5 --approx_inst_size=3 --approx_iterations=3 --round=2
-      $HOME/.local/bin/battle algobattle/problems/testsproblem --verbose --battle_type=averaged --approx_ratio=1.5 --approx_inst_size=3 --approx_iterations=3 --round=2 --ui
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/download-artifact@master
+      with:
+        name: algo-artifact
+        path: .
+    - name: Run short battles with different options as a sanity check
+      run: |
+        $HOME/.local/bin/battle algobattle/problems/testsproblem --verbose --iter_cap=5 --rounds=2 --no_overhead_calculation
+        $HOME/.local/bin/battle algobattle/problems/testsproblem --verbose --iter_cap=5 --rounds=2 --ui \
+        --generators=algobattle/problems/testsproblem/generator,algobattle/problems/testsproblem/generator \
+        --solvers=algobattle/problems/testsproblem/solver,algobattle/problems/testsproblem/solver --team_names=team1,team2
+        $HOME/.local/bin/battle algobattle/problems/testsproblem --verbose --battle_type=averaged --approx_ratio=1.5 --approx_inst_size=3 --approx_iterations=3 --round=2
+        $HOME/.local/bin/battle algobattle/problems/testsproblem --verbose --battle_type=averaged --approx_ratio=1.5 --approx_inst_size=3 --approx_iterations=3 --round=2 --ui
