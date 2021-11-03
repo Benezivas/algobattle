@@ -10,7 +10,7 @@ on:
     branches: [ main, develop ]
 
 jobs:
-  build:
+  lint:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -22,21 +22,6 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install flake8 flake8-docstrings
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-        pip install . --user
-    - uses: actions/upload-artifact@master
-      with:
-        name: algo-artifact
-        path: .
-
-  lint:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/download-artifact@master
-      with:
-        name: algo-artifact
-        path: .
     - name: Lint with flake8
       run: |
         flake8 . --count --max-complexity=10  --max-line-length=127  \
@@ -47,25 +32,29 @@ jobs:
         --docstring-convention numpy --show-source --statistics --ignore=D105,D401
 
   test:
-    needs: build
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/download-artifact@master
+    - uses: actions/checkout@v2
+    - name: Set up Python 3.6
+      uses: actions/setup-python@v2
       with:
-        name: algo-artifact
-        path: .
+        python-version: 3.6
     - name: Test using unittests
       run: |
         python -m unittest
 
   execute:
-    needs: build
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/download-artifact@master
+    - uses: actions/checkout@v2
+    - name: Set up Python 3.6
+      uses: actions/setup-python@v2
       with:
-        name: algo-artifact
-        path: .
+        python-version: 3.6
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install . --user
     - name: Run short battles with different options as a sanity check
       run: |
         $HOME/.local/bin/battle algobattle/problems/testsproblem --verbose --iter_cap=5 --rounds=2 --no_overhead_calculation
