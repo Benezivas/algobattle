@@ -1,6 +1,8 @@
 """UI class, responsible for printing nicely formatted output to STDOUT."""
 import curses
 import logging
+import sys
+from typing import Callable
 
 from algobattle.observer import Observer
 from algobattle.match import Match
@@ -12,19 +14,34 @@ logger = logging.getLogger('algobattle.ui')
 class Ui(Observer):
     """The UI Class declares methods to output information to STDOUT."""
 
-    def __init__(self) -> None:
-        self.stdscr = curses.initscr()
-        curses.cbreak()
-        curses.noecho()
-        self.stdscr.keypad(1)
+    def check_for_terminal(function: Callable) -> Callable:
+        """Ensure that we are attached to a terminal."""
+        def wrapper(self, *args, **kwargs):
+            if not sys.stdout.isatty():
+                logger.error('Not attached to a terminal.')
+                return None
+            else:
+                return function(self, *args, **kwargs)
+        return wrapper
 
+    @check_for_terminal
+    def __init__(self) -> None:
+        if sys.stdout.isatty():
+            self.stdscr = curses.initscr()
+            curses.cbreak()
+            curses.noecho()
+            self.stdscr.keypad(1)
+
+    @check_for_terminal
     def restore(self) -> None:
         """Restore the console. This will be later moved into a proper deconstruction method."""
-        curses.nocbreak()
-        self.stdscr.keypad(0)
-        curses.echo()
-        curses.endwin()
+        if sys.stdout.isatty():
+            curses.nocbreak()
+            self.stdscr.keypad(0)
+            curses.echo()
+            curses.endwin()
 
+    @check_for_terminal
     def update(self, match: Match) -> None:
         """Receive updates by observing the match object and prints them out formatted.
 
