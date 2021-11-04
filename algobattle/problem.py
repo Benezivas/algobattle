@@ -1,3 +1,4 @@
+"""Abstract base class for problem classes used in concrete problem implementations."""
 from abc import ABCMeta, abstractmethod
 
 
@@ -12,26 +13,31 @@ class Problem(metaclass=ABCMeta):
     @property
     @abstractmethod
     def name(self):
+        """Name of a Problem."""
         raise NotImplementedError
 
     @property
     @abstractmethod
     def n_start(self):
+        """Lowest value on which a battle should be executed."""
         raise NotImplementedError
 
     @property
     @abstractmethod
     def parser(self):
+        """Parser object for the corresponding problem."""
         raise NotImplementedError
 
     @property
     @abstractmethod
     def verifier(self):
+        """Verifier object for the corresponding problem."""
         raise NotImplementedError
 
     @property
     @abstractmethod
     def approximable(self):
+        """Boolean flag indicating whether a problem can have an approximate solution."""
         raise NotImplementedError
 
     def __str__(self) -> str:

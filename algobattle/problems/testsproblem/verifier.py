@@ -1,3 +1,4 @@
+"""Simple verifier hand-tailored for certain tests to succeed or fail."""
 import logging
 
 from algobattle.verifier import Verifier

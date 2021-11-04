@@ -1,3 +1,4 @@
+"""Problem class built for tests."""
 import logging
 
 from algobattle.problem import Problem
@@ -14,4 +15,4 @@ class Tests(Problem):
     n_start = 1
     parser = TestsParser()
     verifier = TestsVerifier()
-    approximable = False
+    approximable = True

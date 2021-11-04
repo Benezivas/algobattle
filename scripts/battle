@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Main battle script. Executes all possible types of battles, see battle --help for all options."""
 import sys
 import os
 import logging
@@ -16,7 +17,7 @@ from algobattle.ui import Ui
 if __name__ == "__main__":
 
     def setup_logging(logging_path, verbose_logging, silent):
-        """ Creates and returns a parent logger.
+        """Creates and returns a parent logger.
 
         Parameters:
         ----------
@@ -60,7 +61,6 @@ if __name__ == "__main__":
         logger.info('You can find the log files for this run in {}'.format(logging_path))
         return logger
 
-
     if len(sys.argv) < 2:
         sys.exit('Expecting (relative) path to the parent directory of a problem file as argument. Use "battle --help" for more information on usage and options.')
 
@@ -87,8 +87,8 @@ if __name__ == "__main__":
     parser.add_option('--points', dest='points', type=int, default='100', help='Number of points for which are fought. Default: 100')
     parser.add_option('--do_not_count_points', dest='do_not_count_points', action='store_true', help='If set, points are not calculated for the run.')
     parser.add_option('--silent', dest='silent', action='store_true', help='Disable forking the logging output to stderr.')
-    parser.add_option('--no-overhead-calculation', dest='no_overhead_calculation', action='store_true', help='If set, the program does not benchmark the I/O of the host system to calculate the runtime overhead when started.')
-    parser.add_option('--ui', dest='display_ui', action='store_true', help='If set, the program sets the --silent option and displays a small ui on STDOUT that shows the progess of the battles. Currently only works for iterated battles.')
+    parser.add_option('--no_overhead_calculation', dest='no_overhead_calculation', action='store_true', help='If set, the program does not benchmark the I/O of the host system to calculate the runtime overhead when started.')
+    parser.add_option('--ui', dest='display_ui', action='store_true', help='If set, the program sets the --silent option and displays a small ui on STDOUT that shows the progress of the battles. Currently only works for iterated battles.')
 
     (options, args) = parser.parse_args()
 
@@ -145,13 +145,16 @@ if __name__ == "__main__":
         ui = Ui()
         match.attach(ui)
 
-    results = match.run(options.battle_type, options.battle_rounds, options.iterated_cap, 
+    results = match.run(options.battle_type, options.battle_rounds, options.iterated_cap,
                         options.approximation_instance_size, options.approximation_iterations)
 
     if display_ui:
         match.detach(ui)
+    ui = Ui()
+    ui.restore()
 
-    logger.info('#'*78)
+    logger.info('#' * 78)
+    logger.info('\n{}'.format(ui.format_ascii(results)))
     if not options.do_not_count_points:
         points = calculate_points(results, options.points)
 

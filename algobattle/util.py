@@ -22,7 +22,7 @@ def import_problem_from_path(problem_path: str) -> Problem:
     Parameters
     ----------
     problem_path : str
-        dict containing the results of match.run().
+        Path in the file system to a problem folder.
 
     Returns
     -------

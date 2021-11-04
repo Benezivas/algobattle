@@ -1,3 +1,4 @@
+"""Match class, provides functionality for setting up and executing battles between given teams."""
 import subprocess
 
 import logging
@@ -399,6 +400,7 @@ class Match(Subject):
         encoded_output, _ = run_subprocess(generator_run_command, str(instance_size).encode(),
                                            self.timeout_generator)
         if not encoded_output:
+            logger.warning('No output was generated when running the generator!')
             return 1.0
 
         raw_instance_with_solution = self.problem.parser.decode(encoded_output)
@@ -432,6 +434,7 @@ class Match(Subject):
         encoded_output, _ = run_subprocess(solver_run_command, self.problem.parser.encode(instance),
                                            self.timeout_solver)
         if not encoded_output:
+            logger.warning('No output was generated when running the solver!')
             return 0.0
 
         raw_solver_solution = self.problem.parser.decode(encoded_output)

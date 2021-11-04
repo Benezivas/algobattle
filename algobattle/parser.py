@@ -1,3 +1,4 @@
+"""Abstract base class for parsers used in concrete problem implementations."""
 from abc import ABC, abstractmethod
 from typing import Tuple
 
