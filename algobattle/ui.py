@@ -19,6 +19,7 @@ class Ui(Observer):
         self.stdscr.keypad(1)
 
     def restore(self) -> None:
+        """Restore the console. This will be later moved into a proper deconstruction method."""
         curses.nocbreak()
         self.stdscr.keypad(0)
         curses.echo()
