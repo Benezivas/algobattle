@@ -14,6 +14,15 @@ class Ui(Observer):
 
     def __init__(self) -> None:
         self.stdscr = curses.initscr()
+        curses.cbreak()
+        curses.noecho()
+        self.stdscr.keypad(1)
+
+    def restore(self) -> None:
+        curses.nocbreak()
+        self.stdscr.keypad(0)
+        curses.echo()
+        curses.endwin()
 
     def update(self, match: Match) -> None:
         """Receive updates by observing the match object and prints them out formatted.
@@ -25,9 +34,9 @@ class Ui(Observer):
         """
         self.stdscr.refresh()
         self.stdscr.clear()
-        print(self.formatt_ascii(match.match_data))  # TODO: Refactor s.t. the output stream can be chosen by the user.
+        print(self.format_ascii(match.match_data))  # TODO: Refactor s.t. the output stream can be chosen by the user.
 
-    def formatt_ascii(self, match_data: dict) -> None:
+    def format_ascii(self, match_data: dict) -> None:
         """Format the provided match_data for the given battle_type.
 
         Parameters
