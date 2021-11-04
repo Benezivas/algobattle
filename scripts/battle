@@ -150,8 +150,11 @@ if __name__ == "__main__":
 
     if display_ui:
         match.detach(ui)
+    ui = Ui()
+    ui.restore()
 
     logger.info('#' * 78)
+    logger.info('\n{}'.format(ui.format_ascii(results)))
     if not options.do_not_count_points:
         points = calculate_points(results, options.points)
 
