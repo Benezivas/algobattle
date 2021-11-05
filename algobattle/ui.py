@@ -104,7 +104,7 @@ class Ui(Observer):
         formatted_output_string += '╔═════════╦═════════╦' \
                                    + ''.join(['══════╦' for i in range(match_data['rounds'])]) \
                                    + '══════╦══════╗' + '\n\r' \
-                                   + '║   SOL   ║   GEN   ' \
+                                   + '║   GEN   ║   SOL   ' \
                                    + ''.join(['║{:^6s}'.format('R' + str(i + 1)) for i in range(match_data['rounds'])]) \
                                    + '║  CAP ║  AVG ║' + '\n\r' \
                                    + '╟─────────╫─────────╫' \
@@ -144,7 +144,7 @@ class Ui(Observer):
         formatted_output_string += '╔═════════╦═════════╦' \
                                    + ''.join(['══════╦' for i in range(match_data['rounds'])]) \
                                    + '══════╦══════╦════════╗' + '\n\r' \
-                                   + '║   SOL   ║   GEN   ' \
+                                   + '║   GEN   ║   SOL   ' \
                                    + ''.join(['║{:^6s}'.format('R' + str(i + 1)) for i in range(match_data['rounds'])]) \
                                    + '║ LAST ║ SIZE ║  ITER  ║' + '\n\r' \
                                    + '╟─────────╫─────────╫' \
