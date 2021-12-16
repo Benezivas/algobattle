@@ -89,6 +89,10 @@ if __name__ == "__main__":
     parser.add_option('--silent', dest='silent', action='store_true', help='Disable forking the logging output to stderr.')
     parser.add_option('--no_overhead_calculation', dest='no_overhead_calculation', action='store_true', help='If set, the program does not benchmark the I/O of the host system to calculate the runtime overhead when started.')
     parser.add_option('--ui', dest='display_ui', action='store_true', help='If set, the program sets the --silent option and displays a small ui on STDOUT that shows the progress of the battles. Currently only works for iterated battles.')
+    parser.add_option('--generator-test', action="store_true", help="Will only run the generator without checking the solver. Tests generator for correct instances and running time.")
+    parser.add_option("--solver-output", dest="solver_output", action="store_true", help="If set, the solver output is shown.")
+    parser.add_option("--generator-output", dest="generator_output", action="store_true", help="If set, the generator output is shown.")
+
 
     (options, args) = parser.parse_args()
 
@@ -134,7 +138,7 @@ if __name__ == "__main__":
         runtime_overhead = measure_runtime_overhead()
         logger.info('Maximal measured runtime overhead is at {} seconds. Adding this amount to the configured runtime.'.format(runtime_overhead))
 
-    match = Match(problem, options.config, teams, runtime_overhead=runtime_overhead, approximation_ratio=options.approximation_ratio)
+    match = Match(problem, options.config, teams, runtime_overhead=runtime_overhead, approximation_ratio=options.approximation_ratio, testing_generator=options.generator_test, show_generator_output=options.generator_output, show_solver_output=options.solver_output)
 
     if not match.build_successful:
         logger.critical('Building the match object failed, exiting!')

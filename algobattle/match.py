@@ -21,7 +21,7 @@ class Match(Subject):
     _observers: List[Observer] = []
 
     def __init__(self, problem: Problem, config_path: str, teams: list,
-                 runtime_overhead=0, approximation_ratio=1.0, cache_docker_containers=True) -> None:
+                 runtime_overhead=0, approximation_ratio=1.0, cache_docker_containers=True, testing_generator=False, show_generator_output=False, show_solver_output=False) -> None:
 
         config = configparser.ConfigParser()
         logger.debug('Using additional configuration options from file "%s".', config_path)
@@ -36,6 +36,10 @@ class Match(Subject):
         self.problem = problem
         self.config = config
         self.approximation_ratio = approximation_ratio
+
+        self.testing_generator = testing_generator
+        self.show_generator_output = show_generator_output
+        self.show_solver_output = show_solver_output
 
         self.generating_team = None
         self.solving_team = None
@@ -399,6 +403,10 @@ class Match(Subject):
         sigh.latest_running_docker_image = "generator-" + str(self.generating_team)
         encoded_output, _ = run_subprocess(generator_run_command, str(instance_size).encode(),
                                            self.timeout_generator)
+
+        if self.show_generator_output:
+            print(encoded_output.decode())
+
         if not encoded_output:
             logger.warning('No output was generated when running the generator!')
             return 1.0
@@ -428,6 +436,9 @@ class Match(Subject):
 
         logger.info('Generated instance and certificate are valid!\n\n')
 
+        if self.testing_generator:
+            return 1.0
+
         logger.info('Running solver of group {}...\n'.format(self.solving_team))
 
         sigh.latest_running_docker_image = "solver-" + str(self.solving_team)
@@ -436,6 +447,9 @@ class Match(Subject):
         if not encoded_output:
             logger.warning('No output was generated when running the solver!')
             return 0.0
+
+        if self.show_solver_output:
+            print(encoded_output.decode())
 
         raw_solver_solution = self.problem.parser.decode(encoded_output)
 
