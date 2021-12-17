@@ -405,7 +405,7 @@ class Match(Subject):
                                            self.timeout_generator)
 
         if self.show_generator_output:
-            print(encoded_output.decode())
+            logger.ingo(encoded_output.decode())
 
         if not encoded_output:
             logger.warning('No output was generated when running the generator!')
@@ -449,7 +449,7 @@ class Match(Subject):
             return 0.0
 
         if self.show_solver_output:
-            print(encoded_output.decode())
+            logger.info(encoded_output.decode())
 
         raw_solver_solution = self.problem.parser.decode(encoded_output)
 
