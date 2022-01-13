@@ -16,8 +16,9 @@ class BattleWrapper(ABC):
 
     @abstractmethod
     def wrapper(self, match, options: dict) -> None:
-        """The main base method for a wrapper. In order to manage the
-        execution of a match, the wrapper needs the match object and possibly
+        """The main base method for a wrapper.
+
+        In order to manage the execution of a match, the wrapper needs the match object and possibly
         some options that are specific to the individual battle wrapper.
 
         A wrapper should update the match.match_data dict during its run by calling
