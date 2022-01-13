@@ -277,8 +277,7 @@ class Match(Subject):
     @build_successful
     @team_roles_set
     def _one_fight(self, instance_size: int) -> float:
-        """Execute a single fight of a battle between a given generator and
-        solver for a given instance size.
+        """Execute a single fight of a battle between a given generator and solver for a given instance size.
 
         Parameters
         ----------
@@ -312,9 +311,9 @@ class Match(Subject):
     @build_successful
     @team_roles_set
     def _run_generator(self, instance_size: int) -> Tuple[any, any]:
-        """Execute the generator of match.generating_team and check the
-        validity of the generated output. If the validity checks pass,
-        return the instance and the certificate solution.
+        """Execute the generator of match.generating_team and check the validity of the generated output.
+
+        If the validity checks pass, return the instance and the certificate solution.
 
         Parameters
         ----------
@@ -369,9 +368,9 @@ class Match(Subject):
     @build_successful
     @team_roles_set
     def _run_solver(self, instance_size: int, instance: any) -> any:
-        """Execute the solver of match.solving_team and check the
-        validity of the generated output. If the validity checks pass,
-        return the solver solution.
+        """Execute the solver of match.solving_team and check the validity of the generated output.
+
+        If the validity checks pass, return the solver solution.
 
         Parameters
         ----------
