@@ -45,7 +45,10 @@ if __name__ == "__main__":
         current_timestamp = '{:04d}-{:02d}-{:02d}_{:02d}:{:02d}:{:02d}'.format(_now.year, _now.month, _now.day, _now.hour, _now.minute, _now.second)
         logging_path = logging_path + current_timestamp + '.log'
 
-        logging.basicConfig(filename=logging_path, level=common_logging_level, format='%(asctime)s %(levelname)s: %(message)s', datefmt='%H:%M:%S')
+        logging.basicConfig(handlers=[logging.FileHandler(logging_path, 'w', 'utf-8')],
+                            level=common_logging_level,
+                            format='%(asctime)s %(levelname)s: %(message)s',
+                            datefmt='%H:%M:%S')
 
         logger = logging.getLogger('algobattle')
 
