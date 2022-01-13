@@ -1,3 +1,5 @@
+"""Wrapper that iterates the instance size up to a point where the solving team is no longer able to solve an instance."""
+
 import logging
 
 from algobattle.battle_wrapper import BattleWrapper
@@ -8,7 +10,7 @@ logger = logging.getLogger('algobattle.battle_wrappers.averaged')
 class Averaged(BattleWrapper):
     """Class of an adveraged battle Wrapper."""
 
-    def _averaged_battle_wrapper(self, match, options: dict = {}) -> None:
+    def wrapper(self, match, options: dict = {}) -> None:
         """Execute one averaged battle between a generating and a solving team.
 
         Execute several fights between two teams on a fixed instance size
