@@ -1,3 +1,5 @@
+"""Wrapper that repeats a battle on an instance size a number of times and averages the competitive ratio over all runs."""
+
 import logging
 
 from algobattle.battle_wrapper import BattleWrapper
