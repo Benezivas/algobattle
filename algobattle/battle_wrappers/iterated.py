@@ -87,7 +87,7 @@ class Iterated(BattleWrapper):
 
             match.update_match_data({curr_pair: {curr_round: {'cap': n_cap, 'solved': maximum_reached_n, 'attempting': n}}})
 
-    def calculate_points(match_data: dict, achievable_points: int) -> dict:
+    def calculate_points(self, match_data: dict, achievable_points: int) -> dict:
         """Calculate the number of achieved points, given results.
 
         Each pair of teams fights for the achievable points among one another.
@@ -139,7 +139,7 @@ class Iterated(BattleWrapper):
                     points_proportion0 = (solved0 / (solved0 + solved1))
                     points_proportion1 = (solved1 / (solved0 + solved1))
 
-                points[pair[0]] += round(points_per_iteration * points_proportion0, 1)
-                points[pair[1]] += round(points_per_iteration * points_proportion1, 1)
+                points[pair[0]] += round(points_per_iteration * points_proportion0, 1) / 2
+                points[pair[1]] += round(points_per_iteration * points_proportion1, 1) / 2
 
         return points
