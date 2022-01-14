@@ -36,3 +36,29 @@ class BattleWrapper(ABC):
             Additional options for the wrapper.
         """
         raise NotImplementedError
+
+    def calculate_points(match_data: dict, achievable_points: int) -> dict:
+        """Calculate the number of achieved points, given results.
+
+        As awarding points completely depends on the type of battle that
+        was fought, each wrapper should implement a method that determines
+        how to split up the achievable points among all teams, given
+        the match_data.
+
+        Parameters
+        ----------
+        match_data : dict
+            dict containing the results of match.run().
+        achievable_points : int
+            Number of achievable points.
+
+        Returns
+        -------
+        dict
+            A mapping between team names and their achieved points.
+            The format is {(team_x_name, team_y_name): points [...]} for each
+            pair (x,y) for which there is an entry in match_data and points is a
+            float value.
+        """
+        logger.error('Unclear how to calculate points for this type of battle.')
+        raise NotImplementedError
