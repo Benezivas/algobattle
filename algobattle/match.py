@@ -23,6 +23,7 @@ class Match(Subject):
     _observers: List[Observer] = []
     generating_team = None
     solving_team = None
+    battle_wrapper = None
 
     def __init__(self, problem: Problem, config_path: str, teams: list,
                  runtime_overhead=0, approximation_ratio=1.0, cache_docker_containers=True) -> None:
@@ -248,14 +249,12 @@ class Match(Subject):
                 self.match_data[pair][i]['attempting'] = 0
                 self.match_data[pair][i]['approx_ratios'] = []
 
-        battle_wrapper = None
-
         options = dict()
         if battle_type == 'iterated':
-            battle_wrapper = Iterated()
+            self.battle_wrapper = Iterated()
             options['exponent'] = 2
         elif battle_type == 'averaged':
-            battle_wrapper = Averaged()
+            self.battle_wrapper = Averaged()
         else:
             self.match_data['error'] = 'Unrecognized battle_type given: "{}"'.format(battle_type)
             logger.error(self.match_data['error'])
@@ -269,7 +268,7 @@ class Match(Subject):
 
                 self.generating_team = pair[0]
                 self.solving_team = pair[1]
-                battle_wrapper.wrapper(self, options)
+                self.battle_wrapper.wrapper(self, options)
 
         return self.match_data
 
