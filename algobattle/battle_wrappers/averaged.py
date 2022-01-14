@@ -40,7 +40,7 @@ class Averaged(BattleWrapper):
             match.update_match_data({curr_pair: {curr_round: {'approx_ratios':
                                     match.match_data[curr_pair][curr_round]['approx_ratios'] + [approx_ratio]}}})
 
-    def calculate_points(match_data: dict, achievable_points: int) -> dict:
+    def calculate_points(self, match_data: dict, achievable_points: int) -> dict:
         """Calculate the number of achieved points, given results.
 
         The valuation of an averaged battle is the number of successfully
@@ -83,8 +83,12 @@ class Averaged(BattleWrapper):
                 ratios1 = match_data[pair][i]['approx_ratios']  # pair[1] was solver
                 ratios0 = match_data[(pair[1], pair[0])][i]['approx_ratios']  # pair[0] was solver
 
-                valuation0 = (len(ratios0) / sum(ratios0)) / len(ratios0)
-                valuation1 = (len(ratios1) / sum(ratios1)) / len(ratios1)
+                valuation0 = 0
+                valuation1 = 0
+                if ratios0 and sum(ratios0) != 0:
+                    valuation0 = (len(ratios0) / sum(ratios0)) / len(ratios0)
+                if ratios1 and sum(ratios1) != 0:
+                    valuation1 = (len(ratios1) / sum(ratios1)) / len(ratios1)
 
                 # Default values for proportions, assuming no team manages to solve anything
                 points_proportion0 = 0.5
@@ -95,7 +99,7 @@ class Averaged(BattleWrapper):
                     points_proportion0 = (valuation0 / (valuation0 + valuation1))
                     points_proportion1 = (valuation1 / (valuation0 + valuation1))
 
-                points[pair[0]] += round(points_per_iteration * points_proportion1, 1)
-                points[pair[1]] += round(points_per_iteration * points_proportion0, 1)
+                points[pair[0]] += round(points_per_iteration * points_proportion0, 1) / 2
+                points[pair[1]] += round(points_per_iteration * points_proportion1, 1) / 2
 
         return points
