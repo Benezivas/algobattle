@@ -56,7 +56,6 @@ class Utiltests(unittest.TestCase):
                       ('0', '1'): {0: {'solved': 10}, 1: {'solved': 10}},
                       ('1', '0'): {0: {'solved': 0}, 1: {'solved': 0}}}
         self.assertEqual(self.iterated_wrapper.calculate_points(match_data, 100), {'0': 0, '1': 100})
-        
 
     def test_calculate_points_averaged_weird_type(self):
         match_data = {'rounds': 2, 'type': 'foo'}
