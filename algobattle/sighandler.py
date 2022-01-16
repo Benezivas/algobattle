@@ -13,7 +13,11 @@ def signal_handler(sig, frame):
     _kill_spawned_docker_containers()
 
     logger.info('Received SIGINT, terminating execution.')
-    os.killpg(os.getpid(), signal.SIGTERM)
+    if os.name == 'posix':
+        os.killpg(os.getpid(), signal.SIGTERM)
+    else:
+        os.kill(os.getpid(), signal.CTRL_BREAK_EVENT)
+
 
     sys.exit(0)
 

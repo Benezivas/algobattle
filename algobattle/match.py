@@ -1,5 +1,6 @@
 """Match class, provides functionality for setting up and executing battles between given teams."""
 import subprocess
+import os
 
 import logging
 import configparser
@@ -91,7 +92,11 @@ class Match(Subject):
     def docker_running(function: Callable) -> Callable:
         """Ensure that internal methods are only callable if docker is running."""
         def wrapper(self, *args, **kwargs):
-            docker_running = subprocess.Popen(['docker', 'info'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            if os.name == 'posix':
+                creationflags = 0
+            else:
+                creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
+            docker_running = subprocess.Popen(['docker', 'info'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=creationflags)
             _ = docker_running.communicate()
             if docker_running.returncode:
                 logger.error('Could not connect to the docker daemon. Is docker running?')
@@ -144,7 +149,11 @@ class Match(Subject):
 
         for command in build_commands:
             logger.debug('Building docker container with the following command: {}'.format(command))
-            with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as process:
+            if os.name == 'posix':
+                creationflags = 0
+            else:
+                creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
+            with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=creationflags) as process:
                 try:
                     output, _ = process.communicate(timeout=self.timeout_build)
                     logger.debug(output.decode())
