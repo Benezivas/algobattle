@@ -42,7 +42,9 @@ if __name__ == "__main__":
             os.makedirs(logging_path)
 
         _now = dt.datetime.now()
-        current_timestamp = '{:04d}-{:02d}-{:02d}_{:02d}:{:02d}:{:02d}'.format(_now.year, _now.month, _now.day, _now.hour, _now.minute, _now.second)
+
+        time_seperator = ':' if os.name == 'posix' else '-'
+        current_timestamp = '{:04d}-{:02d}-{:02d}_{:02d}{}{:02d}{}{:02d}'.format(_now.year, _now.month, _now.day, _now.hour, time_seperator, _now.minute, time_seperator, _now.second)
         logging_path = Path(logging_path, current_timestamp + '.log')
 
         logging.basicConfig(handlers=[logging.FileHandler(logging_path, 'w', 'utf-8')],
