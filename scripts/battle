@@ -22,7 +22,7 @@ if __name__ == "__main__":
         Parameters:
         ----------
         logging_path : str
-            Path where the logfile should be stored at.
+            Path to folder where the logfile should be stored at.
         verbose_logging : bool
             Flag indicating whether to include debug messages in the output
         silent : bool
@@ -43,7 +43,7 @@ if __name__ == "__main__":
 
         _now = dt.datetime.now()
         current_timestamp = '{:04d}-{:02d}-{:02d}_{:02d}:{:02d}:{:02d}'.format(_now.year, _now.month, _now.day, _now.hour, _now.minute, _now.second)
-        logging_path = logging_path + current_timestamp + '.log'
+        logging_path = Path(logging_path, current_timestamp + '.log')
 
         logging.basicConfig(handlers=[logging.FileHandler(logging_path, 'w', 'utf-8')],
                             level=common_logging_level,
@@ -73,10 +73,10 @@ if __name__ == "__main__":
     default_config = os.path.join(os.path.dirname(os.path.abspath(algobattle.__file__)), 'config', 'config.ini')
 
     # Option parser to process arguments from the console.
-    usage = 'usage: %prog FILE [options]\nExpecting (relative) path to the parent directory of the problem file as first argument.\nIf you provide generators, solvers and group numbers for multiple teams, make sure that the order is the same for all three arguments!'
+    usage = 'usage: %prog FILE [options]\nExpecting (relative) path to the directory of the problem as first argument.\nIf you provide generators, solvers and group numbers for multiple teams, make sure that the order is the same for all three arguments.'
     parser = OptionParser(usage=usage, version=algobattle.__version__)
     parser.add_option('--verbose', dest='verbose_logging', action='store_true', help='Log all debug messages.')
-    parser.add_option('--output_folder', dest='folder_name', default=default_logging_path, help='Specify the folder into which all logging files are written to. Default: ~/.algobattle_logs/')
+    parser.add_option('--output_folder', dest='folder_name', default=default_logging_path, help='Specify the folder into which all logging files are written to. Can either be a relative or absolute path to folder. If nonexisting, a new folder will be created. Default: ~/.algobattle_logs/')
     parser.add_option('--config_file', dest='config', default=default_config, help='Path to a .ini configuration file to be used for the run. Defaults to the packages config.ini')
     parser.add_option('--solvers', dest='solvers', default=problem_path + '/solver/', help='Specify the folder names containing the solvers of all involved teams as a comma-seperated list. Default: arg1/solver/')
     parser.add_option('--generators', dest='generators', default=problem_path + '/generator/', help='Specify the folder names containing the generators of all involved teams as a comma-seperated list. Default: arg1/generator/')
