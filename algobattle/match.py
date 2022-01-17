@@ -1,9 +1,10 @@
 """Match class, provides functionality for setting up and executing battles between given teams."""
 import subprocess
+import os
 
 import logging
 import configparser
-from typing import Callable, List
+from typing import Callable, List, Tuple
 
 import algobattle.sighandler as sigh
 from algobattle.team import Team
@@ -11,6 +12,8 @@ from algobattle.problem import Problem
 from algobattle.util import run_subprocess, update_nested_dict
 from algobattle.subject import Subject
 from algobattle.observer import Observer
+from algobattle.battle_wrappers.averaged import Averaged
+from algobattle.battle_wrappers.iterated import Iterated
 
 logger = logging.getLogger('algobattle.match')
 
@@ -19,6 +22,9 @@ class Match(Subject):
     """Match class, provides functionality for setting up and executing battles between given teams."""
 
     _observers: List[Observer] = []
+    generating_team = None
+    solving_team = None
+    battle_wrapper = None
 
     def __init__(self, problem: Problem, config_path: str, teams: list,
                  runtime_overhead=0, approximation_ratio=1.0, cache_docker_containers=True) -> None:
@@ -37,36 +43,31 @@ class Match(Subject):
         self.config = config
         self.approximation_ratio = approximation_ratio
 
-        self.generating_team = None
-        self.solving_team = None
         self.build_successful = self._build(teams, cache_docker_containers)
 
         if approximation_ratio != 1.0 and not problem.approximable:
             logger.error('The given problem is not approximable and can only be run with an approximation ratio of 1.0!')
             self.build_successful = False
 
-        self.base_run_command = [
+        self.generator_base_run_command = lambda a: [
             "docker",
             "run",
             "--rm",
             "--network", "none",
             "-i",
-            "--memory=" + str(self.space_solver) + "mb",
+            "--memory=" + str(a) + "mb",
             "--cpus=" + str(self.cpus)
         ]
 
-    def attach(self, observer: Observer) -> None:
-        """Subscribe a new Observer by adding them to the list of observers."""
-        self._observers.append(observer)
-
-    def detach(self, observer: Observer) -> None:
-        """Unsubscribe an Observer by removing them from the list of observers."""
-        self._observers.remove(observer)
-
-    def notify(self) -> None:
-        """Notify all subscribed Observers by calling their update() functions."""
-        for observer in self._observers:
-            observer.update(self)
+        self.solver_base_run_command = lambda a: [
+            "docker",
+            "run",
+            "--rm",
+            "--network", "none",
+            "-i",
+            "--memory=" + str(a) + "mb",
+            "--cpus=" + str(self.cpus)
+        ]
 
     def build_successful(function: Callable) -> Callable:
         """Ensure that internal methods are only callable after a successful build."""
@@ -91,7 +92,11 @@ class Match(Subject):
     def docker_running(function: Callable) -> Callable:
         """Ensure that internal methods are only callable if docker is running."""
         def wrapper(self, *args, **kwargs):
-            docker_running = subprocess.Popen(['docker', 'info'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            creationflags = 0
+            if os.name != 'posix':
+                creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
+            docker_running = subprocess.Popen(['docker', 'info'], stdout=subprocess.PIPE,
+                                              stderr=subprocess.PIPE, creationflags=creationflags)
             _ = docker_running.communicate()
             if docker_running.returncode:
                 logger.error('Could not connect to the docker daemon. Is docker running?')
@@ -100,9 +105,38 @@ class Match(Subject):
                 return function(self, *args, **kwargs)
         return wrapper
 
+    def attach(self, observer: Observer) -> None:
+        """Subscribe a new Observer by adding them to the list of observers."""
+        self._observers.append(observer)
+
+    def detach(self, observer: Observer) -> None:
+        """Unsubscribe an Observer by removing them from the list of observers."""
+        self._observers.remove(observer)
+
+    def notify(self) -> None:
+        """Notify all subscribed Observers by calling their update() functions."""
+        for observer in self._observers:
+            observer.update(self)
+
+    @build_successful
+    def update_match_data(self, new_data: dict) -> bool:
+        """Update the internal match dict with new (partial) information.
+
+        Parameters
+        ----------
+        new_data : dict
+            A dict in the same format as match_data that contains new information.
+        """
+        self.match_data = update_nested_dict(self.match_data, new_data)
+        self.notify()
+        return True
+
     @docker_running
     def _build(self, teams: list, cache_docker_containers=True) -> bool:
         """Build docker containers for the given generators and solvers of each team.
+
+        Any team for which either the generator or solver does not build successfully
+        will be removed from the match.
 
         Parameters
         ----------
@@ -129,37 +163,43 @@ class Match(Subject):
             return False
 
         self.team_names = [team.name for team in teams]
-        build_commands = []
         if len(self.team_names) != len(list(set(self.team_names))):
             logger.error('At least one team name is used twice!')
             return False
 
-        self.single_player = False
-        if len(teams) == 1:
-            self.single_player = True
+        self.single_player = (len(teams) == 1)
 
         for team in teams:
+            build_commands = []
             build_commands.append(base_build_command + ["solver-" + str(team.name), team.solver_path])
             build_commands.append(base_build_command + ["generator-" + str(team.name), team.generator_path])
 
-        for command in build_commands:
-            logger.debug('Building docker container with the following command: {}'.format(command))
-            with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as process:
-                try:
-                    output, _ = process.communicate(timeout=self.timeout_build)
-                    logger.debug(output.decode())
-                except subprocess.TimeoutExpired:
-                    process.kill()
-                    process.wait()
-                    logger.error('Build process for {} ran into a timeout!'.format(command[5]))
-                    return False
-                if process.returncode != 0:
-                    process.kill()
-                    process.wait()
-                    logger.error('Build process for {} failed!'.format(command[5]))
-                    return False
+            build_successful = True
+            for command in build_commands:
+                logger.debug('Building docker container with the following command: {}'.format(command))
+                creationflags = 0
+                if os.name != 'posix':
+                    creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
+                with subprocess.Popen(command, stdout=subprocess.PIPE,
+                                      stderr=subprocess.PIPE, creationflags=creationflags) as process:
+                    try:
+                        output, _ = process.communicate(timeout=self.timeout_build)
+                        logger.debug(output.decode())
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                        process.wait()
+                        logger.error('Build process for {} ran into a timeout!'.format(command[5]))
+                        build_successful = False
+                    if process.returncode != 0:
+                        process.kill()
+                        process.wait()
+                        logger.error('Build process for {} failed!'.format(command[5]))
+                        build_successful = False
+            if not build_successful:
+                logger.error("Removing team {} as their containers did not build successfully.".format(team.name))
+                self.team_names.remove(team.name)
 
-        return True
+        return len(self.team_names) > 0
 
     @build_successful
     def all_battle_pairs(self) -> list:
@@ -175,7 +215,7 @@ class Match(Subject):
         return battle_pairs
 
     @build_successful
-    def run(self, battle_type: str = 'iterated', rounds: int = 5, iterated_cap: int = 50000,
+    def run(self, battle_type: str = 'iterated', rounds: int = 5, iterated_cap: int = 50000, iterated_exponent: int = 2,
             approximation_instance_size: int = 10, approximation_iterations: int = 25) -> dict:
         """Match entry point, executes rounds fights between all teams and returns the results of the battles.
 
@@ -186,7 +226,9 @@ class Match(Subject):
         rounds : int
             Number of Battles between each pair of teams (used for averaging results).
         iterated_cap : int
-            Iteration cutoff after which an iterated battle is automatically stopped, declaring the solver as the winner
+            Iteration cutoff after which an iterated battle is automatically stopped, declaring the solver as the winner.
+        iterated_exponent : int
+            Exponent used for increasing the step size in an iterated battle.
         approximation_instance_size : int
             Instance size on which to run an averaged battle.
         approximation_iterations : int
@@ -233,12 +275,12 @@ class Match(Subject):
                 self.match_data[pair][i]['attempting'] = 0
                 self.match_data[pair][i]['approx_ratios'] = []
 
-        battle_wrapper = None
-
+        options = dict()
         if battle_type == 'iterated':
-            battle_wrapper = self._iterated_battle_wrapper
+            self.battle_wrapper = Iterated()
+            options['exponent'] = iterated_exponent
         elif battle_type == 'averaged':
-            battle_wrapper = self._averaged_battle_wrapper
+            self.battle_wrapper = Averaged()
         else:
             self.match_data['error'] = 'Unrecognized battle_type given: "{}"'.format(battle_type)
             logger.error(self.match_data['error'])
@@ -252,122 +294,9 @@ class Match(Subject):
 
                 self.generating_team = pair[0]
                 self.solving_team = pair[1]
-                _ = battle_wrapper()  # We currently update the match_data inside the wrappers
+                self.battle_wrapper.wrapper(self, options)
 
         return self.match_data
-
-    @build_successful
-    def update_match_data(self, new_data: dict) -> bool:
-        """Update the internal match dict with new (partial) information.
-
-        Parameters
-        ----------
-        new_data : dict
-            A dict in the same format as match_data that contains new information.
-        """
-        self.match_data = update_nested_dict(self.match_data, new_data)
-        self.notify()
-        return True
-
-    @build_successful
-    @team_roles_set
-    def _averaged_battle_wrapper(self) -> list:
-        """Execute one averaged battle between a generating and a solving team.
-
-        Execute several fights between two teams on a fixed instance size
-        and determine the average solution quality.
-
-        Returns
-        -------
-        list
-            Returns a list of the computed approximation ratios.
-        """
-        approximation_ratios = []
-        logger.info('==================== Averaged Battle, Instance Size: {}, Rounds: {} ===================='
-                    .format(self.match_data['approx_inst_size'], self.match_data['approx_iters']))
-        for i in range(self.match_data['approx_iters']):
-            logger.info('=============== Iteration: {}/{} ==============='.format(i + 1, self.match_data['approx_iters']))
-            approx_ratio = self._one_fight(instance_size=self.match_data['approx_inst_size'])
-            approximation_ratios.append(approx_ratio)
-
-            curr_pair = self.match_data['curr_pair']
-            curr_round = self.match_data[curr_pair]['curr_round']
-            self.update_match_data({curr_pair: {curr_round: {'approx_ratios':
-                                    self.match_data[curr_pair][curr_round]['approx_ratios'] + [approx_ratio]}}})
-
-        return approximation_ratios
-
-    @build_successful
-    @team_roles_set
-    def _iterated_battle_wrapper(self) -> int:
-        """Execute one iterative battle between a generating and a solving team.
-
-        Incrementally try to search for the highest n for which the solver is
-        still able to solve instances.  The base increment value is multiplied
-        with the square of the iterations since the last unsolvable instance.
-        Only once the solver fails after the multiplier is reset, it counts as
-        failed. Since this would heavily favour probabilistic algorithms (That
-        may have only failed by chance and are able to solve a certain instance
-        size on a second try), we cap the maximum solution size by the first
-        value that an algorithm has failed on.
-
-        The wrapper automatically ends the battle and declares the solver as the
-        winner once the iteration cap is reached, which is set in the config.ini.
-
-        Returns
-        -------
-        int
-            Returns the biggest instance size for which the solving team still
-            found a solution.
-        """
-        curr_pair = self.match_data['curr_pair']
-        curr_round = self.match_data[curr_pair]['curr_round']
-
-        n = self.problem.n_start
-        maximum_reached_n = 0
-        i = 0
-        n_max = n_cap = self.match_data[curr_pair][curr_round]['cap']
-        alive = True
-
-        logger.info('==================== Iterative Battle, Instanze Size Cap: {} ===================='.format(n_cap))
-        while alive:
-            logger.info('=============== Instance Size: {}/{} ==============='.format(n, n_cap))
-            approx_ratio = self._one_fight(instance_size=n)
-            if approx_ratio == 0.0:
-                alive = False
-            elif approx_ratio > self.approximation_ratio:
-                logger.info('Solver {} does not meet the required solution quality at instance size {}. ({}/{})'
-                            .format(self.solving_team, n, approx_ratio, self.approximation_ratio))
-                alive = False
-
-            if not alive and i > 1:
-                # The step size increase was too aggressive, take it back and reset the increment multiplier
-                logger.info('Setting the solution cap to {}...'.format(n))
-                n_cap = n
-                n -= i * i
-                i = 0
-                alive = True
-            elif n > maximum_reached_n and alive:
-                # We solved an instance of bigger size than before
-                maximum_reached_n = n
-
-            if n + 1 == n_cap:
-                alive = False
-            else:
-                i += 1
-                n += i * i
-
-                if n >= n_cap and n_cap != n_max:
-                    # We have failed at this value of n already, reset the step size!
-                    n -= i * i - 1
-                    i = 1
-                elif n >= n_cap and n_cap == n_max:
-                    logger.info('Solver {} exceeded the instance size cap of {}!'.format(self.solving_team, n_max))
-                    maximum_reached_n = n_max
-                    alive = False
-
-            self.update_match_data({curr_pair: {curr_round: {'cap': n_cap, 'solved': maximum_reached_n, 'attempting': n}}})
-        return maximum_reached_n
 
     @docker_running
     @build_successful
@@ -387,72 +316,122 @@ class Match(Subject):
             the generator (1 if optimal, 0 if failed, >=1 if the
             generator solution is optimal).
         """
-        if not isinstance(instance_size, int) or not instance_size > 0:
-            logger.error('Expected an instance size to be an int of size at least 1, received: {}'.format(instance_size))
-            raise Exception('Expected the instance size to be a positive integer.')
+        instance, generator_solution = self._run_generator(instance_size)
 
-        generator_run_command = self.base_run_command + ["generator-" + str(self.generating_team)]
-        solver_run_command    = self.base_run_command + ["solver-"    + str(self.solving_team)]
+        if not instance and not generator_solution:
+            return 1.0
 
-        logger.info('Running generator of group {}...\n'.format(self.generating_team))
+        solver_solution = self._run_solver(instance_size, instance)
+
+        if not solver_solution:
+            return 0.0
+
+        approximation_ratio = self.problem.verifier.calculate_approximation_ratio(instance, instance_size,
+                                                                                  generator_solution, solver_solution)
+        logger.info('Solver of group {} yields a valid solution with an approx. ratio of {}.'
+                    .format(self.solving_team, approximation_ratio))
+        return approximation_ratio
+
+    @docker_running
+    @build_successful
+    @team_roles_set
+    def _run_generator(self, instance_size: int) -> Tuple[any, any]:
+        """Execute the generator of match.generating_team and check the validity of the generated output.
+
+        If the validity checks pass, return the instance and the certificate solution.
+
+        Parameters
+        ----------
+        instance_size : int
+            The instance size, expected to be a positive int.
+
+        Returns
+        -------
+        any, any
+            If the validity checks pass, the (instance, solution) in whatever
+            format that is specified, else (None, None).
+        """
+        scaled_memory = self.problem.generator_memory_scaler(self.space_generator, instance_size)
+        generator_run_command = self.generator_base_run_command(scaled_memory) + ["generator-" + str(self.generating_team)]
+
+        logger.debug('Running generator of group {}...\n'.format(self.generating_team))
 
         sigh.latest_running_docker_image = "generator-" + str(self.generating_team)
         encoded_output, _ = run_subprocess(generator_run_command, str(instance_size).encode(),
                                            self.timeout_generator)
         if not encoded_output:
-            logger.warning('No output was generated when running the generator!')
-            return 1.0
+            logger.warning('No output was generated when running the generator group {}!'.format(self.generating_team))
+            return None, None
 
         raw_instance_with_solution = self.problem.parser.decode(encoded_output)
 
-        logger.info('Checking generated instance and certificate...')
+        logger.debug('Checking generated instance and certificate...')
 
         raw_instance, raw_solution = self.problem.parser.split_into_instance_and_solution(raw_instance_with_solution)
         instance                   = self.problem.parser.parse_instance(raw_instance, instance_size)
         generator_solution         = self.problem.parser.parse_solution(raw_solution, instance_size)
 
         if not self.problem.verifier.verify_semantics_of_instance(instance, instance_size):
-            logger.warning('Generator {} created a malformed instance at instance size {}!'
-                           .format(self.generating_team, instance_size))
-            return 1.0
+            logger.warning('Generator {} created a malformed instance!'.format(self.generating_team))
+            return None, None
 
         if not self.problem.verifier.verify_semantics_of_solution(generator_solution, instance_size, True):
-            logger.warning('Generator {} created a malformed solution at instance size {}!'
-                           .format(self.generating_team, instance_size))
-            return 1.0
+            logger.warning('Generator {} created a malformed solution at instance size!'.format(self.generating_team))
+            return None, None
 
         if not self.problem.verifier.verify_solution_against_instance(instance, generator_solution, instance_size, True):
-            logger.warning('Generator {} failed at instance size {} due to a wrong certificate for its generated instance!'
-                           .format(self.generating_team, instance_size))
-            return 1.0
+            logger.warning('Generator {} failed due to a wrong certificate for its generated instance!'
+                           .format(self.generating_team))
+            return None, None
 
-        logger.info('Generated instance and certificate are valid!\n\n')
+        self.problem.parser.postprocess_instance(instance, instance_size)
 
-        logger.info('Running solver of group {}...\n'.format(self.solving_team))
+        logger.info('Generated instance and certificate by group {} are valid!\n'.format(self.generating_team))
+
+        return instance, generator_solution
+
+    @docker_running
+    @build_successful
+    @team_roles_set
+    def _run_solver(self, instance_size: int, instance: any) -> any:
+        """Execute the solver of match.solving_team and check the validity of the generated output.
+
+        If the validity checks pass, return the solver solution.
+
+        Parameters
+        ----------
+        instance_size : int
+            The instance size, expected to be a positive int.
+
+        Returns
+        -------
+        any
+            If the validity checks pass, solution in whatever
+            format that is specified, else None.
+        """
+        scaled_memory = self.problem.solver_memory_scaler(self.space_solver, instance_size)
+        solver_run_command = self.solver_base_run_command(scaled_memory) + ["solver-" + str(self.solving_team)]
+        logger.debug('Running solver of group {}...\n'.format(self.solving_team))
 
         sigh.latest_running_docker_image = "solver-" + str(self.solving_team)
         encoded_output, _ = run_subprocess(solver_run_command, self.problem.parser.encode(instance),
                                            self.timeout_solver)
         if not encoded_output:
-            logger.warning('No output was generated when running the solver!')
-            return 0.0
+            logger.warning('No output was generated when running the solver of group {}!'.format(self.solving_team))
+            return None
 
         raw_solver_solution = self.problem.parser.decode(encoded_output)
 
-        logger.info('Checking validity of the solvers solution...')
+        logger.debug('Checking validity of the solvers solution...')
 
         solver_solution = self.problem.parser.parse_solution(raw_solver_solution, instance_size)
         if not self.problem.verifier.verify_semantics_of_solution(solver_solution, instance_size, True):
-            logger.warning('Solver {} created a malformed solution at instance size {}!'
+            logger.warning('Solver of group {} created a malformed solution at instance size {}!'
                            .format(self.solving_team, instance_size))
-            return 0.0
+            return None
         elif not self.problem.verifier.verify_solution_against_instance(instance, solver_solution, instance_size, False):
-            logger.warning('Solver {} yields a wrong solution at instance size {}!'
+            logger.warning('Solver of group {} yields a wrong solution at instance size {}!'
                            .format(self.solving_team, instance_size))
-            return 0.0
-        else:
-            approximation_ratio = self.problem.verifier.calculate_approximation_ratio(instance, instance_size,
-                                                                                      generator_solution, solver_solution)
-            logger.info('Solver {} yields a valid solution with an approx. ratio of {} at instance size {}.'
-                        .format(self.solving_team, approximation_ratio, instance_size))
-            return approximation_ratio
+            return None
+
+        return solver_solution

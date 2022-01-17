@@ -63,7 +63,7 @@ def measure_runtime_overhead() -> float:
     overheads = []
     for i in range(5):
         sigh.latest_running_docker_image = "generator0"
-        _, timeout = run_subprocess(match.base_run_command + ["generator0"],
+        _, timeout = run_subprocess(match.generator_base_run_command(match.space_generator) + ["generator0"],
                                     input=str(50 * i).encode(), timeout=match.timeout_generator)
         if not timeout:
             timeout = match.timeout_generator
@@ -72,71 +72,6 @@ def measure_runtime_overhead() -> float:
     max_overhead = round(max(overheads), 2)
 
     return max_overhead
-
-
-def calculate_points(match_data: dict, achievable_points: int) -> dict:
-    """Calculate the number of achieved points, given results.
-
-    Parameters
-    ----------
-    match_data : dict
-        dict containing the results of match.run().
-    achievable_points : int
-        Number of achievable points.
-
-    Returns
-    -------
-    dict
-        A mapping between team names and their achieved points.
-    """
-    points = dict()
-
-    team_pairs = [key for key in match_data.keys() if isinstance(key, tuple)]
-    team_names = set()
-    for pair in team_pairs:
-        team_names = team_names.union(set((pair[0], pair[1])))
-
-    if len(team_names) == 1:
-        return {team_names.pop(): achievable_points}
-
-    # We want all groups to be able to achieve the same number of total points, regardless of the number of teams
-    normalizer = len(team_names)
-    if match_data['rounds'] <= 0:
-        return {}
-    points_per_iteration = round(achievable_points / match_data['rounds'], 1)
-    for pair in team_pairs:
-        # Points are awarded for each match individually, as one run reaching the cap poisons the average number of points
-        for i in range(match_data['rounds']):
-            points[pair[0]] = points.get(pair[0], 0)
-            points[pair[1]] = points.get(pair[1], 0)
-
-            if match_data['type'] == 'iterated':
-                valuation0 = match_data[pair][i]['solved']
-                valuation1 = match_data[(pair[1], pair[0])][i]['solved']
-            elif match_data['type'] == 'averaged':
-                # The valuation of an averaged battle
-                # is the number of successfully executed battles divided by
-                # the average competitive ratio of successful battles,
-                # to account for failures on execution. A higher number
-                # thus means a better overall result. Normalized to the number of configured points.
-
-                ratios0 = match_data[pair][i]['approx_ratios']
-                ratios1 = match_data[(pair[1], pair[0])][i]['approx_ratios']
-                valuation0 = (len(ratios0) / (sum(ratios0) / len(ratios0)))
-                valuation1 = (len(ratios1) / (sum(ratios1) / len(ratios1)))
-            else:
-                logger.info('Unclear how to calculate points for this type of battle.')
-
-            if valuation0 + valuation1 > 0:
-                points_proportion0 = (valuation0 / (valuation0 + valuation1))
-                points_proportion1 = (valuation1 / (valuation0 + valuation1))
-                points[pair[0]] += round((points_per_iteration * points_proportion1) / normalizer, 1)
-                points[pair[1]] += round((points_per_iteration * points_proportion0) / normalizer, 1)
-            else:
-                points[pair[0]] += round((points_per_iteration // 2) / normalizer, 1)
-                points[pair[1]] += round((points_per_iteration // 2) / normalizer, 1)
-
-    return points
 
 
 def run_subprocess(run_command: list, input: bytes, timeout: float, suppress_output=False):
@@ -167,7 +102,11 @@ def run_subprocess(run_command: list, input: bytes, timeout: float, suppress_out
     if suppress_output:
         stderr = None
 
-    with subprocess.Popen(run_command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=stderr) as p:
+    creationflags = 0
+    if os.name != 'posix':
+        creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
+    with subprocess.Popen(run_command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                          stderr=stderr, creationflags=creationflags) as p:
         try:
             raw_output, _ = p.communicate(input=input, timeout=timeout)
         except subprocess.TimeoutExpired:
