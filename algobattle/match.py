@@ -23,6 +23,7 @@ class Match(Subject):
     _observers: List[Observer] = []
     generating_team = None
     solving_team = None
+    battle_wrapper = None
 
     def __init__(self, problem: Problem, config_path: str, teams: list,
                  runtime_overhead=0, approximation_ratio=1.0, cache_docker_containers=True) -> None:
@@ -47,13 +48,23 @@ class Match(Subject):
             logger.error('The given problem is not approximable and can only be run with an approximation ratio of 1.0!')
             self.build_successful = False
 
-        self.base_run_command = [
+        self.generator_base_run_command = lambda a: [
             "docker",
             "run",
             "--rm",
             "--network", "none",
             "-i",
-            "--memory=" + str(self.space_solver) + "mb",
+            "--memory=" + str(a) + "mb",
+            "--cpus=" + str(self.cpus)
+        ]
+
+        self.solver_base_run_command = lambda a: [
+            "docker",
+            "run",
+            "--rm",
+            "--network", "none",
+            "-i",
+            "--memory=" + str(a) + "mb",
             "--cpus=" + str(self.cpus)
         ]
 
@@ -119,6 +130,9 @@ class Match(Subject):
     def _build(self, teams: list, cache_docker_containers=True) -> bool:
         """Build docker containers for the given generators and solvers of each team.
 
+        Any team for which either the generator or solver does not build successfully
+        will be removed from the match.
+
         Parameters
         ----------
         teams : list
@@ -152,29 +166,33 @@ class Match(Subject):
         if len(teams) == 1:
             self.single_player = True
 
-        build_commands = []
         for team in teams:
+            build_commands = []
             build_commands.append(base_build_command + ["solver-" + str(team.name), team.solver_path])
             build_commands.append(base_build_command + ["generator-" + str(team.name), team.generator_path])
 
-        for command in build_commands:
-            logger.debug('Building docker container with the following command: {}'.format(command))
-            with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as process:
-                try:
-                    output, _ = process.communicate(timeout=self.timeout_build)
-                    logger.debug(output.decode())
-                except subprocess.TimeoutExpired:
-                    process.kill()
-                    process.wait()
-                    logger.error('Build process for {} ran into a timeout!'.format(command[5]))
-                    return False
-                if process.returncode != 0:
-                    process.kill()
-                    process.wait()
-                    logger.error('Build process for {} failed!'.format(command[5]))
-                    return False
+            build_successful = True
+            for command in build_commands:
+                logger.debug('Building docker container with the following command: {}'.format(command))
+                with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as process:
+                    try:
+                        output, _ = process.communicate(timeout=self.timeout_build)
+                        logger.debug(output.decode())
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                        process.wait()
+                        logger.error('Build process for {} ran into a timeout!'.format(command[5]))
+                        build_successful = False
+                    if process.returncode != 0:
+                        process.kill()
+                        process.wait()
+                        logger.error('Build process for {} failed!'.format(command[5]))
+                        build_successful = False
+            if not build_successful:
+                logger.error("Removing team {} as their containers did not build successfully.".format(team.name))
+                self.team_names.remove(team.name)
 
-        return True
+        return len(self.team_names) > 0
 
     @build_successful
     def all_battle_pairs(self) -> list:
@@ -248,14 +266,12 @@ class Match(Subject):
                 self.match_data[pair][i]['attempting'] = 0
                 self.match_data[pair][i]['approx_ratios'] = []
 
-        battle_wrapper = None
-
         options = dict()
         if battle_type == 'iterated':
-            battle_wrapper = Iterated()
+            self.battle_wrapper = Iterated()
             options['exponent'] = 2
         elif battle_type == 'averaged':
-            battle_wrapper = Averaged()
+            self.battle_wrapper = Averaged()
         else:
             self.match_data['error'] = 'Unrecognized battle_type given: "{}"'.format(battle_type)
             logger.error(self.match_data['error'])
@@ -269,7 +285,7 @@ class Match(Subject):
 
                 self.generating_team = pair[0]
                 self.solving_team = pair[1]
-                battle_wrapper.wrapper(self, options)
+                self.battle_wrapper.wrapper(self, options)
 
         return self.match_data
 
@@ -303,8 +319,8 @@ class Match(Subject):
 
         approximation_ratio = self.problem.verifier.calculate_approximation_ratio(instance, instance_size,
                                                                                   generator_solution, solver_solution)
-        logger.info('Solver of group {} yields a valid solution with an approx. ratio of {} at instance size {}.'
-                    .format(self.solving_team, approximation_ratio, instance_size))
+        logger.info('Solver of group {} yields a valid solution with an approx. ratio of {}.'
+                    .format(self.solving_team, approximation_ratio))
         return approximation_ratio
 
     @docker_running
@@ -326,7 +342,8 @@ class Match(Subject):
             If the validity checks pass, the (instance, solution) in whatever
             format that is specified, else (None, None).
         """
-        generator_run_command = self.base_run_command + ["generator-" + str(self.generating_team)]
+        scaled_memory = self.problem.generator_memory_scaler(self.space_generator, instance_size)
+        generator_run_command = self.generator_base_run_command(scaled_memory) + ["generator-" + str(self.generating_team)]
 
         logger.debug('Running generator of group {}...\n'.format(self.generating_team))
 
@@ -334,7 +351,7 @@ class Match(Subject):
         encoded_output, _ = run_subprocess(generator_run_command, str(instance_size).encode(),
                                            self.timeout_generator)
         if not encoded_output:
-            logger.warning('No output was generated when running the generator!')
+            logger.warning('No output was generated when running the generator group {}!'.format(self.generating_team))
             return None, None
 
         raw_instance_with_solution = self.problem.parser.decode(encoded_output)
@@ -346,19 +363,19 @@ class Match(Subject):
         generator_solution         = self.problem.parser.parse_solution(raw_solution, instance_size)
 
         if not self.problem.verifier.verify_semantics_of_instance(instance, instance_size):
-            logger.warning('Generator {} created a malformed instance at instance size {}!'
-                           .format(self.generating_team, instance_size))
+            logger.warning('Generator {} created a malformed instance!'.format(self.generating_team))
             return None, None
 
         if not self.problem.verifier.verify_semantics_of_solution(generator_solution, instance_size, True):
-            logger.warning('Generator {} created a malformed solution at instance size {}!'
-                           .format(self.generating_team, instance_size))
+            logger.warning('Generator {} created a malformed solution at instance size!'.format(self.generating_team))
             return None, None
 
         if not self.problem.verifier.verify_solution_against_instance(instance, generator_solution, instance_size, True):
-            logger.warning('Generator {} failed at instance size {} due to a wrong certificate for its generated instance!'
-                           .format(self.generating_team, instance_size))
+            logger.warning('Generator {} failed due to a wrong certificate for its generated instance!'
+                           .format(self.generating_team))
             return None, None
+
+        self.problem.parser.postprocess_instance(instance, instance_size)
 
         logger.info('Generated instance and certificate by group {} are valid!\n'.format(self.generating_team))
 
@@ -383,14 +400,15 @@ class Match(Subject):
             If the validity checks pass, solution in whatever
             format that is specified, else None.
         """
-        solver_run_command = self.base_run_command + ["solver-" + str(self.solving_team)]
+        scaled_memory = self.problem.solver_memory_scaler(self.space_solver, instance_size)
+        solver_run_command = self.solver_base_run_command(scaled_memory) + ["solver-" + str(self.solving_team)]
         logger.debug('Running solver of group {}...\n'.format(self.solving_team))
 
         sigh.latest_running_docker_image = "solver-" + str(self.solving_team)
         encoded_output, _ = run_subprocess(solver_run_command, self.problem.parser.encode(instance),
                                            self.timeout_solver)
         if not encoded_output:
-            logger.warning('No output was generated when running the solver!')
+            logger.warning('No output was generated when running the solver of group {}!'.format(self.solving_team))
             return None
 
         raw_solver_solution = self.problem.parser.decode(encoded_output)

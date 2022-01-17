@@ -36,7 +36,7 @@ class Parser(ABC):
 
         Parameters
         ----------
-        raw_input : any
+        raw_instance : any
             The raw instance.
         instance_size : int
             The size of the instance.
@@ -54,7 +54,7 @@ class Parser(ABC):
 
         Parameters
         ----------
-        raw_input : any
+        raw_solution : any
             The raw solution.
         instance_size : int
             The size of the instance.
@@ -66,6 +66,32 @@ class Parser(ABC):
         """
         raise NotImplementedError
 
+    def postprocess_instance(self, instance: any, instance_size: int) -> any:
+        """Postprocess an instance, e.g. when the verifier has passed its checks on the instance.
+
+        Some problems may require postprocessing, which should be done by
+        overwriting this method. An example could be a problem parameterized by
+        some measure, e.g. the size of the vertex cover of a graph, which
+        should not be communicated to the solver of another group.
+
+        This way, one can quickly verify using the verifier that some measure
+        holds for the given instance without revealing this sub-certificate
+        of the instance to another team.
+
+        Parameters
+        ----------
+        instance : any
+            The parsed instance.
+        instance_size : int
+            The size of the instance.
+
+        Returns
+        -------
+        any
+            A postprocessed instance.
+        """
+        return instance
+
     @abstractmethod
     def encode(self, input: any) -> bytes:
         """Encode an input and return it.
@@ -75,7 +101,7 @@ class Parser(ABC):
 
         Parameters
         ----------
-        raw_input: any
+        raw_input : any
             The input that is to be encoded.
 
         Returns
