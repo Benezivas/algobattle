@@ -87,6 +87,7 @@ if __name__ == "__main__":
     parser.add_option('--approx_inst_size', dest='approximation_instance_size', type=int, default='10', help='If --battle_type=averaged, the instance size on which the averaged run is to be made. Default: 10')
     parser.add_option('--approx_iterations', dest='approximation_iterations', type=int, default='25', help='If --battle_type=averaged, the number of iterations that are to be averaged. Default: 25')
     parser.add_option('--iter_cap', dest='iterated_cap', type=int, default='50000', help='If --battle_type=iterated, the maximum instance size up to which a battle is to be fought.')
+    parser.add_option('--iter_exponent', dest='iterated_exponent', type=int, default='2', help='If --battle_type=iterated, the exponent used for the step size increase. Default: 2')
     parser.add_option('--points', dest='points', type=int, default='100', help='Number of points for which are fought. Default: 100')
     parser.add_option('--do_not_count_points', dest='do_not_count_points', action='store_true', help='If set, points are not calculated for the run.')
     parser.add_option('--silent', dest='silent', action='store_true', help='Disable forking the logging output to stderr.')
@@ -148,8 +149,9 @@ if __name__ == "__main__":
         ui = Ui()
         match.attach(ui)
 
-    results = match.run(options.battle_type, options.battle_rounds, options.iterated_cap,
-                        options.approximation_instance_size, options.approximation_iterations)
+    results = match.run(options.battle_type, rounds=options.battle_rounds, iterated_cap=options.iterated_cap,
+                        iterated_exponent=options.iterated_exponent, approximation_instance_size=options.approximation_instance_size,
+                        approximation_iterations=options.approximation_iterations)
 
     if display_ui:
         match.detach(ui)
