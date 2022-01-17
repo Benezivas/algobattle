@@ -92,11 +92,11 @@ class Match(Subject):
     def docker_running(function: Callable) -> Callable:
         """Ensure that internal methods are only callable if docker is running."""
         def wrapper(self, *args, **kwargs):
-            if os.name == 'posix':
-                creationflags = 0
-            else:
+            creationflags = 0
+            if os.name != 'posix':
                 creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
-            docker_running = subprocess.Popen(['docker', 'info'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=creationflags)
+            docker_running = subprocess.Popen(['docker', 'info'], stdout=subprocess.PIPE,
+                                              stderr=subprocess.PIPE, creationflags=creationflags)
             _ = docker_running.communicate()
             if docker_running.returncode:
                 logger.error('Could not connect to the docker daemon. Is docker running?')
@@ -167,9 +167,7 @@ class Match(Subject):
             logger.error('At least one team name is used twice!')
             return False
 
-        self.single_player = False
-        if len(teams) == 1:
-            self.single_player = True
+        self.single_player = (len(teams) == 1)
 
         for team in teams:
             build_commands = []
@@ -179,11 +177,11 @@ class Match(Subject):
             build_successful = True
             for command in build_commands:
                 logger.debug('Building docker container with the following command: {}'.format(command))
-                if os.name == 'posix':
-                    creationflags = 0
-                else:
+                creationflags = 0
+                if os.name != 'posix':
                     creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
-                with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=creationflags) as process:
+                with subprocess.Popen(command, stdout=subprocess.PIPE,
+                                      stderr=subprocess.PIPE, creationflags=creationflags) as process:
                     try:
                         output, _ = process.communicate(timeout=self.timeout_build)
                         logger.debug(output.decode())

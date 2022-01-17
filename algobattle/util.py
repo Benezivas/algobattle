@@ -102,11 +102,11 @@ def run_subprocess(run_command: list, input: bytes, timeout: float, suppress_out
     if suppress_output:
         stderr = None
 
-    if os.name == 'posix':
-        creationflags = 0
-    else:
+    creationflags = 0
+    if os.name != 'posix':
         creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
-    with subprocess.Popen(run_command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=stderr, creationflags=creationflags) as p:
+    with subprocess.Popen(run_command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                          stderr=stderr, creationflags=creationflags) as p:
         try:
             raw_output, _ = p.communicate(input=input, timeout=timeout)
         except subprocess.TimeoutExpired:

@@ -18,7 +18,6 @@ def signal_handler(sig, frame):
     else:
         os.kill(os.getpid(), signal.CTRL_BREAK_EVENT)
 
-
     sys.exit(0)
 
 
