@@ -45,7 +45,7 @@ class Iterated(BattleWrapper):
         maximum_reached_n = 0
         i = 0
         exponent = options['exponent']
-        n_max = n_cap = match.match_data[curr_pair][curr_round]['cap']
+        n_cap = match.match_data[curr_pair][curr_round]['cap']
         alive = True
 
         logger.info('==================== Iterative Battle, Instanze Size Cap: {} ===================='.format(n_cap))
@@ -70,20 +70,16 @@ class Iterated(BattleWrapper):
                 # We solved an instance of bigger size than before
                 maximum_reached_n = n
 
-            if n + 1 == n_cap:
+            if n + 1 > n_cap:
                 alive = False
             else:
                 i += 1
                 n += i ** exponent
 
-                if n >= n_cap and n_cap != n_max:
+                if n >= n_cap:
                     # We have failed at this value of n already, reset the step size!
                     n -= i ** exponent - 1
                     i = 1
-                elif n >= n_cap and n_cap == n_max:
-                    logger.info('Solver {} exceeded the instance size cap of {}!'.format(match.solving_team, n_max))
-                    maximum_reached_n = n_max
-                    alive = False
 
             match.update_match_data({curr_pair: {curr_round: {'cap': n_cap, 'solved': maximum_reached_n, 'attempting': n}}})
 
