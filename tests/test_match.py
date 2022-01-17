@@ -66,12 +66,6 @@ class Matchtests(unittest.TestCase):
     def test_run(self):
         self.assertEqual(self.match.run(battle_type='foo')['error'], ('Unrecognized battle_type given: "foo"'))
 
-    def test_averaged_battle_wrapper(self):
-        pass
-
-    def test_iterated_battle_wrapper(self):
-        pass
-
     def test_one_fight_gen_timeout(self):
         team = Team('0', self.tests_path + '/generator_timeout', self.tests_path + '/solver')
         match_run_timeout = Match(self.problem, self.config_short_timeout, [team], cache_docker_containers=False)

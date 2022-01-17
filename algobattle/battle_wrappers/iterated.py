@@ -86,3 +86,60 @@ class Iterated(BattleWrapper):
                     alive = False
 
             match.update_match_data({curr_pair: {curr_round: {'cap': n_cap, 'solved': maximum_reached_n, 'attempting': n}}})
+
+    def calculate_points(self, match_data: dict, achievable_points: int) -> dict:
+        """Calculate the number of achieved points, given results.
+
+        Each pair of teams fights for the achievable points among one another.
+        These achievable points are split over all matches, as one run reaching
+        the iteration cap poisons the average number of points.
+
+        Parameters
+        ----------
+        match_data : dict
+            dict containing the results of match.run().
+        achievable_points : int
+            Number of achievable points.
+
+        Returns
+        -------
+        dict
+            A mapping between team names and their achieved points.
+            The format is {(team_x_name, team_y_name): points [...]} for each
+            pair (x,y) for which there is an entry in match_data and points is a
+            float value. Returns an empty dict if no battle was fought.
+        """
+        points = dict()
+
+        team_pairs = [key for key in match_data.keys() if isinstance(key, tuple)]
+        team_names = set()
+        for pair in team_pairs:
+            team_names = team_names.union(set((pair[0], pair[1])))
+
+        if len(team_names) == 1:
+            return {team_names.pop(): achievable_points}
+
+        if match_data['rounds'] <= 0:
+            return {}
+
+        points_per_iteration = round(achievable_points / match_data['rounds'], 1)
+        for pair in team_pairs:
+            for i in range(match_data['rounds']):
+                points[pair[0]] = points.get(pair[0], 0)
+                points[pair[1]] = points.get(pair[1], 0)
+
+                solved1 = match_data[pair][i]['solved']  # pair[1] was solver
+                solved0 = match_data[(pair[1], pair[0])][i]['solved']  # pair[0] was solver
+
+                # Default values for proportions, assuming no team manages to solve anything
+                points_proportion0 = 0.5
+                points_proportion1 = 0.5
+
+                if solved0 + solved1 > 0:
+                    points_proportion0 = (solved0 / (solved0 + solved1))
+                    points_proportion1 = (solved1 / (solved0 + solved1))
+
+                points[pair[0]] += round(points_per_iteration * points_proportion0, 1) / 2
+                points[pair[1]] += round(points_per_iteration * points_proportion1, 1) / 2
+
+        return points
