@@ -228,7 +228,7 @@ class Match(Subject):
         iterated_cap : int
             Iteration cutoff after which an iterated battle is automatically stopped, declaring the solver as the winner.
         iterated_exponent : int
-
+            Exponent used for increasing the step size in an iterated battle.
         approximation_instance_size : int
             Instance size on which to run an averaged battle.
         approximation_iterations : int
