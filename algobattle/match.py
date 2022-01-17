@@ -375,6 +375,8 @@ class Match(Subject):
                            .format(self.generating_team))
             return None, None
 
+        self.problem.parser.postprocess_instance(instance, instance_size)
+
         logger.info('Generated instance and certificate by group {} are valid!\n'.format(self.generating_team))
 
         return instance, generator_solution
