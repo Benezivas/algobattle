@@ -153,11 +153,10 @@ if __name__ == "__main__":
 
     if display_ui:
         match.detach(ui)
-    ui = Ui()
-    ui.restore()
+        ui.restore()
 
     logger.info('#' * 78)
-    logger.info('\n{}'.format(ui.format_ascii(results)))
+    logger.info('\n{}'.format(match.battle_wrapper.format_as_utf8(match.match_data)))
     if not options.do_not_count_points:
         points = match.battle_wrapper.calculate_points(results, options.points)
 
