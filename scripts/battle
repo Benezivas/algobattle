@@ -161,5 +161,5 @@ if __name__ == "__main__":
     if not options.do_not_count_points:
         points = match.battle_wrapper.calculate_points(results, options.points)
 
-        for team_name in [team.name for team in teams]:
+        for team_name in match.team_names:
             logger.info('Group {} gained {:.1f} points.'.format(team_name, points[team_name]))

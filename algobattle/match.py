@@ -130,6 +130,9 @@ class Match(Subject):
     def _build(self, teams: list, cache_docker_containers=True) -> bool:
         """Build docker containers for the given generators and solvers of each team.
 
+        Any team for which either the generator or solver does not build successfully
+        will be removed from the match.
+
         Parameters
         ----------
         teams : list
@@ -163,29 +166,33 @@ class Match(Subject):
         if len(teams) == 1:
             self.single_player = True
 
-        build_commands = []
         for team in teams:
+            build_commands = []
             build_commands.append(base_build_command + ["solver-" + str(team.name), team.solver_path])
             build_commands.append(base_build_command + ["generator-" + str(team.name), team.generator_path])
 
-        for command in build_commands:
-            logger.debug('Building docker container with the following command: {}'.format(command))
-            with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as process:
-                try:
-                    output, _ = process.communicate(timeout=self.timeout_build)
-                    logger.debug(output.decode())
-                except subprocess.TimeoutExpired:
-                    process.kill()
-                    process.wait()
-                    logger.error('Build process for {} ran into a timeout!'.format(command[5]))
-                    return False
-                if process.returncode != 0:
-                    process.kill()
-                    process.wait()
-                    logger.error('Build process for {} failed!'.format(command[5]))
-                    return False
+            build_successful = True
+            for command in build_commands:
+                logger.debug('Building docker container with the following command: {}'.format(command))
+                with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as process:
+                    try:
+                        output, _ = process.communicate(timeout=self.timeout_build)
+                        logger.debug(output.decode())
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                        process.wait()
+                        logger.error('Build process for {} ran into a timeout!'.format(command[5]))
+                        build_successful = False
+                    if process.returncode != 0:
+                        process.kill()
+                        process.wait()
+                        logger.error('Build process for {} failed!'.format(command[5]))
+                        build_successful = False
+            if not build_successful:
+                logger.error("Removing team {} as their containers did not build successfully.".format(team.name))
+                self.team_names.remove(team.name)
 
-        return True
+        return len(self.team_names) > 0
 
     @build_successful
     def all_battle_pairs(self) -> list:
