@@ -63,7 +63,7 @@ def measure_runtime_overhead() -> float:
     overheads = []
     for i in range(5):
         sigh.latest_running_docker_image = "generator0"
-        _, timeout = run_subprocess(match.base_run_command + ["generator0"],
+        _, timeout = run_subprocess(match.generator_base_run_command(match.space_generator) + ["generator0"],
                                     input=str(50 * i).encode(), timeout=match.timeout_generator)
         if not timeout:
             timeout = match.timeout_generator

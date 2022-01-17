@@ -40,5 +40,13 @@ class Problem(metaclass=ABCMeta):
         """Boolean flag indicating whether a problem can have an approximate solution."""
         raise NotImplementedError
 
+    def generator_memory_scaler(self, memory, instance_size):
+        """Method that scales the amount of memory of the generator in relation to the given instance size."""
+        return memory
+
+    def solver_memory_scaler(self, memory, instance_size):
+        """Method that scales the amount of memory of the solver in relation to the given instance size."""
+        return memory
+
     def __str__(self) -> str:
         return self.name
