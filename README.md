@@ -29,6 +29,12 @@ Adjust the parameters set in the `algobattle/configs/config.ini` file to set
 which hardware resources you want to assign. You can pass alternative
 configuration files to the script using the `--config_file` option.
 
+This program requires the `curses` module which is available by default on Linux
+and can be manually installed on windows, e.g. with
+```
+pip install windows-curses
+```
+
 # Usage
 This repository does not include any practical problems. For a selection of problems
 that have been posed to students in practice, have a look at the
@@ -42,5 +48,12 @@ battle path/to/concrecte/problem/folder
 
 The `battle` script offers several options, e.g. to give custom paths for
 solvers and generators. Run `battle --help` for all options.
+
+On Windows you will need to either use a workaround such as [this one](https://stackoverflow.com/a/55619189)
+or invoke it with
+```
+python path\to\installed\battle\script
+```
+followed by your arguments instead of just `battle`.
 
 Check the [wiki](https://github.com/Benezivas/algobattle/wiki) for further documentation.
