@@ -152,8 +152,8 @@ class Averaged(BattleWrapper):
                                            + '║{:>6.2f}║{:>6d}║{:>3d}/{:>3d} ║'.format(latest_approx_ratio,
                                                                                        match_data['approx_inst_size'],
                                                                                        curr_iter,
-                                                                                       match_data['approx_iters']) + '\r'
-        formatted_output_string += '\n╚═════════╩═════════╩' \
+                                                                                       match_data['approx_iters']) + '\r\n'
+        formatted_output_string += '╚═════════╩═════════╩' \
                                    + ''.join(['══════╩' for i in range(match_data['rounds'])]) \
                                    + '══════╩══════╩════════╝' + '\n\r'
 

@@ -173,8 +173,8 @@ class Iterated(BattleWrapper):
                 formatted_output_string += '║{:>9s}║{:>9s}'.format(pair[0], pair[1]) \
                                            + ''.join(['║{:>6d}'.format(match_data[pair][i]['solved'])
                                                      for i in range(match_data['rounds'])]) \
-                                           + '║{:>6d}║{:>6d}║'.format(match_data[pair][curr_round]['cap'], avg) + '\r'
-        formatted_output_string += '\n╚═════════╩═════════╩' \
+                                           + '║{:>6d}║{:>6d}║'.format(match_data[pair][curr_round]['cap'], avg) + '\r\n'
+        formatted_output_string += '╚═════════╩═════════╩' \
                                    + ''.join(['══════╩' for i in range(match_data['rounds'])]) \
                                    + '══════╩══════╝' + '\n\r'
 
