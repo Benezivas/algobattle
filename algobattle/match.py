@@ -1,15 +1,11 @@
 """Match class, provides functionality for setting up and executing battles between given teams."""
-import subprocess
-import os
-
 import logging
 import configparser
 from typing import Callable, List, Tuple
 
 import algobattle.sighandler as sigh
-from algobattle.team import Team
 from algobattle.problem import Problem
-from algobattle.util import run_subprocess, update_nested_dict
+from algobattle.util import run_subprocess, update_nested_dict, docker_running
 from algobattle.subject import Subject
 from algobattle.observer import Observer
 from algobattle.battle_wrappers.averaged import Averaged
@@ -25,6 +21,7 @@ class Match(Subject):
     generating_team = None
     solving_team = None
     battle_wrapper = None
+    team_names = []
 
     def __init__(self, problem: Problem, config_path: str, teams: list,
                  runtime_overhead=0, approximation_ratio=1.0, cache_docker_containers=True) -> None:
@@ -42,24 +39,22 @@ class Match(Subject):
         self.problem = problem
         self.config = config
         self.approximation_ratio = approximation_ratio
+        self.build_error = False
 
-        self.build_successful = self._build(teams, cache_docker_containers)
+        for team in teams:
+            if team.build_containers(cache_docker_containers):
+                self.team_names.append(team.name)
+        self.single_player = (len(self.team_names) == 1)
+
+        if len(self.team_names) != len(list(set(self.team_names))):
+            logger.error('At least one team name is used twice!')
+            self.build_error = True
 
         if approximation_ratio != 1.0 and not problem.approximable:
             logger.error('The given problem is not approximable and can only be run with an approximation ratio of 1.0!')
-            self.build_successful = False
+            self.build_error = True
 
-        self.generator_base_run_command = lambda a: [
-            "docker",
-            "run",
-            "--rm",
-            "--network", "none",
-            "-i",
-            "--memory=" + str(a) + "mb",
-            "--cpus=" + str(self.cpus)
-        ]
-
-        self.solver_base_run_command = lambda a: [
+        self.base_run_command = lambda a: [
             "docker",
             "run",
             "--rm",
@@ -72,7 +67,7 @@ class Match(Subject):
     def build_successful(function: Callable) -> Callable:
         """Ensure that internal methods are only callable after a successful build."""
         def wrapper(self, *args, **kwargs):
-            if not self.build_successful:
+            if not self.build_error:
                 logger.error('Trying to call Match object which failed to build!')
                 return None
             else:
@@ -84,22 +79,6 @@ class Match(Subject):
         def wrapper(self, *args, **kwargs):
             if not self.generating_team or not self.solving_team:
                 logger.error('Generating or solving team have not been set!')
-                return None
-            else:
-                return function(self, *args, **kwargs)
-        return wrapper
-
-    def docker_running(function: Callable) -> Callable:
-        """Ensure that internal methods are only callable if docker is running."""
-        def wrapper(self, *args, **kwargs):
-            creationflags = 0
-            if os.name != 'posix':
-                creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
-            docker_running = subprocess.Popen(['docker', 'info'], stdout=subprocess.PIPE,
-                                              stderr=subprocess.PIPE, creationflags=creationflags)
-            _ = docker_running.communicate()
-            if docker_running.returncode:
-                logger.error('Could not connect to the docker daemon. Is docker running?')
                 return None
             else:
                 return function(self, *args, **kwargs)
@@ -130,76 +109,6 @@ class Match(Subject):
         self.match_data = update_nested_dict(self.match_data, new_data)
         self.notify()
         return True
-
-    @docker_running
-    def _build(self, teams: list, cache_docker_containers=True) -> bool:
-        """Build docker containers for the given generators and solvers of each team.
-
-        Any team for which either the generator or solver does not build successfully
-        will be removed from the match.
-
-        Parameters
-        ----------
-        teams : list
-            List of Team objects.
-        cache_docker_containers : bool
-            Flag indicating whether to cache built docker containers.
-
-        Returns
-        -------
-        Bool
-            Boolean indicating whether the build process succeeded.
-        """
-        base_build_command = [
-            "docker",
-            "build",
-        ] + (["--no-cache"] if not cache_docker_containers else []) + [
-            "--network=host",
-            "-t"
-        ]
-
-        if not isinstance(teams, list) or any(not isinstance(team, Team) for team in teams):
-            logger.error('Teams argument is expected to be a list of Team objects!')
-            return False
-
-        self.team_names = [team.name for team in teams]
-        if len(self.team_names) != len(list(set(self.team_names))):
-            logger.error('At least one team name is used twice!')
-            return False
-
-        self.single_player = (len(teams) == 1)
-
-        for team in teams:
-            build_commands = []
-            build_commands.append(base_build_command + ["solver-" + str(team.name), team.solver_path])
-            build_commands.append(base_build_command + ["generator-" + str(team.name), team.generator_path])
-
-            build_successful = True
-            for command in build_commands:
-                logger.debug('Building docker container with the following command: {}'.format(command))
-                creationflags = 0
-                if os.name != 'posix':
-                    creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
-                with subprocess.Popen(command, stdout=subprocess.PIPE,
-                                      stderr=subprocess.PIPE, creationflags=creationflags) as process:
-                    try:
-                        output, _ = process.communicate(timeout=self.timeout_build)
-                        logger.debug(output.decode())
-                    except subprocess.TimeoutExpired:
-                        process.kill()
-                        process.wait()
-                        logger.error('Build process for {} ran into a timeout!'.format(command[5]))
-                        build_successful = False
-                    if process.returncode != 0:
-                        process.kill()
-                        process.wait()
-                        logger.error('Build process for {} failed!'.format(command[5]))
-                        build_successful = False
-            if not build_successful:
-                logger.error("Removing team {} as their containers did not build successfully.".format(team.name))
-                self.team_names.remove(team.name)
-
-        return len(self.team_names) > 0
 
     @build_successful
     def all_battle_pairs(self) -> list:
@@ -352,7 +261,7 @@ class Match(Subject):
             format that is specified, else (None, None).
         """
         scaled_memory = self.problem.generator_memory_scaler(self.space_generator, instance_size)
-        generator_run_command = self.generator_base_run_command(scaled_memory) + ["generator-" + str(self.generating_team)]
+        generator_run_command = self.base_run_command(scaled_memory) + ["generator-" + str(self.generating_team)]
 
         logger.debug('Running generator of group {}...\n'.format(self.generating_team))
 
@@ -410,7 +319,7 @@ class Match(Subject):
             format that is specified, else None.
         """
         scaled_memory = self.problem.solver_memory_scaler(self.space_solver, instance_size)
-        solver_run_command = self.solver_base_run_command(scaled_memory) + ["solver-" + str(self.solving_team)]
+        solver_run_command = self.base_run_command(scaled_memory) + ["solver-" + str(self.solving_team)]
         logger.debug('Running solver of group {}...\n'.format(self.solving_team))
 
         sigh.latest_running_docker_image = "solver-" + str(self.solving_team)

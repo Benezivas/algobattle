@@ -6,6 +6,7 @@ import subprocess
 import importlib.util
 import sys
 import collections
+from typing import Callable
 
 import algobattle
 import algobattle.problems.delaytest as DelaytestProblem
@@ -147,3 +148,20 @@ def update_nested_dict(current_dict, updates):
         else:
             current_dict[key] = value
     return current_dict
+
+
+def docker_running(function: Callable) -> Callable:
+    """Ensure that internal methods are only callable if docker is running."""
+    def wrapper(self, *args, **kwargs):
+        creationflags = 0
+        if os.name != 'posix':
+            creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
+        docker_running = subprocess.Popen(['docker', 'info'], stdout=subprocess.PIPE,
+                                          stderr=subprocess.PIPE, creationflags=creationflags)
+        _ = docker_running.communicate()
+        if docker_running.returncode:
+            logger.error('Could not connect to the docker daemon. Is docker running?')
+            return None
+        else:
+            return function(self, *args, **kwargs)
+    return wrapper
