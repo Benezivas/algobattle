@@ -1,5 +1,6 @@
 """Wrapper that iterates the instance size up to a point where the solving team is no longer able to solve an instance."""
 
+import itertools
 import logging
 
 from algobattle.battle_wrapper import BattleWrapper
@@ -68,6 +69,7 @@ class Averaged(BattleWrapper):
         team_names = set()
         for pair in team_pairs:
             team_names = team_names.union(set((pair[0], pair[1])))
+        team_combinations = itertools.combinations(team_names, 2)
 
         if len(team_names) == 1:
             return {team_names.pop(): achievable_points}
@@ -75,7 +77,7 @@ class Averaged(BattleWrapper):
         if match_data['rounds'] <= 0:
             return {}
         points_per_round = round(achievable_points / match_data['rounds'], 1)
-        for pair in team_pairs:
+        for pair in team_combinations:
             for i in range(match_data['rounds']):
                 points[pair[0]] = points.get(pair[0], 0)
                 points[pair[1]] = points.get(pair[1], 0)
@@ -99,8 +101,8 @@ class Averaged(BattleWrapper):
                     points_proportion0 = (valuation0 / (valuation0 + valuation1))
                     points_proportion1 = (valuation1 / (valuation0 + valuation1))
 
-                points[pair[0]] += round(points_per_round * points_proportion0, 1) / 2
-                points[pair[1]] += round(points_per_round * points_proportion1, 1) / 2
+                points[pair[0]] += round(points_per_round * points_proportion0, 1)
+                points[pair[1]] += round(points_per_round * points_proportion1, 1)
 
         return points
 
