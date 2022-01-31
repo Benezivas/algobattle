@@ -1,5 +1,6 @@
 """Wrapper that iterates the instance size up to a point where the solving team is no longer able to solve an instance."""
 
+import itertools
 import logging
 
 from algobattle.battle_wrapper import BattleWrapper
@@ -43,9 +44,9 @@ class Averaged(BattleWrapper):
     def calculate_points(self, match_data: dict, achievable_points: int) -> dict:
         """Calculate the number of achieved points, given results.
 
-        The valuation of an averaged battle is the number of successfully
-        executed battles divided by the average competitive ratio of successful
-        battles, to account for failures on execution.
+        The valuation of an averaged battle is calculating by summing up
+        the reciprocals of each solved fight. This sum is then divided by
+        the total number of ratios to account for unsuccessful battles.
 
         Parameters
         ----------
@@ -68,14 +69,15 @@ class Averaged(BattleWrapper):
         team_names = set()
         for pair in team_pairs:
             team_names = team_names.union(set((pair[0], pair[1])))
+        team_combinations = itertools.combinations(team_names, 2)
 
         if len(team_names) == 1:
             return {team_names.pop(): achievable_points}
 
         if match_data['rounds'] <= 0:
             return {}
-        points_per_iteration = round(achievable_points / match_data['rounds'], 1)
-        for pair in team_pairs:
+        points_per_round = round(achievable_points / match_data['rounds'], 1)
+        for pair in team_combinations:
             for i in range(match_data['rounds']):
                 points[pair[0]] = points.get(pair[0], 0)
                 points[pair[1]] = points.get(pair[1], 0)
@@ -86,9 +88,9 @@ class Averaged(BattleWrapper):
                 valuation0 = 0
                 valuation1 = 0
                 if ratios0 and sum(ratios0) != 0:
-                    valuation0 = (len(ratios0) / sum(ratios0)) / len(ratios0)
+                    valuation0 = sum(1 / x if x != 0 else 0 for x in ratios0) / len(ratios0)
                 if ratios1 and sum(ratios1) != 0:
-                    valuation1 = (len(ratios1) / sum(ratios1)) / len(ratios1)
+                    valuation1 = sum(1 / x if x != 0 else 0 for x in ratios1) / len(ratios1)
 
                 # Default values for proportions, assuming no team manages to solve anything
                 points_proportion0 = 0.5
@@ -99,8 +101,8 @@ class Averaged(BattleWrapper):
                     points_proportion0 = (valuation0 / (valuation0 + valuation1))
                     points_proportion1 = (valuation1 / (valuation0 + valuation1))
 
-                points[pair[0]] += round(points_per_iteration * points_proportion0, 1) / 2
-                points[pair[1]] += round(points_per_iteration * points_proportion1, 1) / 2
+                points[pair[0]] += round(points_per_round * points_proportion0, 1)
+                points[pair[1]] += round(points_per_round * points_proportion1, 1)
 
         return points
 
