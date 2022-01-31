@@ -44,9 +44,9 @@ class Averaged(BattleWrapper):
     def calculate_points(self, match_data: dict, achievable_points: int) -> dict:
         """Calculate the number of achieved points, given results.
 
-        The valuation of an averaged battle is the number of successfully
-        executed battles divided by the average competitive ratio of successful
-        battles, to account for failures on execution.
+        The valuation of an averaged battle is calculating by summing up
+        the reciprocals of each solved fight. This sum is then divided by
+        the total number of ratios to account for unsuccessful battles.
 
         Parameters
         ----------
