@@ -215,7 +215,7 @@ class Match(Subject):
         return battle_pairs
 
     @build_successful
-    def run(self, battle_type: str = 'iterated', rounds: int = 5, iterated_cap: int = 50000,
+    def run(self, battle_type: str = 'iterated', rounds: int = 5, iterated_cap: int = 50000, iterated_exponent: int = 2,
             approximation_instance_size: int = 10, approximation_iterations: int = 25) -> dict:
         """Match entry point, executes rounds fights between all teams and returns the results of the battles.
 
@@ -226,7 +226,9 @@ class Match(Subject):
         rounds : int
             Number of Battles between each pair of teams (used for averaging results).
         iterated_cap : int
-            Iteration cutoff after which an iterated battle is automatically stopped, declaring the solver as the winner
+            Iteration cutoff after which an iterated battle is automatically stopped, declaring the solver as the winner.
+        iterated_exponent : int
+            Exponent used for increasing the step size in an iterated battle.
         approximation_instance_size : int
             Instance size on which to run an averaged battle.
         approximation_iterations : int
@@ -276,7 +278,7 @@ class Match(Subject):
         options = dict()
         if battle_type == 'iterated':
             self.battle_wrapper = Iterated()
-            options['exponent'] = 2
+            options['exponent'] = iterated_exponent
         elif battle_type == 'averaged':
             self.battle_wrapper = Averaged()
         else:
