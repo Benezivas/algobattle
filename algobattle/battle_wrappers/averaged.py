@@ -141,7 +141,7 @@ class Averaged(BattleWrapper):
                     n_dead_iters = executed_iters - len([i for i in match_data[pair][i]['approx_ratios'] if i != 0.0])
 
                     if executed_iters - n_dead_iters > 0:
-                        avg[i] = sum(match_data[pair][i]['approx_ratios']) // (executed_iters - n_dead_iters)
+                        avg[i] = sum(match_data[pair][i]['approx_ratios']) / (executed_iters - n_dead_iters)
 
                 curr_round = match_data[pair]['curr_round']
                 curr_iter = len(match_data[pair][curr_round]['approx_ratios'])
