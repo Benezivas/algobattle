@@ -1,23 +1,26 @@
 """Collection of utility functions."""
+from __future__ import annotations
 import os
 import logging
 import timeit
 import subprocess
 import importlib.util
 import sys
-import collections
+from collections.abc import Mapping, MutableMapping
 from typing import TypeVar
 
 import algobattle
 import algobattle.problems.delaytest as DelaytestProblem
 import algobattle.sighandler as sigh
 from algobattle.problem import Problem
+from algobattle.team import Team
+from algobattle.match import Match
 
 
 logger = logging.getLogger('algobattle.util')
 
 
-def import_problem_from_path(problem_path: str) -> Problem:
+def import_problem_from_path(problem_path: str) -> Problem | None:
     """Try to import and initialize a Problem object from a given path.
 
     Parameters
@@ -32,6 +35,8 @@ def import_problem_from_path(problem_path: str) -> Problem:
     """
     try:
         spec = importlib.util.spec_from_file_location("problem", problem_path + "/__init__.py")
+        assert spec is not None
+        assert spec.loader is not None
         Problem = importlib.util.module_from_spec(spec)
         sys.modules[spec.name] = Problem
         spec.loader.exec_module(Problem)
@@ -53,9 +58,9 @@ def measure_runtime_overhead() -> float:
     problem = DelaytestProblem.Problem()
     config_path = os.path.join(os.path.dirname(os.path.abspath(algobattle.__file__)), 'config', 'config_delaytest.ini')
     delaytest_path = DelaytestProblem.__file__[:-12]  # remove /__init__.py
-    delaytest_team = algobattle.team.Team(0, delaytest_path + '/generator', delaytest_path + '/solver')
+    delaytest_team = Team("0", delaytest_path + '/generator', delaytest_path + '/solver')
 
-    match = algobattle.match.Match(problem, config_path, [delaytest_team])
+    match = Match(problem, config_path, [delaytest_team])
 
     if not match.build_successful:
         logger.warning('Building a match for the time tolerance calculation failed!')
@@ -127,23 +132,23 @@ def run_subprocess(run_command: list[str], input: bytes, timeout: float, suppres
     return raw_output, elapsed_time
 
 
-def update_nested_dict(current_dict: dict, updates: dict) -> dict:
+def update_nested_dict(current_dict: MutableMapping, updates: Mapping) -> MutableMapping:
     """Update a nested dictionary with new data recursively.
 
     Parameters
     ----------
-    current_dict : dict
+    current_dict : MutableMapping
         The dict to be updated.
-    updates : dict
+    updates : Mapping
         The dict containing the updates
 
     Returns
     -------
-    dict
+    MutableMapping
         The updated dict.
     """
     for key, value in updates.items():
-        if isinstance(value, collections.abc.Mapping):
+        if isinstance(value, Mapping):
             current_dict[key] = update_nested_dict(current_dict.get(key, {}), value)
         else:
             current_dict[key] = value
