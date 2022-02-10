@@ -4,7 +4,7 @@ import os
 
 import logging
 import configparser
-from typing import Callable, List, Tuple
+from typing import Any, Callable, List, Tuple
 
 import algobattle.sighandler as sigh
 from algobattle.team import Team
@@ -27,7 +27,7 @@ class Match(Subject):
     battle_wrapper = None
 
     def __init__(self, problem: Problem, config_path: str, teams: list,
-                 runtime_overhead=0, approximation_ratio=1.0, cache_docker_containers=True) -> None:
+                 runtime_overhead: float = 0, approximation_ratio: float = 1.0, cache_docker_containers: bool = True) -> None:
 
         config = configparser.ConfigParser()
         logger.debug('Using additional configuration options from file "%s".', config_path)
@@ -69,7 +69,8 @@ class Match(Subject):
             "--cpus=" + str(self.cpus)
         ]
 
-    def build_successful(function: Callable) -> Callable:
+    @staticmethod
+    def build_successful_wrapper(function: Callable) -> Callable:
         """Ensure that internal methods are only callable after a successful build."""
         def wrapper(self, *args, **kwargs):
             if not self.build_successful:
@@ -79,6 +80,7 @@ class Match(Subject):
                 return function(self, *args, **kwargs)
         return wrapper
 
+    @staticmethod
     def team_roles_set(function: Callable) -> Callable:
         """Ensure that internal methods are only callable after the team roles have been set."""
         def wrapper(self, *args, **kwargs):
@@ -89,6 +91,7 @@ class Match(Subject):
                 return function(self, *args, **kwargs)
         return wrapper
 
+    @staticmethod
     def docker_running(function: Callable) -> Callable:
         """Ensure that internal methods are only callable if docker is running."""
         def wrapper(self, *args, **kwargs):
@@ -118,7 +121,7 @@ class Match(Subject):
         for observer in self._observers:
             observer.update(self)
 
-    @build_successful
+    @build_successful_wrapper
     def update_match_data(self, new_data: dict) -> bool:
         """Update the internal match dict with new (partial) information.
 
@@ -132,7 +135,7 @@ class Match(Subject):
         return True
 
     @docker_running
-    def _build(self, teams: list, cache_docker_containers=True) -> bool:
+    def _build(self, teams: list, cache_docker_containers: bool=True) -> bool:
         """Build docker containers for the given generators and solvers of each team.
 
         Any team for which either the generator or solver does not build successfully
@@ -201,7 +204,7 @@ class Match(Subject):
 
         return len(self.team_names) > 0
 
-    @build_successful
+    @build_successful_wrapper
     def all_battle_pairs(self) -> list:
         """Generate and return a list of all team pairings for battles."""
         battle_pairs = []
@@ -214,7 +217,7 @@ class Match(Subject):
 
         return battle_pairs
 
-    @build_successful
+    @build_successful_wrapper
     def run(self, battle_type: str = 'iterated', rounds: int = 5, iterated_cap: int = 50000, iterated_exponent: int = 2,
             approximation_instance_size: int = 10, approximation_iterations: int = 25) -> dict:
         """Match entry point, executes rounds fights between all teams and returns the results of the battles.
@@ -299,7 +302,7 @@ class Match(Subject):
         return self.match_data
 
     @docker_running
-    @build_successful
+    @build_successful_wrapper
     @team_roles_set
     def _one_fight(self, instance_size: int) -> float:
         """Execute a single fight of a battle between a given generator and solver for a given instance size.
@@ -333,9 +336,9 @@ class Match(Subject):
         return approximation_ratio
 
     @docker_running
-    @build_successful
+    @build_successful_wrapper
     @team_roles_set
-    def _run_generator(self, instance_size: int) -> Tuple[any, any]:
+    def _run_generator(self, instance_size: int) -> Tuple[Any, Any]:
         """Execute the generator of match.generating_team and check the validity of the generated output.
 
         If the validity checks pass, return the instance and the certificate solution.
@@ -391,9 +394,9 @@ class Match(Subject):
         return instance, generator_solution
 
     @docker_running
-    @build_successful
+    @build_successful_wrapper
     @team_roles_set
-    def _run_solver(self, instance_size: int, instance: any) -> any:
+    def _run_solver(self, instance_size: int, instance: Any) -> Any:
         """Execute the solver of match.solving_team and check the validity of the generated output.
 
         If the validity checks pass, return the solver solution.

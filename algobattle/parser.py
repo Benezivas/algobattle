@@ -1,6 +1,6 @@
 """Abstract base class for parsers used in concrete problem implementations."""
 from abc import ABC, abstractmethod
-from typing import Tuple
+from typing import Tuple, Any
 
 
 class Parser(ABC):
@@ -10,7 +10,7 @@ class Parser(ABC):
     """
 
     @abstractmethod
-    def split_into_instance_and_solution(self, raw_input: any) -> Tuple[any, any]:
+    def split_into_instance_and_solution(self, raw_input: Any) -> Tuple[Any, Any]:
         """Split an input into instance and solution, discard anything else.
 
         The validity is only checked by grouping together lines with the same
@@ -19,54 +19,54 @@ class Parser(ABC):
 
         Parameters
         ----------
-        raw_input : any
+        raw_input : Any
             The raw input.
 
         Returns
         -------
-        any, any
+        Any, Any
             Returns a tuple containing the instance and the solution.
             The lines may still be syntactially and semantically incorrect.
         """
         raise NotImplementedError
 
     @abstractmethod
-    def parse_instance(self, raw_instance: any, instance_size: int) -> any:
+    def parse_instance(self, raw_instance: Any, instance_size: int) -> Any:
         """Remove all syntactially wrong elements from the raw instance.
 
         Parameters
         ----------
-        raw_instance : any
+        raw_instance : Any
             The raw instance.
         instance_size : int
             The size of the instance.
 
         Returns
         -------
-        any
+        Any
             Returns what is syntactically valid of the instance.
         """
         raise NotImplementedError
 
     @abstractmethod
-    def parse_solution(self, raw_solution: any, instance_size: int) -> any:
+    def parse_solution(self, raw_solution: Any, instance_size: int) -> Any:
         """Remove all syntactially wrong lines from the raw solution.
 
         Parameters
         ----------
-        raw_solution : any
+        raw_solution : Any
             The raw solution.
         instance_size : int
             The size of the instance.
 
         Returns
         -------
-        any
+        Any
             Returns what is syntactically valid of the solution.
         """
         raise NotImplementedError
 
-    def postprocess_instance(self, instance: any, instance_size: int) -> any:
+    def postprocess_instance(self, instance: Any, instance_size: int) -> Any:
         """Postprocess an instance, e.g. when the verifier has passed its checks on the instance.
 
         Some problems may require postprocessing, which should be done by
@@ -80,20 +80,20 @@ class Parser(ABC):
 
         Parameters
         ----------
-        instance : any
+        instance : Any
             The parsed instance.
         instance_size : int
             The size of the instance.
 
         Returns
         -------
-        any
+        Any
             A postprocessed instance.
         """
         return instance
 
     @abstractmethod
-    def encode(self, input: any) -> bytes:
+    def encode(self, input: Any) -> bytes:
         """Encode an input and return it.
 
         This method is responsible for turning the output of parse_instance back
@@ -101,7 +101,7 @@ class Parser(ABC):
 
         Parameters
         ----------
-        raw_input : any
+        raw_input : Any
             The input that is to be encoded.
 
         Returns
@@ -112,7 +112,7 @@ class Parser(ABC):
         return "\n".join(str(" ".join(str(element) for element in line)) for line in input).encode()
 
     @abstractmethod
-    def decode(self, raw_input: bytes) -> any:
+    def decode(self, raw_input: bytes) -> Any:
         """Decode an input and return it.
 
         This method is responsible for taking the output of a generator or
@@ -126,7 +126,7 @@ class Parser(ABC):
 
         Returns
         -------
-        any
+        Any
             Returns the decoded input.
         """
         return [tuple(line.split()) for line in raw_input.decode().splitlines() if line.split()]

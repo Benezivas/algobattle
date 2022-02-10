@@ -6,6 +6,7 @@ import subprocess
 import importlib.util
 import sys
 import collections
+from typing import TypeVar
 
 import algobattle
 import algobattle.problems.delaytest as DelaytestProblem
@@ -74,7 +75,7 @@ def measure_runtime_overhead() -> float:
     return max_overhead
 
 
-def run_subprocess(run_command: list, input: bytes, timeout: float, suppress_output=False):
+def run_subprocess(run_command: list[str], input: bytes, timeout: float, suppress_output: bool=False):
     """Run a given command as a subprocess.
 
     Parameters
@@ -126,7 +127,7 @@ def run_subprocess(run_command: list, input: bytes, timeout: float, suppress_out
     return raw_output, elapsed_time
 
 
-def update_nested_dict(current_dict, updates):
+def update_nested_dict(current_dict: dict, updates: dict) -> dict:
     """Update a nested dictionary with new data recursively.
 
     Parameters

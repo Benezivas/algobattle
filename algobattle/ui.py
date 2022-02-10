@@ -14,6 +14,7 @@ logger = logging.getLogger('algobattle.ui')
 class Ui(Observer):
     """The UI Class declares methods to output information to STDOUT."""
 
+    @staticmethod
     def check_for_terminal(function: Callable) -> Callable:
         """Ensure that we are attached to a terminal."""
         def wrapper(self, *args, **kwargs):
@@ -54,7 +55,7 @@ class Ui(Observer):
         self.stdscr.clear()
         self.print_formatted_data_to_stdout(match)  # TODO: Refactor s.t. the output stream can be chosen by the user.
 
-    def print_formatted_data_to_stdout(self, match) -> None:
+    def print_formatted_data_to_stdout(self, match: Match) -> None:
         """Output the formatted match data of a battle wrapper to stdout.
 
         Parameters

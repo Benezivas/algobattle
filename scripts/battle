@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Main battle script. Executes all possible types of battles, see battle --help for all options."""
+from __future__ import annotations
 import sys
 import os
 import logging
@@ -16,7 +17,7 @@ from algobattle.ui import Ui
 
 if __name__ == "__main__":
 
-    def setup_logging(logging_path, verbose_logging, silent):
+    def setup_logging(logging_path: str | Path, verbose_logging: bool, silent: bool):
         """Creates and returns a parent logger.
 
         Parameters:

@@ -38,7 +38,7 @@ class BattleWrapper(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def calculate_points(match_data: dict, achievable_points: int) -> dict:
+    def calculate_points(self, match_data: dict, achievable_points: int) -> dict:
         """Calculate the number of achieved points, given results.
 
         As awarding points completely depends on the type of battle that

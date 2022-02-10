@@ -30,7 +30,7 @@ class Matchtests(unittest.TestCase):
 
     def test_build_normal(self):
         # A normal build
-        self.assertTrue(self.match.build_successful)
+        self.assertTrue(self.match.build_successful_wrapper)
 
     def test_build_malformed_docker(self):
         # Malformed docker names
@@ -41,17 +41,17 @@ class Matchtests(unittest.TestCase):
         # Build timeout
         team = Team('0', self.tests_path + '/generator_build_timeout', self.tests_path + '/solver')
         match_build_timeout = Match(self.problem, self.config_short_build_timeout, [team], cache_docker_containers=False)
-        self.assertFalse(match_build_timeout.build_successful)
+        self.assertFalse(match_build_timeout.build_successful_wrapper)
 
     def test_build_error(self):
         # Build error
         team = Team('0', self.tests_path + '/generator_build_error', self.tests_path + '/solver')
         match_build_fail = Match(self.problem, self.config_short_build_timeout, [team], cache_docker_containers=False)
-        self.assertFalse(match_build_fail.build_successful)
+        self.assertFalse(match_build_fail.build_successful_wrapper)
 
     def test_build_foo_problem(self):
         match = Match(self.problem, self.config, 'foo')
-        self.assertFalse(match.build_successful)
+        self.assertFalse(match.build_successful_wrapper)
 
     def test_all_battle_pairs(self):
         team0 = Team('0', self.tests_path + '/generator', self.tests_path + '/solver')
