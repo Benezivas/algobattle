@@ -156,13 +156,14 @@ if __name__ == "__main__":
                         iterated_exponent=options.iterated_exponent, approximation_instance_size=options.approximation_instance_size,
                         approximation_iterations=options.approximation_iterations)
 
-    if display_ui:
+    if ui is not None:
         match.detach(ui)
         ui.restore()
 
     logger.info('#' * 78)
     logger.info(f'\n{match.format_as_utf8()}')
     if not options.do_not_count_points:
+        assert match.battle_wrapper is not None
         points = match.battle_wrapper.calculate_points(results, options.points)
 
         for team_name in match.team_names:
