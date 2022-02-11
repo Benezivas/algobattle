@@ -45,7 +45,7 @@ if __name__ == "__main__":
         _now = dt.datetime.now()
 
         time_seperator = ':' if os.name == 'posix' else '-'
-        current_timestamp = '{:04d}-{:02d}-{:02d}_{:02d}{}{:02d}{}{:02d}'.format(_now.year, _now.month, _now.day, _now.hour, time_seperator, _now.minute, time_seperator, _now.second)
+        current_timestamp = f'{_now.year:04d}-{_now.month:02d}-{_now.day:02d}_{_now.hour:02d}{time_seperator}{_now.minute:02d}{time_seperator}{_now.second:02d}'
         logging_path = Path(logging_path, current_timestamp + '.log')
 
         logging.basicConfig(handlers=[logging.FileHandler(logging_path, 'w', 'utf-8')],
@@ -64,7 +64,7 @@ if __name__ == "__main__":
 
             logger.addHandler(_consolehandler)
 
-        logger.info('You can find the log files for this run in {}'.format(logging_path))
+        logger.info(f'You can find the log files for this run in {logging_path}')
         return logger
 
     if len(sys.argv) < 2:
@@ -109,18 +109,18 @@ if __name__ == "__main__":
     team_names = options.team_names.split(',')
 
     if len(solvers) != len(generators) or len(solvers) != len(team_names) or len(team_names) != len(generators):
-        sys.exit('The number of provided generator paths ({}), solver paths ({}) and group numbers ({}) is not equal!'.format(len(generators), len(solvers), len(team_names)))
+        sys.exit(f'The number of provided generator paths ({len(generators)}), solver paths ({len(solvers)}) and group numbers ({len(team_names)}) is not equal!')
 
     if not os.path.exists(problem_path):
-        sys.exit('Problem path "{}" does not exist in the file system! Use "battle --help" for more information on usage and options.'.format(problem_path))
+        sys.exit('fProblem path "{problem_path}" does not exist in the file system! Use "battle --help" for more information on usage and options.')
     if not os.path.exists(options.config):
-        sys.exit('Config path "{}" does not exist in the file system! Use "battle --help" for more information on usage and options.'.format(options.config))
+        sys.exit(f'Config path "{options.config}" does not exist in the file system! Use "battle --help" for more information on usage and options.')
     for solver_path in solvers:
         if not os.path.exists(solver_path):
-            sys.exit('The given path for option --solvers "{}" does not exist in the file system! Use "battle --help" for more information on usage and options.'.format(solver_path))
+            sys.exit(f'The given path for option --solvers "{solver_path}" does not exist in the file system! Use "battle --help" for more information on usage and options.')
     for generator_path in generators:
         if not os.path.exists(generator_path):
-            sys.exit('The given path for option --generators "{}" does not exist in the file system! Use "battle --help" for more information on usage and options.'.format(generator_path))
+            sys.exit(f'The given path for option --generators "{generator_path}" does not exist in the file system! Use "battle --help" for more information on usage and options.')
 
     logger = setup_logging(options.folder_name, options.verbose_logging, options.silent)
 
@@ -132,14 +132,14 @@ if __name__ == "__main__":
     for i in range(len(generators)):
         teams.append(Team(team_names[i], generators[i], solvers[i]))
 
-    logger.debug('Options for this run: {}'.format(options))
-    logger.debug('Contents of sys.argv: {}'.format(sys.argv))
+    logger.debug(f'Options for this run: {options}')
+    logger.debug(f'Contents of sys.argv: {sys.argv}')
 
     runtime_overhead = 0
     if not options.no_overhead_calculation:
         logger.info('Running a benchmark to determine your machines I/O overhead to start and stop docker containers...')
         runtime_overhead = measure_runtime_overhead()
-        logger.info('Maximal measured runtime overhead is at {} seconds. Adding this amount to the configured runtime.'.format(runtime_overhead))
+        logger.info(f'Maximal measured runtime overhead is at {runtime_overhead} seconds. Adding this amount to the configured runtime.')
 
     match = Match(problem, options.config, teams, runtime_overhead=runtime_overhead, approximation_ratio=options.approximation_ratio)
 
@@ -161,9 +161,9 @@ if __name__ == "__main__":
         ui.restore()
 
     logger.info('#' * 78)
-    logger.info('\n{}'.format(match.battle_wrapper.format_as_utf8(match.match_data)))
+    logger.info(f'\n{match.format_as_utf8()}')
     if not options.do_not_count_points:
         points = match.battle_wrapper.calculate_points(results, options.points)
 
         for team_name in match.team_names:
-            logger.info('Group {} gained {:.1f} points.'.format(team_name, points[team_name]))
+            logger.info(f'Group {team_name} gained {points[team_name]:.1f} points.')
