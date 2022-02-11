@@ -438,3 +438,8 @@ class Match(Subject):
             return None
 
         return solver_solution
+
+    @build_successful_wrapper
+    def format_as_utf8(self):
+        assert self.battle_wrapper is not None
+        self.battle_wrapper.format_as_utf8(self.match_data)

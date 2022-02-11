@@ -72,4 +72,4 @@ class Ui(Observer):
 
         out += '\nAlgobattle version {}\n\r'.format(version)
 
-        print(out + match.battle_wrapper.format_as_utf8(match.match_data))
+        print(out + match.format_as_utf8())
