@@ -43,7 +43,7 @@ def import_problem_from_path(problem_path: str) -> Problem | None:
 
         return Problem.Problem()
     except Exception as e:
-        logger.critical('Importing the given problem failed with the following exception: "{}"'.format(e))
+        logger.critical(f'Importing the given problem failed with the following exception: "{e}"')
         return None
 
 
@@ -119,7 +119,7 @@ def run_subprocess(run_command: list[str], input: bytes, timeout: float, suppres
             logger.warning('Time limit exceeded!')
             return None, None
         except Exception as e:
-            logger.warning('An exception was thrown while running the subprocess:\n{}'.format(e))
+            logger.warning(f'An exception was thrown while running the subprocess:\n{e}')
             return None, None
         finally:
             p.kill()
@@ -127,7 +127,7 @@ def run_subprocess(run_command: list[str], input: bytes, timeout: float, suppres
             sigh._kill_spawned_docker_containers()
 
     elapsed_time = round(timeit.default_timer() - start_time, 2)
-    logger.debug('Approximate elapsed runtime: {}/{} seconds.'.format(elapsed_time, timeout))
+    logger.debug(f'Approximate elapsed runtime: {elapsed_time}/{timeout} seconds.')
 
     return raw_output, elapsed_time
 

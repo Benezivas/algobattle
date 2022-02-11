@@ -70,6 +70,6 @@ class Ui(Observer):
               + r'          /_/   \_\_|\__, |\___/|_.__/ \__,_|\__|\__|_|\___| ' + '\n\r' \
               + r'                      |___/                                  ' + '\n\r'
 
-        out += '\nAlgobattle version {}\n\r'.format(version)
+        out += f'\nAlgobattle version {version}\n\r'
 
         print(out + match.format_as_utf8())
