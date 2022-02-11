@@ -132,23 +132,23 @@ def run_subprocess(run_command: list[str], input: bytes, timeout: float, suppres
     return raw_output, elapsed_time
 
 
-def update_nested_dict(current_dict: MutableMapping, updates: Mapping) -> MutableMapping:
+def update_nested_dict(current_dict: dict, updates: dict) -> dict:
     """Update a nested dictionary with new data recursively.
 
     Parameters
     ----------
-    current_dict : MutableMapping
+    current_dict : dict
         The dict to be updated.
-    updates : Mapping
+    updates : dict
         The dict containing the updates
 
     Returns
     -------
-    MutableMapping
+    dict
         The updated dict.
     """
     for key, value in updates.items():
-        if isinstance(value, Mapping):
+        if isinstance(value, dict):
             current_dict[key] = update_nested_dict(current_dict.get(key, {}), value)
         else:
             current_dict[key] = value
