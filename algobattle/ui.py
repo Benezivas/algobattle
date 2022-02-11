@@ -28,19 +28,19 @@ class Ui(Observer):
     @check_for_terminal
     def __init__(self) -> None:
         if sys.stdout.isatty():
-            self.stdscr = curses.initscr()
-            curses.cbreak()
-            curses.noecho()
+            self.stdscr = curses.initscr()  # type: ignore
+            curses.cbreak()                 # type: ignore
+            curses.noecho()                 # type: ignore
             self.stdscr.keypad(1)
 
     @check_for_terminal
     def restore(self) -> None:
         """Restore the console. This will be later moved into a proper deconstruction method."""
         if sys.stdout.isatty():
-            curses.nocbreak()
+            curses.nocbreak()               # type: ignore
             self.stdscr.keypad(0)
-            curses.echo()
-            curses.endwin()
+            curses.echo()                   # type: ignore
+            curses.endwin()                 # type: ignore
 
     @check_for_terminal
     def update(self, match: Match) -> None:
