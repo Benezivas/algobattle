@@ -32,7 +32,7 @@ class Averaged(BattleWrapper):
         logger.info('==================== Averaged Battle, Instance Size: {}, Rounds: {} ===================='
                     .format(match.match_data['approx_inst_size'], match.match_data['approx_iters']))
         for i in range(match.match_data['approx_iters']):
-            logger.info('=============== Iteration: {}/{} ==============='.format(i + 1, match.match_data['approx_iters']))
+            logger.info(f'=============== Iteration: {i + 1}/{match.match_data["approx_iters"]} ===============')
             approx_ratio = match._one_fight(instance_size=match.match_data['approx_inst_size'])
             approximation_ratios.append(approx_ratio)
 
@@ -125,7 +125,7 @@ class Averaged(BattleWrapper):
                                    + ''.join(['══════╦' for i in range(match_data['rounds'])]) \
                                    + '══════╦══════╦════════╗' + '\n\r' \
                                    + '║   GEN   ║   SOL   ' \
-                                   + ''.join(['║{:^6s}'.format('R' + str(i + 1)) for i in range(match_data['rounds'])]) \
+                                   + ''.join([f'║{"R" + str(i + 1):^6s}' for i in range(match_data['rounds'])]) \
                                    + '║ LAST ║ SIZE ║  ITER  ║' + '\n\r' \
                                    + '╟─────────╫─────────╫' \
                                    + ''.join(['──────╫' for i in range(match_data['rounds'])]) \
@@ -149,8 +149,8 @@ class Averaged(BattleWrapper):
                 if match_data[pair][curr_round]['approx_ratios']:
                     latest_approx_ratio = match_data[pair][curr_round]['approx_ratios'][-1]
 
-                formatted_output_string += '║{:>9s}║{:>9s}'.format(pair[0], pair[1]) \
-                                           + ''.join(['║{:>6.2f}'.format(avg[i]) for i in range(match_data['rounds'])]) \
+                formatted_output_string += f'║{pair[0]:>9s}║{pair[1]:>9s}' \
+                                           + ''.join([f'║{avg[1]:>6.2f}' for i in range(match_data['rounds'])]) \
                                            + '║{:>6.2f}║{:>6d}║{:>3d}/{:>3d} ║'.format(latest_approx_ratio,
                                                                                        match_data['approx_inst_size'],
                                                                                        curr_iter,

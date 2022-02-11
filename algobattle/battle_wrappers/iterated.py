@@ -48,9 +48,9 @@ class Iterated(BattleWrapper):
         n_cap = match.match_data[curr_pair][curr_round]['cap']
         alive = True
 
-        logger.info('==================== Iterative Battle, Instanze Size Cap: {} ===================='.format(n_cap))
+        logger.info(f'==================== Iterative Battle, Instanze Size Cap: {n_cap} ====================')
         while alive:
-            logger.info('=============== Instance Size: {}/{} ==============='.format(n, n_cap))
+            logger.info(f'=============== Instance Size: {n}/{n_cap} ===============')
             approx_ratio = match._one_fight(instance_size=n)
             if approx_ratio == 0.0:
                 alive = False
@@ -61,7 +61,7 @@ class Iterated(BattleWrapper):
 
             if not alive and i > 1:
                 # The step size increase was too aggressive, take it back and reset the increment multiplier
-                logger.info('Setting the solution cap to {}...'.format(n))
+                logger.info(f'Setting the solution cap to {n}...')
                 n_cap = n
                 n -= i ** exponent
                 i = 0
@@ -159,7 +159,7 @@ class Iterated(BattleWrapper):
                                    + ''.join(['══════╦' for i in range(match_data['rounds'])]) \
                                    + '══════╦══════╗' + '\n\r' \
                                    + '║   GEN   ║   SOL   ' \
-                                   + ''.join(['║{:^6s}'.format('R' + str(i + 1)) for i in range(match_data['rounds'])]) \
+                                   + ''.join([f'║{"R" + str(i + 1):^6s}' for i in range(match_data['rounds'])]) \
                                    + '║  CAP ║  AVG ║' + '\n\r' \
                                    + '╟─────────╫─────────╫' \
                                    + ''.join(['──────╫' for i in range(match_data['rounds'])]) \
@@ -170,10 +170,10 @@ class Iterated(BattleWrapper):
                 curr_round = match_data[pair]['curr_round']
                 avg = sum(match_data[pair][i]['solved'] for i in range(match_data['rounds'])) // match_data['rounds']
 
-                formatted_output_string += '║{:>9s}║{:>9s}'.format(pair[0], pair[1]) \
-                                           + ''.join(['║{:>6d}'.format(match_data[pair][i]['solved'])
+                formatted_output_string += f'║{pair[0]:>9s}║{pair[1]:>9s}' \
+                                           + ''.join([f'║{match_data[pair][1]["solved"]:>6d}'
                                                      for i in range(match_data['rounds'])]) \
-                                           + '║{:>6d}║{:>6d}║'.format(match_data[pair][curr_round]['cap'], avg) + '\r\n'
+                                           + f'║{match_data[pair][curr_round]["cap"]:>6d}║{avg:>6d}║' + '\r\n'
         formatted_output_string += '╚═════════╩═════════╩' \
                                    + ''.join(['══════╩' for i in range(match_data['rounds'])]) \
                                    + '══════╩══════╝' + '\n\r'
