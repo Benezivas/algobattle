@@ -179,7 +179,7 @@ class Match(Subject):
 
             build_successful = True
             for command in build_commands:
-                logger.debug('Building docker container with the following command: {}'.format(command))
+                logger.debug(f'Building docker container with the following command: {command}')
                 creationflags = 0
                 if os.name != 'posix':
                     creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
@@ -191,15 +191,15 @@ class Match(Subject):
                     except subprocess.TimeoutExpired:
                         process.kill()
                         process.wait()
-                        logger.error('Build process for {} ran into a timeout!'.format(command[5]))
+                        logger.error(f'Build process for {command[5]} ran into a timeout!')
                         build_successful = False
                     if process.returncode != 0:
                         process.kill()
                         process.wait()
-                        logger.error('Build process for {} failed!'.format(command[5]))
+                        logger.error(f'Build process for {command[5]} failed!')
                         build_successful = False
             if not build_successful:
-                logger.error("Removing team {} as their containers did not build successfully.".format(team.name))
+                logger.error(f"Removing team {team.name} as their containers did not build successfully.")
                 self.team_names.remove(team.name)
 
         return len(self.team_names) > 0
@@ -285,14 +285,14 @@ class Match(Subject):
         elif battle_type == 'averaged':
             self.battle_wrapper = Averaged()
         else:
-            self.match_data['error'] = 'Unrecognized battle_type given: "{}"'.format(battle_type)
+            self.match_data['error'] = f'Unrecognized battle_type given: "{battle_type}"'
             logger.error(self.match_data['error'])
             return self.match_data
 
         for pair in self.all_battle_pairs():
             self.update_match_data({'curr_pair': pair})
             for i in range(rounds):
-                logger.info('{}  Running Battle {}/{}  {}'.format('#' * 20, i + 1, rounds, '#' * 20))
+                logger.info(f'{"#" * 20}  Running Battle {i + 1}/{rounds}  {"#" * 20}')
                 self.update_match_data({pair: {'curr_round': i}})
 
                 self.generating_team = pair[0]
@@ -357,13 +357,13 @@ class Match(Subject):
         scaled_memory = self.problem.generator_memory_scaler(self.space_generator, instance_size)
         generator_run_command = self.generator_base_run_command(scaled_memory) + ["generator-" + str(self.generating_team)]
 
-        logger.debug('Running generator of group {}...\n'.format(self.generating_team))
+        logger.debug(f'Running generator of group {self.generating_team}...\n')
 
         sigh.latest_running_docker_image = "generator-" + str(self.generating_team)
         encoded_output, _ = run_subprocess(generator_run_command, str(instance_size).encode(),
                                            self.timeout_generator)
         if not encoded_output:
-            logger.warning('No output was generated when running the generator group {}!'.format(self.generating_team))
+            logger.warning(f'No output was generated when running the generator group {self.generating_team}!')
             return None, None
 
         raw_instance_with_solution = self.problem.parser.decode(encoded_output)
@@ -375,21 +375,20 @@ class Match(Subject):
         generator_solution         = self.problem.parser.parse_solution(raw_solution, instance_size)
 
         if not self.problem.verifier.verify_semantics_of_instance(instance, instance_size):
-            logger.warning('Generator {} created a malformed instance!'.format(self.generating_team))
+            logger.warning(f'Generator {self.generating_team} created a malformed instance!')
             return None, None
 
         if not self.problem.verifier.verify_semantics_of_solution(generator_solution, instance_size, True):
-            logger.warning('Generator {} created a malformed solution at instance size!'.format(self.generating_team))
+            logger.warning(f'Generator {self.generating_team} created a malformed solution at instance size!')
             return None, None
 
         if not self.problem.verifier.verify_solution_against_instance(instance, generator_solution, instance_size, True):
-            logger.warning('Generator {} failed due to a wrong certificate for its generated instance!'
-                           .format(self.generating_team))
+            logger.warning(f'Generator {self.generating_team} failed due to a wrong certificate for its generated instance!')
             return None, None
 
         self.problem.parser.postprocess_instance(instance, instance_size)
 
-        logger.info('Generated instance and certificate by group {} are valid!\n'.format(self.generating_team))
+        logger.info(f'Generated instance and certificate by group {self.generating_team} are valid!\n')
 
         return instance, generator_solution
 
@@ -414,13 +413,13 @@ class Match(Subject):
         """
         scaled_memory = self.problem.solver_memory_scaler(self.space_solver, instance_size)
         solver_run_command = self.solver_base_run_command(scaled_memory) + ["solver-" + str(self.solving_team)]
-        logger.debug('Running solver of group {}...\n'.format(self.solving_team))
+        logger.debug(f'Running solver of group {self.solving_team}...\n')
 
         sigh.latest_running_docker_image = "solver-" + str(self.solving_team)
         encoded_output, _ = run_subprocess(solver_run_command, self.problem.parser.encode(instance),
                                            self.timeout_solver)
         if not encoded_output:
-            logger.warning('No output was generated when running the solver of group {}!'.format(self.solving_team))
+            logger.warning(f'No output was generated when running the solver of group {self.solving_team}!')
             return None
 
         raw_solver_solution = self.problem.parser.decode(encoded_output)
