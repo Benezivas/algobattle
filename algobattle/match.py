@@ -1,11 +1,13 @@
 """Match class, provides functionality for setting up and executing battles between given teams."""
 from __future__ import annotations
+from dataclasses import dataclass, field
 import subprocess
 import os
 
 import logging
 import configparser
 from typing import Any, Callable, List, Tuple, NamedTuple
+from collections.abc import Mapping
 
 import algobattle.sighandler as sigh
 from algobattle.team import Team
@@ -444,54 +446,84 @@ class Match(Subject):
         assert self.battle_wrapper is not None
         self.battle_wrapper.format_as_utf8(self.match_data)
 
-
+@dataclass
 class MatchData:
     """
-    dict
-            A dictionary contains the current data of a match. You can subscribe
-            to this data using the observable pattern implemented in the match object.
-            If the 'error' key is set to something other than None, do not expect the
-            data to be consistent.
-            Contains the following keys:
-            error: An error message as a str (default: None).
-            problem: The name of a problem
-            curr_pair: The pair of teams currently fighting.
-            rounds: The number of rounds fought between each pair of teams.
-            type: The battle_type, usually 'iterated' or 'averaged'.
-            approx_inst_size: Assuming 'averaged' battle_type, the constant instanze size.
-            approx_iters: Assuming 'averaged' battle_type, the number of iterations over which to average.
-            For each pair (as 2-tuple), there is a nested dict with the following contents:
-            curr_round: The current round of the battle between the two teams.
-            Each round is a key itself with another nested dict with the following contents:
-            cap: Assuming 'iterated' battle_type, the (updated) cap up to which to fight.
-            solved: Assuming 'iterated' battle_type, the largest instance size for which a solution was found (so far).
-            attempting: Assuming 'iterated' battle_type, the current instanze size for which a solution is sought.
-            approx_ratios: Assuming 'averaged' battle_type, a list of the approximation ratios for each iteration.
-        """
+    Dataclass containing the current data of a match. You can subscribe
+    to this data using the observable pattern implemented in the match object.
+    If the 'error' attribute is set to something other than None, do not expect the
+    data to be consistent.
+    Contains the following attributes:
+    error: An error message as a str (default: None).
+    problem: The name of a problem
+    curr_pair: The pair of teams currently fighting.
+    rounds: The number of rounds fought between each pair of teams.
+    type: The battle_type, usually 'iterated' or 'averaged'.
+    approx_inst_size: Assuming 'averaged' battle_type, the constant instanze size.
+    approx_iters: Assuming 'averaged' battle_type, the number of iterations over which to average.
 
-    class PairData(NamedTuple):
-        rounds: list[MatchData.RoundData]
+    For each pair (as 2-tuple), there is a nested record with the following contents:
+    curr_round: The current round of the battle between the two teams.
+    rounds: List of one record per round, each with the following entries:
+
+    cap: Assuming 'iterated' battle_type, the (updated) cap up to which to fight.
+    solved: Assuming 'iterated' battle_type, the largest instance size for which a solution was found (so far).
+    attempting: Assuming 'iterated' battle_type, the current instanze size for which a solution is sought.
+    approx_ratios: Assuming 'averaged' battle_type, a list of the approximation ratios for each iteration.
+    """
+    __match: Match
+    type: str = "iterated"
+    rounds: int = 5
+    iterated_cap: int = 50000
+    approx_inst_size: int = 10
+    approx_iters: int = 25
+    
+    pairs: dict[tuple[str, str], MatchData.PairData] = field(default_factory=dict, init=False)
+    problem: str = field(default=str(Problem.name), init=False)
+    error: str | None = field(default=None, init=False)
+    curr_pair: tuple[str, str] | None = field(default=None, init=False)
+
+    def __post_init__(self) -> None:
+        for pair in self.__match.all_battle_pairs():
+            self.pairs[pair] = MatchData.PairData(self.__match)
+            for _ in range(self.rounds):
+                self.pairs[pair].rounds.append(MatchData.RoundData(self.__match, self.iterated_cap))
+
+    #* using refs back to the parent match object is somewhat memory inefficient
+    #* this could be changed by either heavily modifying __getattribute__ and __setattr__
+    #* of all involved objects or giving up the natural access syntax
+
+    @dataclass
+    class PairData:
+        __match: Match
         curr_round: int = 0
+        rounds: list[MatchData.RoundData] = field(default_factory=list)
 
-    class RoundData(NamedTuple):
+        def __setattr__(self, name: str, value: Any) -> None:
+            """Updates record in the PairData object and notifies all obeservers
+            subscribed to the associated Match object."""
+
+            object.__setattr__(self, name, value)
+            self.__match.notify()
+
+    @dataclass
+    class RoundData:
+        __match: Match
         cap: int
-        approx_ratios: list[float]
         solved: int = 0
         attempting: int = 0
+        approx_ratios: list[float] = field(default_factory=list)
 
-    def __init__(self, match: Match, rounds: int, battle_type: str, approx_inst_size: int | None,
-        approx_iters: int | None, iterated_cap: int):
-        self.error = None
-        self.problem = Problem.name
-        self.curr_pair = None
-        self.rounds = rounds
-        self.type = battle_type
-        self.approx_inst_size = approx_inst_size
-        self.approx_iters = approx_iters
-        self.pairs = {}
-        self.match = match
+        def __setattr__(self, name: str, value: Any) -> None:
+            """Updates record in the RoundData object and notifies all obeservers
+            subscribed to the associated Match object."""
 
-        for pair in match.all_battle_pairs():
-            self.pairs[pair] = MatchData.PairData([])
-            for i in range(rounds):
-                self.pairs[i] = MatchData.RoundData(iterated_cap, [])
+            object.__setattr__(self, name, value)
+            self.__match.notify()
+    
+    def __setattr__(self, name: str, value: Any) -> None:
+        """Updates record in the MatchData object and notifies all obeservers
+        subscribed to the associated Match object."""
+
+        object.__setattr__(self, name, value)
+        self.__match.notify()
