@@ -12,7 +12,7 @@ from collections.abc import Mapping
 import algobattle.sighandler as sigh
 from algobattle.team import Team
 from algobattle.problem import Problem
-from algobattle.util import run_subprocess, update_nested_dict
+from algobattle.util import run_subprocess
 from algobattle.subject import Subject
 from algobattle.observer import Observer
 from algobattle.battle_wrappers.averaged import Averaged

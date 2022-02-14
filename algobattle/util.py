@@ -130,26 +130,3 @@ def run_subprocess(run_command: list[str], input: bytes, timeout: float, suppres
     logger.debug(f'Approximate elapsed runtime: {elapsed_time}/{timeout} seconds.')
 
     return raw_output, elapsed_time
-
-
-def update_nested_dict(current_dict: dict, updates: dict) -> dict:
-    """Update a nested dictionary with new data recursively.
-
-    Parameters
-    ----------
-    current_dict : dict
-        The dict to be updated.
-    updates : dict
-        The dict containing the updates
-
-    Returns
-    -------
-    dict
-        The updated dict.
-    """
-    for key, value in updates.items():
-        if isinstance(value, dict):
-            current_dict[key] = update_nested_dict(current_dict.get(key, {}), value)
-        else:
-            current_dict[key] = value
-    return current_dict
