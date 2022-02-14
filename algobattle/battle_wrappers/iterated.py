@@ -1,5 +1,6 @@
 """Wrapper that repeats a battle on an instance size a number of times and averages the competitive ratio over all runs."""
 
+import itertools
 import logging
 from itertools import combinations
 
@@ -113,7 +114,9 @@ class Iterated(BattleWrapper):
 
         team_names: set[str] = set()
         for pair in match_data.pairs.keys():
-            team_names = team_names.union(set((pair[0], pair[1])))
+            team_names = team_names.union(set(pair))
+        team_combinations = itertools.combinations(team_names, 2)
+        
 
         if len(team_names) == 1:
             return {team_names.pop(): achievable_points}
@@ -122,13 +125,13 @@ class Iterated(BattleWrapper):
             return {}
 
         points_per_iteration = round(achievable_points / match_data.rounds, 1)
-        for pair in match_data.pairs.keys():
+        for pair in team_combinations:
             for i in range(match_data.rounds):
                 points[pair[0]] = points.get(pair[0], 0)
                 points[pair[1]] = points.get(pair[1], 0)
 
                 solved1 = match_data.pairs[pair].rounds[i].solved  # pair[1] was solver
-                solved0 = match_data.pairs[(pair[1], pair[0])].rounds[i].solved  # pair[0] was solver
+                solved0 = match_data.pairs[pair[::-1]].rounds[i].solved  # pair[0] was solver
 
                 # Default values for proportions, assuming no team manages to solve anything
                 points_proportion0 = 0.5
@@ -138,8 +141,8 @@ class Iterated(BattleWrapper):
                     points_proportion0 = (solved0 / (solved0 + solved1))
                     points_proportion1 = (solved1 / (solved0 + solved1))
 
-                points[pair[0]] += round(points_per_iteration * points_proportion0, 1) / 2
-                points[pair[1]] += round(points_per_iteration * points_proportion1, 1) / 2
+                points[pair[0]] += round(points_per_iteration * points_proportion0, 1)
+                points[pair[1]] += round(points_per_iteration * points_proportion1, 1)
 
         return points
 
