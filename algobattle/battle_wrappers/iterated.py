@@ -1,8 +1,10 @@
 """Wrapper that repeats a battle on an instance size a number of times and averages the competitive ratio over all runs."""
 
 import logging
+from itertools import combinations
 
 from algobattle.battle_wrapper import BattleWrapper
+from algobattle.match import Match, MatchData
 
 logger = logging.getLogger('algobattle.battle_wrappers.iterated')
 
@@ -10,7 +12,7 @@ logger = logging.getLogger('algobattle.battle_wrappers.iterated')
 class Iterated(BattleWrapper):
     """Class of an iterated battle Wrapper."""
 
-    def wrapper(self, match, options: dict = {'exponent': 2}) -> None:
+    def wrapper(self, match: Match, options: dict = {'exponent': 2}) -> None:
         """Execute one iterative battle between a generating and a solving team.
 
         Incrementally try to search for the highest n for which the solver is
@@ -27,8 +29,7 @@ class Iterated(BattleWrapper):
         winner once the iteration cap is reached.
 
         During execution, this function updates the match_data of the match
-        object which is passed to it by
-        calls to the match.update_match_data function.
+        object which is passed to it.
 
         Parameters
         ----------
@@ -38,14 +39,15 @@ class Iterated(BattleWrapper):
             A dict that contains an 'exponent' key with an int value of at least 1,
             which determines the step size increase.
         """
-        curr_pair = match.match_data['curr_pair']
-        curr_round = match.match_data[curr_pair]['curr_round']
+        curr_pair = match.match_data.curr_pair
+        assert curr_pair is not None
+        curr_round = match.match_data.pairs[curr_pair].curr_round
 
         n = match.problem.n_start
         maximum_reached_n = 0
         i = 0
         exponent = options['exponent']
-        n_cap = match.match_data[curr_pair][curr_round]['cap']
+        n_cap = match.match_data.pairs[curr_pair].rounds[curr_round].cap
         alive = True
 
         logger.info(f'==================== Iterative Battle, Instanze Size Cap: {n_cap} ====================')
@@ -81,9 +83,11 @@ class Iterated(BattleWrapper):
                     n -= i ** exponent - 1
                     i = 1
 
-            match.update_match_data({curr_pair: {curr_round: {'cap': n_cap, 'solved': maximum_reached_n, 'attempting': n}}})
+            match.match_data.pairs[curr_pair].rounds[curr_round].cap = n_cap
+            match.match_data.pairs[curr_pair].rounds[curr_round].solved = maximum_reached_n
+            match.match_data.pairs[curr_pair].rounds[curr_round].attempting = n
 
-    def calculate_points(self, match_data: dict, achievable_points: int) -> dict:
+    def calculate_points(self, match_data: MatchData, achievable_points: int) -> dict:
         """Calculate the number of achieved points, given results.
 
         Each pair of teams fights for the achievable points among one another.
@@ -92,7 +96,7 @@ class Iterated(BattleWrapper):
 
         Parameters
         ----------
-        match_data : dict
+        match_data : MatchData
             dict containing the results of match.run().
         achievable_points : int
             Number of achievable points.
@@ -107,25 +111,24 @@ class Iterated(BattleWrapper):
         """
         points = dict()
 
-        team_pairs = [key for key in match_data.keys() if isinstance(key, tuple)]
-        team_names = set()
-        for pair in team_pairs:
+        team_names: set[str] = set()
+        for pair in match_data.pairs.keys():
             team_names = team_names.union(set((pair[0], pair[1])))
 
         if len(team_names) == 1:
             return {team_names.pop(): achievable_points}
 
-        if match_data['rounds'] <= 0:
+        if match_data.rounds <= 0:
             return {}
 
-        points_per_iteration = round(achievable_points / match_data['rounds'], 1)
-        for pair in team_pairs:
-            for i in range(match_data['rounds']):
+        points_per_iteration = round(achievable_points / match_data.rounds, 1)
+        for pair in match_data.pairs.keys():
+            for i in range(match_data.rounds):
                 points[pair[0]] = points.get(pair[0], 0)
                 points[pair[1]] = points.get(pair[1], 0)
 
-                solved1 = match_data[pair][i]['solved']  # pair[1] was solver
-                solved0 = match_data[(pair[1], pair[0])][i]['solved']  # pair[0] was solver
+                solved1 = match_data.pairs[pair].rounds[i].solved  # pair[1] was solver
+                solved0 = match_data.pairs[(pair[1], pair[0])].rounds[i].solved  # pair[0] was solver
 
                 # Default values for proportions, assuming no team manages to solve anything
                 points_proportion0 = 0.5
@@ -140,13 +143,13 @@ class Iterated(BattleWrapper):
 
         return points
 
-    def format_as_utf8(self, match_data: dict) -> str:
+    def format_as_utf8(self, match_data: MatchData) -> str:
         """Format the provided match_data for iterated battles.
 
         Parameters
         ----------
-        match_data : dict
-            dict containing match data generated by match.run().
+        match_data : MatchData
+            MatchData containing match data generated by match.run().
 
         Returns
         -------
@@ -156,26 +159,25 @@ class Iterated(BattleWrapper):
         formatted_output_string = ""
         formatted_output_string += 'Battle Type: Iterated Battle\n\r'
         formatted_output_string += '╔═════════╦═════════╦' \
-                                   + ''.join(['══════╦' for i in range(match_data['rounds'])]) \
+                                   + ''.join(['══════╦' for i in range(match_data.rounds)]) \
                                    + '══════╦══════╗' + '\n\r' \
                                    + '║   GEN   ║   SOL   ' \
-                                   + ''.join([f'║{"R" + str(i + 1):^6s}' for i in range(match_data['rounds'])]) \
+                                   + ''.join([f'║{"R" + str(i + 1):^6s}' for i in range(match_data.rounds)]) \
                                    + '║  CAP ║  AVG ║' + '\n\r' \
                                    + '╟─────────╫─────────╫' \
-                                   + ''.join(['──────╫' for i in range(match_data['rounds'])]) \
+                                   + ''.join(['──────╫' for i in range(match_data.rounds)]) \
                                    + '──────╫──────╢' + '\n\r'
 
-        for pair in match_data.keys():
-            if isinstance(pair, tuple):
-                curr_round = match_data[pair]['curr_round']
-                avg = sum(match_data[pair][i]['solved'] for i in range(match_data['rounds'])) // match_data['rounds']
+        for pair in match_data.pairs.keys():
+            curr_round = match_data.pairs[pair].curr_round
+            avg = sum(match_data.pairs[pair].rounds[i].solved for i in range(match_data.rounds)) // match_data.rounds
 
-                formatted_output_string += f'║{pair[0]:>9s}║{pair[1]:>9s}' \
-                                           + ''.join([f'║{match_data[pair][1]["solved"]:>6d}'
-                                                     for i in range(match_data['rounds'])]) \
-                                           + f'║{match_data[pair][curr_round]["cap"]:>6d}║{avg:>6d}║' + '\r\n'
+            formatted_output_string += f'║{pair[0]:>9s}║{pair[1]:>9s}' \
+                                        + ''.join([f'║{match_data.pairs[pair].rounds[1].solved:>6d}'
+                                                    for i in range(match_data.rounds)]) \
+                                        + f'║{match_data.pairs[pair].rounds[curr_round].cap:>6d}║{avg:>6d}║' + '\r\n'
         formatted_output_string += '╚═════════╩═════════╩' \
-                                   + ''.join(['══════╩' for i in range(match_data['rounds'])]) \
+                                   + ''.join(['══════╩' for i in range(match_data.rounds)]) \
                                    + '══════╩══════╝' + '\n\r'
 
         return formatted_output_string
