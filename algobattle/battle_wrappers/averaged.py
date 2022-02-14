@@ -4,6 +4,7 @@ import itertools
 import logging
 
 from algobattle.battle_wrapper import BattleWrapper
+from algobattle.match import Match, MatchData
 
 logger = logging.getLogger('algobattle.battle_wrappers.averaged')
 
@@ -11,15 +12,14 @@ logger = logging.getLogger('algobattle.battle_wrappers.averaged')
 class Averaged(BattleWrapper):
     """Class of an adveraged battle Wrapper."""
 
-    def wrapper(self, match, options: dict = {}) -> None:
+    def wrapper(self, match: Match, options: dict = {}) -> None:
         """Execute one averaged battle between a generating and a solving team.
 
         Execute several fights between two teams on a fixed instance size
         and determine the average solution quality.
 
         During execution, this function updates the match_data of the match
-        object which is passed to it by
-        calls to the match.update_match_data function.
+        object which is passed to it.
 
         Parameters
         ----------
@@ -30,18 +30,18 @@ class Averaged(BattleWrapper):
         """
         approximation_ratios = []
         logger.info('==================== Averaged Battle, Instance Size: {}, Rounds: {} ===================='
-                    .format(match.match_data['approx_inst_size'], match.match_data['approx_iters']))
-        for i in range(match.match_data['approx_iters']):
-            logger.info(f'=============== Iteration: {i + 1}/{match.match_data["approx_iters"]} ===============')
-            approx_ratio = match._one_fight(instance_size=match.match_data['approx_inst_size'])
+                    .format(match.match_data.approx_inst_size, match.match_data.approx_iters))
+        for i in range(match.match_data.approx_iters):
+            logger.info(f'=============== Iteration: {i + 1}/{match.match_data.approx_iters} ===============')
+            approx_ratio = match._one_fight(instance_size=match.match_data.approx_inst_size)
             approximation_ratios.append(approx_ratio)
 
-            curr_pair = match.match_data['curr_pair']
-            curr_round = match.match_data[curr_pair]['curr_round']
-            match.update_match_data({curr_pair: {curr_round: {'approx_ratios':
-                                    match.match_data[curr_pair][curr_round]['approx_ratios'] + [approx_ratio]}}})
+            curr_pair = match.match_data.curr_pair
+            assert curr_pair is not None
+            curr_round = match.match_data.pairs[curr_pair].curr_round
+            match.match_data.pairs[curr_pair].rounds[curr_round].approx_ratios.append(approx_ratio)
 
-    def calculate_points(self, match_data: dict, achievable_points: int) -> dict:
+    def calculate_points(self, match_data: MatchData, achievable_points: int) -> dict:
         """Calculate the number of achieved points, given results.
 
         The valuation of an averaged battle is calculating by summing up
@@ -50,7 +50,7 @@ class Averaged(BattleWrapper):
 
         Parameters
         ----------
-        match_data : dict
+        match_data : MatchData
             dict containing the results of match.run().
         achievable_points : int
             Number of achievable points.
@@ -65,25 +65,24 @@ class Averaged(BattleWrapper):
         """
         points = dict()
 
-        team_pairs = [key for key in match_data.keys() if isinstance(key, tuple)]
-        team_names = set()
-        for pair in team_pairs:
+        team_names: set[str] = set()
+        for pair in match_data.pairs.keys():
             team_names = team_names.union(set((pair[0], pair[1])))
         team_combinations = itertools.combinations(team_names, 2)
 
         if len(team_names) == 1:
             return {team_names.pop(): achievable_points}
 
-        if match_data['rounds'] <= 0:
+        if match_data.rounds <= 0:
             return {}
-        points_per_round = round(achievable_points / match_data['rounds'], 1)
+        points_per_round = round(achievable_points / match_data.rounds, 1)
         for pair in team_combinations:
-            for i in range(match_data['rounds']):
+            for i in range(match_data.rounds):
                 points[pair[0]] = points.get(pair[0], 0)
                 points[pair[1]] = points.get(pair[1], 0)
 
-                ratios1 = match_data[pair][i]['approx_ratios']  # pair[1] was solver
-                ratios0 = match_data[(pair[1], pair[0])][i]['approx_ratios']  # pair[0] was solver
+                ratios1 = match_data.pairs[pair].rounds[i].approx_ratios  # pair[1] was solver
+                ratios0 = match_data.pairs[(pair[1], pair[0])].rounds[i].approx_ratios  # pair[0] was solver
 
                 valuation0 = 0
                 valuation1 = 0
@@ -106,12 +105,12 @@ class Averaged(BattleWrapper):
 
         return points
 
-    def format_as_utf8(self, match_data: dict) -> str:
+    def format_as_utf8(self, match_data: MatchData) -> str:
         """Format the provided match_data for averaged battles.
 
         Parameters
         ----------
-        match_data : dict
+        match_data : MatchData
             dict containing match data generated by match.run().
 
         Returns
@@ -122,41 +121,39 @@ class Averaged(BattleWrapper):
         formatted_output_string = ""
         formatted_output_string += 'Battle Type: Averaged Battle\n\r'
         formatted_output_string += '╔═════════╦═════════╦' \
-                                   + ''.join(['══════╦' for i in range(match_data['rounds'])]) \
+                                   + ''.join(['══════╦' for i in range(match_data.rounds)]) \
                                    + '══════╦══════╦════════╗' + '\n\r' \
                                    + '║   GEN   ║   SOL   ' \
-                                   + ''.join([f'║{"R" + str(i + 1):^6s}' for i in range(match_data['rounds'])]) \
+                                   + ''.join([f'║{"R" + str(i + 1):^6s}' for i in range(match_data.rounds)]) \
                                    + '║ LAST ║ SIZE ║  ITER  ║' + '\n\r' \
                                    + '╟─────────╫─────────╫' \
-                                   + ''.join(['──────╫' for i in range(match_data['rounds'])]) \
+                                   + ''.join(['──────╫' for i in range(match_data.rounds)]) \
                                    + '──────╫──────╫────────╢' + '\n\r'
 
-        for pair in match_data.keys():
-            if isinstance(pair, tuple):
+        for pair in match_data.pairs.keys():
+            avg = [0.0 for i in range(match_data.rounds)]
 
-                avg = [0.0 for i in range(match_data['rounds'])]
+            for i in range(match_data.rounds):
+                executed_iters = len(match_data.pairs[pair].rounds[i].approx_ratios)
+                n_dead_iters = executed_iters - len([i for i in match_data.pairs[pair].rounds[i].approx_ratios if i != 0.0])
 
-                for i in range(match_data['rounds']):
-                    executed_iters = len(match_data[pair][i]['approx_ratios'])
-                    n_dead_iters = executed_iters - len([i for i in match_data[pair][i]['approx_ratios'] if i != 0.0])
+                if executed_iters - n_dead_iters > 0:
+                    avg[i] = sum(match_data.pairs[pair].rounds[i].approx_ratios) / (executed_iters - n_dead_iters)
 
-                    if executed_iters - n_dead_iters > 0:
-                        avg[i] = sum(match_data[pair][i]['approx_ratios']) / (executed_iters - n_dead_iters)
+            curr_round = match_data.pairs[pair].curr_round
+            curr_iter = len(match_data.pairs[pair].rounds[curr_round].approx_ratios)
+            latest_approx_ratio = 0.0
+            if match_data.pairs[pair].rounds[curr_round].approx_ratios:
+                latest_approx_ratio = match_data.pairs[pair].rounds[curr_round].approx_ratios[-1]
 
-                curr_round = match_data[pair]['curr_round']
-                curr_iter = len(match_data[pair][curr_round]['approx_ratios'])
-                latest_approx_ratio = 0.0
-                if match_data[pair][curr_round]['approx_ratios']:
-                    latest_approx_ratio = match_data[pair][curr_round]['approx_ratios'][-1]
-
-                formatted_output_string += f'║{pair[0]:>9s}║{pair[1]:>9s}' \
-                                           + ''.join([f'║{avg[1]:>6.2f}' for i in range(match_data['rounds'])]) \
-                                           + '║{:>6.2f}║{:>6d}║{:>3d}/{:>3d} ║'.format(latest_approx_ratio,
-                                                                                       match_data['approx_inst_size'],
-                                                                                       curr_iter,
-                                                                                       match_data['approx_iters']) + '\r\n'
+            formatted_output_string += f'║{pair[0]:>9s}║{pair[1]:>9s}' \
+                                        + ''.join([f'║{avg[1]:>6.2f}' for i in range(match_data.rounds)]) \
+                                        + '║{:>6.2f}║{:>6d}║{:>3d}/{:>3d} ║'.format(latest_approx_ratio,
+                                                                                    match_data.approx_inst_size,
+                                                                                    curr_iter,
+                                                                                    match_data.approx_iters) + '\r\n'
         formatted_output_string += '╚═════════╩═════════╩' \
-                                   + ''.join(['══════╩' for i in range(match_data['rounds'])]) \
+                                   + ''.join(['══════╩' for i in range(match_data.rounds)]) \
                                    + '══════╩══════╩════════╝' + '\n\r'
 
         return formatted_output_string
