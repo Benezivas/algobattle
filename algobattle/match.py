@@ -124,19 +124,6 @@ class Match(Subject):
         for observer in self._observers:
             observer.update(self)
 
-    @build_successful_wrapper
-    def update_match_data(self, new_data: dict) -> bool:
-        """Update the internal match dict with new (partial) information.
-
-        Parameters
-        ----------
-        new_data : dict
-            A dict in the same format as match_data that contains new information.
-        """
-        self.match_data = update_nested_dict(self.match_data, new_data)
-        self.notify()
-        return True
-
     @docker_running
     def _build(self, teams: list, cache_docker_containers: bool=True) -> bool:
         """Build docker containers for the given generators and solvers of each team.
@@ -222,7 +209,7 @@ class Match(Subject):
 
     @build_successful_wrapper
     def run(self, battle_type: str = 'iterated', rounds: int = 5, iterated_cap: int = 50000, iterated_exponent: int = 2,
-            approximation_instance_size: int = 10, approximation_iterations: int = 25) -> dict:
+            approximation_instance_size: int = 10, approximation_iterations: int = 25) -> MatchData:
         """Match entry point, executes rounds fights between all teams and returns the results of the battles.
 
         Parameters
@@ -242,44 +229,10 @@ class Match(Subject):
 
         Returns
         -------
-        dict
-            A dictionary contains the current data of a match. You can subscribe
-            to this data using the observable pattern implemented in the match object.
-            If the 'error' key is set to something other than None, do not expect the
-            data to be consistent.
-            Contains the following keys:
-            error: An error message as a str (default: None).
-            problem: The name of a problem
-            curr_pair: The pair of teams currently fighting.
-            rounds: The number of rounds fought between each pair of teams.
-            type: The battle_type, usually 'iterated' or 'averaged'.
-            approx_inst_size: Assuming 'averaged' battle_type, the constant instanze size.
-            approx_iters: Assuming 'averaged' battle_type, the number of iterations over which to average.
-            For each pair (as 2-tuple), there is a nested dict with the following contents:
-            curr_round: The current round of the battle between the two teams.
-            Each round is a key itself with another nested dict with the following contents:
-            cap: Assuming 'iterated' battle_type, the (updated) cap up to which to fight.
-            solved: Assuming 'iterated' battle_type, the largest instance size for which a solution was found (so far).
-            attempting: Assuming 'iterated' battle_type, the current instanze size for which a solution is sought.
-            approx_ratios: Assuming 'averaged' battle_type, a list of the approximation ratios for each iteration.
+        MatchData
+            A dataclass instance containing information about the Match so far
         """
-        self.match_data = dict()
-        self.match_data['error'] = None
-        self.match_data['problem'] = Problem.name
-        self.match_data['curr_pair'] = None
-        self.match_data['rounds'] = rounds
-        self.match_data['type'] = battle_type
-        self.match_data['approx_inst_size'] = approximation_instance_size
-        self.match_data['approx_iters'] = approximation_iterations
-        for pair in self.all_battle_pairs():
-            self.match_data[pair] = dict()
-            self.match_data[pair]['curr_round'] = 0
-            for i in range(rounds):
-                self.match_data[pair][i] = dict()
-                self.match_data[pair][i]['cap'] = iterated_cap
-                self.match_data[pair][i]['solved'] = 0
-                self.match_data[pair][i]['attempting'] = 0
-                self.match_data[pair][i]['approx_ratios'] = []
+        self.match_data = MatchData(self, battle_type, rounds, iterated_cap, approximation_instance_size, approximation_iterations)
 
         options = dict()
         if battle_type == 'iterated':
@@ -288,15 +241,15 @@ class Match(Subject):
         elif battle_type == 'averaged':
             self.battle_wrapper = Averaged()
         else:
-            self.match_data['error'] = f'Unrecognized battle_type given: "{battle_type}"'
-            logger.error(self.match_data['error'])
+            self.match_data.error = f'Unrecognized battle_type given: "{battle_type}"'
+            logger.error(self.match_data.error)
             return self.match_data
 
         for pair in self.all_battle_pairs():
-            self.update_match_data({'curr_pair': pair})
+            self.match_data.curr_pair = pair
             for i in range(rounds):
                 logger.info(f'{"#" * 20}  Running Battle {i + 1}/{rounds}  {"#" * 20}')
-                self.update_match_data({pair: {'curr_round': i}})
+                self.match_data.pairs[pair].curr_round = i
 
                 self.generating_team = pair[0]
                 self.solving_team = pair[1]
