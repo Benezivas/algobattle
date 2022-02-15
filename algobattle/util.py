@@ -14,7 +14,7 @@ import algobattle.problems.delaytest as DelaytestProblem
 import algobattle.sighandler as sigh
 from algobattle.problem import Problem
 from algobattle.team import Team
-from algobattle.match import Match
+import algobattle.match
 
 
 logger = logging.getLogger('algobattle.util')
@@ -60,7 +60,7 @@ def measure_runtime_overhead() -> float:
     delaytest_path = DelaytestProblem.__file__[:-12]  # remove /__init__.py
     delaytest_team = Team("0", delaytest_path + '/generator', delaytest_path + '/solver')
 
-    match = Match(problem, config_path, [delaytest_team])
+    match = algobattle.match.Match(problem, config_path, [delaytest_team])
 
     if not match.build_successful:
         logger.warning('Building a match for the time tolerance calculation failed!')

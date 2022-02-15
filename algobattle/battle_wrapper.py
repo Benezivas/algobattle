@@ -5,10 +5,13 @@ responsible for executing specific types of battle. They share the
 characteristic that they are responsible for updating some match data during
 their run, such that it contains the current state of the match.
 """
+from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from algobattle.match import Match, MatchData
 
-from algobattle.match import Match, MatchData
 
 logger = logging.getLogger('algobattle.battle_wrapper')
 

@@ -1,16 +1,18 @@
 """Wrapper that repeats a battle on an instance size a number of times and averages the competitive ratio over all runs."""
 
+from __future__ import annotations
 import itertools
 import logging
-from itertools import combinations
 
-from algobattle.battle_wrapper import BattleWrapper
-from algobattle.match import Match, MatchData
+import algobattle.battle_wrapper
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from algobattle.match import Match, MatchData
 
 logger = logging.getLogger('algobattle.battle_wrappers.iterated')
 
 
-class Iterated(BattleWrapper):
+class Iterated(algobattle.battle_wrapper.BattleWrapper):
     """Class of an iterated battle Wrapper."""
 
     def wrapper(self, match: Match, options: dict = {'exponent': 2}) -> None:

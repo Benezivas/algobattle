@@ -6,8 +6,7 @@ import os
 
 import logging
 import configparser
-from typing import Any, Callable, List, Tuple, NamedTuple
-from collections.abc import Mapping
+from typing import Any, Callable, List
 
 import algobattle.sighandler as sigh
 from algobattle.team import Team
@@ -294,7 +293,7 @@ class Match(Subject):
     @docker_running
     @build_successful_wrapper
     @team_roles_set
-    def _run_generator(self, instance_size: int) -> Tuple[Any, Any]:
+    def _run_generator(self, instance_size: int) -> tuple[Any, Any]:
         """Execute the generator of match.generating_team and check the validity of the generated output.
 
         If the validity checks pass, return the instance and the certificate solution.
