@@ -178,7 +178,7 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
             avg = sum(match_data.pairs[pair].rounds[i].solved for i in range(match_data.rounds)) // match_data.rounds
 
             formatted_output_string += f'║{pair[0]:>9s}║{pair[1]:>9s}' \
-                                        + ''.join([f'║{match_data.pairs[pair].rounds[1].solved:>6d}'
+                                        + ''.join([f'║{match_data.pairs[pair].rounds[i].solved:>6d}'
                                                     for i in range(match_data.rounds)]) \
                                         + f'║{match_data.pairs[pair].rounds[curr_round].cap:>6d}║{avg:>6d}║' + '\r\n'
         formatted_output_string += '╚═════════╩═════════╩' \

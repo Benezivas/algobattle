@@ -116,7 +116,7 @@ class Match(Subject):
             return False
 
         self.team_names = [team.name for team in teams]
-        if len(self.team_names) != len(list(set(self.team_names))):
+        if len(self.team_names) != len(set(self.team_names)):
             logger.error('At least one team name is used twice!')
             return False
 
@@ -355,9 +355,9 @@ class Match(Subject):
         return solver_solution
 
     @build_successful
-    def format_as_utf8(self):
+    def format_as_utf8(self) -> str:
         assert self.battle_wrapper is not None
-        self.battle_wrapper.format_as_utf8(self.match_data)
+        return self.battle_wrapper.format_as_utf8(self.match_data)
 
 @dataclass
 class MatchData:

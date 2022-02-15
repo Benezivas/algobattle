@@ -86,6 +86,6 @@ class BattleWrapper(ABC):
         formatted_output_string = ""
 
         formatted_output_string += f'Battles of type {match_data.type} are currently not compatible with the ui.'
-        formatted_output_string += f'Here is a dump of the match_data dict anyway:\n{match_data}'
+        formatted_output_string += f'Here is a dump of the match_data object anyway:\n{match_data}'
 
         return formatted_output_string
