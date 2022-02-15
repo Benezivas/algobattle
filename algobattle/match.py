@@ -28,7 +28,7 @@ class Match(Subject):
     solving_team = None
     battle_wrapper = None
 
-    def __init__(self, problem: Problem, config_path: str, teams: list,
+    def __init__(self, problem: Problem, config_path: str, teams: list[Team],
                  runtime_overhead: float = 0, approximation_ratio: float = 1.0, cache_docker_containers: bool = True) -> None:
 
         config = configparser.ConfigParser()
@@ -85,7 +85,7 @@ class Match(Subject):
             observer.update(self)
 
     @docker_running
-    def _build(self, teams: list, cache_docker_containers: bool=True) -> bool:
+    def _build(self, teams: list[Team], cache_docker_containers: bool=True) -> bool:
         """Build docker containers for the given generators and solvers of each team.
 
         Any team for which either the generator or solver does not build successfully
@@ -155,7 +155,7 @@ class Match(Subject):
         return len(self.team_names) > 0
 
     @build_successful
-    def all_battle_pairs(self) -> list:
+    def all_battle_pairs(self) -> list[str]:
         """Generate and return a list of all team pairings for battles."""
         battle_pairs = []
         for i in range(len(self.team_names)):

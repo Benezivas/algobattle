@@ -44,7 +44,7 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
             curr_round = match.match_data.pairs[curr_pair].curr_round
             match.match_data.pairs[curr_pair].rounds[curr_round].approx_ratios.append(approx_ratio)
 
-    def calculate_points(self, match_data: MatchData, achievable_points: int) -> dict:
+    def calculate_points(self, match_data: MatchData, achievable_points: int) -> dict[str, float]:
         """Calculate the number of achieved points, given results.
 
         The valuation of an averaged battle is calculating by summing up
@@ -62,8 +62,8 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
         -------
         dict
             A mapping between team names and their achieved points.
-            The format is {(team_x_name, team_y_name): points [...]} for each
-            pair (x,y) for which there is an entry in match_data and points is a
+            The format is {team_name: points [...]} for each
+            team for which there is an entry in match_data and points is a
             float value. Returns an empty dict if no battle was fought.
         """
         points = dict()

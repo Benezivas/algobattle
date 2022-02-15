@@ -90,7 +90,7 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
             match.match_data.pairs[curr_pair].rounds[curr_round].solved = maximum_reached_n
             match.match_data.pairs[curr_pair].rounds[curr_round].attempting = n
 
-    def calculate_points(self, match_data: MatchData, achievable_points: int) -> dict:
+    def calculate_points(self, match_data: MatchData, achievable_points: int) -> dict[str, float]:
         """Calculate the number of achieved points, given results.
 
         Each pair of teams fights for the achievable points among one another.
@@ -108,8 +108,8 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
         -------
         dict
             A mapping between team names and their achieved points.
-            The format is {(team_x_name, team_y_name): points [...]} for each
-            pair (x,y) for which there is an entry in match_data and points is a
+            The format is {team_name: points [...]} for each
+            team for which there is an entry in match_data and points is a
             float value. Returns an empty dict if no battle was fought.
         """
         points = dict()
