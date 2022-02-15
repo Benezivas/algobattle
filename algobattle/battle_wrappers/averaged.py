@@ -1,11 +1,12 @@
 """Wrapper that iterates the instance size up to a point where the solving team is no longer able to solve an instance."""
 
 from __future__ import annotations
+from dataclasses import dataclass
 import itertools
 import logging
 
 import algobattle.battle_wrapper
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from algobattle.match import Match, MatchData
 
@@ -15,7 +16,10 @@ logger = logging.getLogger('algobattle.battle_wrappers.averaged')
 class Averaged(algobattle.battle_wrapper.BattleWrapper):
     """Class of an adveraged battle Wrapper."""
 
-    def wrapper(self, match: Match, options: dict = {}) -> None:
+    def __init__(self, **options) -> None:
+        super().__init__(**options)
+
+    def wrapper(self, match: Match) -> None:
         """Execute one averaged battle between a generating and a solving team.
 
         Execute several fights between two teams on a fixed instance size
@@ -28,8 +32,6 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
         ----------
         match: Match
             The Match object on which the battle wrapper is to be executed on.
-        options: dict
-            No additional options are used for this wrapper.
         """
         approximation_ratios = []
         logger.info('==================== Averaged Battle, Instance Size: {}, Rounds: {} ===================='

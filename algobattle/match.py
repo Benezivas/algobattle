@@ -194,10 +194,8 @@ class Match(Subject):
         """
         self.match_data = MatchData(self, battle_type, rounds, iterated_cap, approximation_instance_size, approximation_iterations)
 
-        options = dict()
         if battle_type == 'iterated':
-            self.battle_wrapper = Iterated()
-            options['exponent'] = iterated_exponent
+            self.battle_wrapper = Iterated(exponent=iterated_exponent)
         elif battle_type == 'averaged':
             self.battle_wrapper = Averaged()
         else:
@@ -213,7 +211,7 @@ class Match(Subject):
 
                 self.generating_team = pair[0]
                 self.solving_team = pair[1]
-                self.battle_wrapper.wrapper(self, options)
+                self.battle_wrapper.wrapper(self)
 
         return self.match_data
 

@@ -6,9 +6,10 @@ characteristic that they are responsible for updating some match data during
 their run, such that it contains the current state of the match.
 """
 from __future__ import annotations
+from dataclasses import dataclass
 import logging
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from algobattle.match import Match, MatchData
 
@@ -20,11 +21,22 @@ class BattleWrapper(ABC):
     """Base class for wrappers that execute a specific kind of battle."""
 
     @abstractmethod
-    def wrapper(self, match: Match, options: dict) -> None:
-        """The main base method for a wrapper.
+    def __init__(self, **options: Any) -> None:
+        """Builds a battle wrapper object with the given option values.
+        Logs warnings if there were options provided that this wrapper doesn't use. 
 
-        In order to manage the execution of a match, the wrapper needs the match object and possibly
-        some options that are specific to the individual battle wrapper.
+        Parameters
+        ----------
+        options: dict[str, Any]
+            Dict containing option values.
+        """
+        for arg, value in options.items():
+            if arg not in vars(type(self)):
+                logger.warning(f"Option '{arg}={value}' was provided, but is not used by {type(self)} type battles.")
+
+    @abstractmethod
+    def wrapper(self, match: Match) -> None:
+        """The main base method for a wrapper.
 
         A wrapper should update the match.match_data object during its run. The callback functionality
         around it is executed automatically.
@@ -36,8 +48,6 @@ class BattleWrapper(ABC):
         ----------
         match: Match
             The Match object on which the battle wrapper is to be executed on.
-        options: dict
-            Additional options for the wrapper.
         """
         raise NotImplementedError
 

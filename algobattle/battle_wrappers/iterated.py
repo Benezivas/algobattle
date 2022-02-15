@@ -1,6 +1,7 @@
 """Wrapper that repeats a battle on an instance size a number of times and averages the competitive ratio over all runs."""
 
 from __future__ import annotations
+from dataclasses import dataclass
 import itertools
 import logging
 
@@ -14,8 +15,12 @@ logger = logging.getLogger('algobattle.battle_wrappers.iterated')
 
 class Iterated(algobattle.battle_wrapper.BattleWrapper):
     """Class of an iterated battle Wrapper."""
+    
+    def __init__(self, exponent: int = 2, **options) -> None:
+        self.exponent = exponent
+        super().__init__(**options)
 
-    def wrapper(self, match: Match, options: dict = {'exponent': 2}) -> None:
+    def wrapper(self, match: Match) -> None:
         """Execute one iterative battle between a generating and a solving team.
 
         Incrementally try to search for the highest n for which the solver is
@@ -38,9 +43,6 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
         ----------
         match: Match
             The Match object on which the battle wrapper is to be executed on.
-        options: dict
-            A dict that contains an 'exponent' key with an int value of at least 1,
-            which determines the step size increase.
         """
         curr_pair = match.match_data.curr_pair
         assert curr_pair is not None
@@ -49,7 +51,7 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
         n = match.problem.n_start
         maximum_reached_n = 0
         i = 0
-        exponent = options['exponent']
+        exponent = self.exponent
         n_cap = match.match_data.pairs[curr_pair].rounds[curr_round].cap
         alive = True
 
