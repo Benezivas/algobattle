@@ -7,7 +7,7 @@ import subprocess
 import importlib.util
 import sys
 from collections.abc import Mapping, MutableMapping
-from typing import TypeVar
+from typing import TypeVar, Callable
 
 import algobattle
 import algobattle.problems.delaytest as DelaytestProblem
@@ -130,3 +130,39 @@ def run_subprocess(run_command: list[str], input: bytes, timeout: float, suppres
     logger.debug(f'Approximate elapsed runtime: {elapsed_time}/{timeout} seconds.')
 
     return raw_output, elapsed_time
+
+def docker_running(function: Callable) -> Callable:
+    """Ensure that internal methods are only callable if docker is running."""
+    def wrapper(self, *args, **kwargs):
+        creationflags = 0
+        if os.name != 'posix':
+            creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
+        docker_running = subprocess.Popen(['docker', 'info'], stdout=subprocess.PIPE,
+                                            stderr=subprocess.PIPE, creationflags=creationflags)
+        _ = docker_running.communicate()
+        if docker_running.returncode:
+            logger.error('Could not connect to the docker daemon. Is docker running?')
+            return None
+        else:
+            return function(self, *args, **kwargs)
+    return wrapper
+
+def build_successful(function: Callable) -> Callable:
+    """Ensure that internal methods are only callable after a successful build."""
+    def wrapper(self, *args, **kwargs):
+        if not self.build_successful:
+            logger.error('Trying to call Match object which failed to build!')
+            return None
+        else:
+            return function(self, *args, **kwargs)
+    return wrapper
+
+def team_roles_set(function: Callable) -> Callable:
+    """Ensure that internal methods are only callable after the team roles have been set."""
+    def wrapper(self, *args, **kwargs):
+        if not self.generating_team or not self.solving_team:
+            logger.error('Generating or solving team have not been set!')
+            return None
+        else:
+            return function(self, *args, **kwargs)
+    return wrapper

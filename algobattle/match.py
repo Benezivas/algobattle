@@ -11,7 +11,7 @@ from typing import Any, Callable, List
 import algobattle.sighandler as sigh
 from algobattle.team import Team
 from algobattle.problem import Problem
-from algobattle.util import run_subprocess
+from algobattle.util import run_subprocess, docker_running, build_successful, team_roles_set
 from algobattle.subject import Subject
 from algobattle.observer import Observer
 from algobattle.battle_wrappers.averaged import Averaged
@@ -70,45 +70,6 @@ class Match(Subject):
             "--memory=" + str(a) + "mb",
             "--cpus=" + str(self.cpus)
         ]
-
-    @staticmethod
-    def build_successful_wrapper(function: Callable) -> Callable:
-        """Ensure that internal methods are only callable after a successful build."""
-        def wrapper(self, *args, **kwargs):
-            if not self.build_successful:
-                logger.error('Trying to call Match object which failed to build!')
-                return None
-            else:
-                return function(self, *args, **kwargs)
-        return wrapper
-
-    @staticmethod
-    def team_roles_set(function: Callable) -> Callable:
-        """Ensure that internal methods are only callable after the team roles have been set."""
-        def wrapper(self, *args, **kwargs):
-            if not self.generating_team or not self.solving_team:
-                logger.error('Generating or solving team have not been set!')
-                return None
-            else:
-                return function(self, *args, **kwargs)
-        return wrapper
-
-    @staticmethod
-    def docker_running(function: Callable) -> Callable:
-        """Ensure that internal methods are only callable if docker is running."""
-        def wrapper(self, *args, **kwargs):
-            creationflags = 0
-            if os.name != 'posix':
-                creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
-            docker_running = subprocess.Popen(['docker', 'info'], stdout=subprocess.PIPE,
-                                              stderr=subprocess.PIPE, creationflags=creationflags)
-            _ = docker_running.communicate()
-            if docker_running.returncode:
-                logger.error('Could not connect to the docker daemon. Is docker running?')
-                return None
-            else:
-                return function(self, *args, **kwargs)
-        return wrapper
 
     def attach(self, observer: Observer) -> None:
         """Subscribe a new Observer by adding them to the list of observers."""
@@ -193,7 +154,7 @@ class Match(Subject):
 
         return len(self.team_names) > 0
 
-    @build_successful_wrapper
+    @build_successful
     def all_battle_pairs(self) -> list:
         """Generate and return a list of all team pairings for battles."""
         battle_pairs = []
@@ -206,7 +167,7 @@ class Match(Subject):
 
         return battle_pairs
 
-    @build_successful_wrapper
+    @build_successful
     def run(self, battle_type: str = 'iterated', rounds: int = 5, iterated_cap: int = 50000, iterated_exponent: int = 2,
             approximation_instance_size: int = 10, approximation_iterations: int = 25) -> MatchData:
         """Match entry point, executes rounds fights between all teams and returns the results of the battles.
@@ -257,7 +218,7 @@ class Match(Subject):
         return self.match_data
 
     @docker_running
-    @build_successful_wrapper
+    @build_successful
     @team_roles_set
     def _one_fight(self, instance_size: int) -> float:
         """Execute a single fight of a battle between a given generator and solver for a given instance size.
@@ -291,7 +252,7 @@ class Match(Subject):
         return approximation_ratio
 
     @docker_running
-    @build_successful_wrapper
+    @build_successful
     @team_roles_set
     def _run_generator(self, instance_size: int) -> tuple[Any, Any]:
         """Execute the generator of match.generating_team and check the validity of the generated output.
@@ -348,7 +309,7 @@ class Match(Subject):
         return instance, generator_solution
 
     @docker_running
-    @build_successful_wrapper
+    @build_successful
     @team_roles_set
     def _run_solver(self, instance_size: int, instance: Any) -> Any:
         """Execute the solver of match.solving_team and check the validity of the generated output.
@@ -393,7 +354,7 @@ class Match(Subject):
 
         return solver_solution
 
-    @build_successful_wrapper
+    @build_successful
     def format_as_utf8(self):
         assert self.battle_wrapper is not None
         self.battle_wrapper.format_as_utf8(self.match_data)
