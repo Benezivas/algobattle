@@ -6,8 +6,7 @@ import timeit
 import subprocess
 import importlib.util
 import sys
-from collections.abc import Mapping, MutableMapping
-from typing import TypeVar, Callable
+from typing import Callable
 
 import algobattle
 import algobattle.problems.delaytest as DelaytestProblem

@@ -6,7 +6,7 @@ import os
 
 import logging
 import configparser
-from typing import Any, Callable, List
+from typing import Any
 
 import algobattle.sighandler as sigh
 from algobattle.team import Team
@@ -23,7 +23,7 @@ logger = logging.getLogger('algobattle.match')
 class Match(Subject):
     """Match class, provides functionality for setting up and executing battles between given teams."""
 
-    _observers: List[Observer] = []
+    _observers: list[Observer] = []
     generating_team = None
     solving_team = None
     battle_wrapper = None
