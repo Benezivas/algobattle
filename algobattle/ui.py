@@ -2,28 +2,17 @@
 import curses
 import logging
 import sys
-from typing import Callable
 
 from algobattle.observer import Observer
 from algobattle.match import Match
 from algobattle import __version__ as version
+from algobattle.util import check_for_terminal
 
 logger = logging.getLogger('algobattle.ui')
 
 
 class Ui(Observer):
     """The UI Class declares methods to output information to STDOUT."""
-
-    @staticmethod
-    def check_for_terminal(function: Callable) -> Callable:
-        """Ensure that we are attached to a terminal."""
-        def wrapper(self, *args, **kwargs):
-            if not sys.stdout.isatty():
-                logger.error('Not attached to a terminal.')
-                return None
-            else:
-                return function(self, *args, **kwargs)
-        return wrapper
 
     @check_for_terminal
     def __init__(self) -> None:

@@ -165,3 +165,13 @@ def team_roles_set(function: Callable) -> Callable:
         else:
             return function(self, *args, **kwargs)
     return wrapper
+
+def check_for_terminal(function: Callable) -> Callable:
+    """Ensure that we are attached to a terminal."""
+    def wrapper(self, *args, **kwargs):
+        if not sys.stdout.isatty():
+            logger.error('Not attached to a terminal.')
+            return None
+        else:
+            return function(self, *args, **kwargs)
+    return wrapper
