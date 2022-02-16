@@ -68,13 +68,6 @@ class BattleWrapper(ABC):
         for arg, value in options.items():
             if arg not in vars(type(self)):
                 logger.warning(f"Option '{arg}={value}' was provided, but is not used by {type(self)} type battles.")
-    
-    def __setattr__(self, name: str, value: Any) -> None:
-        """Updates record in the MatchData object and notifies all obeservers
-        subscribed to the associated Match object."""
-
-        object.__setattr__(self, name, value)
-        self._match.notify()
 
     @abstractmethod
     def wrapper(self, match: Match) -> None:
