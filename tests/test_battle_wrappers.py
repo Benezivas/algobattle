@@ -13,8 +13,8 @@ from algobattle.team import Team
 logging.disable(logging.CRITICAL)
 
 
-class Utiltests(unittest.TestCase):
-    """Tests for the util functions."""
+class BattleWrapperTests(unittest.TestCase):
+    """Tests for the battle wrapper functions."""
 
     def setUp(self) -> None:
         Problem = importlib.import_module('algobattle.problems.testsproblem')
@@ -87,3 +87,6 @@ class Utiltests(unittest.TestCase):
         battle.pairs[("1", "0")][0].approx_ratios = [0, 0, 0]
         battle.pairs[("1", "0")][1].approx_ratios = [0, 0, 0]
         self.assertEqual(battle.calculate_points(100), {'0': 50, '1': 50})
+
+if __name__ == '__main__':
+    unittest.main()
