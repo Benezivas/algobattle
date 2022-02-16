@@ -4,6 +4,7 @@ import unittest
 import logging
 import importlib
 import os
+import subprocess
 
 import algobattle
 from algobattle.match import BuildError, Match, UnknownBattleType
@@ -15,20 +16,25 @@ logging.disable(logging.CRITICAL)
 class Matchtests(unittest.TestCase):
     """Tests for the match object."""
 
-    def setUp(self) -> None:
+    @classmethod
+    def setUpClass(cls) -> None:
         Problem = importlib.import_module('algobattle.problems.testsproblem')
-        self.problem = Problem.Problem()
+        cls.problem = Problem.Problem()
         problem_file = Problem.__file__
         assert problem_file is not None
-        self.tests_path = problem_file[:-12]  # remove /__init__.py
+        cls.tests_path = problem_file[:-12]  # remove /__init__.py
 
-        self.config_directory = os.path.join(os.path.dirname(os.path.abspath(algobattle.__file__)), 'config')
-        self.config = os.path.join(self.config_directory, 'config.ini')
-        self.config_short_build_timeout = os.path.join(self.config_directory, 'config_short_build_timeout.ini')
-        self.config_short_timeout = os.path.join(self.config_directory, 'config_short_run_timeout.ini')
+        cls.config_directory = os.path.join(os.path.dirname(os.path.abspath(algobattle.__file__)), 'config')
+        cls.config = os.path.join(cls.config_directory, 'config.ini')
+        cls.config_short_build_timeout = os.path.join(cls.config_directory, 'config_short_build_timeout.ini')
+        cls.config_short_timeout = os.path.join(cls.config_directory, 'config_short_run_timeout.ini')
 
-        self.team = Team('0', self.tests_path + '/generator', self.tests_path + '/solver')
+        cls.team = Team('0', cls.tests_path + '/generator', cls.tests_path + '/solver')
     
+    def tearDown(self) -> None:
+        images = " ".join(f"generator-{name} solver-{name}" for name in ["0", "1"])
+        subprocess.Popen(f"docker image rm -f {images}")
+
     def assertBuild(self, build: Callable):
         try:
             build()
