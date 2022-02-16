@@ -143,10 +143,6 @@ if __name__ == "__main__":
 
     match = Match(problem, options.config, teams, runtime_overhead=runtime_overhead, approximation_ratio=options.approximation_ratio)
 
-    if not match.build_successful:
-        logger.critical('Building the match object failed, exiting!')
-        sys.exit(1)
-
     ui = None
     if display_ui:
         ui = Ui()

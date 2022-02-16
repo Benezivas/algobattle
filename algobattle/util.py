@@ -59,9 +59,9 @@ def measure_runtime_overhead() -> float:
     delaytest_path = DelaytestProblem.__file__[:-12]  # remove /__init__.py
     delaytest_team = Team("0", delaytest_path + '/generator', delaytest_path + '/solver')
 
-    match = algobattle.match.Match(problem, config_path, [delaytest_team])
-
-    if not match.build_successful:
+    try:
+        match = algobattle.match.Match(problem, config_path, [delaytest_team])
+    except algobattle.match.BuildError as e:
         logger.warning('Building a match for the time tolerance calculation failed!')
         return 0
 
@@ -141,16 +141,6 @@ def docker_running(function: Callable) -> Callable:
         _ = docker_running.communicate()
         if docker_running.returncode:
             logger.error('Could not connect to the docker daemon. Is docker running?')
-            return None
-        else:
-            return function(self, *args, **kwargs)
-    return wrapper
-
-def build_successful(function: Callable) -> Callable:
-    """Ensure that internal methods are only callable after a successful build."""
-    def wrapper(self, *args, **kwargs):
-        if not self.build_successful:
-            logger.error('Trying to call Match object which failed to build!')
             return None
         else:
             return function(self, *args, **kwargs)

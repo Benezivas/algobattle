@@ -13,7 +13,7 @@ from algobattle.battle_wrapper import BattleWrapper
 import algobattle.sighandler as sigh
 from algobattle.team import Team
 from algobattle.problem import Problem
-from algobattle.util import run_subprocess, docker_running, build_successful, team_roles_set
+from algobattle.util import run_subprocess, docker_running, team_roles_set
 from algobattle.subject import Subject
 from algobattle.observer import Observer
 from algobattle.battle_wrappers.averaged import Averaged
@@ -21,6 +21,11 @@ from algobattle.battle_wrappers.iterated import Iterated
 
 logger = logging.getLogger('algobattle.match')
 
+class ConfigurationError(Exception):
+    pass
+
+class BuildError(Exception):
+    pass
 
 class Match(Subject):
     """Match class, provides functionality for setting up and executing battles between given teams."""
@@ -46,13 +51,7 @@ class Match(Subject):
         self.problem = problem
         self.config = config
         self.approximation_ratio = approximation_ratio
-
-        self.build_successful = self._build(teams, cache_docker_containers)
-
-        if approximation_ratio != 1.0 and not problem.approximable:
-            logger.error('The given problem is not approximable and can only be run with an approximation ratio of 1.0!')
-            self.build_successful = False
-
+        
         self.generator_base_run_command = lambda a: [
             "docker",
             "run",
@@ -73,6 +72,12 @@ class Match(Subject):
             "--cpus=" + str(self.cpus)
         ]
 
+        if approximation_ratio != 1.0 and not problem.approximable:
+            logger.error('The given problem is not approximable and can only be run with an approximation ratio of 1.0!')
+            raise ConfigurationError
+
+        self._build(teams, cache_docker_containers)
+
     def attach(self, observer: Observer) -> None:
         """Subscribe a new Observer by adding them to the list of observers."""
         self._observers.append(observer)
@@ -87,7 +92,7 @@ class Match(Subject):
             observer.update(self)
 
     @docker_running
-    def _build(self, teams: list[Team], cache_docker_containers: bool=True) -> bool:
+    def _build(self, teams: list[Team], cache_docker_containers: bool=True) -> None:
         """Build docker containers for the given generators and solvers of each team.
 
         Any team for which either the generator or solver does not build successfully
@@ -115,12 +120,12 @@ class Match(Subject):
 
         if not isinstance(teams, list) or any(not isinstance(team, Team) for team in teams):
             logger.error('Teams argument is expected to be a list of Team objects!')
-            return False
+            raise TypeError
 
         self.team_names = [team.name for team in teams]
         if len(self.team_names) != len(set(self.team_names)):
             logger.error('At least one team name is used twice!')
-            return False
+            raise TypeError
 
         self.single_player = (len(teams) == 1)
 
@@ -154,9 +159,10 @@ class Match(Subject):
                 logger.error(f"Removing team {team.name} as their containers did not build successfully.")
                 self.team_names.remove(team.name)
 
-        return len(self.team_names) > 0
+        if len(self.team_names) == 0:
+            logger.critical("None of the team's containers built successfully.")
+            raise BuildError()
 
-    @build_successful
     def all_battle_pairs(self) -> list[str]:
         """Generate and return a list of all team pairings for battles."""
         battle_pairs = []
@@ -169,7 +175,6 @@ class Match(Subject):
 
         return battle_pairs
 
-    @build_successful
     def run(self, battle_type: str = 'iterated', rounds: int = 5, iterated_cap: int = 50000, iterated_exponent: int = 2,
             approximation_instance_size: int = 10, approximation_iterations: int = 25) -> BattleWrapper:
         """Match entry point, executes rounds fights between all teams and returns the results of the battles.
@@ -216,7 +221,6 @@ class Match(Subject):
         return self.battle_wrapper
 
     @docker_running
-    @build_successful
     @team_roles_set
     def _one_fight(self, instance_size: int) -> float:
         """Execute a single fight of a battle between a given generator and solver for a given instance size.
@@ -250,7 +254,6 @@ class Match(Subject):
         return approximation_ratio
 
     @docker_running
-    @build_successful
     @team_roles_set
     def _run_generator(self, instance_size: int) -> tuple[Any, Any]:
         """Execute the generator of match.generating_team and check the validity of the generated output.
@@ -307,7 +310,6 @@ class Match(Subject):
         return instance, generator_solution
 
     @docker_running
-    @build_successful
     @team_roles_set
     def _run_solver(self, instance_size: int, instance: Any) -> Any:
         """Execute the solver of match.solving_team and check the validity of the generated output.
@@ -352,7 +354,6 @@ class Match(Subject):
 
         return solver_solution
 
-    @build_successful
     def format_as_utf8(self) -> str:
         assert self.battle_wrapper is not None
         return self.battle_wrapper.format_as_utf8()
