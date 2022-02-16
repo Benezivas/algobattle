@@ -2,6 +2,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from io import UnsupportedOperation
+import itertools
 import subprocess
 import os
 
@@ -163,17 +164,12 @@ class Match(Subject):
             logger.critical("None of the team's containers built successfully.")
             raise BuildError()
 
-    def all_battle_pairs(self) -> list[str]:
+    def all_battle_pairs(self) -> list[tuple[str, str]]:
         """Generate and return a list of all team pairings for battles."""
-        battle_pairs = []
-        for i in range(len(self.team_names)):
-            for j in range(len(self.team_names)):
-                battle_pairs.append((self.team_names[i], self.team_names[j]))
-
-        if not self.single_player:
-            battle_pairs = [pair for pair in battle_pairs if pair[0] != pair[1]]
-
-        return battle_pairs
+        if self.single_player:
+            return [(self.team_names[0], self.team_names[1])]
+        else:
+            return list(itertools.permutations(self.team_names, 2))
 
     def run(self, battle_type: str = 'iterated', rounds: int = 5, iterated_cap: int = 50000, iterated_exponent: int = 2,
             approximation_instance_size: int = 10, approximation_iterations: int = 25) -> BattleWrapper:
