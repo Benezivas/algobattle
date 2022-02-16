@@ -1,7 +1,6 @@
 """Match class, provides functionality for setting up and executing battles between given teams."""
 from __future__ import annotations
 from dataclasses import dataclass, field
-from io import UnsupportedOperation
 import itertools
 import subprocess
 import os
@@ -26,6 +25,9 @@ class ConfigurationError(Exception):
     pass
 
 class BuildError(Exception):
+    pass
+
+class UnknownBattleType(Exception):
     pass
 
 class Match(Subject):
@@ -167,7 +169,7 @@ class Match(Subject):
     def all_battle_pairs(self) -> list[tuple[str, str]]:
         """Generate and return a list of all team pairings for battles."""
         if self.single_player:
-            return [(self.team_names[0], self.team_names[1])]
+            return [(self.team_names[0], self.team_names[0])]
         else:
             return list(itertools.permutations(self.team_names, 2))
 
@@ -202,7 +204,7 @@ class Match(Subject):
             self.battle_wrapper = Averaged(self, self.problem.name, rounds, approximation_instance_size, approximation_iterations)
         else:
             logger.error(f'Unrecognized battle_type given: "{battle_type}"')
-            raise UnsupportedOperation
+            raise UnknownBattleType
 
         for pair in self.all_battle_pairs():
             self.battle_wrapper.curr_pair = pair

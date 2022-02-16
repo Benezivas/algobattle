@@ -1,11 +1,12 @@
 """Tests for the Match class."""
+from typing import Callable
 import unittest
 import logging
 import importlib
 import os
 
 import algobattle
-from algobattle.match import Match
+from algobattle.match import BuildError, Match, UnknownBattleType
 from algobattle.team import Team
 
 logging.disable(logging.CRITICAL)
@@ -17,7 +18,9 @@ class Matchtests(unittest.TestCase):
     def setUp(self) -> None:
         Problem = importlib.import_module('algobattle.problems.testsproblem')
         self.problem = Problem.Problem()
-        self.tests_path = Problem.__file__[:-12]  # remove /__init__.py
+        problem_file = Problem.__file__
+        assert problem_file is not None
+        self.tests_path = problem_file[:-12]  # remove /__init__.py
 
         self.config_directory = os.path.join(os.path.dirname(os.path.abspath(algobattle.__file__)), 'config')
         self.config = os.path.join(self.config_directory, 'config.ini')
@@ -25,33 +28,31 @@ class Matchtests(unittest.TestCase):
         self.config_short_timeout = os.path.join(self.config_directory, 'config_short_run_timeout.ini')
 
         self.team = Team('0', self.tests_path + '/generator', self.tests_path + '/solver')
-
-        self.match = Match(self.problem, self.config, [self.team])
+    
+    def assertBuild(self, build: Callable):
+        try:
+            build()
+        except BuildError:
+            self.fail("Docker build did not finish successfully.")
 
     def test_build_normal(self):
         # A normal build
-        self.assertTrue(self.match.build_successful_wrapper)
+        self.assertBuild(lambda: Match(self.problem, self.config, [self.team]))
 
     def test_build_malformed_docker(self):
         # Malformed docker names
-        match_malformed_docker_names = Match(self.problem, self.config, self.team, cache_docker_containers=False)
-        self.assertFalse(match_malformed_docker_names._build((1, 0)))
+        match_malformed_docker_names = Match(self.problem, self.config, [self.team], cache_docker_containers=False)
+        self.assertRaises(TypeError, lambda: match_malformed_docker_names._build((1, 0)))
 
     def test_build_timeout(self):
         # Build timeout
         team = Team('0', self.tests_path + '/generator_build_timeout', self.tests_path + '/solver')
-        match_build_timeout = Match(self.problem, self.config_short_build_timeout, [team], cache_docker_containers=False)
-        self.assertFalse(match_build_timeout.build_successful_wrapper)
+        self.assertRaises(BuildError, lambda: Match(self.problem, self.config_short_build_timeout, [team], cache_docker_containers=False))
 
     def test_build_error(self):
         # Build error
         team = Team('0', self.tests_path + '/generator_build_error', self.tests_path + '/solver')
-        match_build_fail = Match(self.problem, self.config_short_build_timeout, [team], cache_docker_containers=False)
-        self.assertFalse(match_build_fail.build_successful_wrapper)
-
-    def test_build_foo_problem(self):
-        match = Match(self.problem, self.config, 'foo')
-        self.assertFalse(match.build_successful_wrapper)
+        self.assertRaises(BuildError, lambda: Match(self.problem, self.config_short_build_timeout, [team], cache_docker_containers=False))
 
     def test_all_battle_pairs(self):
         team0 = Team('0', self.tests_path + '/generator', self.tests_path + '/solver')
@@ -64,7 +65,8 @@ class Matchtests(unittest.TestCase):
         self.assertEqual(match.all_battle_pairs(), [('0', '0')])
 
     def test_run(self):
-        self.assertEqual(self.match.run(battle_type='foo')['error'], ('Unrecognized battle_type given: "foo"'))
+        match = Match(self.problem, self.config, [self.team])
+        self.assertRaises(UnknownBattleType, lambda: match.run(battle_type='foo'))
 
     def test_one_fight_gen_timeout(self):
         team = Team('0', self.tests_path + '/generator_timeout', self.tests_path + '/solver')
