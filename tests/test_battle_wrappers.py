@@ -1,4 +1,5 @@
 """Tests for all util functions."""
+import subprocess
 import unittest
 import logging
 import importlib
@@ -16,18 +17,16 @@ logging.disable(logging.CRITICAL)
 class BattleWrapperTests(unittest.TestCase):
     """Tests for the battle wrapper functions."""
 
-    def setUp(self) -> None:
+    @classmethod
+    def setUpClass(cls) -> None:
         Problem = importlib.import_module('algobattle.problems.testsproblem')
         assert Problem is not None
-        self.problem = Problem.Problem()
+        cls.problem = Problem.Problem()
         base_path = os.path.dirname(os.path.abspath(algobattle.__file__))
         generator_path = os.path.join(base_path, "problems", "testsproblem", "generator")
         solver_path = os.path.join(base_path, "problems", "testsproblem", "solver")
-        self.config = os.path.join(base_path, 'config', 'config.ini')
-        file = Problem.__file__
-        assert file is not None
-        self.tests_path = file[:-12]  # remove /__init__.py
-        self.match = Match(self.problem, self.config, [Team("0", generator_path, solver_path), Team("1", generator_path, solver_path)])
+        cls.config = os.path.join(base_path, 'config', 'config.ini')
+        cls.match = Match(cls.problem, cls.config, [Team("0", generator_path, solver_path), Team("1", generator_path, solver_path)])
 
     def test_averaged_battle_wrapper(self):
         pass  # TODO: Implement tests for averaged battle wrapper
