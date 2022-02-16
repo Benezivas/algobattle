@@ -20,11 +20,14 @@ class BattleWrapperTests(unittest.TestCase):
         Problem = importlib.import_module('algobattle.problems.testsproblem')
         assert Problem is not None
         self.problem = Problem.Problem()
-        self.config = os.path.join(os.path.dirname(os.path.abspath(algobattle.__file__)), 'config', 'config.ini')
+        base_path = os.path.dirname(os.path.abspath(algobattle.__file__))
+        generator_path = os.path.join(base_path, "testsproblem", "generator")
+        solver_path = os.path.join(base_path, "testsproblem", "solver")
+        self.config = os.path.join(base_path, 'config', 'config.ini')
         file = Problem.__file__
         assert file is not None
         self.tests_path = file[:-12]  # remove /__init__.py
-        self.match = Match(self.problem, "", [Team("0", "", ""), Team("1", "", "")])
+        self.match = Match(self.problem, self.config, [Team("0", generator_path, solver_path), Team("1", generator_path, solver_path)])
 
     def test_averaged_battle_wrapper(self):
         pass  # TODO: Implement tests for averaged battle wrapper
