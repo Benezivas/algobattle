@@ -1,14 +1,14 @@
 """Wrapper that iterates the instance size up to a point where the solving team is no longer able to solve an instance."""
 
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import itertools
 import logging
 
 import algobattle.battle_wrapper
 from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
-    from algobattle.match import Match, MatchData
+    from algobattle.match import Match
 
 logger = logging.getLogger('algobattle.battle_wrappers.averaged')
 
@@ -16,8 +16,18 @@ logger = logging.getLogger('algobattle.battle_wrappers.averaged')
 class Averaged(algobattle.battle_wrapper.BattleWrapper):
     """Class of an adveraged battle Wrapper."""
 
-    def __init__(self, **options) -> None:
-        super().__init__(**options)
+    @dataclass
+    class Result(algobattle.battle_wrapper.BattleWrapper.Result):
+        approx_ratios: list[float] = field(default_factory=list)
+
+    def __init__(self, match: Match, problem: str, rounds: int = 5,
+                instance_size: int = 10, iterations: int = 25,
+                **options: Any) -> None:
+        self.instance_size = instance_size
+        self.iterations = iterations
+
+        self.pairs: dict[tuple[str, str], list[Averaged.Result]]
+        super().__init__(match, problem, rounds, **options)  
 
     def wrapper(self, match: Match) -> None:
         """Execute one averaged battle between a generating and a solving team.
@@ -35,19 +45,19 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
         """
         approximation_ratios = []
         logger.info('==================== Averaged Battle, Instance Size: {}, Rounds: {} ===================='
-                    .format(match.match_data.approx_inst_size, match.match_data.approx_iters))
-        for i in range(match.match_data.approx_iters):
-            logger.info(f'=============== Iteration: {i + 1}/{match.match_data.approx_iters} ===============')
-            approx_ratio = match._one_fight(instance_size=match.match_data.approx_inst_size)
+                    .format(self.instance_size, self.iterations))
+        for i in range(self.iterations):
+            logger.info(f'=============== Iteration: {i + 1}/{self.iterations} ===============')
+            approx_ratio = match._one_fight(instance_size=self.instance_size)
             approximation_ratios.append(approx_ratio)
 
-            curr_pair = match.match_data.curr_pair
+            curr_pair = self.curr_pair
             assert curr_pair is not None
-            curr_round = match.match_data.pairs[curr_pair].curr_round
-            match.match_data.pairs[curr_pair].rounds[curr_round].approx_ratios.append(approx_ratio)
+            curr_round = self.curr_round
+            self.pairs[curr_pair][curr_round].approx_ratios.append(approx_ratio)
 
-    def calculate_points(self, match_data: MatchData, achievable_points: int) -> dict[str, float]:
-        """Calculate the number of achieved points, given results.
+    def calculate_points(self, achievable_points: int) -> dict[str, float]:
+        """Calculate the number of achieved points.
 
         The valuation of an averaged battle is calculating by summing up
         the reciprocals of each solved fight. This sum is then divided by
@@ -55,8 +65,6 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
 
         Parameters
         ----------
-        match_data : MatchData
-            MatchData object containing the results of match.run().
         achievable_points : int
             Number of achievable points.
 
@@ -71,23 +79,23 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
         points = dict()
 
         team_names: set[str] = set()
-        for pair in match_data.pairs.keys():
+        for pair in self.pairs.keys():
             team_names = team_names.union(set(pair))
         team_combinations = itertools.combinations(team_names, 2)
 
         if len(team_names) == 1:
             return {team_names.pop(): achievable_points}
 
-        if match_data.rounds <= 0:
+        if self.rounds <= 0:
             return {}
-        points_per_round = round(achievable_points / match_data.rounds, 1)
+        points_per_round = round(achievable_points / self.rounds, 1)
         for pair in team_combinations:
-            for i in range(match_data.rounds):
+            for i in range(self.rounds):
                 points[pair[0]] = points.get(pair[0], 0)
                 points[pair[1]] = points.get(pair[1], 0)
 
-                ratios1 = match_data.pairs[pair].rounds[i].approx_ratios  # pair[1] was solver
-                ratios0 = match_data.pairs[pair[::-1]].rounds[i].approx_ratios  # pair[0] was solver
+                ratios1 = self.pairs[pair][i].approx_ratios  # pair[1] was solver
+                ratios0 = self.pairs[pair[::-1]][i].approx_ratios  # pair[0] was solver
 
                 valuation0 = 0
                 valuation1 = 0
@@ -110,55 +118,50 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
 
         return points
 
-    def format_as_utf8(self, match_data: MatchData) -> str:
-        """Format the provided match_data for averaged battles.
-
-        Parameters
-        ----------
-        match_data : MatchData
-            MatchData object containing match data generated by match.run().
+    def format_as_utf8(self) -> str:
+        """Format the executed battle.
 
         Returns
         -------
         str
-            A formatted string on the basis of the match_data.
+            A formatted string on the basis of the wrapper.
         """
         formatted_output_string = ""
         formatted_output_string += 'Battle Type: Averaged Battle\n\r'
         formatted_output_string += '╔═════════╦═════════╦' \
-                                   + ''.join(['══════╦' for i in range(match_data.rounds)]) \
+                                   + ''.join(['══════╦' for i in range(self.rounds)]) \
                                    + '══════╦══════╦════════╗' + '\n\r' \
                                    + '║   GEN   ║   SOL   ' \
-                                   + ''.join([f'║{"R" + str(i + 1):^6s}' for i in range(match_data.rounds)]) \
+                                   + ''.join([f'║{"R" + str(i + 1):^6s}' for i in range(self.rounds)]) \
                                    + '║ LAST ║ SIZE ║  ITER  ║' + '\n\r' \
                                    + '╟─────────╫─────────╫' \
-                                   + ''.join(['──────╫' for i in range(match_data.rounds)]) \
+                                   + ''.join(['──────╫' for i in range(self.rounds)]) \
                                    + '──────╫──────╫────────╢' + '\n\r'
 
-        for pair in match_data.pairs.keys():
-            avg = [0.0 for i in range(match_data.rounds)]
+        for pair in self.pairs.keys():
+            avg = [0.0 for i in range(self.rounds)]
 
-            for i in range(match_data.rounds):
-                executed_iters = len(match_data.pairs[pair].rounds[i].approx_ratios)
-                n_dead_iters = executed_iters - len([i for i in match_data.pairs[pair].rounds[i].approx_ratios if i != 0.0])
+            for i in range(self.rounds):
+                executed_iters = len(self.pairs[pair][i].approx_ratios)
+                n_dead_iters = executed_iters - len([i for i in self.pairs[pair][i].approx_ratios if i != 0.0])
 
                 if executed_iters - n_dead_iters > 0:
-                    avg[i] = sum(match_data.pairs[pair].rounds[i].approx_ratios) / (executed_iters - n_dead_iters)
+                    avg[i] = sum(self.pairs[pair][i].approx_ratios) / (executed_iters - n_dead_iters)
 
-            curr_round = match_data.pairs[pair].curr_round
-            curr_iter = len(match_data.pairs[pair].rounds[curr_round].approx_ratios)
+            curr_round = self.curr_round
+            curr_iter = len(self.pairs[pair][curr_round].approx_ratios)
             latest_approx_ratio = 0.0
-            if match_data.pairs[pair].rounds[curr_round].approx_ratios:
-                latest_approx_ratio = match_data.pairs[pair].rounds[curr_round].approx_ratios[-1]
+            if self.pairs[pair][curr_round].approx_ratios:
+                latest_approx_ratio = self.pairs[pair][curr_round].approx_ratios[-1]
 
             formatted_output_string += f'║{pair[0]:>9s}║{pair[1]:>9s}' \
-                                        + ''.join([f'║{avg[1]:>6.2f}' for i in range(match_data.rounds)]) \
+                                        + ''.join([f'║{avg[1]:>6.2f}' for i in range(self.rounds)]) \
                                         + '║{:>6.2f}║{:>6d}║{:>3d}/{:>3d} ║'.format(latest_approx_ratio,
-                                                                                    match_data.approx_inst_size,
+                                                                                    self.instance_size,
                                                                                     curr_iter,
-                                                                                    match_data.approx_iters) + '\r\n'
+                                                                                    self.iterations) + '\r\n'
         formatted_output_string += '╚═════════╩═════════╩' \
-                                   + ''.join(['══════╩' for i in range(match_data.rounds)]) \
+                                   + ''.join(['══════╩' for i in range(self.rounds)]) \
                                    + '══════╩══════╩════════╝' + '\n\r'
 
         return formatted_output_string

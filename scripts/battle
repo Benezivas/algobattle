@@ -164,7 +164,7 @@ if __name__ == "__main__":
     logger.info(f'\n{match.format_as_utf8()}')
     if not options.do_not_count_points:
         assert match.battle_wrapper is not None
-        points = match.battle_wrapper.calculate_points(results, options.points)
+        points = match.battle_wrapper.calculate_points(options.points)
 
         for team_name in match.team_names:
             logger.info(f'Group {team_name} gained {points[team_name]:.1f} points.')

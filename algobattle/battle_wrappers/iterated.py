@@ -8,7 +8,7 @@ import logging
 import algobattle.battle_wrapper
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from algobattle.match import Match, MatchData
+    from algobattle.match import Match
 
 logger = logging.getLogger('algobattle.battle_wrappers.iterated')
 
@@ -16,9 +16,20 @@ logger = logging.getLogger('algobattle.battle_wrappers.iterated')
 class Iterated(algobattle.battle_wrapper.BattleWrapper):
     """Class of an iterated battle Wrapper."""
     
-    def __init__(self, exponent: int = 2, **options) -> None:
+    @dataclass
+    class Result(algobattle.battle_wrapper.BattleWrapper.Result):
+        cap: int = 0
+        solved: int = 0
+        attempting: int = 0
+
+    def __init__(self, match: Match, problem: str, rounds: int = 5,
+                cap: int = 50000, exponent: int = 2,
+                **options) -> None:
         self.exponent = exponent
-        super().__init__(**options)
+        self.cap = cap
+        
+        self.pairs: dict[tuple[str, str], list[Iterated.Result]]
+        super().__init__(match, problem, rounds, **options)
 
     def wrapper(self, match: Match) -> None:
         """Execute one iterative battle between a generating and a solving team.
@@ -44,15 +55,16 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
         match: Match
             The Match object on which the battle wrapper is to be executed on.
         """
-        curr_pair = match.match_data.curr_pair
+        curr_pair = self.curr_pair
         assert curr_pair is not None
-        curr_round = match.match_data.pairs[curr_pair].curr_round
+        curr_round = self.curr_round
 
         n = match.problem.n_start
         maximum_reached_n = 0
         i = 0
         exponent = self.exponent
-        n_cap = match.match_data.pairs[curr_pair].rounds[curr_round].cap
+        n_cap = self.cap
+        self.pairs[curr_pair][curr_round].cap = n_cap
         alive = True
 
         logger.info(f'==================== Iterative Battle, Instanze Size Cap: {n_cap} ====================')
@@ -88,12 +100,12 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
                     n -= i ** exponent - 1
                     i = 1
 
-            match.match_data.pairs[curr_pair].rounds[curr_round].cap = n_cap
-            match.match_data.pairs[curr_pair].rounds[curr_round].solved = maximum_reached_n
-            match.match_data.pairs[curr_pair].rounds[curr_round].attempting = n
+            self.pairs[curr_pair][curr_round].cap = n_cap
+            self.pairs[curr_pair][curr_round].solved = maximum_reached_n
+            self.pairs[curr_pair][curr_round].attempting = n
 
-    def calculate_points(self, match_data: MatchData, achievable_points: int) -> dict[str, float]:
-        """Calculate the number of achieved points, given results.
+    def calculate_points(self, achievable_points: int) -> dict[str, float]:
+        """Calculate the number of achieved points.
 
         Each pair of teams fights for the achievable points among one another.
         These achievable points are split over all matches, as one run reaching
@@ -101,8 +113,6 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
 
         Parameters
         ----------
-        match_data : MatchData
-            dict containing the results of match.run().
         achievable_points : int
             Number of achievable points.
 
@@ -117,7 +127,7 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
         points = dict()
 
         team_names: set[str] = set()
-        for pair in match_data.pairs.keys():
+        for pair in self.pairs.keys():
             team_names = team_names.union(set(pair))
         team_combinations = itertools.combinations(team_names, 2)
         
@@ -125,17 +135,17 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
         if len(team_names) == 1:
             return {team_names.pop(): achievable_points}
 
-        if match_data.rounds <= 0:
+        if self.rounds <= 0:
             return {}
 
-        points_per_iteration = round(achievable_points / match_data.rounds, 1)
+        points_per_iteration = round(achievable_points / self.rounds, 1)
         for pair in team_combinations:
-            for i in range(match_data.rounds):
+            for i in range(self.rounds):
                 points[pair[0]] = points.get(pair[0], 0)
                 points[pair[1]] = points.get(pair[1], 0)
 
-                solved1 = match_data.pairs[pair].rounds[i].solved  # pair[1] was solver
-                solved0 = match_data.pairs[pair[::-1]].rounds[i].solved  # pair[0] was solver
+                solved1 = self.pairs[pair][i].solved  # pair[1] was solver
+                solved0 = self.pairs[pair[::-1]][i].solved  # pair[0] was solver
 
                 # Default values for proportions, assuming no team manages to solve anything
                 points_proportion0 = 0.5
@@ -150,41 +160,38 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
 
         return points
 
-    def format_as_utf8(self, match_data: MatchData) -> str:
-        """Format the provided match_data for iterated battles.
-
-        Parameters
-        ----------
-        match_data : MatchData
-            MatchData containing match data generated by match.run().
+    def format_as_utf8(self) -> str:
+        """Format the executed battle.
 
         Returns
         -------
         str
-            A formatted string on the basis of the match_data.
+            A formatted string on the basis of the wrapper.
         """
         formatted_output_string = ""
         formatted_output_string += 'Battle Type: Iterated Battle\n\r'
         formatted_output_string += '╔═════════╦═════════╦' \
-                                   + ''.join(['══════╦' for i in range(match_data.rounds)]) \
+                                   + ''.join(['══════╦' for i in range(self.rounds)]) \
                                    + '══════╦══════╗' + '\n\r' \
                                    + '║   GEN   ║   SOL   ' \
-                                   + ''.join([f'║{"R" + str(i + 1):^6s}' for i in range(match_data.rounds)]) \
+                                   + ''.join([f'║{"R" + str(i + 1):^6s}' for i in range(self.rounds)]) \
                                    + '║  CAP ║  AVG ║' + '\n\r' \
                                    + '╟─────────╫─────────╫' \
-                                   + ''.join(['──────╫' for i in range(match_data.rounds)]) \
+                                   + ''.join(['──────╫' for i in range(self.rounds)]) \
                                    + '──────╫──────╢' + '\n\r'
 
-        for pair in match_data.pairs.keys():
-            curr_round = match_data.pairs[pair].curr_round
-            avg = sum(match_data.pairs[pair].rounds[i].solved for i in range(match_data.rounds)) // match_data.rounds
+        for pair in self.pairs.keys():
+            curr_round = self.curr_round
+            avg = sum(self.pairs[pair][i].solved for i in range(self.rounds)) // self.rounds
 
             formatted_output_string += f'║{pair[0]:>9s}║{pair[1]:>9s}' \
-                                        + ''.join([f'║{match_data.pairs[pair].rounds[i].solved:>6d}'
-                                                    for i in range(match_data.rounds)]) \
-                                        + f'║{match_data.pairs[pair].rounds[curr_round].cap:>6d}║{avg:>6d}║' + '\r\n'
+                                        + ''.join([f'║{self.pairs[pair][i].solved:>6d}'
+                                                    for i in range(self.rounds)]) \
+                                        + f'║{self.pairs[pair][curr_round].cap:>6d}║{avg:>6d}║' + '\r\n'
         formatted_output_string += '╚═════════╩═════════╩' \
-                                   + ''.join(['══════╩' for i in range(match_data.rounds)]) \
+                                   + ''.join(['══════╩' for i in range(self.rounds)]) \
                                    + '══════╩══════╝' + '\n\r'
 
         return formatted_output_string
+
+
