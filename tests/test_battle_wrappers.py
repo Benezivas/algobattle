@@ -28,6 +28,11 @@ class BattleWrapperTests(unittest.TestCase):
         cls.config = os.path.join(base_path, 'config', 'config.ini')
         cls.match = Match(cls.problem, cls.config, [Team("0", generator_path, solver_path), Team("1", generator_path, solver_path)])
 
+    @classmethod
+    def tearDownClass(cls) -> None:
+        images = " ".join(f"generator-{name} solver-{name}" for name in cls.match.team_names)
+        subprocess.Popen(f"docker image rm -f {images}")
+
     def test_averaged_battle_wrapper(self):
         pass  # TODO: Implement tests for averaged battle wrapper
 
