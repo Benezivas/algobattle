@@ -21,8 +21,8 @@ class BattleWrapperTests(unittest.TestCase):
         assert Problem is not None
         self.problem = Problem.Problem()
         base_path = os.path.dirname(os.path.abspath(algobattle.__file__))
-        generator_path = os.path.join(base_path, "testsproblem", "generator")
-        solver_path = os.path.join(base_path, "testsproblem", "solver")
+        generator_path = os.path.join(base_path, "problems", "testsproblem", "generator")
+        solver_path = os.path.join(base_path, "problems", "testsproblem", "solver")
         self.config = os.path.join(base_path, 'config', 'config.ini')
         file = Problem.__file__
         assert file is not None
