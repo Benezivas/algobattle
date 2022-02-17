@@ -9,6 +9,7 @@ import algobattle
 from algobattle.match import Match
 from algobattle.team import Team
 from algobattle.util import import_problem_from_path, measure_runtime_overhead, run_subprocess
+import algobattle.sighandler as sigh
 
 logging.disable(logging.CRITICAL)
 
@@ -35,6 +36,7 @@ class Utiltests(unittest.TestCase):
     def test_run_subprocess(self):
         team = Team('0', self.tests_path + '/generator_timeout', self.tests_path + '/solver')
         match = Match(self.problem, self.config, [team])
+        sigh.latest_running_docker_image = "generator-0"
         raw_output, _ = run_subprocess(match.generator_base_run_command(match.space_generator) + ['generator-0'], b"", 2)
         subprocess.run("docker image rm -f generator-0 solver-0")
         self.assertIsNone(raw_output)
