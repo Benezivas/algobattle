@@ -1,4 +1,5 @@
 """Implementations used to safely kill a running battle, cleaning up possibly running docker containers."""
+from asyncio.subprocess import STDOUT
 import signal
 import sys
 import logging
@@ -24,8 +25,9 @@ def signal_handler(sig, frame):
 def _kill_spawned_docker_containers():
     """Terminate all running docker containers spawned by this program."""
     if latest_running_docker_image:
-        subprocess.run('docker ps -a -q --filter ancestor={} | xargs -r docker kill > {} 2>&1'
-                       .format(latest_running_docker_image, '/dev/null' if os.name == 'posix' else 'nul'), shell=True)
+        containers = subprocess.run(f"docker ps -q -q --filter ancestor={latest_running_docker_image}", stdout=subprocess.PIPE)
+        for id in containers.stdout.decode().splitlines():
+            subprocess.run(f"docker kill {id.strip()}", stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
 
 
 signal.signal(signal.SIGINT, signal_handler)
