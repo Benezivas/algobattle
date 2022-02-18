@@ -80,7 +80,7 @@ class Image:
         
         finally:
             try:
-                _ = run(f"docker kill {name}", capture_output=True, check=True, text=True)
+                run(f"docker kill {name}", capture_output=True, check=True, text=True)
             except CalledProcessError as e:
                 if e.stderr.find(f"No such container: {name}") == -1:
                     logger.warning(f"Could not kill container '{self.description}':\n{e.stderr}")
@@ -124,5 +124,6 @@ def docker_running(function: Callable) -> Callable:
             run("docker info", capture_output=True, check=True, text=True)
         except CalledProcessError:
             logger.error("could not connect to the docker daemon. Is docker running?")
+            raise DockerError
         return function(self, *args, **kwargs)
     return wrapper
