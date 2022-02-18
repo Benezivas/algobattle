@@ -13,11 +13,12 @@ from algobattle.battle_wrapper import BattleWrapper
 import algobattle.sighandler as sigh
 from algobattle.team import Team
 from algobattle.problem import Problem
-from algobattle.util import run_subprocess, docker_running, team_roles_set
+from algobattle.util import run_subprocess, team_roles_set
 from algobattle.subject import Subject
 from algobattle.observer import Observer
 from algobattle.battle_wrappers.averaged import Averaged
 from algobattle.battle_wrappers.iterated import Iterated
+from algobattle.docker import docker_running
 
 logger = logging.getLogger('algobattle.match')
 
