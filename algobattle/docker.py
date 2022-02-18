@@ -44,7 +44,7 @@ def build(path: str,
         logger.error(f"Build process for '{path}' failed with stderr '{e.stderr.decode()}'!")
         raise DockerError from e
 
-    return Image(image_name, result.stdout.strip()[5:], description)
+    return Image(image_name, result.stdout.strip()[7:], description)
 
 
 @dataclass
