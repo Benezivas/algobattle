@@ -11,8 +11,8 @@ logger = logging.getLogger('algobattle.problems.testsproblem')
 class Tests(Problem):
     """Artificial problem used for tests."""
 
-    name = 'Tests'
-    n_start = 1
-    parser = TestsParser()
-    verifier = TestsVerifier()
-    approximable = True
+    name: str = 'Tests'
+    n_start: int = 1
+    parser: TestsParser = TestsParser()
+    verifier: TestsVerifier = TestsVerifier()
+    approximable: bool = True
