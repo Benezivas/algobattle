@@ -41,7 +41,11 @@ def build(path: str,
         raise DockerError from e
 
     except CalledProcessError as e:
-        logger.error(f"Build process for '{path}' failed with stderr '{e.stderr.decode()}'!")
+        logger.error(f"Build process for '{path}' failed with stderr '{e.stderr}'!")
+        raise DockerError from e
+    
+    except Exception as e:
+        logger.error(f"Build process for '{path}' failed!")
         raise DockerError from e
 
     return Image(image_name, result.stdout.strip()[7:], description)
