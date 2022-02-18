@@ -73,9 +73,10 @@ class Image:
         except TimeoutExpired as e:
             logger.warning(f"'{self.description}' exceeded time limit!")
             return ""
-        
+
         except Exception as e:
-            logger.warning(f"An exception was thrown while running '{self.description}':\n{e}")
+            stderr = f"\nstderr:\n{e.stderr}" if isinstance(e, CalledProcessError) else ""
+            logger.warning(f"An exception was thrown while running '{self.description}':\n{e}{stderr}")
             raise DockerError from e
         
         finally:
