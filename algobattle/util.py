@@ -46,39 +46,6 @@ def import_problem_from_path(problem_path: str) -> Problem | None:
         return None
 
 
-def measure_runtime_overhead() -> float:
-    """Calculate the I/O delay for starting and stopping docker on the host machine.
-
-    Returns
-    -------
-    float
-        I/O overhead in seconds, rounded to two decimal places.
-    """
-    problem = DelaytestProblem.Problem()
-    config_path = os.path.join(os.path.dirname(os.path.abspath(algobattle.__file__)), 'config', 'config_delaytest.ini')
-    delaytest_path = DelaytestProblem.__file__[:-12]  # remove /__init__.py
-    delaytest_team = Team("0", delaytest_path + '/generator', delaytest_path + '/solver')
-
-    try:
-        match = algobattle.match.Match(problem, config_path, [delaytest_team])
-    except algobattle.match.BuildError:
-        logger.warning('Building a match for the time tolerance calculation failed!')
-        return 0
-
-    overheads = []
-    for i in range(5):
-        sigh.latest_running_docker_image = "generator0"
-        _, timeout = run_subprocess(match.generator_base_run_command(match.space_generator) + ["generator0"],
-                                    input=str(50 * i).encode(), timeout=match.timeout_generator)
-        if not timeout:
-            timeout = match.timeout_generator
-        overheads.append(float(timeout))
-
-    max_overhead = round(max(overheads), 2)
-
-    return max_overhead
-
-
 def run_subprocess(run_command: list[str], input: bytes, timeout: float, suppress_output: bool=False):
     """Run a given command as a subprocess.
 

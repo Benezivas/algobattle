@@ -8,7 +8,8 @@ import os
 import algobattle
 from algobattle.match import Match
 from algobattle.team import Team
-from algobattle.util import import_problem_from_path, measure_runtime_overhead, run_subprocess
+from algobattle.util import import_problem_from_path, run_subprocess
+from algobattle.docker import measure_runtime_overhead
 import algobattle.sighandler as sigh
 
 logging.disable(logging.CRITICAL)
