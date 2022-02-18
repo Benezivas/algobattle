@@ -90,6 +90,7 @@ class Image:
 
         return result.stdout
 
+
 def measure_runtime_overhead() -> float:
     """Calculate the I/O delay for starting and stopping docker on the host machine.
 
@@ -115,7 +116,7 @@ def measure_runtime_overhead() -> float:
             overheads.append(300)
     
     return round(max(overheads), 2)
-            
+ 
 
 def docker_running(function: Callable) -> Callable:
     """Ensure that internal methods are only callable if docker is running."""
