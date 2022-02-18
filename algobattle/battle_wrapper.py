@@ -6,10 +6,10 @@ characteristic that they are responsible for updating some match data during
 their run, such that it contains the current state of the match.
 """
 from __future__ import annotations
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import logging
-from abc import ABC, abstractmethod, abstractproperty
-from typing import TYPE_CHECKING, Any, TypeVar
+from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from algobattle.match import Match
 

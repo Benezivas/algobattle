@@ -61,7 +61,7 @@ def measure_runtime_overhead() -> float:
 
     try:
         match = algobattle.match.Match(problem, config_path, [delaytest_team])
-    except algobattle.match.BuildError as e:
+    except algobattle.match.BuildError:
         logger.warning('Building a match for the time tolerance calculation failed!')
         return 0
 
