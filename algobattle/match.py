@@ -10,7 +10,7 @@ from algobattle.battle_wrapper import BattleWrapper
 from algobattle.team import Team
 from algobattle.problem import Problem
 from algobattle.util import team_roles_set
-from algobattle.docker import docker_running, build
+from algobattle.docker import DockerError, docker_running, build
 from algobattle.subject import Subject
 from algobattle.observer import Observer
 from algobattle.battle_wrappers.averaged import Averaged
@@ -105,7 +105,7 @@ class Match(Subject):
             try:
                 team.generator = build(team.generator_path, f"generator-{team.name}", f"generator for team {team.name}", timeout=self.timeout_build)
                 team.solver = build(team.solver_path, f"solver-{team.name}", f"solver for team {team.name}", timeout=self.timeout_build)
-            except:
+            except DockerError:
                 logger.error(f"Removing team {team.name} as their containers did not build successfully.")
                 self.teams.remove(team)
 
@@ -223,7 +223,7 @@ class Match(Subject):
         logger.debug(f'Running generator of group {self.generating_team}...\n')
         try:
             output = self.generating_team.generator.run(str(instance_size), timeout=self.timeout_generator, memory=scaled_memory, cpus=self.cpus)
-        except:
+        except DockerError:
             return None, None
 
         if not output:
@@ -282,7 +282,7 @@ class Match(Subject):
         logger.debug(f'Running solver of group {self.solving_team}...\n')
         try:
             output = self.solving_team.solver.run(instance_str, timeout=self.timeout_solver, memory=scaled_memory, cpus=self.cpus)
-        except:
+        except DockerError:
             return None
         
         if not output:

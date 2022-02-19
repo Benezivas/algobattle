@@ -16,6 +16,9 @@ from algobattle.util import import_problem_from_path
 from algobattle.docker import measure_runtime_overhead
 from algobattle.ui import Ui
 
+#! do not remove, even when unused!
+import algobattle.sighandler
+
 if __name__ == "__main__":
 
     def setup_logging(logging_path: str | Path, verbose_logging: bool, silent: bool):

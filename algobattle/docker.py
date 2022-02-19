@@ -39,21 +39,27 @@ def build(path: str,
         raise DockerError from e
 
     except CalledProcessError as e:
-        logger.error(f"Build process for '{path}' failed with stderr '{e.stderr}'!")
+        logger.warning(f"Building '{path}' did not complete successfully:\n{e.stderr}")
         raise DockerError from e
-    
-    except Exception as e:
-        logger.error(f"Build process for '{path}' failed!")
+
+    except OSError as e:
+        logger.warning(f"OSError thrown while building '{path}':\n{e}")
+        raise DockerError from e
+
+    except ValueError as e:
+        logger.warning(f"Build process for '{path}' created with invalid arguments:\n{e}")
         raise DockerError from e
 
     return Image(image_name, result.stdout.strip()[7:], description)
 
 
-@dataclass
+_running_containers: set[tuple[Image, str]] = set()
+
+@dataclass(frozen=True)
 class Image:
     name: str
     id: str
-    description: str = ""
+    description: str
 
     def run(self,
             input: str | None = None,
@@ -67,8 +73,10 @@ class Image:
         cpus_cmd = f"--cpus {cpus}" if cpus is not None else ""
         name = f"algobattle_{uuid1().hex[:8]}"
         cmd = f"docker run --rm --network none -i --name {name} {memory_cmd} {cpus_cmd} {self.id}"
+        #creationflags = CREATE_NEW_PROCESS_GROUP if os.name != "posix" else 0
 
         logger.debug(f"Running {self.description}.")
+        _running_containers.add((self, name))
         try:
             result = run(cmd, input=input, capture_output=True, timeout=timeout, check=True, text=True)
 
@@ -76,23 +84,37 @@ class Image:
             logger.warning(f"'{self.description}' exceeded time limit!")
             return ""
 
-        except Exception as e:
-            stderr = f"\nstderr:\n{e.stderr}" if isinstance(e, CalledProcessError) else ""
-            logger.warning(f"An exception was thrown while running '{self.description}':\n{e}{stderr}")
+        except CalledProcessError as e:
+            logger.warning(f"Running '{self.description}' did not complete successfully:\n{e.stderr}")
+            raise DockerError from e
+
+        except OSError as e:
+            logger.warning(f"OSError thrown while running '{self.description}':\n{e}")
+            raise DockerError from e
+
+        except ValueError as e:
+            logger.warning(f"Process '{self.description}' created with invalid arguments:\n{e}")
             raise DockerError from e
         
         finally:
-            try:
-                run(f"docker kill {name}", capture_output=True, check=True, text=True)
-            except CalledProcessError as e:
-                if e.stderr.find(f"No such container: {name}") == -1:
-                    logger.warning(f"Could not kill container '{self.description}':\n{e.stderr}")
+            _kill_container(self, name)
         
         elapsed_time = round(default_timer() - start_time, 2)
         logger.debug(f'Approximate elapsed runtime: {elapsed_time}/{timeout} seconds.')
 
         return result.stdout
 
+def _kill_container(image: Image, name: str) -> None:
+    try:
+        run(f"docker kill {name}", capture_output=True, check=True, text=True)
+    except CalledProcessError as e:
+        if e.stderr.find(f"No such container: {name}") == -1:
+            logger.warning(f"Could not kill container '{image.description}':\n{e.stderr}")
+    _running_containers.discard((image, name))
+
+def kill_all_running_containers() -> None:
+    for container in _running_containers.copy():
+        _kill_container(*container)
 
 def measure_runtime_overhead() -> float:
     """Calculate the I/O delay for starting and stopping docker on the host machine.
@@ -115,7 +137,7 @@ def measure_runtime_overhead() -> float:
             start_time = default_timer()
             image.run(str(50 * i), timeout=300)
             overheads.append(default_timer() - start_time)
-        except:
+        except DockerError:
             overheads.append(300)
     
     return round(max(overheads), 2)
