@@ -6,6 +6,7 @@ import itertools
 import logging
 
 import algobattle.battle_wrapper
+from algobattle.team import Team
 from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from algobattle.match import Match
@@ -26,7 +27,7 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
         self.instance_size = instance_size
         self.iterations = iterations
 
-        self.pairs: dict[tuple[str, str], list[Averaged.Result]]
+        self.pairs: dict[tuple[Team, Team], list[Averaged.Result]]
         super().__init__(match, problem, rounds, **options)  
 
     def wrapper(self, match: Match) -> None:
@@ -56,7 +57,7 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
             curr_round = self.curr_round
             self.pairs[curr_pair][curr_round].approx_ratios.append(approx_ratio)
 
-    def calculate_points(self, achievable_points: int) -> dict[str, float]:
+    def calculate_points(self, achievable_points: int) -> dict[Team, float]:
         """Calculate the number of achieved points.
 
         The valuation of an averaged battle is calculating by summing up
@@ -78,13 +79,13 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
         """
         points = dict()
 
-        team_names: set[str] = set()
+        teams: set[Team] = set()
         for pair in self.pairs.keys():
-            team_names = team_names.union(set(pair))
-        team_combinations = itertools.combinations(team_names, 2)
+            teams = teams.union(set(pair))
+        team_combinations = itertools.combinations(teams, 2)
 
-        if len(team_names) == 1:
-            return {team_names.pop(): achievable_points}
+        if len(teams) == 1:
+            return {teams.pop(): achievable_points}
 
         if self.rounds <= 0:
             return {}

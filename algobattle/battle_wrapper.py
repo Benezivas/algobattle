@@ -10,6 +10,7 @@ from dataclasses import dataclass
 import logging
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
+from algobattle.team import Team
 if TYPE_CHECKING:
     from algobattle.match import Match
 
@@ -56,9 +57,9 @@ class BattleWrapper(ABC):
         self.rounds = rounds
 
         self.curr_round: int = 0
-        self.pairs: dict[tuple[str, str], list[BattleWrapper.Result]] = {}
+        self.pairs: dict[tuple[Team, Team], list[BattleWrapper.Result]] = {}
         self.error: str | None = None
-        self.curr_pair: tuple[str, str] | None = None
+        self.curr_pair: tuple[Team, Team] | None = None
 
         for pair in self._match.all_battle_pairs():
             self.pairs[pair] = []
@@ -87,7 +88,7 @@ class BattleWrapper(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def calculate_points(self, achievable_points: int) -> dict[str, float]:
+    def calculate_points(self, achievable_points: int) -> dict[Team, float]:
         """Calculate the number of achieved points, given results.
 
         As awarding points completely depends on the type of battle that

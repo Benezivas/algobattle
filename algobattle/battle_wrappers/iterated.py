@@ -6,6 +6,7 @@ import itertools
 import logging
 
 import algobattle.battle_wrapper
+from algobattle.team import Team
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from algobattle.match import Match
@@ -28,7 +29,7 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
         self.exponent = exponent
         self.cap = cap
         
-        self.pairs: dict[tuple[str, str], list[Iterated.Result]]
+        self.pairs: dict[tuple[Team, Team], list[Iterated.Result]]
         super().__init__(match, problem, rounds, **options)
 
     def wrapper(self, match: Match) -> None:
@@ -104,7 +105,7 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
             self.pairs[curr_pair][curr_round].solved = maximum_reached_n
             self.pairs[curr_pair][curr_round].attempting = n
 
-    def calculate_points(self, achievable_points: int) -> dict[str, float]:
+    def calculate_points(self, achievable_points: int) -> dict[Team, float]:
         """Calculate the number of achieved points.
 
         Each pair of teams fights for the achievable points among one another.
@@ -126,14 +127,14 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
         """
         points = dict()
 
-        team_names: set[str] = set()
+        teams: set[Team] = set()
         for pair in self.pairs.keys():
-            team_names = team_names.union(set(pair))
-        team_combinations = itertools.combinations(team_names, 2)
+            teams = teams.union(set(pair))
+        team_combinations = itertools.combinations(teams, 2)
         
 
-        if len(team_names) == 1:
-            return {team_names.pop(): achievable_points}
+        if len(teams) == 1:
+            return {teams.pop(): achievable_points}
 
         if self.rounds <= 0:
             return {}
