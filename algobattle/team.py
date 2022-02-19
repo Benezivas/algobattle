@@ -1,6 +1,6 @@
 """Team class, stores necessary information about a Team, such as their associated solver and generator."""
 from __future__ import annotations
-from docker import Image
+from algobattle.docker import Image
 
 class Team:
     """Team class responsible for holding basic information of a specific team."""
