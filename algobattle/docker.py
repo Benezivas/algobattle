@@ -65,7 +65,7 @@ class Image:
             ) -> str:
         start_time = default_timer()
 
-        memory_cmd = f"-m {memory}" if memory is not None else ""
+        memory_cmd = f"-m {memory}mb" if memory is not None else ""
         cpus_cmd = f"--cpus {cpus}" if cpus is not None else ""
         name = f"algobattle_{uuid1().hex[:8]}"
         cmd = f"docker run --rm --network none -i --name {name} {memory_cmd} {cpus_cmd} {self.id}"
