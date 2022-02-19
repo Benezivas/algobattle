@@ -65,10 +65,10 @@ class Matchtests(unittest.TestCase):
         team1 = Team('1', self.tests_path + '/generator', self.tests_path + '/solver')
         teams = [team0, team1]
         match = Match(self.problem, self.config, teams)
-        self.assertEqual(match.all_battle_pairs(), [('0', '1'), ('1', '0')])
+        self.assertEqual(match.all_battle_pairs(), [(team0, team1), (team1, team0)])
 
         match = Match(self.problem, self.config, [team0])
-        self.assertEqual(match.all_battle_pairs(), [('0', '0')])
+        self.assertEqual(match.all_battle_pairs(), [(self.team, self.team)])
 
     def test_run(self):
         match = Match(self.problem, self.config, [self.team])

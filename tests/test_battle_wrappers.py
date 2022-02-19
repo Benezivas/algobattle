@@ -50,7 +50,7 @@ class BattleWrapperTests(unittest.TestCase):
         battle.pairs[self.teams][1].solved = 0
         battle.pairs[self.teams[::-1]][0].solved = 0
         battle.pairs[self.teams[::-1]][1].solved = 0
-        self.assertEqual(battle.calculate_points(100), {'0': 50, '1': 50})
+        self.assertEqual(battle.calculate_points(100), {self.teams[0]: 50, self.teams[1]: 50})
 
     def test_calculate_points_iterated_draw(self):
         battle = Iterated(self.match, self.problem, rounds=2)
@@ -58,7 +58,7 @@ class BattleWrapperTests(unittest.TestCase):
         battle.pairs[self.teams][1].solved = 10
         battle.pairs[self.teams[::-1]][0].solved = 10
         battle.pairs[self.teams[::-1]][1].solved = 20
-        self.assertEqual(battle.calculate_points(100), {'0': 50, '1': 50})
+        self.assertEqual(battle.calculate_points(100), {self.teams[0]: 50, self.teams[1]: 50})
 
     def test_calculate_points_iterated_domination(self):
         battle = Iterated(self.match, self.problem, rounds=2)
@@ -66,7 +66,7 @@ class BattleWrapperTests(unittest.TestCase):
         battle.pairs[self.teams][1].solved = 10
         battle.pairs[self.teams[::-1]][0].solved = 0
         battle.pairs[self.teams[::-1]][1].solved = 0
-        self.assertEqual(battle.calculate_points(100), {'0': 0, '1': 100})
+        self.assertEqual(battle.calculate_points(100), {self.teams[0]: 0, self.teams[1]: 100})
 
     def test_calculate_points_averaged_zero_rounds(self):
         battle = Averaged(self.match, self.problem, rounds=0)
@@ -78,7 +78,7 @@ class BattleWrapperTests(unittest.TestCase):
         battle.pairs[self.teams][1].approx_ratios = [1.5, 1.5, 1.5]
         battle.pairs[self.teams[::-1]][0].approx_ratios = [1.5, 1.5, 1.5]
         battle.pairs[self.teams[::-1]][1].approx_ratios = [1.5, 1.5, 1.5]
-        self.assertEqual(battle.calculate_points(100), {'0': 50, '1': 50})
+        self.assertEqual(battle.calculate_points(100), {self.teams[0]: 50, self.teams[1]: 50})
 
     def test_calculate_points_averaged_domination(self):
         battle = Averaged(self.match, self.problem, rounds=2)
@@ -86,7 +86,7 @@ class BattleWrapperTests(unittest.TestCase):
         battle.pairs[self.teams][1].approx_ratios = [1.5, 1.5, 1.5]
         battle.pairs[self.teams[::-1]][0].approx_ratios = [1.0, 1.0, 1.0]
         battle.pairs[self.teams[::-1]][1].approx_ratios = [1.0, 1.0, 1.0]
-        self.assertEqual(battle.calculate_points(100), {'0': 60, '1': 40})
+        self.assertEqual(battle.calculate_points(100), {self.teams[0]: 60, self.teams[1]: 40})
 
     def test_calculate_points_averaged_no_successful_round(self):
         battle = Averaged(self.match, self.problem, rounds=2)
@@ -94,7 +94,7 @@ class BattleWrapperTests(unittest.TestCase):
         battle.pairs[self.teams][1].approx_ratios = [0, 0, 0]
         battle.pairs[self.teams[::-1]][0].approx_ratios = [0, 0, 0]
         battle.pairs[self.teams[::-1]][1].approx_ratios = [0, 0, 0]
-        self.assertEqual(battle.calculate_points(100), {'0': 50, '1': 50})
+        self.assertEqual(battle.calculate_points(100), {self.teams[0]: 50, self.teams[1]: 50})
 
 if __name__ == '__main__':
     unittest.main()
