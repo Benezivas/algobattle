@@ -13,12 +13,12 @@ from algobattle.battle_wrapper import BattleWrapper
 import algobattle.sighandler as sigh
 from algobattle.team import Team
 from algobattle.problem import Problem
-from algobattle.util import run_subprocess, team_roles_set
+from algobattle.util import team_roles_set
+from algobattle.docker import DockerError, docker_running, build, Image
 from algobattle.subject import Subject
 from algobattle.observer import Observer
 from algobattle.battle_wrappers.averaged import Averaged
 from algobattle.battle_wrappers.iterated import Iterated
-from algobattle.docker import docker_running
 
 logger = logging.getLogger('algobattle.match')
 
@@ -126,53 +126,31 @@ class Match(Subject):
             logger.error('Teams argument is expected to be a list of Team objects!')
             raise TypeError
 
-        self.team_names = [team.name for team in teams]
-        if len(self.team_names) != len(set(self.team_names)):
+        self.teams = teams
+        if len(self.teams) != len(set(self.teams)):
             logger.error('At least one team name is used twice!')
             raise TypeError
 
         self.single_player = (len(teams) == 1)
 
         for team in teams:
-            build_commands = []
-            build_commands.append(base_build_command + ["solver-" + str(team.name), team.solver_path])
-            build_commands.append(base_build_command + ["generator-" + str(team.name), team.generator_path])
-
-            build_successful = True
-            for command in build_commands:
-                logger.debug(f'Building docker container with the following command: {command}')
-                creationflags = 0
-                if os.name != 'posix':
-                    creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
-                with subprocess.Popen(command, stdout=subprocess.PIPE,
-                                      stderr=subprocess.PIPE, creationflags=creationflags) as process:
-                    try:
-                        output, _ = process.communicate(timeout=self.timeout_build)
-                        logger.debug(output.decode())
-                    except subprocess.TimeoutExpired:
-                        process.kill()
-                        process.wait()
-                        logger.error(f'Build process for {command[5]} ran into a timeout!')
-                        build_successful = False
-                    if process.returncode != 0:
-                        process.kill()
-                        process.wait()
-                        logger.error(f'Build process for {command[5]} failed!')
-                        build_successful = False
-            if not build_successful:
+            try:
+                team.generator = build(team.generator_path, f"generator-{team.name}", f"generator for team {team.name}", timeout=self.timeout_build)
+                team.solver = build(team.solver_path, f"solver-{team.name}", f"solver for team {team.name}", timeout=self.timeout_build)
+            except:
                 logger.error(f"Removing team {team.name} as their containers did not build successfully.")
-                self.team_names.remove(team.name)
+                self.teams.remove(team)
 
-        if len(self.team_names) == 0:
+        if len(self.teams) == 0:
             logger.critical("None of the team's containers built successfully.")
             raise BuildError()
 
-    def all_battle_pairs(self) -> list[tuple[str, str]]:
+    def all_battle_pairs(self) -> list[tuple[Team, Team]]:
         """Generate and return a list of all team pairings for battles."""
         if self.single_player:
-            return [(self.team_names[0], self.team_names[0])]
+            return [(self.teams[0], self.teams[0])]
         else:
-            return list(itertools.permutations(self.team_names, 2))
+            return list(itertools.permutations(self.teams, 2))
 
     def run(self, battle_type: str = 'iterated', rounds: int = 5, iterated_cap: int = 50000, iterated_exponent: int = 2,
             approximation_instance_size: int = 10, approximation_iterations: int = 25) -> BattleWrapper:
@@ -270,19 +248,21 @@ class Match(Subject):
             If the validity checks pass, the (instance, solution) in whatever
             format that is specified, else (None, None).
         """
+        assert self.generating_team is not None
+        assert self.generating_team.generator is not None
         scaled_memory = self.problem.generator_memory_scaler(self.space_generator, instance_size)
-        generator_run_command = self.generator_base_run_command(scaled_memory) + ["generator-" + str(self.generating_team)]
 
         logger.debug(f'Running generator of group {self.generating_team}...\n')
-
-        sigh.latest_running_docker_image = "generator-" + str(self.generating_team)
-        encoded_output, _ = run_subprocess(generator_run_command, str(instance_size).encode(),
-                                           self.timeout_generator)
-        if not encoded_output:
-            logger.warning(f'No output was generated when running the generator group {self.generating_team}!')
+        try:
+            output = self.generating_team.generator.run(str(instance_size), timeout=self.timeout_generator, memory=scaled_memory, cpus=self.cpus)
+        except:
             return None, None
 
-        raw_instance_with_solution = self.problem.parser.decode(encoded_output)
+        if not output:
+            logger.warning(f'No output was generated when running {self.generating_team.generator.description}!')
+            return None, None
+
+        raw_instance_with_solution = self.problem.parser.decode(output)
 
         logger.debug('Checking generated instance and certificate...')
 
@@ -326,18 +306,23 @@ class Match(Subject):
             If the validity checks pass, solution in whatever
             format that is specified, else None.
         """
+        assert self.solving_team is not None
+        assert self.solving_team.solver is not None
         scaled_memory = self.problem.solver_memory_scaler(self.space_solver, instance_size)
+        instance_str = self.problem.parser.encode(instance)
+
         solver_run_command = self.solver_base_run_command(scaled_memory) + ["solver-" + str(self.solving_team)]
         logger.debug(f'Running solver of group {self.solving_team}...\n')
-
-        sigh.latest_running_docker_image = "solver-" + str(self.solving_team)
-        encoded_output, _ = run_subprocess(solver_run_command, self.problem.parser.encode(instance),
-                                           self.timeout_solver)
-        if not encoded_output:
+        try:
+            output = self.solving_team.solver.run(instance_str, timeout=self.timeout_solver, memory=scaled_memory, cpus=self.cpus)
+        except:
+            return None
+        
+        if not output:
             logger.warning(f'No output was generated when running the solver of group {self.solving_team}!')
             return None
 
-        raw_solver_solution = self.problem.parser.decode(encoded_output)
+        raw_solver_solution = self.problem.parser.decode(output)
 
         logger.debug('Checking validity of the solvers solution...')
 

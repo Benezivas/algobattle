@@ -163,5 +163,5 @@ if __name__ == "__main__":
         assert match.battle_wrapper is not None
         points = match.battle_wrapper.calculate_points(options.points)
 
-        for team_name in match.team_names:
+        for team_name in match.teams:
             logger.info(f'Group {team_name} gained {points[team_name]:.1f} points.')
