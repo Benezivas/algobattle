@@ -22,4 +22,4 @@ class DelaytestParser(Parser):
         return super().encode(input)
 
     def decode(self, raw_input):
-        return raw_input.decode().splitlines()
+        return raw_input.splitlines()
