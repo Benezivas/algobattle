@@ -26,11 +26,14 @@ def build(path: str,
         timeout: float | None = None,
         cache: bool = True,
         )-> Image:
-    name_cmd = f"-t {image_name}" if image_name != "" else ""
-    cache_cmd = "--no-cache" if not cache else ""
-    cmd = f"docker build -q {name_cmd} --network=host {cache_cmd} {path}"
+    cmd = ["docker", "build", "-q", "--network=host"]
+    if image_name is not None:
+        cmd += ["-t", image_name]
+    if not cache:
+        cmd.append("--no-cache")
+    cmd.append(path)
     
-    logger.debug(f'Building docker container with the following command: {cmd}')
+    logger.debug(f"Building docker container with the following command: {' '.join(cmd)}")
     try:
         result = run(cmd, capture_output=True, timeout=timeout, check=True, text=True)
 
@@ -68,12 +71,13 @@ class Image:
             cpus: int | None = None
             ) -> str:
         start_time = default_timer()
-
-        memory_cmd = f"-m {memory}mb" if memory is not None else ""
-        cpus_cmd = f"--cpus {cpus}" if cpus is not None else ""
         name = f"algobattle_{uuid1().hex[:8]}"
-        cmd = f"docker run --rm --network none -i --name {name} {memory_cmd} {cpus_cmd} {self.id}"
-        #creationflags = CREATE_NEW_PROCESS_GROUP if os.name != "posix" else 0
+        cmd = ["docker", "run", "--rm", "--network", "none", "-i", "--name", name]
+        if memory is not None:
+            cmd.append(f"-m={memory}mb")
+        if cpus is not None:
+            cmd.append(f"--cpus={cpus}")
+        cmd.append(self.id)
 
         logger.debug(f"Running {self.description}.")
         _running_containers.add((self, name))
@@ -106,7 +110,7 @@ class Image:
 
 def _kill_container(image: Image, name: str) -> None:
     try:
-        run(f"docker kill {name}", capture_output=True, check=True, text=True)
+        run(["docker", "kill", name], capture_output=True, check=True, text=True)
     except CalledProcessError as e:
         if e.stderr.find(f"No such container: {name}") == -1:
             logger.warning(f"Could not kill container '{image.description}':\n{e.stderr}")
@@ -147,7 +151,7 @@ def docker_running(function: Callable) -> Callable:
     """Ensure that internal methods are only callable if docker is running."""
     def wrapper(self, *args, **kwargs):
         try:
-            run("docker info", capture_output=True, check=True, text=True)
+            run(["docker", "info"], capture_output=True, check=True, text=True)
         except CalledProcessError:
             logger.error("could not connect to the docker daemon. Is docker running?")
             raise DockerError
