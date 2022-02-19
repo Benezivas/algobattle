@@ -77,70 +77,70 @@ class Matchtests(unittest.TestCase):
     def test_one_fight_gen_timeout(self):
         team = Team('0', self.tests_path + '/generator_timeout', self.tests_path + '/solver')
         match_run_timeout = Match(self.problem, self.config_short_timeout, [team], cache_docker_containers=False)
-        match_run_timeout.generating_team = '0'
-        match_run_timeout.solving_team = '0'
+        match_run_timeout.generating_team = team
+        match_run_timeout.solving_team = team
         self.assertEqual(match_run_timeout._one_fight(1), 1.0)
 
     def test_one_fight_gen_exec_error(self):
         team = Team('0', self.tests_path + '/generator_execution_error', self.tests_path + '/solver')
         match_broken_generator = Match(self.problem, self.config, [team], cache_docker_containers=False)
-        match_broken_generator.generating_team = '0'
-        match_broken_generator.solving_team = '0'
+        match_broken_generator.generating_team = team
+        match_broken_generator.solving_team = team
         self.assertEqual(match_broken_generator._one_fight(1), 1.0)
 
     def test_one_fight_gen_wrong_instance(self):
         team = Team('0', self.tests_path + '/generator_wrong_instance', self.tests_path + '/solver')
         match_wrong_generator_instance = Match(self.problem, self.config, [team], cache_docker_containers=False)
-        match_wrong_generator_instance.generating_team = '0'
-        match_wrong_generator_instance.solving_team = '0'
+        match_wrong_generator_instance.generating_team = team
+        match_wrong_generator_instance.solving_team = team
         self.assertEqual(match_wrong_generator_instance._one_fight(1), 1.0)
 
     def test_one_fight_gen_malformed_sol(self):
         team = Team('0', self.tests_path + '/generator_malformed_solution', self.tests_path + '/solver')
         match_malformed_generator_solution = Match(self.problem, self.config, [team], cache_docker_containers=False)
-        match_malformed_generator_solution.generating_team = '0'
-        match_malformed_generator_solution.solving_team = '0'
+        match_malformed_generator_solution.generating_team = team
+        match_malformed_generator_solution.solving_team = team
         self.assertEqual(match_malformed_generator_solution._one_fight(1), 1.0)
 
     def test_one_fight_gen_wrong_cert(self):
         team = Team('0', self.tests_path + '/generator_wrong_certificate', self.tests_path + '/solver')
         match_wrong_generator_certificate = Match(self.problem, self.config, [team], cache_docker_containers=False)
-        match_wrong_generator_certificate.generating_team = '0'
-        match_wrong_generator_certificate.solving_team = '0'
+        match_wrong_generator_certificate.generating_team = team
+        match_wrong_generator_certificate.solving_team = team
         self.assertEqual(match_wrong_generator_certificate._one_fight(1), 1.0)
 
     def test_one_fight_sol_timeout(self):
         team = Team('0', self.tests_path + '/generator', self.tests_path + '/solver_timeout')
         match_solver_timeout = Match(self.problem, self.config_short_timeout, [team], cache_docker_containers=False)
-        match_solver_timeout.generating_team = '0'
-        match_solver_timeout.solving_team = '0'
+        match_solver_timeout.generating_team = team
+        match_solver_timeout.solving_team = team
         self.assertEqual(match_solver_timeout._one_fight(1), 0.0)
 
     def test_one_fight_sol_exec_error(self):
         team = Team('0', self.tests_path + '/generator', self.tests_path + '/solver_execution_error')
         match_broken_solver = Match(self.problem, self.config, [team], cache_docker_containers=False)
-        match_broken_solver.generating_team = '0'
-        match_broken_solver.solving_team = '0'
+        match_broken_solver.generating_team = team
+        match_broken_solver.solving_team = team
         self.assertEqual(match_broken_solver._one_fight(1), 0.0)
 
     def test_one_fight_sol_malformed(self):
         team = Team('0', self.tests_path + '/generator', self.tests_path + '/solver_malformed_solution')
         match_malformed_solution = Match(self.problem, self.config, [team], cache_docker_containers=False)
-        match_malformed_solution.generating_team = '0'
-        match_malformed_solution.solving_team = '0'
+        match_malformed_solution.generating_team = team
+        match_malformed_solution.solving_team = team
         self.assertEqual(match_malformed_solution._one_fight(1), 0.0)
 
     def test_one_fight_sol_wrong_cert(self):
         team = Team('0', self.tests_path + '/generator', self.tests_path + '/solver_wrong_certificate')
         match_wrong_certificate = Match(self.problem, self.config, [team], cache_docker_containers=False)
-        match_wrong_certificate.generating_team = '0'
-        match_wrong_certificate.solving_team = '0'
+        match_wrong_certificate.generating_team = team
+        match_wrong_certificate.solving_team = team
         self.assertEqual(match_wrong_certificate._one_fight(1), 0.0)
 
     def test_one_fight_successful(self):
         successful_match = Match(self.problem, self.config, [self.team], cache_docker_containers=False)
-        successful_match.generating_team = '0'
-        successful_match.solving_team = '0'
+        successful_match.generating_team = self.team
+        successful_match.solving_team = self.team
         self.assertEqual(successful_match._one_fight(1), 1.0)
 
 
