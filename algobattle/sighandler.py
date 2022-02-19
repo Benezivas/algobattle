@@ -1,5 +1,4 @@
 """Implementations used to safely kill a running battle, cleaning up possibly running docker containers."""
-from asyncio.subprocess import STDOUT
 import signal
 import sys
 import logging

@@ -1,16 +1,12 @@
 """Tests for all util functions."""
-import subprocess
 import unittest
 import logging
 import importlib
 import os
 
 import algobattle
-from algobattle.match import Match
-from algobattle.team import Team
 from algobattle.util import import_problem_from_path
 from algobattle.docker import measure_runtime_overhead
-import algobattle.sighandler as sigh
 
 logging.disable(logging.CRITICAL)
 

@@ -10,9 +10,7 @@ from subprocess import CalledProcessError, TimeoutExpired, run
 from timeit import default_timer
 from typing import Callable
 from uuid import uuid1
-import os
 
-import algobattle
 import algobattle.problems.delaytest as DelaytestProblem
 
 

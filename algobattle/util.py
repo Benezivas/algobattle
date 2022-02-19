@@ -1,19 +1,11 @@
 """Collection of utility functions."""
 from __future__ import annotations
-import os
 import logging
-import timeit
-import subprocess
 import importlib.util
 import sys
 from typing import Callable
 
-import algobattle
-import algobattle.problems.delaytest as DelaytestProblem
-import algobattle.sighandler as sigh
 from algobattle.problem import Problem
-from algobattle.team import Team
-import algobattle.match
 
 
 logger = logging.getLogger('algobattle.util')

@@ -1,20 +1,16 @@
 """Match class, provides functionality for setting up and executing battles between given teams."""
 from __future__ import annotations
-from dataclasses import dataclass, field
 import itertools
-import subprocess
-import os
 
 import logging
 import configparser
 from typing import Any
 from algobattle.battle_wrapper import BattleWrapper
 
-import algobattle.sighandler as sigh
 from algobattle.team import Team
 from algobattle.problem import Problem
 from algobattle.util import team_roles_set
-from algobattle.docker import DockerError, docker_running, build, Image
+from algobattle.docker import docker_running, build
 from algobattle.subject import Subject
 from algobattle.observer import Observer
 from algobattle.battle_wrappers.averaged import Averaged
@@ -56,26 +52,6 @@ class Match(Subject):
         self.config = config
         self.approximation_ratio = approximation_ratio
         
-        self.generator_base_run_command = lambda a: [
-            "docker",
-            "run",
-            "--rm",
-            "--network", "none",
-            "-i",
-            "--memory=" + str(a) + "mb",
-            "--cpus=" + str(self.cpus)
-        ]
-
-        self.solver_base_run_command = lambda a: [
-            "docker",
-            "run",
-            "--rm",
-            "--network", "none",
-            "-i",
-            "--memory=" + str(a) + "mb",
-            "--cpus=" + str(self.cpus)
-        ]
-
         if approximation_ratio != 1.0 and not problem.approximable:
             logger.error('The given problem is not approximable and can only be run with an approximation ratio of 1.0!')
             raise ConfigurationError
@@ -114,14 +90,6 @@ class Match(Subject):
         Bool
             Boolean indicating whether the build process succeeded.
         """
-        base_build_command = [
-            "docker",
-            "build",
-        ] + (["--no-cache"] if not cache_docker_containers else []) + [
-            "--network=host",
-            "-t"
-        ]
-
         if not isinstance(teams, list) or any(not isinstance(team, Team) for team in teams):
             logger.error('Teams argument is expected to be a list of Team objects!')
             raise TypeError
@@ -311,7 +279,6 @@ class Match(Subject):
         scaled_memory = self.problem.solver_memory_scaler(self.space_solver, instance_size)
         instance_str = self.problem.parser.encode(instance)
 
-        solver_run_command = self.solver_base_run_command(scaled_memory) + ["solver-" + str(self.solving_team)]
         logger.debug(f'Running solver of group {self.solving_team}...\n')
         try:
             output = self.solving_team.solver.run(instance_str, timeout=self.timeout_solver, memory=scaled_memory, cpus=self.cpus)
