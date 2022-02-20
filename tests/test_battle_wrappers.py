@@ -1,5 +1,4 @@
 """Tests for all util functions."""
-import subprocess
 import unittest
 import logging
 import importlib
@@ -31,8 +30,7 @@ class BattleWrapperTests(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls) -> None:
-        images = " ".join(f"generator-{name} solver-{name}" for name in cls.match.teams)
-        subprocess.Popen(f"docker image rm -f {images}")
+        cls.match.cleanup()
 
     def test_averaged_battle_wrapper(self):
         pass  # TODO: Implement tests for averaged battle wrapper
