@@ -308,3 +308,10 @@ class Match(Subject):
     def format_as_utf8(self) -> str:
         assert self.battle_wrapper is not None
         return self.battle_wrapper.format_as_utf8()
+
+    def cleanup(self) -> None:
+        for team in self.teams:
+            if team.generator is not None:
+                team.generator.remove()
+            if team.solver is not None:
+                team.solver.remove()
