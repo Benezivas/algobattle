@@ -107,6 +107,26 @@ class Image:
         logger.debug(f'Approximate elapsed runtime: {elapsed_time}/{timeout} seconds.')
 
         return result.stdout
+    
+    def remove(self) -> None:
+        cmd = ["docker", "image", "rm", "-f", self.id]
+        try:
+            run(cmd, capture_output=True, check=True, text=True)
+
+        except CalledProcessError as e:
+            if e.stderr.find("No such image") == -1:
+                logger.warning(f"Removing '{self.description}' did not complete successfully:\n{e.stderr}")
+            raise DockerError from e
+
+        except OSError as e:
+            logger.warning(f"OSError thrown while trying to remove '{self.description}':\n{e}")
+            raise DockerError from e
+
+        except ValueError as e:
+            logger.warning(f"Trying to remove '{self.description}' with invalid arguments:\n{e}")
+            raise DockerError from e
+
+
 
 def _kill_container(image: Image, name: str) -> None:
     try:
