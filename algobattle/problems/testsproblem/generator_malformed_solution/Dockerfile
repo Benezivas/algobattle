@@ -1,6 +1,4 @@
-FROM python:3
+FROM alpine
 
-COPY main.sh /
-COPY main.py /
-
-CMD ["./main.sh"]
+# outputs a static, artificially malformed solution.
+CMD ["printf", "i 1\ns 0 1\n"]
