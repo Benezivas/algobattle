@@ -19,50 +19,46 @@ logger = logging.getLogger("algobattle.docker")
 class DockerError(Exception):
     pass
 
-
-def build(path: str,
-        image_name: str = "",
-        description: str = "",
-        timeout: float | None = None,
-        cache: bool = True,
-        )-> Image:
-    cmd = ["docker", "build", "-q", "--network=host"]
-    if image_name is not None:
-        cmd += ["-t", image_name]
-    if not cache:
-        cmd.append("--no-cache")
-    cmd.append(path)
-    
-    logger.debug(f"Building docker container with the following command: {' '.join(cmd)}")
-    try:
-        result = run(cmd, capture_output=True, timeout=timeout, check=True, text=True)
-
-    except TimeoutExpired as e:
-        logger.error(f"Build process for '{path}' ran into a timeout!")
-        raise DockerError from e
-
-    except CalledProcessError as e:
-        logger.warning(f"Building '{path}' did not complete successfully:\n{e.stderr}")
-        raise DockerError from e
-
-    except OSError as e:
-        logger.warning(f"OSError thrown while building '{path}':\n{e}")
-        raise DockerError from e
-
-    except ValueError as e:
-        logger.warning(f"Build process for '{path}' created with invalid arguments:\n{e}")
-        raise DockerError from e
-
-    return Image(image_name, result.stdout.strip()[7:], description)
-
-
 _running_containers: set[tuple[Image, str]] = set()
 
-@dataclass(frozen=True)
 class Image:
-    name: str
-    id: str
-    description: str
+    def __init__(self,
+                path: str,
+                image_name: str = "",
+                description: str = "",
+                timeout: float | None = None,
+                cache: bool = True,
+                )-> None:
+        cmd = ["docker", "build", "-q", "--network=host"]
+        if image_name is not None:
+            cmd += ["-t", image_name]
+        if not cache:
+            cmd.append("--no-cache")
+        cmd.append(path)
+        
+        logger.debug(f"Building docker container with the following command: {' '.join(cmd)}")
+        try:
+            result = run(cmd, capture_output=True, timeout=timeout, check=True, text=True)
+
+        except TimeoutExpired as e:
+            logger.error(f"Build process for '{path}' ran into a timeout!")
+            raise DockerError from e
+
+        except CalledProcessError as e:
+            logger.warning(f"Building '{path}' did not complete successfully:\n{e.stderr}")
+            raise DockerError from e
+
+        except OSError as e:
+            logger.warning(f"OSError thrown while building '{path}':\n{e}")
+            raise DockerError from e
+
+        except ValueError as e:
+            logger.warning(f"Build process for '{path}' created with invalid arguments:\n{e}")
+            raise DockerError from e
+
+        self.name = image_name
+        self.id = result.stdout.strip()[7:]
+        self.description = description if description else image_name
 
     def run(self,
             input: str | None = None,
@@ -151,7 +147,7 @@ def measure_runtime_overhead() -> float:
 
     delaytest_path = DelaytestProblem.__file__[:-12] + '/generator' # remove /__init__.py
     try:
-        image = build(delaytest_path, "delaytest_generator", "delaytest generator", timeout=300)
+        image = Image(delaytest_path, "delaytest_generator", "delaytest generator", timeout=300)
     except DockerError:
         return 0
 

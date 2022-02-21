@@ -10,7 +10,7 @@ from algobattle.battle_wrapper import BattleWrapper
 from algobattle.team import Team
 from algobattle.problem import Problem
 from algobattle.util import team_roles_set
-from algobattle.docker import DockerError, docker_running, build
+from algobattle.docker import DockerError, Image, docker_running
 from algobattle.subject import Subject
 from algobattle.observer import Observer
 from algobattle.battle_wrappers.averaged import Averaged
@@ -103,8 +103,8 @@ class Match(Subject):
 
         for team in teams:
             try:
-                team.generator = build(team.generator_path, f"generator-{team.name}", f"generator for team {team.name}", timeout=self.timeout_build)
-                team.solver = build(team.solver_path, f"solver-{team.name}", f"solver for team {team.name}", timeout=self.timeout_build)
+                team.generator = Image(team.generator_path, f"generator-{team.name}", f"generator for team {team.name}", timeout=self.timeout_build)
+                team.solver = Image(team.solver_path, f"solver-{team.name}", f"solver for team {team.name}", timeout=self.timeout_build)
             except DockerError:
                 logger.error(f"Removing team {team.name} as their containers did not build successfully.")
                 self.teams.remove(team)
