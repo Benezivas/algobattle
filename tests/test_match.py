@@ -48,10 +48,11 @@ class Matchtests(unittest.TestCase):
             self.match = Match(self.problem, self.config, [self.team])
         self.assertBuild(build_match)
 
+    # Do we really need this test if we have to trick the type checker to make it fail?
     def test_build_malformed_docker(self):
         # Malformed docker names
         self.match = Match(self.problem, self.config, [self.team], cache_docker_containers=False)
-        self.assertRaises(TypeError, lambda: cast(Match, self.match)._build((1, 0)))
+        self.assertRaises(TypeError, lambda: cast(Match, self.match)._build(cast(list[Team], (1, 0))))
 
     def test_build_timeout(self):
         # Build timeout
