@@ -17,18 +17,43 @@ import algobattle.problems.delaytest as DelaytestProblem
 logger = logging.getLogger("algobattle.docker")
 
 class DockerError(Exception):
+    """Error type for any issue during the execution of a docker command.
+    The only error raised by any function in the docker module."""
     pass
 
 _running_containers: set[tuple[Image, str]] = set()
 
 class Image:
+    """Class defining a docker image.
+    Constructor execution may take several seconds and should not be interrupted."""
     def __init__(self,
                 path: str,
-                image_name: str = "",
-                description: str = "",
+                image_name: str,
+                description: str | None,
                 timeout: float | None = None,
                 cache: bool = True,
                 )-> None:
+        """Constructs the python Image object and uses the docker daemon to build the image.
+        
+        Parameters
+        ----------
+        path
+            Path to folder containing the Dockerfile
+        image_name
+            Name of the image, used both internally and for the docker image name.
+        description
+            Optional description for the image, defaults to image_name
+        timeout
+            Build timeout in seconds, raises DockerError if exceeded.
+        cache
+            Unset to instruct docker to not cache the image build.
+        
+        Raises
+        ------
+        DockerError
+        	On almost all common issues that might happen during the build, including timeouts, syntax errors,
+            OS errors, and errors thrown by the docker daemon.
+        """
         cmd = ["docker", "build", "-q", "--network=host"]
         if image_name is not None:
             cmd += ["-t", image_name]
@@ -58,7 +83,7 @@ class Image:
 
         self.name = image_name
         self.id = result.stdout.strip()[7:]
-        self.description = description if description else image_name
+        self.description = description if description is not None else image_name
 
     def run(self,
             input: str | None = None,
@@ -66,6 +91,30 @@ class Image:
             memory: int | None = None,
             cpus: int | None = None
             ) -> str:
+        """Runs a docker image with the provided input and returns its output.
+
+        Parameters
+        ----------
+        input
+            The input string the container will be provided with
+        timeout
+            Timeout in seconds. Returns an empty output if exceeded
+        memory
+            Maximum memory the container will be allocated in MB
+        cpus
+            Number of cpus the container will be allocated
+        
+        Returns
+        -------
+        Output string of the container
+
+        Raises
+        ------
+        DockerError
+        	On almost all common issues that might happen during the execution, including syntax errors,
+            OS errors, and errors thrown by the docker daemon.
+
+        """
         start_time = default_timer()
         name = f"algobattle_{uuid1().hex[:8]}"
         cmd = ["docker", "run", "--rm", "--network", "none", "-i", "--name", name]
@@ -105,6 +154,19 @@ class Image:
         return result.stdout
     
     def remove(self) -> None:
+        """Removes the image from the docker daemon.
+        
+        **This will not cause the python object to be deleted.** Attempting to run the image after it has been removed will
+        cause runtime errors not caught by the linter or typechecker. 
+        Will not throw an error if the image has been removed already.
+
+        Raises
+        ------
+        DockerError
+        	On almost all common issues that might happen during the execution, including syntax errors,
+            OS errors, and errors thrown by the docker daemon.
+
+        """
         cmd = ["docker", "image", "rm", "-f", self.id]
         try:
             run(cmd, capture_output=True, check=True, text=True)
@@ -125,6 +187,17 @@ class Image:
 
 
 def _kill_container(image: Image, name: str) -> None:
+    """Kills a running container.
+    Do not call this function if you didn't start the container,
+    it's rather unsafe and will cause many downstream errors.
+    
+    Parameters
+    ----------
+    image
+        Image that the container was built from.
+    name
+        Name of the container, not of the image.
+    """
     try:
         run(["docker", "kill", name], capture_output=True, check=True, text=True)
     except CalledProcessError as e:
@@ -133,6 +206,9 @@ def _kill_container(image: Image, name: str) -> None:
     _running_containers.discard((image, name))
 
 def kill_all_running_containers() -> None:
+    """Kills all currently running containers.
+    You should only call this in order to completely abort a match, it will cause many downstream errors.
+    """
     for container in _running_containers.copy():
         _kill_container(*container)
 
