@@ -10,7 +10,7 @@ from algobattle.battle_wrapper import BattleWrapper
 from algobattle.team import Team
 from algobattle.problem import Problem
 from algobattle.util import team_roles_set
-from algobattle.docker import DockerError, Image, docker_running
+from algobattle.docker import DockerError, Image
 from algobattle.subject import Subject
 from algobattle.observer import Observer
 from algobattle.battle_wrappers.averaged import Averaged
@@ -71,7 +71,6 @@ class Match(Subject):
         for observer in self._observers:
             observer.update(self)
 
-    @docker_running
     def _build(self, teams: list[Team], cache_docker_containers: bool=True) -> None:
         """Build docker containers for the given generators and solvers of each team.
 
@@ -165,7 +164,6 @@ class Match(Subject):
 
         return self.battle_wrapper
 
-    @docker_running
     @team_roles_set
     def _one_fight(self, instance_size: int) -> float:
         """Execute a single fight of a battle between a given generator and solver for a given instance size.
@@ -198,7 +196,6 @@ class Match(Subject):
                     .format(self.solving_team, approximation_ratio))
         return approximation_ratio
 
-    @docker_running
     @team_roles_set
     def _run_generator(self, instance_size: int) -> tuple[Any, Any]:
         """Execute the generator of match.generating_team and check the validity of the generated output.
@@ -256,7 +253,6 @@ class Match(Subject):
 
         return instance, generator_solution
 
-    @docker_running
     @team_roles_set
     def _run_solver(self, instance_size: int, instance: Any) -> Any:
         """Execute the solver of match.solving_team and check the validity of the generated output.

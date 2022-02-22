@@ -255,15 +255,3 @@ def measure_runtime_overhead() -> float:
             overheads.append(300)
     
     return round(max(overheads), 2)
- 
-
-def docker_running(function: Callable) -> Callable:
-    """Ensure that internal methods are only callable if docker is running."""
-    def wrapper(self, *args, **kwargs):
-        try:
-            run(["docker", "info"], capture_output=True, check=True, text=True)
-        except CalledProcessError:
-            logger.error("could not connect to the docker daemon. Is docker running?")
-            raise SystemExit
-        return function(self, *args, **kwargs)
-    return wrapper
