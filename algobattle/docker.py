@@ -4,7 +4,6 @@ functionality like timeouts and windows support requires annoying workarounds at
 """
 
 from __future__ import annotations
-from dataclasses import dataclass
 import logging
 from subprocess import CalledProcessError, TimeoutExpired, run
 from timeit import default_timer
@@ -70,6 +69,10 @@ class Image:
             raise DockerError from e
 
         except CalledProcessError as e:
+            if e.stderr.find("error during connect") != -1:
+                logger.error("Could not connect to the docker daemon. Is docker running?")
+                raise SystemExit("Exited algobattle: Could not connect to the docker daemon. Is docker running?")
+
             logger.warning(f"Building '{path}' did not complete successfully:\n{e.stderr}")
             raise DockerError from e
 
@@ -134,6 +137,10 @@ class Image:
             return ""
 
         except CalledProcessError as e:
+            if e.stderr.find("error during connect") != -1:
+                logger.error("Could not connect to the docker daemon. Is docker running?")
+                raise SystemExit("Exited algobattle: Could not connect to the docker daemon. Is docker running?")
+
             logger.warning(f"Running '{self.description}' did not complete successfully:\n{e.stderr}")
             raise DockerError from e
 
@@ -172,8 +179,13 @@ class Image:
             run(cmd, capture_output=True, check=True, text=True)
 
         except CalledProcessError as e:
+            if e.stderr.find("error during connect") != -1:
+                logger.error("Could not connect to the docker daemon. Is docker running?")
+                raise SystemExit("Exited algobattle: Could not connect to the docker daemon. Is docker running?")
+            
             if e.stderr.find("No such image") == -1:
                 logger.warning(f"Removing '{self.description}' did not complete successfully:\n{e.stderr}")
+            
             raise DockerError from e
 
         except OSError as e:
@@ -200,9 +212,15 @@ def _kill_container(image: Image, name: str) -> None:
     """
     try:
         run(["docker", "kill", name], capture_output=True, check=True, text=True)
+    
     except CalledProcessError as e:
+        if e.stderr.find("error during connect") != -1:
+            logger.error("Could not connect to the docker daemon. Is docker running?")
+            raise SystemExit("Exited algobattle: Could not connect to the docker daemon. Is docker running?")
+        
         if e.stderr.find(f"No such container: {name}") == -1:
             logger.warning(f"Could not kill container '{image.description}':\n{e.stderr}")
+    
     _running_containers.discard((image, name))
 
 def kill_all_running_containers() -> None:
@@ -246,6 +264,6 @@ def docker_running(function: Callable) -> Callable:
             run(["docker", "info"], capture_output=True, check=True, text=True)
         except CalledProcessError:
             logger.error("could not connect to the docker daemon. Is docker running?")
-            raise DockerError
+            raise SystemExit
         return function(self, *args, **kwargs)
     return wrapper

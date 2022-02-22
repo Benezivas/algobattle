@@ -19,58 +19,56 @@ from algobattle.ui import Ui
 #! do not remove, even when unused!
 import algobattle.sighandler
 
+def setup_logging(logging_path: str | Path, verbose_logging: bool, silent: bool):
+    """Creates and returns a parent logger.
+
+    Parameters:
+    ----------
+    logging_path : str
+        Path to folder where the logfile should be stored at.
+    verbose_logging : bool
+        Flag indicating whether to include debug messages in the output
+    silent : bool
+        Flag indicating whether not to pipe the logging output to stderr.
+
+    Returns:
+    ----------
+    Logger:
+        The Logger object.
+    """
+    common_logging_level = logging.INFO
+
+    if verbose_logging:
+        common_logging_level = logging.DEBUG
+
+    os.makedirs(logging_path, exist_ok=True)
+
+    _now = dt.datetime.now()
+
+    time_seperator = ':' if os.name == 'posix' else '-'
+    current_timestamp = f'{_now.year:04d}-{_now.month:02d}-{_now.day:02d}_{_now.hour:02d}{time_seperator}{_now.minute:02d}{time_seperator}{_now.second:02d}'
+    logging_path = Path(logging_path, current_timestamp + '.log')
+
+    logging.basicConfig(handlers=[logging.FileHandler(logging_path, 'w', 'utf-8')],
+                        level=common_logging_level,
+                        format='%(asctime)s %(levelname)s: %(message)s',
+                        datefmt='%H:%M:%S')
+
+    logger = logging.getLogger('algobattle')
+
+    if not silent:
+        # Pipe logging out to console
+        _consolehandler = logging.StreamHandler(stream=sys.stderr)
+        _consolehandler.setLevel(common_logging_level)
+
+        _consolehandler.setFormatter(logging.Formatter('%(message)s'))
+
+        logger.addHandler(_consolehandler)
+
+    logger.info(f'You can find the log files for this run in {logging_path}')
+    return logger
+
 if __name__ == "__main__":
-
-    def setup_logging(logging_path: str | Path, verbose_logging: bool, silent: bool):
-        """Creates and returns a parent logger.
-
-        Parameters:
-        ----------
-        logging_path : str
-            Path to folder where the logfile should be stored at.
-        verbose_logging : bool
-            Flag indicating whether to include debug messages in the output
-        silent : bool
-            Flag indicating whether not to pipe the logging output to stderr.
-
-        Returns:
-        ----------
-        Logger:
-            The Logger object.
-        """
-        common_logging_level = logging.INFO
-
-        if verbose_logging:
-            common_logging_level = logging.DEBUG
-
-        if not os.path.exists(logging_path):
-            os.makedirs(logging_path)
-
-        _now = dt.datetime.now()
-
-        time_seperator = ':' if os.name == 'posix' else '-'
-        current_timestamp = f'{_now.year:04d}-{_now.month:02d}-{_now.day:02d}_{_now.hour:02d}{time_seperator}{_now.minute:02d}{time_seperator}{_now.second:02d}'
-        logging_path = Path(logging_path, current_timestamp + '.log')
-
-        logging.basicConfig(handlers=[logging.FileHandler(logging_path, 'w', 'utf-8')],
-                            level=common_logging_level,
-                            format='%(asctime)s %(levelname)s: %(message)s',
-                            datefmt='%H:%M:%S')
-
-        logger = logging.getLogger('algobattle')
-
-        if not silent:
-            # Pipe logging out to console
-            _consolehandler = logging.StreamHandler(stream=sys.stderr)
-            _consolehandler.setLevel(common_logging_level)
-
-            _consolehandler.setFormatter(logging.Formatter('%(message)s'))
-
-            logger.addHandler(_consolehandler)
-
-        logger.info(f'You can find the log files for this run in {logging_path}')
-        return logger
-
     if len(sys.argv) < 2:
         sys.exit('Expecting (relative) path to the parent directory of a problem file as argument. Use "battle --help" for more information on usage and options.')
 
