@@ -1,4 +1,5 @@
 """Tests for all util functions."""
+from pathlib import Path
 import unittest
 import logging
 import importlib
@@ -21,10 +22,10 @@ class BattleWrapperTests(unittest.TestCase):
         Problem = importlib.import_module('algobattle.problems.testsproblem')
         assert Problem is not None
         cls.problem = Problem.Problem()
-        base_path = os.path.dirname(os.path.abspath(algobattle.__file__))
-        generator_path = os.path.join(base_path, "problems", "testsproblem", "generator")
-        solver_path = os.path.join(base_path, "problems", "testsproblem", "solver")
-        cls.config = os.path.join(base_path, 'config', 'config.ini')
+        base_path = Path(algobattle.__file__).resolve().parent
+        generator_path = base_path / "problems" / "testsproblem" / "generator"
+        solver_path = base_path / "problems" / "testsproblem" / "solver"
+        cls.config = base_path / 'config' / 'config.ini'
         cls.teams = (Team("0", generator_path, solver_path), Team("1", generator_path, solver_path))
         cls.match = Match(cls.problem, cls.config, list(cls.teams))
 

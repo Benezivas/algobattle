@@ -4,6 +4,7 @@ import itertools
 
 import logging
 import configparser
+from pathlib import Path
 from typing import Any
 from algobattle.battle_wrapper import BattleWrapper
 
@@ -35,7 +36,7 @@ class Match(Subject):
     solving_team = None
     battle_wrapper = None
 
-    def __init__(self, problem: Problem, config_path: str, teams: list[Team],
+    def __init__(self, problem: Problem, config_path: Path, teams: list[Team],
                  runtime_overhead: float = 0, approximation_ratio: float = 1.0, cache_docker_containers: bool = True) -> None:
 
         config = configparser.ConfigParser()

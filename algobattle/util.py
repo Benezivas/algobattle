@@ -2,6 +2,7 @@
 from __future__ import annotations
 import logging
 import importlib.util
+from pathlib import Path
 import sys
 from typing import Callable
 
@@ -11,12 +12,12 @@ from algobattle.problem import Problem
 logger = logging.getLogger('algobattle.util')
 
 
-def import_problem_from_path(problem_path: str) -> Problem | None:
+def import_problem_from_path(problem_path: Path) -> Problem | None:
     """Try to import and initialize a Problem object from a given path.
 
     Parameters
     ----------
-    problem_path : str
+    problem_path : Path
         Path in the file system to a problem folder.
 
     Returns
@@ -25,7 +26,7 @@ def import_problem_from_path(problem_path: str) -> Problem | None:
         Returns an object of the problem if successful, None otherwise.
     """
     try:
-        spec = importlib.util.spec_from_file_location("problem", problem_path + "/__init__.py")
+        spec = importlib.util.spec_from_file_location("problem", problem_path / "__init__.py")
         assert spec is not None
         assert spec.loader is not None
         Problem = importlib.util.module_from_spec(spec)

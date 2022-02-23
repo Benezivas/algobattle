@@ -5,6 +5,7 @@ functionality like timeouts and windows support requires annoying workarounds at
 
 from __future__ import annotations
 import logging
+from pathlib import Path
 from subprocess import CalledProcessError, TimeoutExpired, run
 from timeit import default_timer
 from typing import Callable
@@ -26,7 +27,7 @@ class Image:
     """Class defining a docker image.
     Constructor execution may take several seconds and should not be interrupted."""
     def __init__(self,
-                path: str,
+                path: Path,
                 image_name: str,
                 description: str | None,
                 timeout: float | None = None,
@@ -58,7 +59,7 @@ class Image:
             cmd += ["-t", image_name]
         if not cache:
             cmd.append("--no-cache")
-        cmd.append(path)
+        cmd.append(str(path))
         
         logger.debug(f"Building docker container with the following command: {' '.join(cmd)}")
         try:
@@ -239,7 +240,7 @@ def measure_runtime_overhead() -> float:
         I/O overhead in seconds, rounded to two decimal places.
     """
 
-    delaytest_path = DelaytestProblem.__file__[:-12] + '/generator' # remove /__init__.py
+    delaytest_path = Path(DelaytestProblem.__file__).parent / 'generator'
     try:
         image = Image(delaytest_path, "delaytest_generator", "delaytest generator", timeout=300)
     except DockerError:

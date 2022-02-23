@@ -1,12 +1,13 @@
 """Team class, stores necessary information about a Team, such as their associated solver and generator."""
 from __future__ import annotations
+from pathlib import Path
 from algobattle.docker import Image
 
 class Team:
     """Team class responsible for holding basic information of a specific team."""
 
-    def __init__(self, team_name: str, generator_path: str, solver_path: str) -> None:
-        self.name = str(team_name).replace(' ', '_').lower()  # Lower case needed for docker tag created from name
+    def __init__(self, team_name: str, generator_path: Path, solver_path: Path) -> None:
+        self.name = team_name.replace(' ', '_').lower()  # Lower case needed for docker tag created from name
         self.generator_path = generator_path
         self.solver_path = solver_path
         self.generator: Image | None = None
