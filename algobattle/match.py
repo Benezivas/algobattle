@@ -212,7 +212,7 @@ class Match(Subject):
         assert team.generator is not None
         scaled_memory = self.problem.generator_memory_scaler(self.space_generator, instance_size)
 
-        logger.debug(f'Running generator of group {self.generating_team}...\n')
+        logger.debug(f'Running generator of group {team}...\n')
         try:
             output = team.generator.run(str(instance_size), timeout=self.timeout_generator, memory=scaled_memory, cpus=self.cpus)
         except DockerError:
@@ -231,20 +231,20 @@ class Match(Subject):
         generator_solution         = self.problem.parser.parse_solution(raw_solution, instance_size)
 
         if not self.problem.verifier.verify_semantics_of_instance(instance, instance_size):
-            logger.warning(f'Generator {self.generating_team} created a malformed instance!')
+            logger.warning(f'Generator {team} created a malformed instance!')
             return None, None
 
         if not self.problem.verifier.verify_semantics_of_solution(generator_solution, instance_size, True):
-            logger.warning(f'Generator {self.generating_team} created a malformed solution at instance size!')
+            logger.warning(f'Generator {team} created a malformed solution at instance size!')
             return None, None
 
         if not self.problem.verifier.verify_solution_against_instance(instance, generator_solution, instance_size, True):
-            logger.warning(f'Generator {self.generating_team} failed due to a wrong certificate for its generated instance!')
+            logger.warning(f'Generator {team} failed due to a wrong certificate for its generated instance!')
             return None, None
 
         self.problem.parser.postprocess_instance(instance, instance_size)
 
-        logger.info(f'Generated instance and certificate by group {self.generating_team} are valid!\n')
+        logger.info(f'Generated instance and certificate by group {team} are valid!\n')
 
         return instance, generator_solution
 
@@ -268,14 +268,14 @@ class Match(Subject):
         scaled_memory = self.problem.solver_memory_scaler(self.space_solver, instance_size)
         instance_str = self.problem.parser.encode(instance)
 
-        logger.debug(f'Running solver of group {self.solving_team}...\n')
+        logger.debug(f'Running solver of group {team}...\n')
         try:
             output = team.solver.run(instance_str, timeout=self.timeout_solver, memory=scaled_memory, cpus=self.cpus)
         except DockerError:
             return None
         
         if not output:
-            logger.warning(f'No output was generated when running the solver of group {self.solving_team}!')
+            logger.warning(f'No output was generated when running the solver of group {team}!')
             return None
 
         raw_solver_solution = self.problem.parser.decode(output)
@@ -285,11 +285,11 @@ class Match(Subject):
         solver_solution = self.problem.parser.parse_solution(raw_solver_solution, instance_size)
         if not self.problem.verifier.verify_semantics_of_solution(solver_solution, instance_size, True):
             logger.warning('Solver of group {} created a malformed solution at instance size {}!'
-                           .format(self.solving_team, instance_size))
+                           .format(team, instance_size))
             return None
         elif not self.problem.verifier.verify_solution_against_instance(instance, solver_solution, instance_size, False):
             logger.warning('Solver of group {} yields a wrong solution at instance size {}!'
-                           .format(self.solving_team, instance_size))
+                           .format(team, instance_size))
             return None
 
         return solver_solution
