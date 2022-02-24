@@ -24,7 +24,7 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
         solved: int = 0
         attempting: int = 0
 
-    def __init__(self, problem: Problem, run_parameters: RunParameters, rounds: int = 5,
+    def __init__(self, problem: Problem, run_parameters: RunParameters = RunParameters(), rounds: int = 5,
                 cap: int = 50000, exponent: int = 2,
                 **options) -> None:
         self.exponent = exponent

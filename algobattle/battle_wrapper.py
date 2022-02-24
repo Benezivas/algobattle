@@ -39,7 +39,7 @@ class BattleWrapper(ABC):
             object.__setattr__(self, name, value)
             self._match.notify()
     
-    def __init__(self, problem: Problem, run_parameters: RunParameters, rounds: int = 5, **options: Any):
+    def __init__(self, problem: Problem, run_parameters: RunParameters = RunParameters(), rounds: int = 5, **options: Any):
         """Builds a battle wrapper object with the given option values.
         Logs warnings if there were options provided that this wrapper doesn't use. 
 

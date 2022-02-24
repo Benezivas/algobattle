@@ -22,7 +22,7 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
     class Result(algobattle.battle_wrapper.BattleWrapper.Result):
         approx_ratios: list[float] = field(default_factory=list)
 
-    def __init__(self, problem: Problem, run_parameters: RunParameters, rounds: int = 5,
+    def __init__(self, problem: Problem, run_parameters: RunParameters = RunParameters(), rounds: int = 5,
                 instance_size: int = 10, iterations: int = 25,
                 **options: Any) -> None:
         self.instance_size = instance_size
