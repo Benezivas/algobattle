@@ -10,7 +10,6 @@ from algobattle.battle_wrapper import BattleWrapper
 
 from algobattle.team import Team
 from algobattle.problem import Problem
-from algobattle.util import team_roles_set
 from algobattle.docker import DockerError, Image
 from algobattle.subject import Subject
 from algobattle.observer import Observer

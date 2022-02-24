@@ -39,16 +39,6 @@ def import_problem_from_path(problem_path: Path) -> Problem | None:
         return None
 
 
-def team_roles_set(function: Callable) -> Callable:
-    """Ensure that internal methods are only callable after the team roles have been set."""
-    def wrapper(self, *args, **kwargs):
-        if not self.generating_team or not self.solving_team:
-            logger.error('Generating or solving team have not been set!')
-            return None
-        else:
-            return function(self, *args, **kwargs)
-    return wrapper
-
 def check_for_terminal(function: Callable) -> Callable:
     """Ensure that we are attached to a terminal."""
     def wrapper(self, *args, **kwargs):
