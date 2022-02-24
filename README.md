@@ -56,4 +56,9 @@ python path\to\installed\battle\script
 ```
 followed by your arguments instead of just `battle`.
 
+There is a [bug](ttps://bugs.python.org/issue28168) in the way Python handles interrupts on windows.
+This means that if the container you're running doesn't terminate when it receives `CTRL + C`
+the battle script won't stop executing until the timeout has been reached. Avoid installing badly
+behaving signal handlers in your programs to avoid running into this issue.
+
 Check the [wiki](https://github.com/Benezivas/algobattle/wiki) for further documentation.
