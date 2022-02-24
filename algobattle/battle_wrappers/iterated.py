@@ -172,13 +172,13 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
         formatted_output_string = ""
         formatted_output_string += 'Battle Type: Iterated Battle\n\r'
         formatted_output_string += '╔═════════╦═════════╦' \
-                                   + ''.join(['══════╦' for i in range(self.rounds)]) \
+                                   + ''.join(['══════╦' for _ in range(self.rounds)]) \
                                    + '══════╦══════╗' + '\n\r' \
                                    + '║   GEN   ║   SOL   ' \
                                    + ''.join([f'║{"R" + str(i + 1):^6s}' for i in range(self.rounds)]) \
                                    + '║  CAP ║  AVG ║' + '\n\r' \
                                    + '╟─────────╫─────────╫' \
-                                   + ''.join(['──────╫' for i in range(self.rounds)]) \
+                                   + ''.join(['──────╫' for _ in range(self.rounds)]) \
                                    + '──────╫──────╢' + '\n\r'
 
         for pair in self.pairs.keys():
@@ -190,7 +190,7 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
                                                     for i in range(self.rounds)]) \
                                         + f'║{self.pairs[pair][curr_round].cap:>6d}║{avg:>6d}║' + '\r\n'
         formatted_output_string += '╚═════════╩═════════╩' \
-                                   + ''.join(['══════╩' for i in range(self.rounds)]) \
+                                   + ''.join(['══════╩' for _ in range(self.rounds)]) \
                                    + '══════╩══════╝' + '\n\r'
 
         return formatted_output_string

@@ -8,7 +8,6 @@ import logging
 from pathlib import Path
 from subprocess import CalledProcessError, TimeoutExpired, run
 from timeit import default_timer
-from typing import Callable
 from uuid import uuid1
 
 import algobattle.problems.delaytest as DelaytestProblem

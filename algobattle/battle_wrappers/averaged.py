@@ -130,17 +130,17 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
         formatted_output_string = ""
         formatted_output_string += 'Battle Type: Averaged Battle\n\r'
         formatted_output_string += '╔═════════╦═════════╦' \
-                                   + ''.join(['══════╦' for i in range(self.rounds)]) \
+                                   + ''.join(['══════╦' for _ in range(self.rounds)]) \
                                    + '══════╦══════╦════════╗' + '\n\r' \
                                    + '║   GEN   ║   SOL   ' \
                                    + ''.join([f'║{"R" + str(i + 1):^6s}' for i in range(self.rounds)]) \
                                    + '║ LAST ║ SIZE ║  ITER  ║' + '\n\r' \
                                    + '╟─────────╫─────────╫' \
-                                   + ''.join(['──────╫' for i in range(self.rounds)]) \
+                                   + ''.join(['──────╫' for _ in range(self.rounds)]) \
                                    + '──────╫──────╫────────╢' + '\n\r'
 
         for pair in self.pairs.keys():
-            avg = [0.0 for i in range(self.rounds)]
+            avg = [0.0 for _ in range(self.rounds)]
 
             for i in range(self.rounds):
                 executed_iters = len(self.pairs[pair][i].approx_ratios)
@@ -156,13 +156,13 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
                 latest_approx_ratio = self.pairs[pair][curr_round].approx_ratios[-1]
 
             formatted_output_string += f'║{pair[0]:>9s}║{pair[1]:>9s}' \
-                                        + ''.join([f'║{avg[1]:>6.2f}' for i in range(self.rounds)]) \
+                                        + ''.join([f'║{avg[i]:>6.2f}' for i in range(self.rounds)]) \
                                         + '║{:>6.2f}║{:>6d}║{:>3d}/{:>3d} ║'.format(latest_approx_ratio,
                                                                                     self.instance_size,
                                                                                     curr_iter,
                                                                                     self.iterations) + '\r\n'
         formatted_output_string += '╚═════════╩═════════╩' \
-                                   + ''.join(['══════╩' for i in range(self.rounds)]) \
+                                   + ''.join(['══════╩' for _ in range(self.rounds)]) \
                                    + '══════╩══════╩════════╝' + '\n\r'
 
         return formatted_output_string

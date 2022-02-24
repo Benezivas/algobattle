@@ -5,7 +5,6 @@ from typing import Callable, cast
 import unittest
 import logging
 import importlib
-import os
 
 import algobattle
 from algobattle.match import BuildError, Match, UnknownBattleType
