@@ -103,8 +103,8 @@ class Match(Subject):
 
         for team in teams:
             try:
-                team.generator = Image(team.generator_path, f"generator-{team.name}", f"generator for team {team.name}", timeout=self.timeout_build)
-                team.solver = Image(team.solver_path, f"solver-{team.name}", f"solver for team {team.name}", timeout=self.timeout_build)
+                team.generator = Image(team.generator_path, f"generator-{team.name}", f"generator for team {team.name}", timeout=self.timeout_build, cache=cache_docker_containers)
+                team.solver = Image(team.solver_path, f"solver-{team.name}", f"solver for team {team.name}", timeout=self.timeout_build, cache=cache_docker_containers)
             except DockerError:
                 logger.error(f"Removing team {team.name} as their containers did not build successfully.")
                 self.teams.remove(team)
