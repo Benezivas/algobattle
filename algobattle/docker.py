@@ -121,7 +121,7 @@ class Image:
         """
         start_time = default_timer()
         name = f"algobattle_{uuid1().hex[:8]}"
-        cmd = ["docker", "run", "--rm", "--network", "none", "-i", "--name", name]
+        cmd = ["docker", "run", "--rm", "--network", "none", "-i", "--sig-proxy=true", "--name", name]
         if memory is not None:
             cmd.append(f"-m={memory}mb")
         if cpus is not None:
