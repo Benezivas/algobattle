@@ -2,13 +2,12 @@
 from pathlib import Path
 import unittest
 import logging
-import importlib
 
 import algobattle
 from algobattle.battle_wrappers.averaged import Averaged
 from algobattle.battle_wrappers.iterated import Iterated
-from algobattle.match import Match
 from algobattle.team import Team
+from algobattle.problems.testsproblem import Problem
 
 logging.disable(logging.CRITICAL)
 
@@ -18,19 +17,11 @@ class BattleWrapperTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        Problem = importlib.import_module('algobattle.problems.testsproblem')
-        assert Problem is not None
-        cls.problem = Problem.Problem()
+        cls.problem = Problem()
         base_path = Path(algobattle.__file__).resolve().parent
         generator_path = base_path / "problems" / "testsproblem" / "generator"
         solver_path = base_path / "problems" / "testsproblem" / "solver"
-        cls.config = base_path / 'config' / 'config.ini'
         cls.teams = (Team("0", generator_path, solver_path), Team("1", generator_path, solver_path))
-        cls.match = Match(cls.problem, cls.config, list(cls.teams))
-
-    @classmethod
-    def tearDownClass(cls) -> None:
-        cls.match.cleanup()
 
     def test_averaged_battle_wrapper(self):
         pass  # TODO: Implement tests for averaged battle wrapper
