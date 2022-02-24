@@ -32,7 +32,7 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
         self.pairs: dict[tuple[Team, Team], list[Iterated.Result]]
         super().__init__(match, problem, rounds, **options)
 
-    def wrapper(self, match: Match) -> None:
+    def wrapper(self, match: Match, generating: Team, solving: Team) -> None:
         """Execute one iterative battle between a generating and a solving team.
 
         Incrementally try to search for the highest n for which the solver is
@@ -71,7 +71,7 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
         logger.info(f'==================== Iterative Battle, Instanze Size Cap: {n_cap} ====================')
         while alive:
             logger.info(f'=============== Instance Size: {n}/{n_cap} ===============')
-            approx_ratio = match._one_fight(instance_size=n)
+            approx_ratio = match._one_fight(generating, solving, instance_size=n)
             if approx_ratio == 0.0:
                 alive = False
             elif approx_ratio > match.approximation_ratio:

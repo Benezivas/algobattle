@@ -159,14 +159,11 @@ class Match(Subject):
                 logger.info(f'{"#" * 20}  Running Battle {i + 1}/{rounds}  {"#" * 20}')
                 self.battle_wrapper.curr_round = i
 
-                self.generating_team = pair[0]
-                self.solving_team = pair[1]
-                self.battle_wrapper.wrapper(self)
+                self.battle_wrapper.wrapper(self, pair[0], pair[1])
 
         return self.battle_wrapper
 
-    @team_roles_set
-    def _one_fight(self, instance_size: int) -> float:
+    def _one_fight(self, generating: Team, solving: Team, instance_size: int) -> float:
         """Execute a single fight of a battle between a given generator and solver for a given instance size.
 
         Parameters
@@ -181,12 +178,12 @@ class Match(Subject):
             the generator (1 if optimal, 0 if failed, >=1 if the
             generator solution is optimal).
         """
-        instance, generator_solution = self._run_generator(instance_size)
+        instance, generator_solution = self._run_generator(generating, instance_size)
 
         if not instance and not generator_solution:
             return 1.0
 
-        solver_solution = self._run_solver(instance_size, instance)
+        solver_solution = self._run_solver(solving, instance_size, instance)
 
         if not solver_solution:
             return 0.0
@@ -197,8 +194,7 @@ class Match(Subject):
                     .format(self.solving_team, approximation_ratio))
         return approximation_ratio
 
-    @team_roles_set
-    def _run_generator(self, instance_size: int) -> tuple[Any, Any]:
+    def _run_generator(self, team: Team, instance_size: int) -> tuple[Any, Any]:
         """Execute the generator of match.generating_team and check the validity of the generated output.
 
         If the validity checks pass, return the instance and the certificate solution.
@@ -214,18 +210,17 @@ class Match(Subject):
             If the validity checks pass, the (instance, solution) in whatever
             format that is specified, else (None, None).
         """
-        assert self.generating_team is not None
-        assert self.generating_team.generator is not None
+        assert team.generator is not None
         scaled_memory = self.problem.generator_memory_scaler(self.space_generator, instance_size)
 
         logger.debug(f'Running generator of group {self.generating_team}...\n')
         try:
-            output = self.generating_team.generator.run(str(instance_size), timeout=self.timeout_generator, memory=scaled_memory, cpus=self.cpus)
+            output = team.generator.run(str(instance_size), timeout=self.timeout_generator, memory=scaled_memory, cpus=self.cpus)
         except DockerError:
             return None, None
 
         if not output:
-            logger.warning(f'No output was generated when running {self.generating_team.generator.description}!')
+            logger.warning(f'No output was generated when running {team.generator}!')
             return None, None
 
         raw_instance_with_solution = self.problem.parser.decode(output)
@@ -254,8 +249,7 @@ class Match(Subject):
 
         return instance, generator_solution
 
-    @team_roles_set
-    def _run_solver(self, instance_size: int, instance: Any) -> Any:
+    def _run_solver(self, team: Team, instance_size: int, instance: Any) -> Any:
         """Execute the solver of match.solving_team and check the validity of the generated output.
 
         If the validity checks pass, return the solver solution.
@@ -271,14 +265,13 @@ class Match(Subject):
             If the validity checks pass, solution in whatever
             format that is specified, else None.
         """
-        assert self.solving_team is not None
-        assert self.solving_team.solver is not None
+        assert team.solver is not None
         scaled_memory = self.problem.solver_memory_scaler(self.space_solver, instance_size)
         instance_str = self.problem.parser.encode(instance)
 
         logger.debug(f'Running solver of group {self.solving_team}...\n')
         try:
-            output = self.solving_team.solver.run(instance_str, timeout=self.timeout_solver, memory=scaled_memory, cpus=self.cpus)
+            output = team.solver.run(instance_str, timeout=self.timeout_solver, memory=scaled_memory, cpus=self.cpus)
         except DockerError:
             return None
         

@@ -30,7 +30,7 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
         self.pairs: dict[tuple[Team, Team], list[Averaged.Result]]
         super().__init__(match, problem, rounds, **options)  
 
-    def wrapper(self, match: Match) -> None:
+    def wrapper(self, match: Match, generating: Team, solving: Team) -> None:
         """Execute one averaged battle between a generating and a solving team.
 
         Execute several fights between two teams on a fixed instance size
@@ -49,7 +49,7 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
                     .format(self.instance_size, self.iterations))
         for i in range(self.iterations):
             logger.info(f'=============== Iteration: {i + 1}/{self.iterations} ===============')
-            approx_ratio = match._one_fight(instance_size=self.instance_size)
+            approx_ratio = match._one_fight(generating, solving, instance_size=self.instance_size)
             approximation_ratios.append(approx_ratio)
 
             curr_pair = self.curr_pair

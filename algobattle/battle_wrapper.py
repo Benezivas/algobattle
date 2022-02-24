@@ -71,7 +71,7 @@ class BattleWrapper(ABC):
                 logger.warning(f"Option '{arg}={value}' was provided, but is not used by {type(self)} type battles.")
 
     @abstractmethod
-    def wrapper(self, match: Match) -> None:
+    def wrapper(self, match: Match, generating: Team, solving: Team) -> None:
         """The main base method for a wrapper.
 
         A wrapper should update the match.match_data object during its run. The callback functionality
