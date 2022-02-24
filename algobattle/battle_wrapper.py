@@ -12,8 +12,9 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
 from algobattle.problem import Problem
 from algobattle.team import Team
+from algobattle.docker import DockerError
 if TYPE_CHECKING:
-    from algobattle.match import Match
+    from algobattle.match import Match, RunParameters
 
 
 logger = logging.getLogger('algobattle.battle_wrapper')
@@ -38,7 +39,7 @@ class BattleWrapper(ABC):
             object.__setattr__(self, name, value)
             self._match.notify()
     
-    def __init__(self, problem: Problem, rounds: int = 5, **options: Any):
+    def __init__(self, problem: Problem, run_parameters: RunParameters, rounds: int = 5, **options: Any):
         """Builds a battle wrapper object with the given option values.
         Logs warnings if there were options provided that this wrapper doesn't use. 
 
@@ -55,6 +56,7 @@ class BattleWrapper(ABC):
         """
         self.problem = problem
         self.rounds = rounds
+        self.run_parameters = run_parameters
 
         self.curr_round: int = 0
         self.pairs: dict[tuple[Team, Team], list[BattleWrapper.Result]] = {}
@@ -135,11 +137,11 @@ class BattleWrapper(ABC):
             format that is specified, else (None, None).
         """
         assert team.generator is not None
-        scaled_memory = self.problem.generator_memory_scaler(self.space_generator, instance_size)
+        scaled_memory = self.problem.generator_memory_scaler(self.run_parameters.space_generator, instance_size)
 
         logger.debug(f'Running generator of group {team}...\n')
         try:
-            output = team.generator.run(str(instance_size), timeout=self.timeout_generator, memory=scaled_memory, cpus=self.cpus)
+            output = team.generator.run(str(instance_size), timeout=self.run_parameters.timeout_generator, memory=scaled_memory, cpus=self.run_parameters.cpus)
         except DockerError:
             return None, None
 
@@ -190,12 +192,12 @@ class BattleWrapper(ABC):
             format that is specified, else None.
         """
         assert team.solver is not None
-        scaled_memory = self.problem.solver_memory_scaler(self.space_solver, instance_size)
+        scaled_memory = self.problem.solver_memory_scaler(self.run_parameters.space_solver, instance_size)
         instance_str = self.problem.parser.encode(instance)
 
         logger.debug(f'Running solver of group {team}...\n')
         try:
-            output = team.solver.run(instance_str, timeout=self.timeout_solver, memory=scaled_memory, cpus=self.cpus)
+            output = team.solver.run(instance_str, timeout=self.run_parameters.timeout_solver, memory=scaled_memory, cpus=self.run_parameters.cpus)
         except DockerError:
             return None
         

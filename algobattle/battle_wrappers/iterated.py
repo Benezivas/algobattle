@@ -10,7 +10,7 @@ from algobattle.problem import Problem
 from algobattle.team import Team
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from algobattle.match import Match
+    from algobattle.match import Match, RunParameters
 
 logger = logging.getLogger('algobattle.battle_wrappers.iterated')
 
@@ -24,14 +24,14 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
         solved: int = 0
         attempting: int = 0
 
-    def __init__(self, problem: Problem, rounds: int = 5,
+    def __init__(self, problem: Problem, run_parameters: RunParameters, rounds: int = 5,
                 cap: int = 50000, exponent: int = 2,
                 **options) -> None:
         self.exponent = exponent
         self.cap = cap
         
         self.pairs: dict[tuple[Team, Team], list[Iterated.Result]]
-        super().__init__(problem, rounds, **options)
+        super().__init__(problem, run_parameters, rounds, **options)
 
     def wrapper(self, match: Match, generating: Team, solving: Team) -> None:
         """Execute one iterative battle between a generating and a solving team.

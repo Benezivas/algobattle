@@ -1,11 +1,12 @@
 """Match class, provides functionality for setting up and executing battles between given teams."""
 from __future__ import annotations
+from dataclasses import dataclass
 import itertools
 
 import logging
 import configparser
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 from algobattle.battle_wrapper import BattleWrapper
 
 from algobattle.team import Team
@@ -27,6 +28,15 @@ class BuildError(Exception):
 class UnknownBattleType(Exception):
     pass
 
+class RunParameters:
+    def __init__(self, config: Mapping[str, str], runtime_overhead: float = 0) -> None:
+        self.timeout_build           = int(config['timeout_build']) + runtime_overhead
+        self.timeout_generator       = int(config['timeout_generator']) + runtime_overhead
+        self.timeout_solver          = int(config['timeout_solver']) + runtime_overhead
+        self.space_generator         = int(config['space_generator'])
+        self.space_solver            = int(config['space_solver'])
+        self.cpus                    = int(config['cpus'])
+
 class Match(Subject):
     """Match class, provides functionality for setting up and executing battles between given teams."""
 
@@ -42,12 +52,7 @@ class Match(Subject):
         logger.debug('Using additional configuration options from file "%s".', config_path)
         config.read(config_path)
 
-        self.timeout_build           = int(config['run_parameters']['timeout_build']) + runtime_overhead
-        self.timeout_generator       = int(config['run_parameters']['timeout_generator']) + runtime_overhead
-        self.timeout_solver          = int(config['run_parameters']['timeout_solver']) + runtime_overhead
-        self.space_generator         = int(config['run_parameters']['space_generator'])
-        self.space_solver            = int(config['run_parameters']['space_solver'])
-        self.cpus                    = int(config['run_parameters']['cpus'])
+        self.run_parameters = RunParameters(config["run_parameters"])
         self.problem = problem
         self.config = config
         self.approximation_ratio = approximation_ratio
@@ -102,8 +107,8 @@ class Match(Subject):
 
         for team in teams:
             try:
-                team.generator = Image(team.generator_path, f"generator-{team.name}", f"generator for team {team.name}", timeout=self.timeout_build, cache=cache_docker_containers)
-                team.solver = Image(team.solver_path, f"solver-{team.name}", f"solver for team {team.name}", timeout=self.timeout_build, cache=cache_docker_containers)
+                team.generator = Image(team.generator_path, f"generator-{team.name}", f"generator for team {team.name}", timeout=self.run_parameters.timeout_build, cache=cache_docker_containers)
+                team.solver = Image(team.solver_path, f"solver-{team.name}", f"solver for team {team.name}", timeout=self.run_parameters.timeout_build, cache=cache_docker_containers)
             except DockerError:
                 logger.error(f"Removing team {team.name} as their containers did not build successfully.")
                 self.teams.remove(team)
@@ -145,9 +150,9 @@ class Match(Subject):
         """
 
         if battle_type == 'iterated':
-            self.battle_wrapper = Iterated(self.problem, rounds, iterated_cap, iterated_exponent)
+            self.battle_wrapper = Iterated(self.problem, self.run_parameters, rounds, iterated_cap, iterated_exponent)
         elif battle_type == 'averaged':
-            self.battle_wrapper = Averaged(self.problem, rounds, approximation_instance_size, approximation_iterations)
+            self.battle_wrapper = Averaged(self.problem, self.run_parameters, rounds, approximation_instance_size, approximation_iterations)
         else:
             logger.error(f'Unrecognized battle_type given: "{battle_type}"')
             raise UnknownBattleType
