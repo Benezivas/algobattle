@@ -112,7 +112,7 @@ class Parser(ABC):
         return "\n".join(str(" ".join(str(element) for element in line)) for line in input)
 
     @abstractmethod
-    def decode(self, raw_input: bytes) -> str:
+    def decode(self, raw_input: str) -> str:
         """Decode an input and return it.
 
         This method is responsible for taking the output of a generator or

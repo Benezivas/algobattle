@@ -222,7 +222,7 @@ def _kill_container(image: Image, name: str) -> None:
             logger.error("Could not connect to the docker daemon. Is docker running?")
             raise SystemExit("Exited algobattle: Could not connect to the docker daemon. Is docker running?")
         
-        if e.stderr.find(f"No such container: {name}") == -1 and e.stderr.find(f"Container {name} is not running") == -1:
+        if e.stderr.find(f"No such container: {name}") == -1 and e.stderr.find(f"is not running") == -1:
             logger.warning(f"Could not kill container '{image.description}':\n{e.stderr}")
     
     _running_containers.discard((image, name))
