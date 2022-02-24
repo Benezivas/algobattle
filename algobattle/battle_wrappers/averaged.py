@@ -46,8 +46,7 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
             The Match object on which the battle wrapper is to be executed on.
         """
         approximation_ratios = []
-        logger.info('==================== Averaged Battle, Instance Size: {}, Rounds: {} ===================='
-                    .format(self.instance_size, self.iterations))
+        logger.info(f'==================== Averaged Battle, Instance Size: {self.instance_size}, Rounds: {self.iterations} ====================')
         for i in range(self.iterations):
             logger.info(f'=============== Iteration: {i + 1}/{self.iterations} ===============')
             approx_ratio = self._one_fight(generating, solving, instance_size=self.instance_size)
@@ -158,10 +157,7 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
 
             formatted_output_string += f'║{pair[0]:>9s}║{pair[1]:>9s}' \
                                         + ''.join([f'║{avg[i]:>6.2f}' for i in range(self.rounds)]) \
-                                        + '║{:>6.2f}║{:>6d}║{:>3d}/{:>3d} ║'.format(latest_approx_ratio,
-                                                                                    self.instance_size,
-                                                                                    curr_iter,
-                                                                                    self.iterations) + '\r\n'
+                                        + f'║{latest_approx_ratio:>6.2f}║{self.instance_size:>6d}║{curr_iter:>3d}/{self.iterations:>3d} ║' + '\r\n'
         formatted_output_string += '╚═════════╩═════════╩' \
                                    + ''.join(['══════╩' for _ in range(self.rounds)]) \
                                    + '══════╩══════╩════════╝' + '\n\r'

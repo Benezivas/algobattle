@@ -49,7 +49,7 @@ class Match(Subject):
                  runtime_overhead: float = 0, approximation_ratio: float = 1.0, cache_docker_containers: bool = True) -> None:
 
         config = configparser.ConfigParser()
-        logger.debug('Using additional configuration options from file "%s".', config_path)
+        logger.debug(f'Using additional configuration options from file "{config_path}".')
         config.read(config_path)
 
         self.run_parameters = RunParameters(config["run_parameters"])

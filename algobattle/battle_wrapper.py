@@ -116,8 +116,7 @@ class BattleWrapper(ABC):
 
         approximation_ratio = self.problem.verifier.calculate_approximation_ratio(instance, instance_size,
                                                                                   generator_solution, solver_solution)
-        logger.info('Solver of group {} yields a valid solution with an approx. ratio of {}.'
-                    .format(solving, approximation_ratio))
+        logger.info(f'Solver of group {solving} yields a valid solution with an approx. ratio of {approximation_ratio}.')
         return approximation_ratio
 
     def _run_generator(self, team: Team, instance_size: int) -> tuple[Any, Any]:
@@ -211,12 +210,10 @@ class BattleWrapper(ABC):
 
         solver_solution = self.problem.parser.parse_solution(raw_solver_solution, instance_size)
         if not self.problem.verifier.verify_semantics_of_solution(solver_solution, instance_size, True):
-            logger.warning('Solver of group {} created a malformed solution at instance size {}!'
-                           .format(team, instance_size))
+            logger.warning(f'Solver of group {team} created a malformed solution at instance size {instance_size}!')
             return None
         elif not self.problem.verifier.verify_solution_against_instance(instance, solver_solution, instance_size, False):
-            logger.warning('Solver of group {} yields a wrong solution at instance size {}!'
-                           .format(team, instance_size))
+            logger.warning(f'Solver of group {team} yields a wrong solution at instance size {instance_size}!')
             return None
 
         return solver_solution

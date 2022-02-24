@@ -76,8 +76,7 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
             if approx_ratio == 0.0:
                 alive = False
             elif approx_ratio > match.approximation_ratio:
-                logger.info('Solver {} does not meet the required solution quality at instance size {}. ({}/{})'
-                            .format(match.solving_team, n, approx_ratio, match.approximation_ratio))
+                logger.info(f'Solver {match.solving_team} does not meet the required solution quality at instance size {n}. ({approx_ratio}/{match.approximation_ratio})')
                 alive = False
 
             if not alive and i > 1:
