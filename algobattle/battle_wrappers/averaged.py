@@ -6,6 +6,7 @@ import itertools
 import logging
 
 import algobattle.battle_wrapper
+from algobattle.problem import Problem
 from algobattle.team import Team
 from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
@@ -21,14 +22,14 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
     class Result(algobattle.battle_wrapper.BattleWrapper.Result):
         approx_ratios: list[float] = field(default_factory=list)
 
-    def __init__(self, match: Match, problem: str, rounds: int = 5,
+    def __init__(self, problem: Problem, rounds: int = 5,
                 instance_size: int = 10, iterations: int = 25,
                 **options: Any) -> None:
         self.instance_size = instance_size
         self.iterations = iterations
 
         self.pairs: dict[tuple[Team, Team], list[Averaged.Result]]
-        super().__init__(match, problem, rounds, **options)  
+        super().__init__(problem, rounds, **options)  
 
     def wrapper(self, match: Match, generating: Team, solving: Team) -> None:
         """Execute one averaged battle between a generating and a solving team.
@@ -49,7 +50,7 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
                     .format(self.instance_size, self.iterations))
         for i in range(self.iterations):
             logger.info(f'=============== Iteration: {i + 1}/{self.iterations} ===============')
-            approx_ratio = match._one_fight(generating, solving, instance_size=self.instance_size)
+            approx_ratio = self._one_fight(generating, solving, instance_size=self.instance_size)
             approximation_ratios.append(approx_ratio)
 
             curr_pair = self.curr_pair
