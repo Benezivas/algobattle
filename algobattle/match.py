@@ -29,13 +29,25 @@ class UnknownBattleType(Exception):
     pass
 
 class RunParameters:
-    def __init__(self, config: Mapping[str, str], runtime_overhead: float = 0) -> None:
-        self.timeout_build           = int(config['timeout_build']) + runtime_overhead
-        self.timeout_generator       = int(config['timeout_generator']) + runtime_overhead
-        self.timeout_solver          = int(config['timeout_solver']) + runtime_overhead
-        self.space_generator         = int(config['space_generator'])
-        self.space_solver            = int(config['space_solver'])
-        self.cpus                    = int(config['cpus'])
+    def __init__(self, config: Mapping[str, str] = {}, runtime_overhead: float = 0) -> None:
+        def __access(key: str) -> int | None:
+            if key in config.keys():
+                return int(config[key])
+            else:
+                return None
+        def __map(i: int | None, x: float) -> float | None:
+            if i is not None:
+                return i + x
+            else:
+                return None
+
+        self.timeout_build      = __map(__access('timeout_build'), runtime_overhead)
+        self.timeout_generator  = __map(__access('timeout_generator'), runtime_overhead)
+        self.timeout_solver     = __map(__access('timeout_solver'), runtime_overhead)
+        self.space_generator    = __access('space_generator')
+        self.space_solver       = __access('space_solver')
+        self.cpus               = __access('cpus')
+
 
 class Match(Subject):
     """Match class, provides functionality for setting up and executing battles between given teams."""
