@@ -128,6 +128,7 @@ class Image:
             cmd.append(f"--cpus={cpus}")
         cmd.append(self.id)
 
+        result = None
         logger.debug(f"Running {self.description}.")
         _running_containers.add((self, name))
         try:
@@ -154,7 +155,10 @@ class Image:
             raise DockerError from e
         
         finally:
-            _kill_container(self, name)
+            if result is None:
+                _kill_container(self, name)
+            else:
+                _running_containers.discard((self, name))
         
         elapsed_time = round(default_timer() - start_time, 2)
         logger.debug(f'Approximate elapsed runtime: {elapsed_time}/{timeout} seconds.')
@@ -219,7 +223,7 @@ def _kill_container(image: Image, name: str) -> None:
             logger.error("Could not connect to the docker daemon. Is docker running?")
             raise SystemExit("Exited algobattle: Could not connect to the docker daemon. Is docker running?")
         
-        if e.stderr.find(f"No such container: {name}") == -1:
+        if e.stderr.find(f"No such container: {name}") == -1 and e.stderr.find(f"Container {name} is not running") == -1:
             logger.warning(f"Could not kill container '{image.description}':\n{e.stderr}")
     
     _running_containers.discard((image, name))
