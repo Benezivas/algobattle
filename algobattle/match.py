@@ -62,7 +62,7 @@ class Match:
         logger.debug(f'Using additional configuration options from file "{config_path}".')
         config.read(config_path)
 
-        self.run_parameters = RunParameters(config["run_parameters"])
+        self.run_parameters = RunParameters(config["run_parameters"], runtime_overhead)
         self.problem = problem
         self.config = config
         self.approximation_ratio = approximation_ratio
