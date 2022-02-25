@@ -4,7 +4,7 @@ import logging
 import importlib.util
 from pathlib import Path
 import sys
-from typing import Callable
+from typing import Callable, Any
 
 from algobattle.problem import Problem
 
@@ -48,3 +48,27 @@ def check_for_terminal(function: Callable) -> Callable:
         else:
             return function(self, *args, **kwargs)
     return wrapper
+
+def format_table(table: list[list[Any]], column_spacing: dict[int, int] = {}) -> str:
+    if len(table) == 0:
+        return "\n"
+
+    table = [[str(element) for element in row] for row in table]
+    col_sizes = [len(max((row[i] for row in table), key=len)) for i in range(len(table[0]))]
+    for (i, k) in column_spacing.items():
+        col_sizes[i] = k
+
+    horizontal_sep_fmt = "{start}" + "{middle}".join("{sep}" * (width + 2) for width in col_sizes) + "{end}\n"
+    top = horizontal_sep_fmt.format(start="╔", middle="╦", end="╗", sep="═")
+    middle = horizontal_sep_fmt.format(start="╟", middle="╫", end="╢", sep="─")
+    bottom = horizontal_sep_fmt.format(start="╚", middle="╩", end="╝", sep="═")
+
+    content_fmt = "║ " + " ║ ".join(f"{{: ^{width}}}" for width in col_sizes) + " ║\n"
+
+    res = top + middle.join(content_fmt.format(*row) for row in table) + bottom
+
+    return res
+
+t = [["test", "yes", "no"], [1, 2, 3], ["blep", "aaaaaaaaaaaaa", ""],[10, 20, 30]]
+
+print(format_table(t))
