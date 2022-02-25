@@ -196,7 +196,8 @@ class BattleWrapper(ABC):
         return solver_solution
 
     @abstractmethod
-    def calculate_points(self, achievable_points: int) -> dict[Team, float]:
+    @staticmethod
+    def calculate_points(results: dict[Matchup, list[BattleWrapper.Result]], achievable_points: int) -> dict[Team, float]:
         """Calculate the number of achieved points, given results.
 
         As awarding points completely depends on the type of battle that
