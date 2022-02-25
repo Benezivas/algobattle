@@ -1,4 +1,5 @@
 """Collection of utility functions."""
+from configparser import ConfigParser
 import os
 import logging
 import timeit
@@ -6,12 +7,12 @@ import subprocess
 import importlib.util
 import sys
 import collections
+import inspect
 
+from algobattle.problem import Problem
 import algobattle
 import algobattle.problems.delaytest as DelaytestProblem
 import algobattle.sighandler as sigh
-from algobattle.problem import Problem
-
 
 logger = logging.getLogger('algobattle.util')
 
@@ -27,7 +28,7 @@ def import_problem_from_path(problem_path: str) -> Problem:
     Returns
     -------
     Problem
-        Returns an object of the problem if successful, None otherwise.
+        Returns an object of the problem.
     """
     try:
         spec = importlib.util.spec_from_file_location("problem", problem_path + "/__init__.py")
@@ -41,6 +42,33 @@ def import_problem_from_path(problem_path: str) -> Problem:
         return None
 
 
+def initialize_wrapper(wrapper_name: str, config: ConfigParser):
+    """Try to import and initialize a Battle Wrapper from a given name.
+
+    For this to work, a BattleWrapper module with the same name as the argument
+    needs to be present in the algobattle/battle_wrappers folder.
+
+    Parameters
+    ----------
+    wrapper : str
+        Name of a battle wrapper module in algobattle/battle_wrappers.
+
+    config : ConfigParser
+        A ConfigParser object containing possible additional arguments for the battle_wrapper.
+
+    Returns
+    -------
+    BattleWrapper
+        A BattleWrapper object of the given wrapper_name.
+    """
+    try:
+        wrapper_module = importlib.import_module("algobattle.battle_wrappers." + str(wrapper_name))
+        return getattr(wrapper_module, inspect.getmembers(wrapper_module)[0][0])(config)
+    except Exception as e:
+        logger.critical('Importing a wrapper from the given path failed with the following exception: "{}"'.format(e))
+        return None
+
+
 def measure_runtime_overhead() -> float:
     """Calculate the I/O delay for starting and stopping docker on the host machine.
 
@@ -50,11 +78,12 @@ def measure_runtime_overhead() -> float:
         I/O overhead in seconds, rounded to two decimal places.
     """
     problem = DelaytestProblem.Problem()
-    config_path = os.path.join(os.path.dirname(os.path.abspath(algobattle.__file__)), 'config', 'config_delaytest.ini')
+    config = ConfigParser()
+    config.read(os.path.join(os.path.dirname(os.path.abspath(algobattle.__file__)), 'config', 'config_delaytest.ini'))
     delaytest_path = DelaytestProblem.__file__[:-12]  # remove /__init__.py
     delaytest_team = algobattle.team.Team(0, delaytest_path + '/generator', delaytest_path + '/solver')
 
-    match = algobattle.match.Match(problem, config_path, [delaytest_team])
+    match = algobattle.match.Match(problem, config, [delaytest_team])
 
     if not match.build_successful:
         logger.warning('Building a match for the time tolerance calculation failed!')
@@ -74,7 +103,7 @@ def measure_runtime_overhead() -> float:
     return max_overhead
 
 
-def run_subprocess(run_command: list, input: bytes, timeout: float, suppress_output=False):
+def run_subprocess(run_command: list, input: bytes, timeout: float, suppress_output: bool = False) -> None:
     """Run a given command as a subprocess.
 
     Parameters
@@ -126,7 +155,7 @@ def run_subprocess(run_command: list, input: bytes, timeout: float, suppress_out
     return raw_output, elapsed_time
 
 
-def update_nested_dict(current_dict, updates):
+def update_nested_dict(current_dict: dict, updates: dict) -> dict:
     """Update a nested dictionary with new data recursively.
 
     Parameters
