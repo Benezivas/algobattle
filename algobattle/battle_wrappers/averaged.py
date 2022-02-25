@@ -9,6 +9,8 @@ import algobattle.battle_wrapper
 from algobattle.problem import Problem
 from algobattle.team import Team
 from typing import TYPE_CHECKING, Any
+
+from algobattle.ui import Ui
 if TYPE_CHECKING:
     from algobattle.match import Match, RunParameters
 
@@ -22,14 +24,14 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
     class Result(algobattle.battle_wrapper.BattleWrapper.Result):
         approx_ratios: list[float] = field(default_factory=list)
 
-    def __init__(self, problem: Problem, run_parameters: RunParameters = RunParameters(), rounds: int = 5,
+    def __init__(self, problem: Problem, run_parameters: RunParameters = RunParameters(), ui: Ui | None = None, rounds: int = 5,
                 instance_size: int = 10, iterations: int = 25,
                 **options: Any) -> None:
         self.instance_size = instance_size
         self.iterations = iterations
 
         self.pairs: dict[tuple[Team, Team], list[Averaged.Result]]
-        super().__init__(problem, run_parameters, rounds, **options)  
+        super().__init__(problem, run_parameters, ui, rounds, **options)  
 
     def wrapper(self, match: Match, generating: Team, solving: Team) -> None:
         """Execute one averaged battle between a generating and a solving team.

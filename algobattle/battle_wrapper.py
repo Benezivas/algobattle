@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any
 from algobattle.problem import Problem
 from algobattle.team import Team
 from algobattle.docker import DockerError
+from algobattle.ui import Ui
 if TYPE_CHECKING:
     from algobattle.match import Match, RunParameters
 
@@ -30,16 +31,18 @@ class BattleWrapper(ABC):
 
     @dataclass
     class Result:
-        _match: Match
+        _ui: Ui | None
 
         def __setattr__(self, name: str, value: Any) -> None:
             """Updates record in the RoundData object and notifies all obeservers
             subscribed to the associated Match object."""
 
             object.__setattr__(self, name, value)
-            self._match.notify()
+            if self._ui is not None:
+                self._ui.update()
+
     
-    def __init__(self, problem: Problem, run_parameters: RunParameters = RunParameters(), rounds: int = 5, **options: Any):
+    def __init__(self, problem: Problem, run_parameters: RunParameters = RunParameters(), ui: Ui | None = None, rounds: int = 5, **options: Any):
         """Builds a battle wrapper object with the given option values.
         Logs warnings if there were options provided that this wrapper doesn't use. 
 
@@ -66,7 +69,7 @@ class BattleWrapper(ABC):
         for pair in self._match.all_battle_pairs():
             self.pairs[pair] = []
             for _ in range(self.rounds):
-                self.pairs[pair].append(type(self).Result(self._match))
+                self.pairs[pair].append(type(self).Result(ui))
 
         for arg, value in options.items():
             if arg not in vars(type(self)):

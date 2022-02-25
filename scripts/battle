@@ -144,19 +144,15 @@ if __name__ == "__main__":
         runtime_overhead = measure_runtime_overhead()
         logger.info(f'Maximal measured runtime overhead is at {runtime_overhead} seconds. Adding this amount to the configured runtime.')
 
-    match = Match(problem, options.config, teams, runtime_overhead=runtime_overhead, approximation_ratio=options.approximation_ratio)
+    ui = Ui() if display_ui else None
+    match = Match(problem, options.config, teams, ui, runtime_overhead=runtime_overhead, approximation_ratio=options.approximation_ratio)
 
-    ui = None
-    if display_ui:
-        ui = Ui()
-        match.attach(ui)
 
     results = match.run(options.battle_type, rounds=options.battle_rounds, iterated_cap=options.iterated_cap,
                         iterated_exponent=options.iterated_exponent, approximation_instance_size=options.approximation_instance_size,
                         approximation_iterations=options.approximation_iterations)
 
     if ui is not None:
-        match.detach(ui)
         ui.restore()
 
     logger.info('#' * 78)

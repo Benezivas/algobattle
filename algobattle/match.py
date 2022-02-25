@@ -16,6 +16,7 @@ from algobattle.subject import Subject
 from algobattle.observer import Observer
 from algobattle.battle_wrappers.averaged import Averaged
 from algobattle.battle_wrappers.iterated import Iterated
+from algobattle.ui import Ui
 
 logger = logging.getLogger('algobattle.match')
 
@@ -49,7 +50,7 @@ class RunParameters:
         self.cpus               = __access('cpus')
 
 
-class Match(Subject):
+class Match:
     """Match class, provides functionality for setting up and executing battles between given teams."""
 
     _observers: list[Observer] = []
@@ -57,7 +58,7 @@ class Match(Subject):
     solving_team = None
     battle_wrapper = None
 
-    def __init__(self, problem: Problem, config_path: Path, teams: list[Team],
+    def __init__(self, problem: Problem, config_path: Path, teams: list[Team], ui: Ui | None = None,
                  runtime_overhead: float = 0, approximation_ratio: float = 1.0, cache_docker_containers: bool = True) -> None:
 
         config = configparser.ConfigParser()
@@ -68,25 +69,13 @@ class Match(Subject):
         self.problem = problem
         self.config = config
         self.approximation_ratio = approximation_ratio
+        self.ui = ui
         
         if approximation_ratio != 1.0 and not problem.approximable:
             logger.error('The given problem is not approximable and can only be run with an approximation ratio of 1.0!')
             raise ConfigurationError
 
         self._build(teams, cache_docker_containers)
-
-    def attach(self, observer: Observer) -> None:
-        """Subscribe a new Observer by adding them to the list of observers."""
-        self._observers.append(observer)
-
-    def detach(self, observer: Observer) -> None:
-        """Unsubscribe an Observer by removing them from the list of observers."""
-        self._observers.remove(observer)
-
-    def notify(self) -> None:
-        """Notify all subscribed Observers by calling their update() functions."""
-        for observer in self._observers:
-            observer.update(self)
 
     def _build(self, teams: list[Team], cache_docker_containers: bool=True) -> None:
         """Build docker containers for the given generators and solvers of each team.
@@ -162,9 +151,9 @@ class Match(Subject):
         """
 
         if battle_type == 'iterated':
-            self.battle_wrapper = Iterated(self.problem, self.run_parameters, rounds, iterated_cap, iterated_exponent)
+            self.battle_wrapper = Iterated(self.problem, self.run_parameters, self.ui, rounds, iterated_cap, iterated_exponent)
         elif battle_type == 'averaged':
-            self.battle_wrapper = Averaged(self.problem, self.run_parameters, rounds, approximation_instance_size, approximation_iterations)
+            self.battle_wrapper = Averaged(self.problem, self.run_parameters, self.ui, rounds, approximation_instance_size, approximation_iterations)
         else:
             logger.error(f'Unrecognized battle_type given: "{battle_type}"')
             raise UnknownBattleType
