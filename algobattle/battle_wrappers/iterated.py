@@ -9,10 +9,9 @@ import algobattle.battle_wrapper
 from algobattle.matchups import Matchup
 from algobattle.problem import Problem
 from algobattle.team import Team
-from algobattle.ui import Ui
 from typing import TYPE_CHECKING, Generator
 if TYPE_CHECKING:
-    from algobattle.match import Match, RunParameters
+    from algobattle.match import RunParameters
 
 logger = logging.getLogger('algobattle.battle_wrappers.iterated')
 
@@ -33,7 +32,6 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
         self.cap = cap
         self.approx_ratio = approximation_ratio
         
-        self.pairs: dict[tuple[Team, Team], list[Iterated.Result]]
         super().__init__(problem, run_parameters, **options)
 
     def wrapper(self, matchup: Matchup) -> Generator[Iterated.Result, None, None]:

@@ -6,7 +6,7 @@ import itertools
 import logging
 import configparser
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Mapping
 from algobattle.battle_wrapper import BattleWrapper
 from algobattle.matchups import BattleMatchups, Matchup
 
@@ -51,10 +51,6 @@ class RunParameters:
 
 class Match:
     """Match class, provides functionality for setting up and executing battles between given teams."""
-
-    generating_team = None
-    solving_team = None
-    battle_wrapper = None
 
     def __init__(self, problem: Problem, config_path: Path, teams: list[Team], ui: Ui | None = None,
                  runtime_overhead: float = 0, approximation_ratio: float = 1.0, cache_docker_containers: bool = True) -> None:

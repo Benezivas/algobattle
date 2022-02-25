@@ -11,7 +11,6 @@ from algobattle.problem import Problem
 from algobattle.team import Team
 from typing import TYPE_CHECKING, Any, Generator
 
-from algobattle.ui import Ui
 if TYPE_CHECKING:
     from algobattle.match import RunParameters
 
@@ -31,7 +30,6 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
         self.instance_size = instance_size
         self.iterations = iterations
 
-        self.pairs: dict[tuple[Team, Team], list[Averaged.Result]]
         super().__init__(problem, run_parameters, **options)  
 
     def wrapper(self, matchup: Matchup) -> Generator[Averaged.Result, None, None]:

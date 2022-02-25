@@ -6,7 +6,6 @@ characteristic that they are responsible for updating some match data during
 their run, such that it contains the current state of the match.
 """
 from __future__ import annotations
-from dataclasses import dataclass
 import logging
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Generator
@@ -14,9 +13,8 @@ from algobattle.matchups import Matchup
 from algobattle.problem import Problem
 from algobattle.team import Team
 from algobattle.docker import DockerError
-from algobattle.ui import Ui
 if TYPE_CHECKING:
-    from algobattle.match import Match, RunParameters
+    from algobattle.match import RunParameters
 
 
 logger = logging.getLogger('algobattle.battle_wrapper')
@@ -46,8 +44,6 @@ class BattleWrapper(ABC):
         """
         self.problem = problem
         self.run_parameters = run_parameters
-
-        self.error: str | None = None
 
         for arg, value in options.items():
             if arg not in vars(type(self)):
