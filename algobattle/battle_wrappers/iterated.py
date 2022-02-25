@@ -6,10 +6,11 @@ import itertools
 import logging
 
 import algobattle.battle_wrapper
+from algobattle.matchups import Matchup
 from algobattle.problem import Problem
 from algobattle.team import Team
 from algobattle.ui import Ui
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Generator
 if TYPE_CHECKING:
     from algobattle.match import Match, RunParameters
 
@@ -25,16 +26,17 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
         solved: int = 0
         attempting: int = 0
 
-    def __init__(self, problem: Problem, run_parameters: RunParameters = RunParameters(), ui: Ui | None = None, rounds: int = 5,
-                cap: int = 50000, exponent: int = 2,
+    def __init__(self, problem: Problem, run_parameters: RunParameters = RunParameters(),
+                cap: int = 50000, exponent: int = 2, approximation_ratio: float = 1,
                 **options) -> None:
         self.exponent = exponent
         self.cap = cap
+        self.approx_ratio = approximation_ratio
         
         self.pairs: dict[tuple[Team, Team], list[Iterated.Result]]
-        super().__init__(problem, run_parameters, ui, rounds, **options)
+        super().__init__(problem, run_parameters, **options)
 
-    def wrapper(self, match: Match, generating: Team, solving: Team) -> None:
+    def wrapper(self, matchup: Matchup) -> Generator[Iterated.Result, None, None]:
         """Execute one iterative battle between a generating and a solving team.
 
         Incrementally try to search for the highest n for which the solver is
@@ -58,26 +60,22 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
         match: Match
             The Match object on which the battle wrapper is to be executed on.
         """
-        curr_pair = self.curr_pair
-        assert curr_pair is not None
-        curr_round = self.curr_round
 
-        n = match.problem.n_start
+        n = self.problem.n_start
         maximum_reached_n = 0
         i = 0
         exponent = self.exponent
         n_cap = self.cap
-        self.pairs[curr_pair][curr_round].cap = n_cap
         alive = True
 
         logger.info(f'==================== Iterative Battle, Instanze Size Cap: {n_cap} ====================')
         while alive:
             logger.info(f'=============== Instance Size: {n}/{n_cap} ===============')
-            approx_ratio = self._one_fight(generating, solving, instance_size=n)
+            approx_ratio = self._one_fight(matchup, instance_size=n)
             if approx_ratio == 0.0:
                 alive = False
-            elif approx_ratio > match.approximation_ratio:
-                logger.info(f'Solver {match.solving_team} does not meet the required solution quality at instance size {n}. ({approx_ratio}/{match.approximation_ratio})')
+            elif approx_ratio > self.approx_ratio:
+                logger.info(f'Solver {matchup.solver} does not meet the required solution quality at instance size {n}. ({approx_ratio}/{self.approx_ratio})')
                 alive = False
 
             if not alive and i > 1:
@@ -102,9 +100,7 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
                     n -= i ** exponent - 1
                     i = 1
 
-            self.pairs[curr_pair][curr_round].cap = n_cap
-            self.pairs[curr_pair][curr_round].solved = maximum_reached_n
-            self.pairs[curr_pair][curr_round].attempting = n
+            yield Iterated.Result(n_cap, maximum_reached_n, n)
 
     def calculate_points(self, achievable_points: int) -> dict[Team, float]:
         """Calculate the number of achieved points.

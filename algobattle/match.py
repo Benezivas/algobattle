@@ -8,6 +8,7 @@ import configparser
 from pathlib import Path
 from typing import Any, Mapping
 from algobattle.battle_wrapper import BattleWrapper
+from algobattle.matchups import BattleMatchups, Matchup
 
 from algobattle.team import Team
 from algobattle.problem import Problem
@@ -67,10 +68,15 @@ class Match:
         self.config = config
         self.approximation_ratio = approximation_ratio
         self.ui = ui
+        self.battle_matchups = BattleMatchups(teams)
         
         if approximation_ratio != 1.0 and not problem.approximable:
             logger.error('The given problem is not approximable and can only be run with an approximation ratio of 1.0!')
             raise ConfigurationError
+        
+        self.results: dict[Matchup, list[BattleWrapper.Result]] = {}
+        for matchup in self.battle_matchups:
+            self.results[matchup] = []
 
         self._build(teams, cache_docker_containers)
 
@@ -148,20 +154,24 @@ class Match:
         """
 
         if battle_type == 'iterated':
-            self.battle_wrapper = Iterated(self.problem, self.run_parameters, self.ui, rounds, iterated_cap, iterated_exponent)
+            self.battle_wrapper = Iterated(self.problem, self.run_parameters, iterated_cap, iterated_exponent, self.approximation_ratio)
         elif battle_type == 'averaged':
-            self.battle_wrapper = Averaged(self.problem, self.run_parameters, self.ui, rounds, approximation_instance_size, approximation_iterations)
+            self.battle_wrapper = Averaged(self.problem, self.run_parameters, approximation_instance_size, approximation_iterations)
         else:
             logger.error(f'Unrecognized battle_type given: "{battle_type}"')
             raise UnknownBattleType
 
-        for pair in self.all_battle_pairs():
-            self.battle_wrapper.curr_pair = pair
+        for matchup in self.battle_matchups:
             for i in range(rounds):
                 logger.info(f'{"#" * 20}  Running Battle {i + 1}/{rounds}  {"#" * 20}')
-                self.battle_wrapper.curr_round = i
+                self.results[matchup].append(self.battle_wrapper.Result())
+                if self.ui is not None:
+                    self.ui.update()
+                for result in self.battle_wrapper.wrapper(matchup):
+                    self.results[matchup][i] = result
+                    if self.ui is not None:
+                        self.ui.update()
 
-                self.battle_wrapper.wrapper(self, pair[0], pair[1])
 
         return self.battle_wrapper
 

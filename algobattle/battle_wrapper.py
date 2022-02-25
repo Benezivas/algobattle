@@ -9,7 +9,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 import logging
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Generator
+from algobattle.matchups import Matchup
 from algobattle.problem import Problem
 from algobattle.team import Team
 from algobattle.docker import DockerError
@@ -25,24 +26,10 @@ class BattleWrapper(ABC):
     """Base class for wrappers that execute a specific kind of battle.
     Its state contains information about the battle and its history."""
 
-    #* using refs back to the parent match object is somewhat memory inefficient
-    #* this could be changed by either heavily modifying __getattribute__ and __setattr__
-    #* of the result classes or giving up the natural access syntax
-
-    @dataclass
     class Result:
-        _ui: Ui | None
-
-        def __setattr__(self, name: str, value: Any) -> None:
-            """Updates record in the RoundData object and notifies all obeservers
-            subscribed to the associated Match object."""
-
-            object.__setattr__(self, name, value)
-            if self._ui is not None:
-                self._ui.update()
-
+        pass
     
-    def __init__(self, problem: Problem, run_parameters: RunParameters = RunParameters(), ui: Ui | None = None, rounds: int = 5, **options: Any):
+    def __init__(self, problem: Problem, run_parameters: RunParameters = RunParameters(), **options: Any):
         """Builds a battle wrapper object with the given option values.
         Logs warnings if there were options provided that this wrapper doesn't use. 
 
@@ -58,25 +45,16 @@ class BattleWrapper(ABC):
             Dict containing option values.
         """
         self.problem = problem
-        self.rounds = rounds
         self.run_parameters = run_parameters
 
-        self.curr_round: int = 0
-        self.pairs: dict[tuple[Team, Team], list[BattleWrapper.Result]] = {}
         self.error: str | None = None
-        self.curr_pair: tuple[Team, Team] | None = None
-
-        for pair in self._match.all_battle_pairs():
-            self.pairs[pair] = []
-            for _ in range(self.rounds):
-                self.pairs[pair].append(type(self).Result(ui))
 
         for arg, value in options.items():
             if arg not in vars(type(self)):
                 logger.warning(f"Option '{arg}={value}' was provided, but is not used by {type(self)} type battles.")
 
     @abstractmethod
-    def wrapper(self, match: Match, generating: Team, solving: Team) -> None:
+    def wrapper(self, matchup: Matchup) -> Generator[BattleWrapper.Result, None, None]:
         """The main base method for a wrapper.
 
         A wrapper should update the match.match_data object during its run. The callback functionality
@@ -92,7 +70,7 @@ class BattleWrapper(ABC):
         """
         raise NotImplementedError
     
-    def _one_fight(self, generating: Team, solving: Team, instance_size: int) -> float:
+    def _one_fight(self, matchup: Matchup, instance_size: int) -> float:
         """Execute a single fight of a battle between a given generator and solver for a given instance size.
 
         Parameters
@@ -107,19 +85,19 @@ class BattleWrapper(ABC):
             the generator (1 if optimal, 0 if failed, >=1 if the
             generator solution is optimal).
         """
-        instance, generator_solution = self._run_generator(generating, instance_size)
+        instance, generator_solution = self._run_generator(matchup.generator, instance_size)
 
         if not instance and not generator_solution:
             return 1.0
 
-        solver_solution = self._run_solver(solving, instance_size, instance)
+        solver_solution = self._run_solver(matchup.solver, instance_size, instance)
 
         if not solver_solution:
             return 0.0
 
         approximation_ratio = self.problem.verifier.calculate_approximation_ratio(instance, instance_size,
                                                                                   generator_solution, solver_solution)
-        logger.info(f'Solver of group {solving} yields a valid solution with an approx. ratio of {approximation_ratio}.')
+        logger.info(f'Solver of group {matchup.solver} yields a valid solution with an approx. ratio of {approximation_ratio}.')
         return approximation_ratio
 
     def _run_generator(self, team: Team, instance_size: int) -> tuple[Any, Any]:

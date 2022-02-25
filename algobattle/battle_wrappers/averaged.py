@@ -6,13 +6,14 @@ import itertools
 import logging
 
 import algobattle.battle_wrapper
+from algobattle.matchups import Matchup
 from algobattle.problem import Problem
 from algobattle.team import Team
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Generator
 
 from algobattle.ui import Ui
 if TYPE_CHECKING:
-    from algobattle.match import Match, RunParameters
+    from algobattle.match import RunParameters
 
 logger = logging.getLogger('algobattle.battle_wrappers.averaged')
 
@@ -24,16 +25,16 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
     class Result(algobattle.battle_wrapper.BattleWrapper.Result):
         approx_ratios: list[float] = field(default_factory=list)
 
-    def __init__(self, problem: Problem, run_parameters: RunParameters = RunParameters(), ui: Ui | None = None, rounds: int = 5,
+    def __init__(self, problem: Problem, run_parameters: RunParameters = RunParameters(),
                 instance_size: int = 10, iterations: int = 25,
                 **options: Any) -> None:
         self.instance_size = instance_size
         self.iterations = iterations
 
         self.pairs: dict[tuple[Team, Team], list[Averaged.Result]]
-        super().__init__(problem, run_parameters, ui, rounds, **options)  
+        super().__init__(problem, run_parameters, **options)  
 
-    def wrapper(self, match: Match, generating: Team, solving: Team) -> None:
+    def wrapper(self, matchup: Matchup) -> Generator[Averaged.Result, None, None]:
         """Execute one averaged battle between a generating and a solving team.
 
         Execute several fights between two teams on a fixed instance size
@@ -47,17 +48,14 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
         match: Match
             The Match object on which the battle wrapper is to be executed on.
         """
-        approximation_ratios = []
+        res = Averaged.Result()
         logger.info(f'==================== Averaged Battle, Instance Size: {self.instance_size}, Rounds: {self.iterations} ====================')
         for i in range(self.iterations):
             logger.info(f'=============== Iteration: {i + 1}/{self.iterations} ===============')
-            approx_ratio = self._one_fight(generating, solving, instance_size=self.instance_size)
-            approximation_ratios.append(approx_ratio)
+            approx_ratio = self._one_fight(matchup, instance_size=self.instance_size)
+            res.approx_ratios.append(approx_ratio)
 
-            curr_pair = self.curr_pair
-            assert curr_pair is not None
-            curr_round = self.curr_round
-            self.pairs[curr_pair][curr_round].approx_ratios.append(approx_ratio)
+        yield res
 
     def calculate_points(self, achievable_points: int) -> dict[Team, float]:
         """Calculate the number of achieved points.
