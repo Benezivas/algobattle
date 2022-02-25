@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import itertools
 import logging
+from collections import defaultdict
 
 import algobattle.battle_wrapper
 from algobattle.matchups import Matchup
@@ -55,7 +56,8 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
 
         yield res
 
-    def calculate_points(self, achievable_points: int) -> dict[Team, float]:
+    @staticmethod
+    def calculate_points(results: dict[Matchup, list[Averaged.Result]], achievable_points: int) -> dict[Team, float]:
         """Calculate the number of achieved points.
 
         The valuation of an averaged battle is calculating by summing up
@@ -75,26 +77,29 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
             team for which there is an entry in match_data and points is a
             float value. Returns an empty dict if no battle was fought.
         """
-        points = dict()
+        points: defaultdict[Team, float] = defaultdict(lambda: 0)
 
         teams: set[Team] = set()
-        for pair in self.pairs.keys():
+        for pair in results.keys():
             teams = teams.union(set(pair))
         team_combinations = itertools.combinations(teams, 2)
+        
 
         if len(teams) == 1:
             return {teams.pop(): achievable_points}
 
-        if self.rounds <= 0:
+        rounds = len(next(iter(results.values())))
+        if rounds == 0:
             return {}
-        points_per_round = round(achievable_points / self.rounds, 1)
+        
+        points_per_round = round(achievable_points / rounds, 1)
         for pair in team_combinations:
-            for i in range(self.rounds):
+            for i in range(rounds):
                 points[pair[0]] = points.get(pair[0], 0)
                 points[pair[1]] = points.get(pair[1], 0)
 
-                ratios1 = self.pairs[pair][i].approx_ratios  # pair[1] was solver
-                ratios0 = self.pairs[pair[::-1]][i].approx_ratios  # pair[0] was solver
+                ratios1 = results[Matchup(*pair)][i].approx_ratios  # pair[1] was solver
+                ratios0 = results[Matchup(*pair[::-1])][i].approx_ratios  # pair[0] was solver
 
                 valuation0 = 0
                 valuation1 = 0
