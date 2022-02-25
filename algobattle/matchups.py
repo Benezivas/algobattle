@@ -10,6 +10,11 @@ class Matchup:
     generator: Team
     solver: Team
 
+    def __iter__(self) -> Iterator[Team]:
+        yield self.generator
+        yield self.solver
+
+
 class BattleMatchups:
     
     def __init__(self, teams: list[Team]) -> None:

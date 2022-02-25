@@ -1,6 +1,7 @@
 """Wrapper that repeats a battle on an instance size a number of times and averages the competitive ratio over all runs."""
 
 from __future__ import annotations
+from collections import defaultdict
 from dataclasses import dataclass
 import itertools
 import logging
@@ -100,7 +101,8 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
 
             yield Iterated.Result(n_cap, maximum_reached_n, n)
 
-    def calculate_points(self, achievable_points: int) -> dict[Team, float]:
+    @staticmethod
+    def calculate_points(results: dict[Matchup, list[Iterated.Result]], achievable_points: int) -> dict[Team, float]:
         """Calculate the number of achieved points.
 
         Each pair of teams fights for the achievable points among one another.
@@ -120,10 +122,10 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
             team for which there is an entry in match_data and points is a
             float value. Returns an empty dict if no battle was fought.
         """
-        points = dict()
+        points: defaultdict[Team, float] = defaultdict(lambda: 0)
 
         teams: set[Team] = set()
-        for pair in self.pairs.keys():
+        for pair in results.keys():
             teams = teams.union(set(pair))
         team_combinations = itertools.combinations(teams, 2)
         
@@ -131,17 +133,15 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
         if len(teams) == 1:
             return {teams.pop(): achievable_points}
 
-        if self.rounds <= 0:
+        rounds = len(next(iter(results.values())))
+        if rounds == 0:
             return {}
 
-        points_per_iteration = round(achievable_points / self.rounds, 1)
+        points_per_iteration = round(achievable_points / rounds, 1)
         for pair in team_combinations:
-            for i in range(self.rounds):
-                points[pair[0]] = points.get(pair[0], 0)
-                points[pair[1]] = points.get(pair[1], 0)
-
-                solved1 = self.pairs[pair][i].solved  # pair[1] was solver
-                solved0 = self.pairs[pair[::-1]][i].solved  # pair[0] was solver
+            for i in range(rounds):
+                solved1 = results[Matchup(*pair)][i].solved  # pair[1] was solver
+                solved0 = results[Matchup(*pair[::-1])][i].solved  # pair[0] was solver
 
                 # Default values for proportions, assuming no team manages to solve anything
                 points_proportion0 = 0.5
