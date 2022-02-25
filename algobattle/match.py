@@ -12,8 +12,6 @@ from algobattle.battle_wrapper import BattleWrapper
 from algobattle.team import Team
 from algobattle.problem import Problem
 from algobattle.docker import DockerError, Image
-from algobattle.subject import Subject
-from algobattle.observer import Observer
 from algobattle.battle_wrappers.averaged import Averaged
 from algobattle.battle_wrappers.iterated import Iterated
 from algobattle.ui import Ui
@@ -53,7 +51,6 @@ class RunParameters:
 class Match:
     """Match class, provides functionality for setting up and executing battles between given teams."""
 
-    _observers: list[Observer] = []
     generating_team = None
     solving_team = None
     battle_wrapper = None

@@ -3,7 +3,6 @@ import curses
 import logging
 import sys
 
-from algobattle.observer import Observer
 from algobattle.match import Match
 from algobattle import __version__ as version
 from algobattle.util import check_for_terminal
@@ -11,7 +10,7 @@ from algobattle.util import check_for_terminal
 logger = logging.getLogger('algobattle.ui')
 
 
-class Ui(Observer):
+class Ui:
     """The UI Class declares methods to output information to STDOUT."""
 
     @check_for_terminal
