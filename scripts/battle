@@ -13,7 +13,7 @@ import algobattle
 from algobattle.fight_handler import FightHandler
 from algobattle.match import Match
 from algobattle.team import Team
-from algobattle.util import measure_runtime_overhead, import_problem_from_path, initialize_wrapper
+from algobattle.util import measure_runtime_overhead, import_problem_from_path, initialize_wrapper, build_docker_container
 from algobattle.ui import Ui
 
 if __name__ == "__main__":
@@ -138,7 +138,19 @@ if __name__ == "__main__":
 
     teams = []
     for i in range(len(generators)):
-        teams.append(Team(team_names[i], generators[i], solvers[i], config['run_parameters']['timeout_build']))
+        generator_tag = 'generator-{}'.format(team_names[i])
+        generator_built = build_docker_container(generators[i],
+                                                 generator_tag,
+                                                 timeout_build=int(config['run_parameters']['timeout_build']))
+        solver_tag = 'solver-{}'.format(team_names[i])
+        solver_built = build_docker_container(solvers[i],
+                                              solver_tag,
+                                              timeout_build=int(config['run_parameters']['timeout_build']))
+        build_successful = generator_built & solver_built
+        if build_successful:
+            teams.append(Team(team_names[i], generator_tag, solver_tag))
+        else:
+            logger.warning('Building generators and solvers for team {} failed, they will be excluded!'.format(team_names[i]))
 
     runtime_overhead = 0
     if not options.no_overhead_calculation:
