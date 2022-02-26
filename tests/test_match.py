@@ -6,7 +6,6 @@ import unittest
 import logging
 
 import algobattle
-from algobattle.battle_wrapper import BattleWrapper
 from algobattle.battle_wrappers.iterated import Iterated
 from algobattle.match import BuildError, Match, UnknownBattleType
 from algobattle.team import Team

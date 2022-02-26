@@ -6,10 +6,8 @@ import logging
 import configparser
 from pathlib import Path
 from collections.abc import Mapping
-from typing import Type, cast
-from algobattle import battle_wrappers
 from algobattle.battle_wrapper import BattleWrapper
-from algobattle.matchups import BattleMatchups, Matchup
+from algobattle.matchups import BattleMatchups
 
 from algobattle.team import Team
 from algobattle.problem import Problem

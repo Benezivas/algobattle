@@ -4,7 +4,7 @@ import logging
 import importlib.util
 from pathlib import Path
 import sys
-from typing import Callable, Any
+from typing import Any
 
 from algobattle.problem import Problem
 
