@@ -10,6 +10,7 @@ import algobattle.battle_wrapper
 from algobattle.matchups import Matchup
 from algobattle.problem import Problem
 from algobattle.team import Team
+from algobattle.util import format_table
 from typing import TYPE_CHECKING, Any, Generator
 
 if TYPE_CHECKING:
@@ -24,6 +25,17 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
     @dataclass
     class Result(algobattle.battle_wrapper.BattleWrapper.Result):
         approx_ratios: list[float] = field(default_factory=list)
+
+        def __float__(self) -> float:
+            successful_iters = [x for x in self.approx_ratios if x != 0]
+            return sum(successful_iters) / len(successful_iters)
+
+        def __str__(self) -> str:
+            return str(float(self))
+        
+        def __repr__(self) -> str:
+            return str(self.approx_ratios)
+
 
     def __init__(self, problem: Problem, run_parameters: RunParameters = RunParameters(),
                 instance_size: int = 10, iterations: int = 25,
@@ -122,47 +134,12 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
 
         return points
 
-    def format_as_utf8(self) -> str:
-        """Format the executed battle.
+    @staticmethod
+    def format(results: dict[Matchup, list[Averaged.Result]]) -> str:
+        num_rounds = len(next(iter(results.values())))
+        table = []
+        table.append(["GEN", "SOL", *range(1, num_rounds + 1), "LAST"])
+        for (matchup, res) in results.items():
+            table.append([matchup.generator, matchup.solver, *res, res[-1].approx_ratios[-1]])
 
-        Returns
-        -------
-        str
-            A formatted string on the basis of the wrapper.
-        """
-        formatted_output_string = ""
-        formatted_output_string += 'Battle Type: Averaged Battle\n\r'
-        formatted_output_string += '╔═════════╦═════════╦' \
-                                   + ''.join(['══════╦' for _ in range(self.rounds)]) \
-                                   + '══════╦══════╦════════╗' + '\n\r' \
-                                   + '║   GEN   ║   SOL   ' \
-                                   + ''.join([f'║{"R" + str(i + 1):^6s}' for i in range(self.rounds)]) \
-                                   + '║ LAST ║ SIZE ║  ITER  ║' + '\n\r' \
-                                   + '╟─────────╫─────────╫' \
-                                   + ''.join(['──────╫' for _ in range(self.rounds)]) \
-                                   + '──────╫──────╫────────╢' + '\n\r'
-
-        for pair in self.pairs.keys():
-            avg = [0.0 for _ in range(self.rounds)]
-
-            for i in range(self.rounds):
-                executed_iters = len(self.pairs[pair][i].approx_ratios)
-                n_dead_iters = executed_iters - len([i for i in self.pairs[pair][i].approx_ratios if i != 0.0])
-
-                if executed_iters - n_dead_iters > 0:
-                    avg[i] = sum(self.pairs[pair][i].approx_ratios) / (executed_iters - n_dead_iters)
-
-            curr_round = self.curr_round
-            curr_iter = len(self.pairs[pair][curr_round].approx_ratios)
-            latest_approx_ratio = 0.0
-            if self.pairs[pair][curr_round].approx_ratios:
-                latest_approx_ratio = self.pairs[pair][curr_round].approx_ratios[-1]
-
-            formatted_output_string += f'║{pair[0]:>9s}║{pair[1]:>9s}' \
-                                        + ''.join([f'║{avg[i]:>6.2f}' for i in range(self.rounds)]) \
-                                        + f'║{latest_approx_ratio:>6.2f}║{self.instance_size:>6d}║{curr_iter:>3d}/{self.iterations:>3d} ║' + '\r\n'
-        formatted_output_string += '╚═════════╩═════════╩' \
-                                   + ''.join(['══════╩' for _ in range(self.rounds)]) \
-                                   + '══════╩══════╩════════╝' + '\n\r'
-
-        return formatted_output_string
+        return "Battle Type: Averaged Battle\n" + format_table(table)
