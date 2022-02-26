@@ -1,8 +1,11 @@
 """Wrapper that repeats a battle on an instance size a number of times and averages the competitive ratio over all runs."""
 
+from configparser import ConfigParser
 import logging
+from typing import Tuple
 
 from algobattle.battle_wrapper import BattleWrapper
+from algobattle.fight_handler import FightHandler
 
 logger = logging.getLogger('algobattle.battle_wrappers.iterated')
 
@@ -10,7 +13,32 @@ logger = logging.getLogger('algobattle.battle_wrappers.iterated')
 class Iterated(BattleWrapper):
     """Class of an iterated battle Wrapper."""
 
-    def wrapper(self, match, options: dict = {'exponent': 2}) -> None:
+    def __init__(self, config: ConfigParser) -> None:
+        if 'iterated' in config:
+            self.iteration_cap = int(config['iterated'].get('iteration_cap', 50000))
+            self.exponent = int(config['iterated'].get('exponent', 2))
+            self.approximation_ratio = float(config['iterated'].get('approximation_ratio', 1.0))
+        else:
+            self.iteration_cap = 50000
+            self.exponent = 2
+            self.approximation_ratio = 1.0
+        self.reset_round_data()
+
+    def __str__(self) -> str:
+        return "Iterated"
+
+    def reset_round_data(self) -> None:
+        """Resets the round_data dict to default values."""
+        self.round_data = {'type': str(self),
+                           'iteration_cap': self.iteration_cap,
+                           'current_cap': self.iteration_cap,
+                           'solved': 0,
+                           'attempting': 0,
+                           'exponent': self.exponent,
+                           'approximation_ratio': self.approximation_ratio}
+
+    @BattleWrapper.reset_state
+    def run_round(self, fight_handler: FightHandler) -> None:
         """Execute one iterative battle between a generating and a solving team.
 
         Incrementally try to search for the highest n for which the solver is
@@ -20,51 +48,45 @@ class Iterated(BattleWrapper):
         Only once the solver fails after the multiplier is reset, it counts as
         failed. Since this would heavily favour probabilistic algorithms (That
         may have only failed by chance and are able to solve a certain instance
-        size on a second try), we cap the maximum solution size by the first
+        size on a second try), we cap the maximum solution size by the last
         value that an algorithm has failed on.
 
         The wrapper automatically ends the battle and declares the solver as the
         winner once the iteration cap is reached.
 
-        During execution, this function updates the match_data of the match
-        object which is passed to it by
-        calls to the match.update_match_data function.
+        During execution, this function updates the self.round_data dict,
+        which automatically notifies all observers subscribed to this object.
 
         Parameters
         ----------
-        match: Match
-            The Match object on which the battle wrapper is to be executed on.
-        options: dict
-            A dict that contains an 'exponent' key with an int value of at least 1,
-            which determines the step size increase.
+        fight_handler: FightHandler
+            Fight handler that manages the execution of a concrete fight.
         """
-        curr_pair = match.match_data['curr_pair']
-        curr_round = match.match_data[curr_pair]['curr_round']
-
-        n = match.problem.n_start
+        n = fight_handler.problem.n_start
         maximum_reached_n = 0
-        i = 0
-        exponent = options['exponent']
-        n_cap = match.match_data[curr_pair][curr_round]['cap']
+        base_increment = 0
+        exponent = self.round_data['exponent']
+        n_cap = self.round_data['iteration_cap']
         alive = True
+
+        self.round_data = {'attempting': n}
 
         logger.info('==================== Iterative Battle, Instanze Size Cap: {} ===================='.format(n_cap))
         while alive:
             logger.info('=============== Instance Size: {}/{} ==============='.format(n, n_cap))
-            approx_ratio = match._one_fight(instance_size=n)
-            if approx_ratio == 0.0:
-                alive = False
-            elif approx_ratio > match.approximation_ratio:
+
+            approx_ratio = fight_handler.fight(instance_size=n)
+            if approx_ratio == 0.0 or approx_ratio > self.approximation_ratio:
                 logger.info('Solver {} does not meet the required solution quality at instance size {}. ({}/{})'
-                            .format(match.solving_team, n, approx_ratio, match.approximation_ratio))
+                            .format(fight_handler.solving_team, n, approx_ratio, self.approximation_ratio))
                 alive = False
 
-            if not alive and i > 1:
-                # The step size increase was too aggressive, take it back and reset the increment multiplier
+            if not alive and base_increment > 1:
+                # The step size increase was too aggressive, take it back and reset the base_increment
                 logger.info('Setting the solution cap to {}...'.format(n))
                 n_cap = n
-                n -= i ** exponent
-                i = 0
+                n -= base_increment ** exponent
+                base_increment = 0
                 alive = True
             elif n > maximum_reached_n and alive:
                 # We solved an instance of bigger size than before
@@ -73,109 +95,80 @@ class Iterated(BattleWrapper):
             if n + 1 > n_cap:
                 alive = False
             else:
-                i += 1
-                n += i ** exponent
+                base_increment += 1
+                n += base_increment ** exponent
 
                 if n >= n_cap:
                     # We have failed at this value of n already, reset the step size!
-                    n -= i ** exponent - 1
-                    i = 1
+                    n -= base_increment ** exponent - 1
+                    base_increment = 1
 
-            match.update_match_data({curr_pair: {curr_round: {'cap': n_cap, 'solved': maximum_reached_n, 'attempting': n}}})
+            self.round_data = {'current_cap': n_cap, 'solved': maximum_reached_n, 'attempting': n}
 
-    def calculate_points(self, match_data: dict, achievable_points: int) -> dict:
-        """Calculate the number of achieved points, given results.
+    def calculate_valuations(self, round_data0, round_data1) -> Tuple:
+        """Returns the highest instance size for which each team was successful.
 
-        Each pair of teams fights for the achievable points among one another.
-        These achievable points are split over all matches, as one run reaching
-        the iteration cap poisons the average number of points.
-
-        Parameters
-        ----------
-        match_data : dict
-            dict containing the results of match.run().
-        achievable_points : int
-            Number of achievable points.
+        round_data0: dict
+            round_data in which the 0th team solved instances.
+        round_data1: dict
+            round_data in which the 1st team solved instances.
 
         Returns
         -------
-        dict
-            A mapping between team names and their achieved points.
-            The format is {(team_x_name, team_y_name): points [...]} for each
-            pair (x,y) for which there is an entry in match_data and points is a
-            float value. Returns an empty dict if no battle was fought.
+        Tuple
+            A 2-tuple with the calculated valuations for each team.
         """
-        points = dict()
+        return (round_data0['solved'], round_data1['solved'])
 
-        team_pairs = [key for key in match_data.keys() if isinstance(key, tuple)]
-        team_names = set()
-        for pair in team_pairs:
-            team_names = team_names.union(set((pair[0], pair[1])))
+    def format_round_contents(self, round_data: dict) -> str:
+        """Format the provided round_data for iterated battles.
 
-        if len(team_names) == 1:
-            return {team_names.pop(): achievable_points}
-
-        if match_data['rounds'] <= 0:
-            return {}
-
-        points_per_iteration = round(achievable_points / match_data['rounds'], 1)
-        for pair in team_pairs:
-            for i in range(match_data['rounds']):
-                points[pair[0]] = points.get(pair[0], 0)
-                points[pair[1]] = points.get(pair[1], 0)
-
-                solved1 = match_data[pair][i]['solved']  # pair[1] was solver
-                solved0 = match_data[(pair[1], pair[0])][i]['solved']  # pair[0] was solver
-
-                # Default values for proportions, assuming no team manages to solve anything
-                points_proportion0 = 0.5
-                points_proportion1 = 0.5
-
-                if solved0 + solved1 > 0:
-                    points_proportion0 = (solved0 / (solved0 + solved1))
-                    points_proportion1 = (solved1 / (solved0 + solved1))
-
-                points[pair[0]] += round(points_per_iteration * points_proportion0, 1) / 2
-                points[pair[1]] += round(points_per_iteration * points_proportion1, 1) / 2
-
-        return points
-
-    def format_as_utf8(self, match_data: dict) -> str:
-        """Format the provided match_data for iterated battles.
+        The returned tuple is supposed to be used for formatted live outputs.
 
         Parameters
         ----------
-        match_data : dict
-            dict containing match data generated by match.run().
+        round_data : dict
+            dict containing round data.
 
         Returns
         -------
         str
-            A formatted string on the basis of the match_data.
+            A string of the size of the currently highest solved instance.
         """
-        formatted_output_string = ""
-        formatted_output_string += 'Battle Type: Iterated Battle\n\r'
-        formatted_output_string += '╔═════════╦═════════╦' \
-                                   + ''.join(['══════╦' for i in range(match_data['rounds'])]) \
-                                   + '══════╦══════╗' + '\n\r' \
-                                   + '║   GEN   ║   SOL   ' \
-                                   + ''.join(['║{:^6s}'.format('R' + str(i + 1)) for i in range(match_data['rounds'])]) \
-                                   + '║  CAP ║  AVG ║' + '\n\r' \
-                                   + '╟─────────╫─────────╫' \
-                                   + ''.join(['──────╫' for i in range(match_data['rounds'])]) \
-                                   + '──────╫──────╢' + '\n\r'
+        return str(round_data['solved'])
 
-        for pair in match_data.keys():
-            if isinstance(pair, tuple):
-                curr_round = match_data[pair]['curr_round']
-                avg = sum(match_data[pair][i]['solved'] for i in range(match_data['rounds'])) // match_data['rounds']
+    def format_misc_headers(self) -> Tuple:
+        """Return which strings are to be used as headers a formatted output.
 
-                formatted_output_string += '║{:>9s}║{:>9s}'.format(pair[0], pair[1]) \
-                                           + ''.join(['║{:>6d}'.format(match_data[pair][i]['solved'])
-                                                     for i in range(match_data['rounds'])]) \
-                                           + '║{:>6d}║{:>6d}║'.format(match_data[pair][curr_round]['cap'], avg) + '\r'
-        formatted_output_string += '\n╚═════════╩═════════╩' \
-                                   + ''.join(['══════╩' for i in range(match_data['rounds'])]) \
-                                   + '══════╩══════╝' + '\n\r'
+        Make sure that the number of elements of the returned tuple match
+        up with the number of elements returned by format_misc_contents.
 
-        return formatted_output_string
+        Returns
+        -------
+        Tuple
+            A 2-tuple of strings containing header names for:
+            - the current upper bound for instance sizes
+            - The average instance size solved over all rounds
+        """
+        return ('CAP', 'AVG')
+
+    def format_misc_contents(self, round_data: dict) -> Tuple:
+        """Format additional data that is to be displayed.
+
+        Make sure that the number of elements of the returned tuple match
+        up with the number of elements returned by format_misc_headers.
+
+        Parameters
+        ----------
+        round_data : dict
+            dict containing round data.
+
+        Returns
+        -------
+        Tuple
+            A 2-tuple of strings containing header names for:
+            - the current upper bound for instance sizes
+            - The average instance size solved over all rounds
+        """
+        # TODO: We cannot calculate the average as we only have access to a single round.
+        return (str(round_data['current_cap']), 'TODO')
