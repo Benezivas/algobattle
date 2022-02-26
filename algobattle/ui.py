@@ -2,13 +2,23 @@
 import curses
 import logging
 import sys
+from typing import Callable, TypeVar
 
-from algobattle.match import Match
 from algobattle import __version__ as version
-from algobattle.util import check_for_terminal
+
 
 logger = logging.getLogger('algobattle.ui')
 
+F = TypeVar("F", bound=Callable)
+def check_for_terminal(function: F) -> F:
+    """Ensure that we are attached to a terminal."""
+    def wrapper(self, *args, **kwargs):
+        if not sys.stdout.isatty():
+            logger.error('Not attached to a terminal.')
+            return None
+        else:
+            return function(self, *args, **kwargs)
+    return wrapper # type: ignore
 
 class Ui:
     """The UI Class declares methods to output information to STDOUT."""
@@ -31,7 +41,7 @@ class Ui:
             curses.endwin()                 # type: ignore
 
     @check_for_terminal
-    def update(self, match: Match) -> None:
+    def update(self, results: str) -> None:
         """Receive updates by observing the match object and prints them out formatted.
 
         Parameters
@@ -41,9 +51,9 @@ class Ui:
         """
         self.stdscr.refresh()
         self.stdscr.clear()
-        self.print_formatted_data_to_stdout(match)  # TODO: Refactor s.t. the output stream can be chosen by the user.
+        self.print_formatted_data_to_stdout(results)  # TODO: Refactor s.t. the output stream can be chosen by the user.
 
-    def print_formatted_data_to_stdout(self, match: Match) -> None:
+    def print_formatted_data_to_stdout(self, results: str) -> None:
         """Output the formatted match data of a battle wrapper to stdout.
 
         Parameters
@@ -60,4 +70,4 @@ class Ui:
 
         out += f'\nAlgobattle version {version}\n\r'
 
-        print(out + match.format_as_utf8())
+        print(out + results)

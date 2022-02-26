@@ -38,17 +38,6 @@ def import_problem_from_path(problem_path: Path) -> Problem | None:
         logger.critical(f'Importing the given problem failed with the following exception: "{e}"')
         return None
 
-
-def check_for_terminal(function: Callable) -> Callable:
-    """Ensure that we are attached to a terminal."""
-    def wrapper(self, *args, **kwargs):
-        if not sys.stdout.isatty():
-            logger.error('Not attached to a terminal.')
-            return None
-        else:
-            return function(self, *args, **kwargs)
-    return wrapper
-
 def format_table(table: list[list[Any]], column_spacing: dict[int, int] = {}) -> str:
     if len(table) == 0:
         return "\n"
