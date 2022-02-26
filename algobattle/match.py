@@ -22,8 +22,11 @@ class Match(Subject, Observer):
         self.match_data = {'type': str(self.battle_wrapper),
                            'problem': str(self.fight_handler.problem),
                            'teams': [str(team) for team in self.teams],
+                           'rounds': self.rounds,
                            'curr_pair': None}  # match_data is a property with special getters and setters
-        self.match_data = property(self._get_match_data, self._update_match_data)  # Decorator to reduce updating overhead.
+        for pair in self.all_battle_pairs():
+            for round in range(rounds):
+                self.match_data = {pair: {'curr_round': 0, round: self.battle_wrapper.round_data}}
 
     def run(self) -> None:
         """Match entry point, executes fights between all teams."""
@@ -34,7 +37,6 @@ class Match(Subject, Observer):
             for i in range(self.rounds):
                 logger.info('{}  Running Battle {}/{}  {}'.format('#' * 20, i + 1, self.rounds, '#' * 20))
                 self.match_data = {pair: {'curr_round': i}}
-
                 self.battle_wrapper.run_round(self.fight_handler)
 
     def calculate_points(self, achievable_points: int) -> dict:
@@ -44,8 +46,6 @@ class Match(Subject, Observer):
 
         Each pair of teams fights for the achievable points among one another.
         These achievable points are split over all rounds.
-
-        This method only returns sensible data if all rounds have been fought.
         Points are derived from pairings of teams, it is thus expected that
         for each pairing of teams (x,y) there is also a pairing (y,x).
 
@@ -60,20 +60,20 @@ class Match(Subject, Observer):
             A mapping between team names and their achieved points.
             The format is {str(team)): points [...]}.
         """
-        if self.match_data['rounds'] <= 0:
+        if self.rounds <= 0:
             return {}
 
         if len(self.teams) == 1:  # Special case for single player
             return {str(self.teams[0]): achievable_points}
 
         points = dict()
-        points_per_iteration = round(achievable_points / self.match_data['rounds'], 1)
+        points_per_iteration = round(achievable_points / self.rounds, 1)
 
         for pair in self.all_battle_pairs():
             points[pair[0]] = points.get(pair[0], 0)
             points[pair[1]] = points.get(pair[1], 0)
 
-            for i in range(self.match_data['rounds']):
+            for i in range(self.rounds):
                 round_data0 = self.match_data[(pair[1], pair[0])][i]  # pair[0] was solver
                 round_data1 = self.match_data[pair][i]  # pair[1] was solver
 
@@ -152,7 +152,7 @@ class Match(Subject, Observer):
             A formatted delimiter string.
         """
         nheaders = len(self.battle_wrapper.format_misc_headers())
-        rounds = self.match_data['rounds']
+        rounds = self.rounds
 
         delimiter_start = '{}{}{}{}{}'.format(left_delim, 9 * line_char, mid_delim, 9 * line_char, mid_delim)
         additional_round_chunks = ('{}{}'.format(line_char * 9, mid_delim)) * rounds
@@ -170,11 +170,11 @@ class Match(Subject, Observer):
             A formatted header string.
         """
         headers = self.battle_wrapper.format_misc_headers()
-        rounds = self.match_data['rounds']
+        rounds = self.rounds
 
         default_header = '║   GEN   ║   SOL   '
         additional_round_headers = ''.join(['║{:^9s}'.format('R' + str(i + 1)) for i in range(rounds)])
-        additional_misc_headers = ''.join(['║{:>9s}'.format(headers[i] for i in range(len(headers)))])
+        additional_misc_headers = ''.join(['║{:>9s}'.format(headers[i]) for i in range(len(headers))])
         closing_header = '║'
 
         return default_header + additional_round_headers + additional_misc_headers + closing_header
@@ -191,7 +191,7 @@ class Match(Subject, Observer):
         for pair in self.all_battle_pairs():
             default_contents = '║{:>9s}║{:>9s}'.format(pair[0], pair[1])
             additional_round_contents = ''
-            for round in range(self.match_data['rounds']):
+            for round in range(self.rounds):
                 round_data = self.match_data[pair][round]
                 additional_round_contents += '║{:>9s}'.format(self.battle_wrapper.format_round_contents(round_data))
 
@@ -199,7 +199,7 @@ class Match(Subject, Observer):
             latest_round_data = self.match_data[pair][latest_round]
 
             misc_contents = self.battle_wrapper.format_misc_contents(latest_round_data)
-            additional_misc_contents = ''.join(['║{:>9s}'.format(misc_contents[i] for i in range(len(misc_contents)))])
+            additional_misc_contents = ''.join(['║{:>9s}'.format(misc_contents[i]) for i in range(len(misc_contents))])
             closing_contents = '║'
 
             round_lines.append(default_contents + additional_round_contents + additional_misc_contents + closing_contents)
@@ -214,8 +214,10 @@ class Match(Subject, Observer):
         battle_wrapper : BattleWrapper
             The observed battle_wrapper object.
         """
-        if self.match_data['curr_pair']:
-            self.match_data = {self.match_data['curr_pair']: {self.match_data['curr_round']: battle_wrapper.round_data}}
+        if 'curr_pair' in self._match_data.keys():
+            current_pair = self._match_data['curr_pair']
+            current_round = self._match_data[current_pair]['curr_round']
+            update_nested_dict(self._match_data, {current_pair: {current_round: battle_wrapper.round_data}})
         self.notify()
 
     def _update_match_data(self, new_data: dict) -> bool:
@@ -232,6 +234,9 @@ class Match(Subject, Observer):
     def _get_match_data(self) -> dict:
         """Return the current match data."""
         return self._match_data
+
+    _match_data = {}
+    match_data = property(_get_match_data, _update_match_data)  # Decorator to reduce updating overhead.
 
     def attach(self, observer: Observer) -> None:
         """Subscribe a new Observer by adding them to the list of observers."""
