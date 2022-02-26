@@ -7,7 +7,7 @@ import itertools
 import logging
 
 import algobattle.battle_wrapper
-from algobattle.matchups import Matchup
+from algobattle.matchups import Matchup, BattleMatchups
 from algobattle.problem import Problem
 from algobattle.team import Team
 from algobattle.util import format_table
@@ -20,21 +20,6 @@ logger = logging.getLogger('algobattle.battle_wrappers.iterated')
 
 class Iterated(algobattle.battle_wrapper.BattleWrapper):
     """Class of an iterated battle Wrapper."""
-    
-    @dataclass
-    class Result(algobattle.battle_wrapper.BattleWrapper.Result):
-        cap: int = 0
-        solved: int = 0
-        attempting: int = 0
-
-        def __int__(self) -> int:
-            return self.cap
-
-        def __str__(self) -> str:
-            return str(int(self))
-        
-        def __repr__(self) -> str:
-            return f"Result(cap={self.cap}, solved={self.solved}, attempting={self.attempting}"
 
     def __init__(self, problem: Problem, run_parameters: RunParameters = RunParameters(),
                 cap: int = 50000, exponent: int = 2, approximation_ratio: float = 1,
@@ -109,70 +94,88 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
                     n -= i ** exponent - 1
                     i = 1
 
-            yield Iterated.Result(n_cap, maximum_reached_n, n)
+            yield self.Result(n_cap, maximum_reached_n, n)
+    
+    @dataclass
+    class Result(algobattle.battle_wrapper.BattleWrapper.Result):
+        cap: int = 0
+        solved: int = 0
+        attempting: int = 0
 
-    @staticmethod
-    def calculate_points(results: dict[Matchup, list[Iterated.Result]], achievable_points: int) -> dict[Team, float]:
-        """Calculate the number of achieved points.
+        def __int__(self) -> int:
+            return self.cap
 
-        Each pair of teams fights for the achievable points among one another.
-        These achievable points are split over all matches, as one run reaching
-        the iteration cap poisons the average number of points.
-
-        Parameters
-        ----------
-        achievable_points : int
-            Number of achievable points.
-
-        Returns
-        -------
-        dict
-            A mapping between team names and their achieved points.
-            The format is {team_name: points [...]} for each
-            team for which there is an entry in match_data and points is a
-            float value. Returns an empty dict if no battle was fought.
-        """
-        points: defaultdict[Team, float] = defaultdict(lambda: 0)
-
-        teams: set[Team] = set()
-        for pair in results.keys():
-            teams = teams.union(set(pair))
-        team_combinations = itertools.combinations(teams, 2)
+        def __str__(self) -> str:
+            return str(int(self))
         
+        def __repr__(self) -> str:
+            return f"Result(cap={self.cap}, solved={self.solved}, attempting={self.attempting}"
 
-        if len(teams) == 1:
-            return {teams.pop(): achievable_points}
 
-        rounds = len(next(iter(results.values())))
-        if rounds == 0:
-            return {}
+    class MatchResult(algobattle.battle_wrapper.BattleWrapper.MatchResult[Result]):
 
-        points_per_iteration = round(achievable_points / rounds, 1)
-        for pair in team_combinations:
-            for i in range(rounds):
-                solved1 = results[Matchup(*pair)][i].solved  # pair[1] was solver
-                solved0 = results[Matchup(*pair[::-1])][i].solved  # pair[0] was solver
+        def __init__(self, matchups: BattleMatchups, rounds: int = 0) -> None:
+            super().__init_hidden__(matchups, rounds, Iterated.Result)
+        
+        def format(self) -> str:
+            num_rounds = len(next(iter(self.values())))
+            table = []
+            table.append(["GEN", "SOL", *range(1, num_rounds + 1), "CAP", "AVG"])
+            for (matchup, res) in self.items():
+                table.append([matchup.generator, matchup.solver, *res, res[-1].cap, sum(int(r) for r in res) // len(res)])
 
-                # Default values for proportions, assuming no team manages to solve anything
-                points_proportion0 = 0.5
-                points_proportion1 = 0.5
+            return "Battle Type: Iterated Battle\n" + format_table(table)
 
-                if solved0 + solved1 > 0:
-                    points_proportion0 = (solved0 / (solved0 + solved1))
-                    points_proportion1 = (solved1 / (solved0 + solved1))
+        def calculate_points(self, achievable_points: int) -> dict[Team, float]:
+            """Calculate the number of achieved points.
 
-                points[pair[0]] += round(points_per_iteration * points_proportion0, 1)
-                points[pair[1]] += round(points_per_iteration * points_proportion1, 1)
+            Each pair of teams fights for the achievable points among one another.
+            These achievable points are split over all matches, as one run reaching
+            the iteration cap poisons the average number of points.
 
-        return points
+            Parameters
+            ----------
+            achievable_points : int
+                Number of achievable points.
 
-    @staticmethod
-    def format(results: dict[Matchup, list[Iterated.Result]]) -> str:
-        num_rounds = len(next(iter(results.values())))
-        table = []
-        table.append(["GEN", "SOL", *range(1, num_rounds + 1), "CAP", "AVG"])
-        for (matchup, res) in results.items():
-            table.append([matchup.generator, matchup.solver, *res, res[-1].cap, sum(int(r) for r in res) // len(res)])
+            Returns
+            -------
+            dict
+                A mapping between team names and their achieved points.
+                The format is {team_name: points [...]} for each
+                team for which there is an entry in match_data and points is a
+                float value. Returns an empty dict if no battle was fought.
+            """
+            points: defaultdict[Team, float] = defaultdict(lambda: 0)
 
-        return "Battle Type: Iterated Battle\n" + format_table(table)
+            teams: set[Team] = set()
+            for pair in self.keys():
+                teams = teams.union(set(pair))
+            team_combinations = itertools.combinations(teams, 2)
+            
 
+            if len(teams) == 1:
+                return {teams.pop(): achievable_points}
+
+            rounds = len(next(iter(self.values())))
+            if rounds == 0:
+                return {}
+
+            points_per_iteration = round(achievable_points / rounds, 1)
+            for pair in team_combinations:
+                for i in range(rounds):
+                    solved1 = self[Matchup(*pair)][i].solved  # pair[1] was solver
+                    solved0 = self[Matchup(*pair[::-1])][i].solved  # pair[0] was solver
+
+                    # Default values for proportions, assuming no team manages to solve anything
+                    points_proportion0 = 0.5
+                    points_proportion1 = 0.5
+
+                    if solved0 + solved1 > 0:
+                        points_proportion0 = (solved0 / (solved0 + solved1))
+                        points_proportion1 = (solved1 / (solved0 + solved1))
+
+                    points[pair[0]] += round(points_per_iteration * points_proportion0, 1)
+                    points[pair[1]] += round(points_per_iteration * points_proportion1, 1)
+
+            return points

@@ -1,12 +1,13 @@
 """Match class, provides functionality for setting up and executing battles between given teams."""
 from __future__ import annotations
-from dataclasses import dataclass
 import itertools
 
 import logging
 import configparser
 from pathlib import Path
-from typing import Mapping
+from collections.abc import Mapping
+from typing import Type, cast
+from algobattle import battle_wrappers
 from algobattle.battle_wrapper import BattleWrapper
 from algobattle.matchups import BattleMatchups, Matchup
 
@@ -69,10 +70,6 @@ class Match:
         if approximation_ratio != 1.0 and not problem.approximable:
             logger.error('The given problem is not approximable and can only be run with an approximation ratio of 1.0!')
             raise ConfigurationError
-        
-        self.results: dict[Matchup, list[BattleWrapper.Result]] = {}
-        for matchup in self.battle_matchups:
-            self.results[matchup] = []
 
         self._build(teams, cache_docker_containers)
 
@@ -125,7 +122,7 @@ class Match:
             return list(itertools.permutations(self.teams, 2))
 
     def run(self, battle_type: str = 'iterated', rounds: int = 5, iterated_cap: int = 50000, iterated_exponent: int = 2,
-            approximation_instance_size: int = 10, approximation_iterations: int = 25) -> BattleWrapper:
+            approximation_instance_size: int = 10, approximation_iterations: int = 25) -> BattleWrapper.MatchResult:
         """Match entry point, executes rounds fights between all teams and returns the results of the battles.
 
         Parameters
@@ -150,30 +147,31 @@ class Match:
         """
 
         if battle_type == 'iterated':
-            self.battle_wrapper = Iterated(self.problem, self.run_parameters, iterated_cap, iterated_exponent, self.approximation_ratio)
+            res = Iterated.Result
+            battle_wrapper = Iterated(self.problem, self.run_parameters, iterated_cap, iterated_exponent, self.approximation_ratio)
         elif battle_type == 'averaged':
-            self.battle_wrapper = Averaged(self.problem, self.run_parameters, approximation_instance_size, approximation_iterations)
+            res = Averaged.Result
+            battle_wrapper = Averaged(self.problem, self.run_parameters, approximation_instance_size, approximation_iterations)
         else:
             logger.error(f'Unrecognized battle_type given: "{battle_type}"')
             raise UnknownBattleType
+        
+        results: BattleWrapper.MatchResult[res] = type(battle_wrapper).MatchResult(self.battle_matchups, rounds)
 
+        if self.ui is not None:
+            self.ui.update(results.format())
+        
         for matchup in self.battle_matchups:
             for i in range(rounds):
                 logger.info(f'{"#" * 20}  Running Battle {i + 1}/{rounds}  {"#" * 20}')
-                self.results[matchup].append(self.battle_wrapper.Result())
-                if self.ui is not None:
-                    self.ui.update()
-                for result in self.battle_wrapper.wrapper(matchup):
-                    self.results[matchup][i] = result
+        
+                for result in battle_wrapper.wrapper(matchup):
+                    results[matchup][i] = result
                     if self.ui is not None:
-                        self.ui.update()
+                        self.ui.update(results.format())
 
 
-        return self.battle_wrapper
-
-    def format_as_utf8(self) -> str:
-        assert self.battle_wrapper is not None
-        return self.battle_wrapper.format_as_utf8()
+        return results
 
     def cleanup(self) -> None:
         for team in self.teams:

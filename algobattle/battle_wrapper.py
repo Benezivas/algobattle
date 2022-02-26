@@ -8,8 +8,8 @@ their run, such that it contains the current state of the match.
 from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Generator
-from algobattle.matchups import Matchup
+from typing import TYPE_CHECKING, Any, Generator, TypeVar
+from algobattle.matchups import BattleMatchups, Matchup
 from algobattle.problem import Problem
 from algobattle.team import Team
 from algobattle.docker import DockerError
@@ -19,13 +19,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger('algobattle.battle_wrapper')
 
-
 class BattleWrapper(ABC):
     """Base class for wrappers that execute a specific kind of battle.
     Its state contains information about the battle and its history."""
-
-    class Result:
-        pass
     
     def __init__(self, problem: Problem, run_parameters: RunParameters = RunParameters(), **options: Any):
         """Builds a battle wrapper object with the given option values.
@@ -50,7 +46,7 @@ class BattleWrapper(ABC):
                 logger.warning(f"Option '{arg}={value}' was provided, but is not used by {type(self)} type battles.")
 
     @abstractmethod
-    def wrapper(self, matchup: Matchup) -> Generator[BattleWrapper.Result, None, None]:
+    def wrapper(self, matchup: Matchup) -> Generator[Result, None, None]:
         """The main base method for a wrapper.
 
         A wrapper should update the match.match_data object during its run. The callback functionality
@@ -195,45 +191,57 @@ class BattleWrapper(ABC):
 
         return solver_solution
 
-    @abstractmethod
-    @staticmethod
-    def calculate_points(results: dict[Matchup, list[BattleWrapper.Result]], achievable_points: int) -> dict[Team, float]:
-        """Calculate the number of achieved points, given results.
+    class Result:
+        pass
 
-        As awarding points completely depends on the type of battle that
-        was fought, each wrapper should implement a method that determines
-        how to split up the achievable points among all teams.
+    Res = TypeVar("Res", covariant=True, bound=Result)
+    class MatchResult(dict[Matchup, list[Res]], ABC):
 
-        Parameters
-        ----------
-        achievable_points : int
-            Number of achievable points.
+        def __init__(self, matchups: BattleMatchups, rounds: int = 0) -> None:
+            pass
+        
+        def __init_hidden__(self, matchups: BattleMatchups, rounds: int, result_type: type):
+            for matchup in matchups:
+                self[matchup] = [result_type() for _ in range(rounds)]
 
-        Returns
-        -------
-        dict
-            A mapping between team names and their achieved points.
-            The format is {team_name: points [...]} for each
-            team for which there is an entry in match_data and points is a
-            float value. Returns an empty dict if no battle was fought.
-        """
-        raise NotImplementedError
+        
+        def format(self) -> str:
+            """Format the match_data for the battle wrapper as a UTF-8 string.
 
-    def format_as_utf8(self) -> str:
-        """Format the match_data for the battle wrapper as a UTF-8 string.
+            The output should not exceed 80 characters, assuming the default
+            of a battle of 5 rounds.
 
-        The output should not exceed 80 characters, assuming the default
-        of a battle of 5 rounds.
+            Returns
+            -------
+            str
+                A formatted string on the basis of the match_data.
+            """
 
-        Returns
-        -------
-        str
-            A formatted string on the basis of the match_data.
-        """
-        formatted_output_string = ""
+            formatted_output_string = f"Battles of this type are currently not compatible with the ui.\n"
+            formatted_output_string += "Here is a dump of the result objects anyway:\n"
+            formatted_output_string += "\n".join(f"{matchup}: {res}" for (matchup, res) in self.items())
 
-        formatted_output_string += f'Battles of type {type(self).__name__} are currently not compatible with the ui.'
-        formatted_output_string += f'Here is a dump of the battle wrapper object anyway:\n{self}'
+            return formatted_output_string
 
-        return formatted_output_string
-    
+        @abstractmethod
+        def calculate_points(self, achievable_points: int) -> dict[Team, float]:
+            """Calculate the number of achieved points, given results.
+
+            As awarding points completely depends on the type of battle that
+            was fought, each wrapper should implement a method that determines
+            how to split up the achievable points among all teams.
+
+            Parameters
+            ----------
+            achievable_points : int
+                Number of achievable points.
+
+            Returns
+            -------
+            dict
+                A mapping between team names and their achieved points.
+                The format is {team_name: points [...]} for each
+                team for which there is an entry in match_data and points is a
+                float value. Returns an empty dict if no battle was fought.
+            """
+            raise NotImplementedError
