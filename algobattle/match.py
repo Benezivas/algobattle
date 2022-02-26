@@ -97,7 +97,7 @@ class Match(Subject, Observer):
         battle_pairs = []
         for i in range(len(self.teams)):
             for j in range(len(self.teams)):
-                battle_pairs.append((str(self.teams[i]), str(self.teams[j])))
+                battle_pairs.append((self.teams[i], self.teams[j]))
 
         if not len(self.teams) == 1:
             battle_pairs = [pair for pair in battle_pairs if pair[0] != pair[1]]
