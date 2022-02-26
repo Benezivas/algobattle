@@ -30,14 +30,16 @@ class Match(Subject, Observer):
 
     def run(self) -> None:
         """Match entry point, executes fights between all teams."""
-        for pair in self.all_battle_pairs():
-            self.match_data = {'curr_pair': pair}
+        for pair in self.all_battle_pairs(as_team_objects=True):
+            self.match_data = {'curr_pair': (str(pair[0]), str(pair[1]))}
             self.fight_handler.set_roles(generating=pair[0], solving=pair[1])
+            print(self.match_data)
 
             for i in range(self.rounds):
                 logger.info('{}  Running Battle {}/{}  {}'.format('#' * 20, i + 1, self.rounds, '#' * 20))
-                self.match_data = {pair: {'curr_round': i}}
+                self.match_data = {str(pair): {'curr_round': i}}
                 self.battle_wrapper.run_round(self.fight_handler)
+                print(self.match_data)
 
     def calculate_points(self, achievable_points: int) -> dict:
         """Calculate the number of points achieved through the match.
@@ -92,13 +94,17 @@ class Match(Subject, Observer):
 
         return points
 
-    def all_battle_pairs(self) -> list:
+    def all_battle_pairs(self, as_team_objects=False) -> list:
         """Generate and return a list of all team pairings for battles."""
         battle_pairs = []
         for i in range(len(self.teams)):
             for j in range(len(self.teams)):
-                battle_pairs.append((self.teams[i], self.teams[j]))
+                if as_team_objects:
+                    battle_pairs.append((self.teams[i], self.teams[j]))
+                else:
+                    battle_pairs.append((str(self.teams[i]), str(self.teams[j])))
 
+                    
         if not len(self.teams) == 1:
             battle_pairs = [pair for pair in battle_pairs if pair[0] != pair[1]]
 
