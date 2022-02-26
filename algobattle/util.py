@@ -7,11 +7,8 @@ import subprocess
 import importlib.util
 import sys
 import collections
-<<<<<<< HEAD
 import inspect
-=======
 from typing import Callable
->>>>>>> refactor-team-docker-build
 
 from algobattle.problem import Problem
 import algobattle
@@ -67,7 +64,7 @@ def initialize_wrapper(wrapper_name: str, config: ConfigParser):
     """
     try:
         wrapper_module = importlib.import_module("algobattle.battle_wrappers." + str(wrapper_name))
-        return getattr(wrapper_module, inspect.getmembers(wrapper_module)[0][0])(config)
+        return getattr(wrapper_module, wrapper_name.capitalize())(config)
     except Exception as e:
         logger.critical('Importing a wrapper from the given path failed with the following exception: "{}"'.format(e))
         return None
@@ -85,21 +82,23 @@ def measure_runtime_overhead() -> float:
     config = ConfigParser()
     config.read(os.path.join(os.path.dirname(os.path.abspath(algobattle.__file__)), 'config', 'config_delaytest.ini'))
     delaytest_path = DelaytestProblem.__file__[:-12]  # remove /__init__.py
-    delaytest_team = algobattle.team.Team(0, delaytest_path + '/generator', delaytest_path + '/solver')
-
-    match = algobattle.match.Match(problem, config, [delaytest_team])
-
-    if not match.build_successful:
-        logger.warning('Building a match for the time tolerance calculation failed!')
+    # TODO: We do not need a complete team here, only generator0. Move container creation out of team.
+    delaytest_team = algobattle.team.Team(0,
+                                          delaytest_path + '/generator',
+                                          delaytest_path + '/solver',
+                                          config['run_parameters']['timeout_build'])
+    if not delaytest_team.build_successful:
+        logger.warning('Building the generator or solver for the time tolerance calculation failed!')
         return 0
+    fight_handler = algobattle.fight_handler.FightHandler(problem, config)
 
     overheads = []
     for i in range(5):
         sigh.latest_running_docker_image = "generator0"
-        _, timeout = run_subprocess(match.generator_base_run_command(match.space_generator) + ["generator0"],
-                                    input=str(50 * i).encode(), timeout=match.timeout_generator)
+        _, timeout = run_subprocess(fight_handler.base_run_command(fight_handler.space_generator) + ["generator0"],
+                                    input=str(50 * i).encode(), timeout=fight_handler.timeout_generator)
         if not timeout:
-            timeout = match.timeout_generator
+            timeout = fight_handler.timeout_generator
         overheads.append(float(timeout))
 
     max_overhead = round(max(overheads), 2)
