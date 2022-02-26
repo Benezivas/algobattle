@@ -10,6 +10,7 @@ import algobattle.battle_wrapper
 from algobattle.matchups import Matchup
 from algobattle.problem import Problem
 from algobattle.team import Team
+from algobattle.util import format_table
 from typing import TYPE_CHECKING, Generator
 if TYPE_CHECKING:
     from algobattle.match import RunParameters
@@ -25,6 +26,15 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
         cap: int = 0
         solved: int = 0
         attempting: int = 0
+
+        def __int__(self) -> int:
+            return self.cap
+
+        def __str__(self) -> str:
+            return str(int(self))
+        
+        def __repr__(self) -> str:
+            return f"Result(cap={self.cap}, solved={self.solved}, attempting={self.attempting}"
 
     def __init__(self, problem: Problem, run_parameters: RunParameters = RunParameters(),
                 cap: int = 50000, exponent: int = 2, approximation_ratio: float = 1,
@@ -156,38 +166,13 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
 
         return points
 
-    def format_as_utf8(self) -> str:
-        """Format the executed battle.
+    @staticmethod
+    def format(results: dict[Matchup, list[Iterated.Result]]) -> str:
+        num_rounds = len(next(iter(results.values())))
+        table = []
+        table.append(["GEN", "SOL", *range(1, num_rounds + 1), "CAP", "AVG"])
+        for (matchup, res) in results.items():
+            table.append([matchup.generator, matchup.solver, *res, res[-1].cap, sum(int(r) for r in res) // len(res)])
 
-        Returns
-        -------
-        str
-            A formatted string on the basis of the wrapper.
-        """
-        formatted_output_string = ""
-        formatted_output_string += 'Battle Type: Iterated Battle\n\r'
-        formatted_output_string += '╔═════════╦═════════╦' \
-                                   + ''.join(['══════╦' for _ in range(self.rounds)]) \
-                                   + '══════╦══════╗' + '\n\r' \
-                                   + '║   GEN   ║   SOL   ' \
-                                   + ''.join([f'║{"R" + str(i + 1):^6s}' for i in range(self.rounds)]) \
-                                   + '║  CAP ║  AVG ║' + '\n\r' \
-                                   + '╟─────────╫─────────╫' \
-                                   + ''.join(['──────╫' for _ in range(self.rounds)]) \
-                                   + '──────╫──────╢' + '\n\r'
-
-        for pair in self.pairs.keys():
-            curr_round = self.curr_round
-            avg = sum(self.pairs[pair][i].solved for i in range(self.rounds)) // self.rounds
-
-            formatted_output_string += f'║{pair[0]:>9s}║{pair[1]:>9s}' \
-                                        + ''.join([f'║{self.pairs[pair][i].solved:>6d}'
-                                                    for i in range(self.rounds)]) \
-                                        + f'║{self.pairs[pair][curr_round].cap:>6d}║{avg:>6d}║' + '\r\n'
-        formatted_output_string += '╚═════════╩═════════╩' \
-                                   + ''.join(['══════╩' for _ in range(self.rounds)]) \
-                                   + '══════╩══════╝' + '\n\r'
-
-        return formatted_output_string
-
+        return "Battle Type: Iterated Battle\n" + format_table(table)
 
