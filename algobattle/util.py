@@ -57,7 +57,3 @@ def format_table(table: list[list[Any]], column_spacing: dict[int, int] = {}) ->
     res = top + middle.join(content_fmt.format(*row) for row in table) + bottom
 
     return res
-
-t = [["test", "yes", "no"], [1, 2, 3], ["blep", "aaaaaaaaaaaaa", ""],[10, 20, 30]]
-
-print(format_table(t))
