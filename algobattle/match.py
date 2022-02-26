@@ -112,13 +112,6 @@ class Match:
             logger.critical("None of the team's containers built successfully.")
             raise BuildError()
 
-    def all_battle_pairs(self) -> list[tuple[Team, Team]]:
-        """Generate and return a list of all team pairings for battles."""
-        if self.single_player:
-            return [(self.teams[0], self.teams[0])]
-        else:
-            return list(itertools.permutations(self.teams, 2))
-
     def run(self, battle_type: str = 'iterated', rounds: int = 5, iterated_cap: int = 50000, iterated_exponent: int = 2,
             approximation_instance_size: int = 10, approximation_iterations: int = 25) -> BattleWrapper.MatchResult:
         """Match entry point, executes rounds fights between all teams and returns the results of the battles.

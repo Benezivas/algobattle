@@ -9,7 +9,7 @@ import algobattle
 from algobattle.battle_wrappers.iterated import Iterated
 from algobattle.match import BuildError, Match, UnknownBattleType
 from algobattle.team import Team
-from algobattle.matchups import Matchup
+from algobattle.matchups import BattleMatchups, Matchup
 import algobattle.problems.testsproblem as Problem
 
 logging.disable(logging.CRITICAL)
@@ -74,13 +74,11 @@ class Matchtests(unittest.TestCase):
         team0 = Team('0', self.tests_path / 'generator', self.tests_path / 'solver')
         team1 = Team('1', self.tests_path / 'generator', self.tests_path / 'solver')
         teams = [team0, team1]
-        self.match = Match(self.problem, self.config, teams)
-        self.assertEqual(self.match.all_battle_pairs(), [(team0, team1), (team1, team0)])
+        self.assertEqual(list(BattleMatchups(teams)), [Matchup(team0, team1), Matchup(team1, team0)])
 
     def test_all_battle_pairs_solo_battle(self):
         team0 = Team('0', self.tests_path / 'generator', self.tests_path / 'solver')
-        self.match = Match(self.problem, self.config, [team0])
-        self.assertEqual(self.match.all_battle_pairs(), [(self.team, self.team)])
+        self.assertEqual(list(BattleMatchups([team0])), [Matchup(self.team, self.team)])
 
     def test_run(self):
         self.match = Match(self.problem, self.config, [self.team])
