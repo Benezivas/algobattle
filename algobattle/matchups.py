@@ -19,9 +19,13 @@ class BattleMatchups:
     
     def __init__(self, teams: list[Team]) -> None:
         self.teams = teams
+        if len(self.teams) == 1:
+            self._list = [Matchup(self.teams[0], self.teams[0])]
+        else:
+            self._list = [Matchup(*x) for x in permutations(self.teams, 2)]
     
     def __iter__(self) -> Iterator[Matchup]:
-        if len(self.teams) == 1:
-            return iter([Matchup(self.teams[0], self.teams[0])])
-        else:
-            return map(lambda x: Matchup(*x), permutations(self.teams, 2))
+        return iter(self._list)
+    
+    def __getitem__(self, i: int) -> Matchup:
+        return self._list[i]
