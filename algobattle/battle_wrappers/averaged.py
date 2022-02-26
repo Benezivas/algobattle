@@ -53,8 +53,6 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
             res.approx_ratios.append(approx_ratio)
             yield res
 
-
-
     @dataclass
     class Result(algobattle.battle_wrapper.BattleWrapper.Result):
         approx_ratios: list[float] = field(default_factory=list)
@@ -73,6 +71,15 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
 
         def __init__(self, matchups: BattleMatchups, rounds: int = 0) -> None:
             super().__init_hidden__(matchups, rounds, Averaged.Result)
+
+        def format(self) -> str:
+            num_rounds = len(next(iter(self.values())))
+            table = []
+            table.append(["GEN", "SOL", *range(1, num_rounds + 1), "LAST"])
+            for (matchup, res) in self.items():
+                table.append([matchup.generator, matchup.solver, *res, res[-1].approx_ratios[-1]])
+
+            return "Battle Type: Averaged Battle\n" + format_table(table)
     
         def calculate_points(self, achievable_points: int) -> dict[Team, float]:
             """Calculate the number of achieved points.
@@ -138,12 +145,3 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
                     points[pair[1]] += round(points_per_round * points_proportion1, 1)
 
             return points
-
-        def format(self) -> str:
-            num_rounds = len(next(iter(self.values())))
-            table = []
-            table.append(["GEN", "SOL", *range(1, num_rounds + 1), "LAST"])
-            for (matchup, res) in self.items():
-                table.append([matchup.generator, matchup.solver, *res, res[-1].approx_ratios[-1]])
-
-            return "Battle Type: Averaged Battle\n" + format_table(table)
