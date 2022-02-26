@@ -7,6 +7,7 @@ import logging
 
 import algobattle
 from algobattle.battle_wrapper import BattleWrapper
+from algobattle.battle_wrappers.iterated import Iterated
 from algobattle.match import BuildError, Match, UnknownBattleType
 from algobattle.team import Team
 from algobattle.matchups import Matchup
@@ -32,6 +33,7 @@ class Matchtests(unittest.TestCase):
 
         cls.team = Team('0', cls.tests_path / 'generator', cls.tests_path / 'solver')
         cls.match: Match | None = None
+        cls.wrapper = Iterated(cls.problem)
     
     def tearDown(self) -> None:
         if self.match is not None:
@@ -88,51 +90,51 @@ class Matchtests(unittest.TestCase):
     def test_one_fight_gen_timeout(self):
         team = Team('0', self.tests_path / 'generator_timeout', self.tests_path / 'solver')
         self.match = Match(self.problem, self.config_short_timeout, [team], cache_docker_containers=False)
-        self.assertEqual(cast(BattleWrapper, self.match.battle_wrapper)._one_fight(Matchup(team, team), 1), 1.0)
+        self.assertEqual(self.wrapper._one_fight(Matchup(team, team), 1), 1.0)
 
     def test_one_fight_gen_exec_error(self):
         team = Team('0', self.tests_path / 'generator_execution_error', self.tests_path / 'solver')
         self.match = Match(self.problem, self.config, [team], cache_docker_containers=False)
-        self.assertEqual(cast(BattleWrapper, self.match.battle_wrapper)._one_fight(Matchup(team, team), 1), 1.0)
+        self.assertEqual(self.wrapper._one_fight(Matchup(team, team), 1), 1.0)
 
     def test_one_fight_gen_wrong_instance(self):
         team = Team('0', self.tests_path / 'generator_wrong_instance', self.tests_path / 'solver')
         self.match = Match(self.problem, self.config, [team], cache_docker_containers=False)
-        self.assertEqual(cast(BattleWrapper, self.match.battle_wrapper)._one_fight(Matchup(team, team), 1), 1.0)
+        self.assertEqual(self.wrapper._one_fight(Matchup(team, team), 1), 1.0)
 
     def test_one_fight_gen_malformed_sol(self):
         team = Team('0', self.tests_path / 'generator_malformed_solution', self.tests_path / 'solver')
         self.match = Match(self.problem, self.config, [team], cache_docker_containers=False)
-        self.assertEqual(cast(BattleWrapper, self.match.battle_wrapper)._one_fight(Matchup(team, team), 1), 1.0)
+        self.assertEqual(self.wrapper._one_fight(Matchup(team, team), 1), 1.0)
 
     def test_one_fight_gen_wrong_cert(self):
         team = Team('0', self.tests_path / 'generator_wrong_certificate', self.tests_path / 'solver')
         self.match = Match(self.problem, self.config, [team], cache_docker_containers=False)
-        self.assertEqual(cast(BattleWrapper, self.match.battle_wrapper)._one_fight(Matchup(team, team), 1), 1.0)
+        self.assertEqual(self.wrapper._one_fight(Matchup(team, team), 1), 1.0)
 
     def test_one_fight_sol_timeout(self):
         team = Team('0', self.tests_path / 'generator', self.tests_path / 'solver_timeout')
         self.match = Match(self.problem, self.config_short_timeout, [team], cache_docker_containers=False)
-        self.assertEqual(cast(BattleWrapper, self.match.battle_wrapper)._one_fight(Matchup(team, team), 1), 0.0)
+        self.assertEqual(self.wrapper._one_fight(Matchup(team, team), 1), 0.0)
 
     def test_one_fight_sol_exec_error(self):
         team = Team('0', self.tests_path / 'generator', self.tests_path / 'solver_execution_error')
         self.match = Match(self.problem, self.config, [team], cache_docker_containers=False)
-        self.assertEqual(cast(BattleWrapper, self.match.battle_wrapper)._one_fight(Matchup(team, team), 1), 0.0)
+        self.assertEqual(self.wrapper._one_fight(Matchup(team, team), 1), 0.0)
 
     def test_one_fight_sol_malformed(self):
         team = Team('0', self.tests_path / 'generator', self.tests_path / 'solver_malformed_solution')
         self.match = Match(self.problem, self.config, [team], cache_docker_containers=False)
-        self.assertEqual(cast(BattleWrapper, self.match.battle_wrapper)._one_fight(Matchup(team, team), 1), 0.0)
+        self.assertEqual(self.wrapper._one_fight(Matchup(team, team), 1), 0.0)
 
     def test_one_fight_sol_wrong_cert(self):
         team = Team('0', self.tests_path / 'generator', self.tests_path / 'solver_wrong_certificate')
         self.match = Match(self.problem, self.config, [team], cache_docker_containers=False)
-        self.assertEqual(cast(BattleWrapper, self.match.battle_wrapper)._one_fight(Matchup(team, team), 1), 0.0)
+        self.assertEqual(self.wrapper._one_fight(Matchup(team, team), 1), 0.0)
 
     def test_one_fight_successful(self):
         self.match = Match(self.problem, self.config, [self.team], cache_docker_containers=False)
-        self.assertEqual(cast(BattleWrapper, self.match.battle_wrapper)._one_fight(Matchup(self.team, self.team), 1), 1.0)
+        self.assertEqual(self.wrapper._one_fight(Matchup(self.team, self.team), 1), 1.0)
 
 
 if __name__ == '__main__':
