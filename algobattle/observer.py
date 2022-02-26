@@ -1,8 +1,8 @@
 """Observer class for an Observable pattern."""
-from abc import ABC, abstractmethod
+from abc import ABCMeta, abstractmethod
 
 
-class Observer(ABC):
+class Observer(metaclass=ABCMeta):
     """The Observer interface declares the update method, used by subjects."""
 
     @abstractmethod
