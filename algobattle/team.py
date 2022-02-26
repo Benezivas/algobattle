@@ -11,12 +11,13 @@ logger = logging.getLogger('algobattle.team')
 class Team:
     """Team class responsible for holding basic information of a specific team."""
 
-    def __init__(self, team_name: str, generator_path: str, solver_path: str, cache_docker_containers=True) -> None:
+    def __init__(self, team_name: str, generator_path: str, solver_path: str, timeout_build=900, cache_docker_containers=True) -> None:
         self.name = str(team_name).replace(' ', '_').lower()  # Lower case needed for docker tag created from name
         self.generator_path = generator_path
         self.solver_path = solver_path
+        self.timeout_build = float(timeout_build)
 
-        self.build_containers(cache_docker_containers)
+        self.build_successful = self.build_containers(cache_docker_containers)
 
     def __str__(self) -> str:
         return self.name
