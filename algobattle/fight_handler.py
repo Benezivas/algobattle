@@ -110,7 +110,7 @@ class FightHandler():
             format that is specified, else (None, None).
         """
         scaled_memory = self.problem.generator_memory_scaler(self.space_generator, instance_size)
-        generator_run_command = self.generator_base_run_command(scaled_memory) + ["generator-" + str(self.generating_team)]
+        generator_run_command = self.base_run_command(scaled_memory) + ["generator-" + str(self.generating_team)]
 
         logger.debug('Running generator of group {}...\n'.format(self.generating_team))
 
@@ -167,7 +167,7 @@ class FightHandler():
             format that is specified, else None.
         """
         scaled_memory = self.problem.solver_memory_scaler(self.space_solver, instance_size)
-        solver_run_command = self.solver_base_run_command(scaled_memory) + ["solver-" + str(self.solving_team)]
+        solver_run_command = self.base_run_command(scaled_memory) + ["solver-" + str(self.solving_team)]
         logger.debug('Running solver of group {}...\n'.format(self.solving_team))
 
         sigh.latest_running_docker_image = "solver-" + str(self.solving_team)
