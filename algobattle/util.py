@@ -7,7 +7,6 @@ import subprocess
 import importlib.util
 import sys
 import collections
-import inspect
 from typing import Callable
 
 from algobattle.problem import Problem
