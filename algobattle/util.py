@@ -80,21 +80,21 @@ def measure_runtime_overhead() -> float:
     problem = DelaytestProblem.Problem()
     config = ConfigParser()
     config.read(os.path.join(os.path.dirname(os.path.abspath(algobattle.__file__)), 'config', 'config_delaytest.ini'))
-    delaytest_path = DelaytestProblem.__file__[:-12]  # remove /__init__.py
-    # TODO: We do not need a complete team here, only generator0. Move container creation out of team.
-    delaytest_team = algobattle.team.Team(0,
-                                          delaytest_path + '/generator',
-                                          delaytest_path + '/solver',
-                                          config['run_parameters']['timeout_build'])
-    if not delaytest_team.build_successful:
-        logger.warning('Building the generator or solver for the time tolerance calculation failed!')
+    delaytest_path = DelaytestProblem.__file__[:-12] + '/generator'  # remove /__init__.py
+    build_successful = build_docker_container(delaytest_path,
+                                              'runtime-checker',
+                                              timeout_build=int(config['run_parameters']['timeout_build']))
+
+    if not build_successful:
+        logger.warning('Building a match for the time tolerance calculation failed!')
         return 0
+
     fight_handler = algobattle.fight_handler.FightHandler(problem, config)
 
     overheads = []
     for i in range(5):
-        sigh.latest_running_docker_image = "generator0"
-        _, timeout = run_subprocess(fight_handler.base_run_command(fight_handler.space_generator) + ["generator0"],
+        sigh.latest_running_docker_image = 'runtime-checker'
+        _, timeout = run_subprocess(fight_handler.base_run_command(fight_handler.space_generator) + ['runtime-checker'],
                                     input=str(50 * i).encode(), timeout=fight_handler.timeout_generator)
         if not timeout:
             timeout = fight_handler.timeout_generator
@@ -195,3 +195,60 @@ def docker_running(function: Callable) -> Callable:
         else:
             return function(self, *args, **kwargs)
     return wrapper
+
+
+@docker_running
+def build_docker_container(container_path: str, docker_tag: str,
+                           timeout_build: int = 600, cache_docker_container: bool = True) -> bool:
+    """Build docker containers for the given container_path.
+
+    The container can later be referenced by its docker_tag.
+
+    Parameters
+    ----------
+    container_path : str
+        Path to folder containing a Dockerfile in the file system.
+    docker_tag : str
+        The tag by which the built container can be referenced by.
+    timeout_build : int
+        Maximum time for building the docker container, in seconds.
+    cache_docker_containers : bool
+        Flag indicating whether to cache built docker container.
+
+    Returns
+    -------
+    Bool
+        Boolean indicating whether the build process succeeded.
+    """
+    build_command = [
+        "docker",
+        "build",
+    ] + (["--no-cache"] if not cache_docker_container else []) + [
+        "--network=host",
+        "-t",
+        docker_tag,
+        container_path
+    ]
+
+    build_successful = True
+    logger.debug('Building docker container with the following command: {}'.format(build_command))
+    creationflags = 0
+    if os.name != 'posix':
+        creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
+    with subprocess.Popen(build_command, stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE, creationflags=creationflags) as process:
+        try:
+            output, _ = process.communicate(timeout=timeout_build)
+            logger.debug(output.decode())
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait()
+            logger.error('Build process for {} ran into a timeout!'.format(docker_tag))
+            build_successful = False
+        if process.returncode != 0:
+            process.kill()
+            process.wait()
+            logger.error('Build process for {} failed!'.format(docker_tag))
+            build_successful = False
+
+    return build_successful
