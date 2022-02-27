@@ -178,7 +178,7 @@ class Image:
             OS errors, and errors thrown by the docker daemon.
 
         """
-        cmd = ["docker", "image", "rm", "-f", self.id]
+        cmd = ["docker", "image", "rm", "--no-prune", "-f", self.id]
         try:
             run(cmd, capture_output=True, check=True, text=True)
 
