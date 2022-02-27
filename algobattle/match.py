@@ -50,7 +50,7 @@ class RunParameters:
 class Match:
     """Match class, provides functionality for setting up and executing battles between given teams."""
 
-    def __init__(self, problem: Problem, config_path: Path, teams: list[Team], ui: Ui | None = None,
+    def __init__(self, problem: Problem, config_path: Path, team_info: list[tuple[str, Path, Path]], ui: Ui | None = None,
                  runtime_overhead: float = 0, approximation_ratio: float = 1.0, cache_docker_containers: bool = True) -> None:
 
         config = configparser.ConfigParser()
@@ -62,54 +62,25 @@ class Match:
         self.config = config
         self.approximation_ratio = approximation_ratio
         self.ui = ui
-        self.battle_matchups = BattleMatchups(teams)
         
         if approximation_ratio != 1.0 and not problem.approximable:
             logger.error('The given problem is not approximable and can only be run with an approximation ratio of 1.0!')
             raise ConfigurationError
 
-        self._build(teams, cache_docker_containers)
-
-    def _build(self, teams: list[Team], cache_docker_containers: bool=True) -> None:
-        """Build docker containers for the given generators and solvers of each team.
-
-        Any team for which either the generator or solver does not build successfully
-        will be removed from the match.
-
-        Parameters
-        ----------
-        teams : list
-            List of Team objects.
-        cache_docker_containers : bool
-            Flag indicating whether to cache built docker containers.
-
-        Returns
-        -------
-        Bool
-            Boolean indicating whether the build process succeeded.
-        """
-        if not isinstance(teams, list) or any(not isinstance(team, Team) for team in teams):
-            logger.error('Teams argument is expected to be a list of Team objects!')
-            raise TypeError
-
-        self.teams = teams
-        if len(self.teams) != len(set(self.teams)):
-            logger.error('At least one team name is used twice!')
-            raise TypeError
-
-        self.single_player = (len(teams) == 1)
-
-        for team in teams:
+        self.teams: list[Team] = []
+        for info in team_info:
             try:
-                team.generator = Image(team.generator_path, f"generator-{team}", f"generator for team {team}", timeout=self.run_parameters.timeout_build, cache=cache_docker_containers)
-                team.solver = Image(team.solver_path, f"solver-{team}", f"solver for team {team}", timeout=self.run_parameters.timeout_build, cache=cache_docker_containers)
+                self.teams.append(Team(*info, timeout_build=self.run_parameters.timeout_build, cache_container=cache_docker_containers))
             except DockerError:
-                logger.error(f"Removing team {team} as their containers did not build successfully.")
-                self.teams.remove(team)
-
+                logger.error(f"Removing team {info[0]} as their containers did not build successfully.")
+            except ValueError as e:
+                logger.error(f"Team name '{info[0]}' is used twice!")
+                raise TypeError from e
         if len(self.teams) == 0:
             logger.critical("None of the team's containers built successfully.")
             raise BuildError()
+        
+        self.battle_matchups = BattleMatchups(self.teams)
 
     def run(self, battle_type: str = 'iterated', rounds: int = 5, iterated_cap: int = 50000, iterated_exponent: int = 2,
             approximation_instance_size: int = 10, approximation_iterations: int = 25) -> BattleWrapper.MatchResult:
