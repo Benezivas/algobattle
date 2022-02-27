@@ -156,10 +156,8 @@ if __name__ == "__main__":
         ui.restore()
 
     logger.info('#' * 78)
-    logger.info(f'\n{match.format_as_utf8()}')
+    logger.info(f'\n{results.format()}')
     if not options.do_not_count_points:
-        assert match.battle_wrapper is not None
-        points = match.battle_wrapper.calculate_points(options.points)
-
-        for team_name in match.teams:
-            logger.info(f'Group {team_name} gained {points[team_name]:.1f} points.')
+        points = results.calculate_points(options.points)
+        for team, points in points.items():
+            logger.info(f'Group {team} gained {points:.1f} points.')
