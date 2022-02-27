@@ -131,9 +131,7 @@ if __name__ == "__main__":
     if not problem:
         sys.exit(1)
 
-    teams = []
-    for i in range(len(generators)):
-        teams.append(Team(team_names[i], generators[i], solvers[i]))
+    teams = [(team_names[i], generators[i], solvers[i]) for i in range(len(generators))]
 
     logger.debug(f'Options for this run: {options}')
     logger.debug(f'Contents of sys.argv: {sys.argv}')

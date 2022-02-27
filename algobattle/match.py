@@ -10,7 +10,7 @@ from algobattle.matchups import BattleMatchups
 
 from algobattle.team import Team
 from algobattle.problem import Problem
-from algobattle.docker import DockerError, Image
+from algobattle.docker import DockerError
 from algobattle.battle_wrappers.averaged import Averaged
 from algobattle.battle_wrappers.iterated import Iterated
 from algobattle.ui import Ui

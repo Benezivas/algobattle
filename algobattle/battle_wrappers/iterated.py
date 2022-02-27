@@ -21,7 +21,7 @@ logger = logging.getLogger('algobattle.battle_wrappers.iterated')
 class Iterated(algobattle.battle_wrapper.BattleWrapper):
     """Class of an iterated battle Wrapper."""
 
-    def __init__(self, problem: Problem, run_parameters: RunParameters = RunParameters(),
+    def __init__(self, problem: Problem, run_parameters: RunParameters | None = None,
                 cap: int = 50000, exponent: int = 2, approximation_ratio: float = 1,
                 **options) -> None:
         self.exponent = exponent

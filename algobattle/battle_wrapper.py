@@ -23,7 +23,7 @@ class BattleWrapper(ABC):
     """Base class for wrappers that execute a specific kind of battle.
     Its state contains information about the battle and its history."""
     
-    def __init__(self, problem: Problem, run_parameters: RunParameters = RunParameters(), **options: Any):
+    def __init__(self, problem: Problem, run_parameters: RunParameters | None = None, **options: Any):
         """Builds a battle wrapper object with the given option values.
         Logs warnings if there were options provided that this wrapper doesn't use. 
 
@@ -39,7 +39,11 @@ class BattleWrapper(ABC):
             Dict containing option values.
         """
         self.problem = problem
-        self.run_parameters = run_parameters
+        if run_parameters is not None:
+            self.run_parameters = run_parameters
+        else:
+            from algobattle.match import RunParameters
+            self.run_parameters = RunParameters()
 
         for arg, value in options.items():
             if arg not in vars(type(self)):
