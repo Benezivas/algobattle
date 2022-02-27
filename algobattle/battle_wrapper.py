@@ -1,3 +1,4 @@
+from __future__ import annotations
 """Base class for wrappers that execute a specific kind of battle.
 
 The battle wrapper class is a base class for specific wrappers, which are
@@ -5,7 +6,6 @@ responsible for executing specific types of battle. They share the
 characteristic that they are responsible for updating some match data during
 their run, such that it contains the current state of the match.
 """
-from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Generator, TypeVar
@@ -199,13 +199,10 @@ class BattleWrapper(ABC):
     Res = TypeVar("Res", covariant=True, bound=Result)
     class MatchResult(dict[Matchup, list[Res]], ABC):
 
-        def __init__(self, matchups: BattleMatchups, rounds: int = 0) -> None:
-            pass
-        
-        def __init_hidden__(self, matchups: BattleMatchups, rounds: int, result_type: type):
+        def __init__(self, matchups: BattleMatchups, rounds: int) -> None:
+            self.rounds = rounds
             for matchup in matchups:
-                self[matchup] = [result_type() for _ in range(rounds)]
-
+                self[matchup] = []
         
         def format(self) -> str:
             """Format the match_data for the battle wrapper as a UTF-8 string.

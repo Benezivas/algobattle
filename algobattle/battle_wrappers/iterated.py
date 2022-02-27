@@ -7,7 +7,7 @@ import itertools
 import logging
 
 import algobattle.battle_wrapper
-from algobattle.matchups import Matchup, BattleMatchups
+from algobattle.matchups import Matchup
 from algobattle.problem import Problem
 from algobattle.team import Team
 from algobattle.util import format_table
@@ -103,7 +103,7 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
         attempting: int = 0
 
         def __int__(self) -> int:
-            return self.cap
+            return self.solved
 
         def __str__(self) -> str:
             return str(int(self))
@@ -113,9 +113,6 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
 
 
     class MatchResult(algobattle.battle_wrapper.BattleWrapper.MatchResult[Result]):
-
-        def __init__(self, matchups: BattleMatchups, rounds: int = 0) -> None:
-            super().__init_hidden__(matchups, rounds, Iterated.Result)
         
         def format(self) -> str:
             num_rounds = len(next(iter(self.values())))
@@ -161,7 +158,7 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
             if rounds == 0:
                 return {}
 
-            points_per_iteration = round(achievable_points / rounds, 1)
+            points_per_round = round(achievable_points / rounds, 1)
             for pair in team_combinations:
                 for i in range(rounds):
                     solved1 = self[Matchup(*pair)][i].solved  # pair[1] was solver
@@ -175,7 +172,7 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
                         points_proportion0 = (solved0 / (solved0 + solved1))
                         points_proportion1 = (solved1 / (solved0 + solved1))
 
-                    points[pair[0]] += round(points_per_iteration * points_proportion0, 1)
-                    points[pair[1]] += round(points_per_iteration * points_proportion1, 1)
+                    points[pair[0]] += round(points_per_round * points_proportion0, 1)
+                    points[pair[1]] += round(points_per_round * points_proportion1, 1)
 
             return points

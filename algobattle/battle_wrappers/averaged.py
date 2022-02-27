@@ -11,7 +11,6 @@ from algobattle.matchups import Matchup
 from algobattle.problem import Problem
 from algobattle.team import Team
 from algobattle.util import format_table
-from algobattle.matchups import BattleMatchups
 from typing import TYPE_CHECKING, Any, Generator
 
 if TYPE_CHECKING:
@@ -69,15 +68,23 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
     
     class MatchResult(algobattle.battle_wrapper.BattleWrapper.MatchResult[Result]):
 
-        def __init__(self, matchups: BattleMatchups, rounds: int = 0) -> None:
-            super().__init_hidden__(matchups, rounds, Averaged.Result)
-
         def format(self) -> str:
-            num_rounds = len(next(iter(self.values())))
             table = []
-            table.append(["GEN", "SOL", *range(1, num_rounds + 1), "LAST"])
+            table.append(["GEN", "SOL", *range(1, self.rounds + 1), "LAST"])
             for (matchup, res) in self.items():
-                table.append([matchup.generator, matchup.solver, *res, res[-1].approx_ratios[-1]])
+                if len(res) == 0:
+                    last_ratio = ""
+                else:
+                    if len(res[-1].approx_ratios) == 0:
+                        if len(res) == 1:
+                            last_ratio = ""
+                        else:
+                            last_ratio = res[-2].approx_ratios[-1]
+                    else:
+                        last_ratio = res[-1].approx_ratios[-1]
+                padding = [""] * (self.rounds - len(res))
+
+                table.append([matchup.generator, matchup.solver, *res, *padding, last_ratio])
 
             return "Battle Type: Averaged Battle\n" + format_table(table)
     
@@ -112,13 +119,12 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
             if len(teams) == 1:
                 return {teams.pop(): achievable_points}
 
-            rounds = len(next(iter(self.values())))
-            if rounds == 0:
+            if self.rounds == 0:
                 return {}
             
-            points_per_round = round(achievable_points / rounds, 1)
+            points_per_round = round(achievable_points / self.rounds, 1)
             for pair in team_combinations:
-                for i in range(rounds):
+                for i in range(self.rounds):
                     points[pair[0]] = points.get(pair[0], 0)
                     points[pair[1]] = points.get(pair[1], 0)
 

@@ -11,7 +11,6 @@ from pathlib import Path
 
 import algobattle
 from algobattle.match import Match
-from algobattle.team import Team
 from algobattle.util import import_problem_from_path
 from algobattle.docker import measure_runtime_overhead
 from algobattle.ui import Ui
