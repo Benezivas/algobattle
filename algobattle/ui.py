@@ -2,7 +2,9 @@
 import curses
 import logging
 import sys
+from time import sleep
 from typing import Callable, TypeVar
+from algobattle.sighandler import signal_handler
 
 from algobattle import __version__ as version
 
@@ -51,7 +53,12 @@ class Ui:
         """
         self.print_formatted_data_to_stdout(results)  # TODO: Refactor s.t. the output stream can be chosen by the user.
         self.stdscr.refresh()
-        self.stdscr.clear()
+        self.stdscr.nodelay(1)
+        c = self.stdscr.getch()
+        if c == 3:
+            signal_handler(None, None)
+        else:
+            curses.flushinp() # type: ignore
 
     def print_formatted_data_to_stdout(self, results: str) -> None:
         """Output the formatted match data of a battle wrapper to stdout.
