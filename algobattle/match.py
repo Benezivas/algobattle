@@ -136,7 +136,4 @@ class Match:
 
     def cleanup(self) -> None:
         for team in self.teams:
-            if team.generator is not None:
-                team.generator.remove()
-            if team.solver is not None:
-                team.solver.remove()
+            team.cleanup()

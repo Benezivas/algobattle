@@ -108,7 +108,6 @@ class BattleWrapper(ABC):
             If the validity checks pass, the (instance, solution) in whatever
             format that is specified, else (None, None).
         """
-        assert team.generator is not None
         scaled_memory = self.problem.generator_memory_scaler(self.run_parameters.space_generator, instance_size)
 
         logger.debug(f'Running generator of group {team}...\n')
@@ -163,7 +162,6 @@ class BattleWrapper(ABC):
             If the validity checks pass, solution in whatever
             format that is specified, else None.
         """
-        assert team.solver is not None
         scaled_memory = self.problem.solver_memory_scaler(self.run_parameters.space_solver, instance_size)
         instance_str = self.problem.parser.encode(instance)
 
