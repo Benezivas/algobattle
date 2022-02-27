@@ -142,7 +142,12 @@ if __name__ == "__main__":
         runtime_overhead = measure_runtime_overhead()
         logger.info(f'Maximal measured runtime overhead is at {runtime_overhead} seconds. Adding this amount to the configured runtime.')
 
-    ui = Ui() if display_ui else None
+    if display_ui:
+        ui = Ui()
+        ui.update("Setting up match...")
+    else:
+        ui = None
+    
     match = Match(problem, options.config, teams, ui, runtime_overhead=runtime_overhead, approximation_ratio=options.approximation_ratio)
 
 
@@ -161,3 +166,4 @@ if __name__ == "__main__":
             logger.info(f'Group {team} gained {points:.1f} points.')
     
     match.cleanup()
+    print(results.format())
