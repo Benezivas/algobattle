@@ -115,11 +115,18 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
     class MatchResult(algobattle.battle_wrapper.BattleWrapper.MatchResult[Result]):
         
         def format(self) -> str:
-            num_rounds = len(next(iter(self.values())))
             table = []
-            table.append(["GEN", "SOL", *range(1, num_rounds + 1), "CAP", "AVG"])
-            for (matchup, res) in self.items():
-                table.append([matchup.generator, matchup.solver, *res, res[-1].cap, sum(int(r) for r in res) // len(res)])
+            table.append(["GEN", "SOL", *range(1, self.rounds + 1), "CAP", "AVG"])
+            
+            for matchup, res in self.items():
+                padding = [""] * (self.rounds - len(res))
+                if len(res) == 0:
+                    last_cap = ""
+                    avg = ""
+                else:
+                    last_cap = res[-1].cap
+                    avg = sum(int(r) for r in res) // len(res)
+                table.append([matchup.generator, matchup.solver, *res, *padding, last_cap, avg])
 
             return "Battle Type: Iterated Battle\n" + format_table(table)
 

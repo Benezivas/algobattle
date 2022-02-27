@@ -71,7 +71,7 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
         def format(self) -> str:
             table = []
             table.append(["GEN", "SOL", *range(1, self.rounds + 1), "LAST"])
-            for (matchup, res) in self.items():
+            for matchup, res in self.items():
                 if len(res) == 0:
                     last_ratio = ""
                 else:
