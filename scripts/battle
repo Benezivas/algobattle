@@ -142,7 +142,7 @@ if __name__ == "__main__":
         logger.info(f'Maximal measured runtime overhead is at {runtime_overhead} seconds. Adding this amount to the configured runtime.')
 
     if display_ui:
-        ui = Ui()
+        ui = Ui(logger, logger.getEffectiveLevel())
         ui.update("Setting up match...")
     else:
         ui = None

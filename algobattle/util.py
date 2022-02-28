@@ -50,7 +50,7 @@ def format_table(table: list[list[Any]], column_spacing: dict[int, int] = {}) ->
     horizontal_sep_fmt = "{start}" + "{middle}".join("{sep}" * (width + 2) for width in col_sizes) + "{end}\n"
     top = horizontal_sep_fmt.format(start="╔", middle="╦", end="╗", sep="═")
     middle = horizontal_sep_fmt.format(start="╟", middle="╫", end="╢", sep="─")
-    bottom = horizontal_sep_fmt.format(start="╚", middle="╩", end="╝", sep="═")
+    bottom = horizontal_sep_fmt.format(start="╚", middle="╩", end="╝", sep="═")[:-1]
 
     content_fmt = "║ " + " ║ ".join(f"{{: ^{width}}}" for width in col_sizes) + " ║\n"
 
