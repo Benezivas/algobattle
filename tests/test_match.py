@@ -7,7 +7,7 @@ import logging
 
 import algobattle
 from algobattle.battle_wrappers.iterated import Iterated
-from algobattle.match import BuildError, Match, UnknownBattleType
+from algobattle.match import BuildError, Match
 from algobattle.matchups import Matchup
 import algobattle.problems.testsproblem as Problem
 
@@ -65,7 +65,7 @@ class Matchtests(unittest.TestCase):
 
     def test_run(self):
         self.match = Match(self.problem, self.config, [self.team])
-        self.assertRaises(UnknownBattleType, lambda: cast(Match, self.match).run(battle_type='foo'))
+        self.assertRaises(ValueError, lambda: cast(Match, self.match).run(battle_type='foo'))
 
     def test_one_fight_gen_timeout(self):
         team = ('0', self.tests_path / 'generator_timeout', self.tests_path / 'solver')

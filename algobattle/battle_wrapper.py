@@ -8,7 +8,9 @@ their run, such that it contains the current state of the match.
 """
 import logging
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Generator, TypeVar
+from typing import TYPE_CHECKING, Any, Generator, Type, TypeVar
+from inspect import isabstract
+
 from algobattle.matchups import BattleMatchups, Matchup
 from algobattle.problem import Problem
 from algobattle.team import Team
@@ -16,14 +18,19 @@ from algobattle.docker import DockerError
 if TYPE_CHECKING:
     from algobattle.match import RunParameters
 
-
 logger = logging.getLogger('algobattle.battle_wrapper')
 
 class BattleWrapper(ABC):
     """Base class for wrappers that execute a specific kind of battle.
     Its state contains information about the battle and its history."""
     
-    def __init__(self, problem: Problem, run_parameters: RunParameters | None = None, **options: Any):
+    wrapper_classes: dict[str, Type[BattleWrapper]] = {}
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        if not isabstract(cls):
+            BattleWrapper.wrapper_classes[cls.__name__.lower()] = cls
+
+    def __init__(self, problem: Problem, run_parameters: RunParameters | None = None, **options: dict[str, Any]):
         """Builds a battle wrapper object with the given option values.
         Logs warnings if there were options provided that this wrapper doesn't use. 
 
@@ -44,10 +51,14 @@ class BattleWrapper(ABC):
         else:
             from algobattle.match import RunParameters
             self.run_parameters = RunParameters()
-
-        for arg, value in options.items():
-            if arg not in vars(type(self)):
-                logger.warning(f"Option '{arg}={value}' was provided, but is not used by {type(self)} type battles.")
+    
+    @staticmethod
+    def getWrapperClass(battle_type: str) -> Type[BattleWrapper]:
+        if battle_type.lower() in BattleWrapper.wrapper_classes.keys():
+            return BattleWrapper.wrapper_classes[battle_type]
+        else:
+            logger.error(f'Unrecognized battle_type given: "{battle_type}"')
+            raise ValueError
 
     @abstractmethod
     def wrapper(self, matchup: Matchup) -> Generator[Result, None, None]:

@@ -5,15 +5,17 @@ import logging
 import configparser
 from pathlib import Path
 from collections.abc import Mapping
+from typing import Any
+
 from algobattle.battle_wrapper import BattleWrapper
 from algobattle.matchups import BattleMatchups
-
 from algobattle.team import Team
 from algobattle.problem import Problem
 from algobattle.docker import DockerError
-from algobattle.battle_wrappers.averaged import Averaged
-from algobattle.battle_wrappers.iterated import Iterated
 from algobattle.ui import Ui
+
+#! Don't remove, even when not accessed
+import algobattle.battle_wrappers   # type: ignore
 
 logger = logging.getLogger('algobattle.match')
 
@@ -21,9 +23,6 @@ class ConfigurationError(Exception):
     pass
 
 class BuildError(Exception):
-    pass
-
-class UnknownBattleType(Exception):
     pass
 
 class RunParameters:
@@ -82,8 +81,7 @@ class Match:
         
         self.battle_matchups = BattleMatchups(self.teams)
 
-    def run(self, battle_type: str = 'iterated', rounds: int = 5, iterated_cap: int = 50000, iterated_exponent: int = 2,
-            approximation_instance_size: int = 10, approximation_iterations: int = 25) -> BattleWrapper.MatchResult:
+    def run(self, battle_type: str = 'iterated', rounds: int = 5, **wrapper_options: dict[str, Any]) -> BattleWrapper.MatchResult:
         """Match entry point, executes rounds fights between all teams and returns the results of the battles.
 
         Parameters
@@ -107,17 +105,11 @@ class Match:
             A wrapper instance containing information about the executed battle.
         """
 
-        if battle_type == 'iterated':
-            res = Iterated.Result
-            battle_wrapper = Iterated(self.problem, self.run_parameters, iterated_cap, iterated_exponent, self.approximation_ratio)
-        elif battle_type == 'averaged':
-            res = Averaged.Result
-            battle_wrapper = Averaged(self.problem, self.run_parameters, approximation_instance_size, approximation_iterations)
-        else:
-            logger.error(f'Unrecognized battle_type given: "{battle_type}"')
-            raise UnknownBattleType
+        WrapperClass = BattleWrapper.getWrapperClass(battle_type)
+        ResultClass = WrapperClass.Result
+        battle_wrapper = WrapperClass(self.problem, self.run_parameters, **wrapper_options)
         
-        results: BattleWrapper.MatchResult[res] = type(battle_wrapper).MatchResult(self.battle_matchups, rounds)
+        results = WrapperClass.MatchResult(self.battle_matchups, rounds)    # type: ignore
 
         if self.ui is not None:
             self.ui.update(results.format())
@@ -125,7 +117,7 @@ class Match:
         for matchup in self.battle_matchups:
             for i in range(rounds):
                 logger.info(f'{"#" * 20}  Running Battle {i + 1}/{rounds}  {"#" * 20}')
-                results[matchup].append(res())
+                results[matchup].append(ResultClass())
 
                 for result in battle_wrapper.wrapper(matchup):
                     results[matchup][i] = result
