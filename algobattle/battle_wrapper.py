@@ -221,6 +221,9 @@ class BattleWrapper(ABC):
             formatted_output_string += "\n".join(f"{matchup}: {res}" for (matchup, res) in self.items())
 
             return formatted_output_string
+        
+        def __str__(self) -> str:
+            return self.format()
 
         @abstractmethod
         def calculate_points(self, achievable_points: int) -> dict[Team, float]:

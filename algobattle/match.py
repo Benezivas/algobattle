@@ -120,7 +120,7 @@ class Match:
         results: BattleWrapper.MatchResult[res] = type(battle_wrapper).MatchResult(self.battle_matchups, rounds)
 
         if self.ui is not None:
-            self.ui.update(results.format())
+            self.ui.update(str(results))
         
         for matchup in self.battle_matchups:
             for i in range(rounds):
@@ -130,7 +130,7 @@ class Match:
                 for result in battle_wrapper.wrapper(matchup):
                     results[matchup][i] = result
                     if self.ui is not None:
-                        self.ui.update(results.format())
+                        self.ui.update(str(results))
 
 
         return results
