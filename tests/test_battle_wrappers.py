@@ -1,11 +1,11 @@
 """Tests for all util functions."""
 from dataclasses import dataclass
-import unittest
+from unittest import TestCase, main
 import logging
 
 from algobattle.battle_wrappers.averaged import Averaged
 from algobattle.battle_wrappers.iterated import Iterated
-from algobattle.matchups import BattleMatchups
+from algobattle.matchups import BattleMatchups, Matchup
 from algobattle.team import Team
 
 logging.disable(logging.CRITICAL)
@@ -20,8 +20,8 @@ def team(name: str) -> Team:
     """Aliasing function to deal with invariance issues."""
     return TestTeam(name)
 
-class PointsCalculationTests(unittest.TestCase):
-    """Tests for the battle wrapper functions."""
+class PointsCalculationTests(TestCase):
+    """Tests for the points calculation functions."""
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -70,5 +70,18 @@ class PointsCalculationTests(unittest.TestCase):
         results[self.matchups[1]] = [Averaged.Result([0, 0, 0]), Averaged.Result([0, 0, 0])]
         self.assertEqual(results.calculate_points(100), {self.teams[0]: 50, self.teams[1]: 50})
 
+class MatchupsTests(TestCase):
+    """Tests for the matchup generators."""
+    
+    def test_all_battle_pairs(self):
+        team0 = team("0")
+        team1 = team("1")
+        teams = [team0, team1]
+        self.assertEqual(list(BattleMatchups(teams)), [Matchup(team0, team1), Matchup(team1, team0)])
+
+    def test_all_battle_pairs_solo_battle(self):
+        team0 = team("0")
+        self.assertEqual(list(BattleMatchups([team0])), [Matchup(team0, team0)])
+
 if __name__ == '__main__':
-    unittest.main()
+    main()
