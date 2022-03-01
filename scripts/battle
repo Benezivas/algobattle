@@ -169,4 +169,5 @@ if __name__ == "__main__":
             logger.info(f'Group {team} gained {points:.1f} points.')
     
     match.cleanup()
-    print(results.format())
+    if not options.silent:
+        print(results.format())
