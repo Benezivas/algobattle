@@ -86,6 +86,7 @@ if __name__ == "__main__":
     parser.add_argument('--output_folder', dest='folder_name', type=resolved_path, default=default_logging_path, help='Specify the folder into which the log file is written to. Can either be a relative or absolute path to folder. If nonexisting, a new folder will be created. Default: ~/.algobattle_logs/')
     parser.add_argument('--config_file', dest='config', type=resolved_path, default=default_config, help='Path to a .ini configuration file to be used for the run. Defaults to the packages config.ini')
     parser.add_argument('--no_overhead_calculation', dest='no_overhead_calculation', action='store_true', help='If set, the program does not benchmark the I/O of the host system to calculate the runtime overhead when started.')
+    parser.add_argument("--no_cleanup", action="store_true", help="Don't clean up any created docker images.")
 
     parser.add_argument("--teams", action="extend", nargs="*", help="Any number of paths that specify teams. Either by the found folder structure or a team.ini file found there. Defaults to the problem path.")
 
@@ -172,5 +173,6 @@ if __name__ == "__main__":
         for team, points in points.items():
             logger.info(f'Group {team} gained {points:.1f} points.')
     
-    match.cleanup()
+    if not options.no_cleanup:
+        match.cleanup()
     print(results.format())
