@@ -175,4 +175,5 @@ if __name__ == "__main__":
     
     if not options.no_cleanup:
         match.cleanup()
-    print(results.format())
+    if options.display != "silent":
+        print(results.format())
