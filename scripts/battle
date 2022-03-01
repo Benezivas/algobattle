@@ -67,29 +67,25 @@ def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
     logger.info(f'You can find the log files for this run in {logging_path}')
     return logger
 
+def resolved_path(path: str) -> Path:
+    return Path(path).resolve()
+
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        sys.exit('Expecting (relative) path to the parent directory of a problem file as argument. Use "battle --help" for more information on usage and options.')
-
-    problem_path = Path(sys.argv[1]).resolve()
-
     default_logging_path = Path.home() / '.algobattle_logs'
     default_config = Path(algobattle.__file__).resolve().parent / 'config' / 'config.ini'
 
-    # Option parser to process arguments from the console.
-    usage = 'usage: %(prog)s FILE [options]\nExpecting (relative) path to the directory of the problem as first argument.\nIf you provide generators, solvers and group numbers for multiple teams, make sure that the order is the same for all three arguments.'
-    parser = ArgumentParser(usage=usage, prog="algobattle")
-    parser.add_argument("problem_path", help="Path to the parent directory of a problem file as argument.")
+    parser = ArgumentParser(prog="algobattle")
+    parser.add_argument("problem_path", type=resolved_path, help="Path to the parent directory of a problem file as argument.")
     parser.add_argument("--version", action="version", version=f"Algobattle version {algobattle.__version__}")
     parser.add_argument('--verbose', dest='verbose_logging', action='store_true', help='Log all debug messages.')
     parser.add_argument('--silent', dest='silent', action='store_true', help='Disable forking the logging output to stderr.')
     parser.add_argument('--ui', dest='display_ui', action='store_true', help='If set, the program sets the --silent option and displays a small ui on STDOUT that shows the progress of the battles.')
-    parser.add_argument('--output_folder', dest='folder_name', default=default_logging_path, help='Specify the folder into which the log file is written to. Can either be a relative or absolute path to folder. If nonexisting, a new folder will be created. Default: ~/.algobattle_logs/')
-    parser.add_argument('--config_file', dest='config', default=default_config, help='Path to a .ini configuration file to be used for the run. Defaults to the packages config.ini')
+    parser.add_argument('--output_folder', dest='folder_name', type=resolved_path, default=default_logging_path, help='Specify the folder into which the log file is written to. Can either be a relative or absolute path to folder. If nonexisting, a new folder will be created. Default: ~/.algobattle_logs/')
+    parser.add_argument('--config_file', dest='config', type=resolved_path, default=default_config, help='Path to a .ini configuration file to be used for the run. Defaults to the packages config.ini')
     parser.add_argument('--no_overhead_calculation', dest='no_overhead_calculation', action='store_true', help='If set, the program does not benchmark the I/O of the host system to calculate the runtime overhead when started.')
 
-    parser.add_argument('--solvers', dest='solvers', default=str(problem_path / 'solver'), help='Specify the folder names containing the solvers of all involved teams as a comma-seperated list. Default: arg1/solver/')
-    parser.add_argument('--generators', dest='generators', default=str(problem_path / 'generator'), help='Specify the folder names containing the generators of all involved teams as a comma-seperated list. Default: arg1/generator/')
+    parser.add_argument('--solvers', dest='solvers', default="{problem_path}/solver", help='Specify the folder names containing the solvers of all involved teams as a comma-seperated list. Default: arg1/solver/')
+    parser.add_argument('--generators', dest='generators', default="{problem_path}/generator", help='Specify the folder names containing the generators of all involved teams as a comma-seperated list. Default: arg1/generator/')
     parser.add_argument('--team_names', dest='team_names', default='0', help='Specify the team names of all involved teams as a list strings as a comma-seperated list. Default: "0"')
 
     parser.add_argument('--battle_type', dest='battle_type', choices=['iterated', 'averaged'], default='iterated', help='Type of battle wrapper to be used. Possible options: iterated, averaged. Default: iterated')
@@ -112,9 +108,10 @@ if __name__ == "__main__":
         options.silent = True
 
     problem_path = Path(options.problem_path)
-    options.config = Path(options.config)
-    solvers = [Path(s) for s in options.solvers.split(',')]
-    generators = [Path(g) for g in options.generators.split(',')]
+    solvers = options.solvers.format(problem_path=str(problem_path))
+    solvers = [Path(s).resolve() for s in solvers.split(',')]
+    generators = options.generators.format(problem_path=str(problem_path))
+    generators = [Path(g).resolve() for g in generators.split(',')]
     team_names = options.team_names.split(',')
 
     if not (len(solvers) == len(generators) == len(team_names)):
