@@ -14,8 +14,6 @@ from algobattle.problem import Problem
 from algobattle.docker import DockerError
 from algobattle.ui import Ui
 
-#! Don't remove, even when not accessed
-import algobattle.battle_wrappers   # type: ignore
 
 logger = logging.getLogger('algobattle.match')
 

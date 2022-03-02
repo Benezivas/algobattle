@@ -21,6 +21,30 @@ logger = logging.getLogger('algobattle.battle_wrappers.iterated')
 class Iterated(algobattle.battle_wrapper.BattleWrapper):
     """Class of an iterated battle Wrapper."""
 
+    battle_args = [([
+            "--cap",
+        ], {
+            "dest": "cap",
+            "type": int,
+            "default": 50000,
+            "help": "The maximum instance size up to which a battle is to be fought. Default: 50000",
+        }), ([
+            "--exponent",
+        ], {
+            "dest": "exponent",
+            "type": int,
+            "default": "2",
+            "help": "The exponent used for the step size increase. Default: 2"
+        }), ([
+            "--approx_ratio",
+        ], {
+            "dest": "approximation_ratio",
+            "type": float,
+            "default": 1.0,
+            "help": "Tolerated approximation ratio of a solution, if the problem is compatible with approximation. Default: 1.0"
+        }),
+    ]
+
     def __init__(self, problem: Problem, run_parameters: RunParameters | None = None,
                 cap: int = 50000, exponent: int = 2, approximation_ratio: float = 1,
                 **options) -> None:

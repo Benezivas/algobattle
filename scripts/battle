@@ -15,9 +15,11 @@ from algobattle.match import Match
 from algobattle.util import import_problem_from_path
 from algobattle.docker import measure_runtime_overhead
 from algobattle.ui import Ui
+from algobattle.battle_wrapper import BattleWrapper
 
 #! do not remove, even when unused!
 import algobattle.sighandler
+import algobattle.battle_wrappers   # type: ignore
 
 def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
     """Creates and returns a parent logger.
@@ -78,30 +80,27 @@ if __name__ == "__main__":
     default_logging_path = Path.home() / '.algobattle_logs'
     default_config = Path(algobattle.__file__).resolve().parent / 'config' / 'config.ini'
 
-    parser = ArgumentParser(prog="algobattle")
-    parser.add_argument("problem_path", type=resolved_path, help="Path to the parent directory of a problem file as argument.")
-    parser.add_argument("--version", action="version", version=f"Algobattle version {algobattle.__version__}")
-    parser.add_argument('--verbose', dest='verbose_logging', action='store_true', help='Log all debug messages.')
-    parser.add_argument("--display", "-d", choices=["silent", "ui", "logs"], default="logs", help="Choose display mode, silent will hide all output, logs will pipe the logs to stderr, and ui will display a small terminal ui. Default: logs")
-    parser.add_argument('--output_folder', "-o", dest='folder_name', type=resolved_path, default=default_logging_path, help='Specify the folder into which the log file is written to. Can either be a relative or absolute path to folder. If nonexisting, a new folder will be created. Default: ~/.algobattle_logs/')
-    parser.add_argument('--config_file', "-c", dest='config', type=resolved_path, default=default_config, help='Path to a .ini configuration file to be used for the run. Defaults to the packages config.ini')
-    parser.add_argument('--no_overhead_calculation', dest='no_overhead_calculation', action='store_true', help='If set, the program does not benchmark the I/O of the host system to calculate the runtime overhead when started.')
-    parser.add_argument("--no_cleanup", action="store_true", help="Don't clean up any created docker images.")
+    parent_parser = ArgumentParser(add_help=False)
+    parent_parser.add_argument("--teams", "-t", action="extend", nargs="*", help="Any number of paths that specify teams. Either by the found folder structure or a team.ini file found there. Defaults to the problem path.")
+    parent_parser.add_argument("--version", action="version", version=f"Algobattle version {algobattle.__version__}")
+    parent_parser.add_argument('--verbose', dest='verbose_logging', action='store_true', help='Log all debug messages.')
+    parent_parser.add_argument("--display", "-d", choices=["silent", "ui", "logs"], default="logs", help="Choose display mode, silent will hide all output, logs will pipe the logs to stderr, and ui will display a small terminal ui. Default: logs")
+    parent_parser.add_argument('--output_folder', "-o", dest='folder_name', type=resolved_path, default=default_logging_path, help='Specify the folder into which the log file is written to. Can either be a relative or absolute path to folder. If nonexisting, a new folder will be created. Default: ~/.algobattle_logs/')
+    parent_parser.add_argument('--config_file', "-c", dest='config', type=resolved_path, default=default_config, help='Path to a .ini configuration file to be used for the run. Defaults to the packages config.ini')
+    parent_parser.add_argument('--no_overhead_calculation', dest='no_overhead_calculation', action='store_true', help='If set, the program does not benchmark the I/O of the host system to calculate the runtime overhead when started.')
+    parent_parser.add_argument("--no_cleanup", action="store_true", help="Don't clean up any created docker images.")
+    parent_parser.add_argument('--rounds', "-r", dest='battle_rounds', type=int, default='5', help='Number of rounds that are to be fought in the battle (points are split between all rounds). Default: 5')
+    parent_parser.add_argument('--points', "-p", dest='points', type=int, default='100', help='Number of points that are to be fought for. Default: 100')
+    parent_parser.add_argument('--do_not_count_points', dest='do_not_count_points', action='store_true', help='If set, points are not calculated for the run.')
+    
+    parser = ArgumentParser(parents=[parent_parser])
+    parent_parser.add_argument("problem_path", type=resolved_path, help="Path to the parent directory of a problem file as argument.")
 
-    parser.add_argument("--teams", "-t", action="extend", nargs="*", help="Any number of paths that specify teams. Either by the found folder structure or a team.ini file found there. Defaults to the problem path.")
-
-    parser.add_argument('--battle_type', "-b", dest='battle_type', choices=['iterated', 'averaged'], default='iterated', help='Type of battle wrapper to be used. Possible options: iterated, averaged. Default: iterated')
-    parser.add_argument('--rounds', "-r", dest='battle_rounds', type=int, default='5', help='Number of rounds that are to be fought in the battle (points are split between all rounds). Default: 5')
-    parser.add_argument('--points', "-p", dest='points', type=int, default='100', help='Number of points that are to be fought for. Default: 100')
-    parser.add_argument('--do_not_count_points', dest='do_not_count_points', action='store_true', help='If set, points are not calculated for the run.')
-
-    parser.add_argument('--iter_cap', dest='iterated_cap', type=int, default='50000', help='If --battle_type=iterated, the maximum instance size up to which a battle is to be fought. Default: 50000')
-    parser.add_argument('--iter_exponent', dest='iterated_exponent', type=int, default='2', help='If --battle_type=iterated, the exponent used for the step size increase. Default: 2')
-    parser.add_argument('--approx_ratio', dest='approximation_ratio', type=float, default='1.0', help='Tolerated approximation ratio of a solution, if the problem is compatible with approximation. Default: 1.0')
-
-    parser.add_argument('--approx_inst_size', dest='approximation_instance_size', type=int, default='10', help='If --battle_type=averaged, the instance size on which the averaged run is to be made. Default: 10')
-    parser.add_argument('--approx_iterations', dest='approximation_iterations', type=int, default='25', help='If --battle_type=averaged, the number of iterations that are to be averaged. Default: 25')
-
+    subparsers = parser.add_subparsers(help="Type of battle to run.", dest="battle_type", required=True)
+    for name, cls in BattleWrapper.wrapper_classes.items():
+        battle_parser = subparsers.add_parser(name, parents=[parent_parser])
+        for args, kwargs in cls.battle_args:
+            battle_parser.add_argument(*args, **kwargs)
 
     options = parser.parse_args()
 
