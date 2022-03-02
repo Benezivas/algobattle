@@ -47,27 +47,27 @@ def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
 
     _now = dt.datetime.now()
 
-    time_seperator = ':' if os.name == 'posix' else '-'
-    current_timestamp = f'{_now.year:04d}-{_now.month:02d}-{_now.day:02d}_{_now.hour:02d}{time_seperator}{_now.minute:02d}{time_seperator}{_now.second:02d}'
-    logging_path /= current_timestamp + '.log'
+    time_seperator = ":" if os.name == "posix" else "-"
+    current_timestamp = f"{_now.year:04d}-{_now.month:02d}-{_now.day:02d}_{_now.hour:02d}{time_seperator}{_now.minute:02d}{time_seperator}{_now.second:02d}"
+    logging_path /= current_timestamp + ".log"
 
-    logging.basicConfig(handlers=[logging.FileHandler(logging_path, 'w', 'utf-8')],
+    logging.basicConfig(handlers=[logging.FileHandler(logging_path, "w", "utf-8")],
                         level=common_logging_level,
-                        format='%(asctime)s %(levelname)s: %(message)s',
-                        datefmt='%H:%M:%S')
+                        format="%(asctime)s %(levelname)s: %(message)s",
+                        datefmt="%H:%M:%S")
 
-    logger = logging.getLogger('algobattle')
+    logger = logging.getLogger("algobattle")
 
     if not silent:
         # Pipe logging out to console
         _consolehandler = logging.StreamHandler(stream=sys.stderr)
         _consolehandler.setLevel(common_logging_level)
 
-        _consolehandler.setFormatter(logging.Formatter('%(message)s'))
+        _consolehandler.setFormatter(logging.Formatter("%(message)s"))
 
         logger.addHandler(_consolehandler)
 
-    logger.info(f'You can find the log files for this run in {logging_path}')
+    logger.info(f"You can find the log files for this run in {logging_path}")
     return logger
 
 def resolved_path(path: str) -> Path:
@@ -77,21 +77,21 @@ def extend_default_path(path: str, problem_path: Path) -> Path:
     return resolved_path(path.format(problem_path=problem_path))
 
 if __name__ == "__main__":
-    default_logging_path = Path.home() / '.algobattle_logs'
-    default_config = Path(algobattle.__file__).resolve().parent / 'config' / 'config.ini'
+    default_logging_path = Path.home() / ".algobattle_logs"
+    default_config = Path(algobattle.__file__).resolve().parent / "config" / "config.ini"
 
     parent_parser = ArgumentParser(add_help=False)
     parent_parser.add_argument("--teams", "-t", action="extend", nargs="*", help="Any number of paths that specify teams. Either by the found folder structure or a team.ini file found there. Defaults to the problem path.")
     parent_parser.add_argument("--version", action="version", version=f"Algobattle version {algobattle.__version__}")
-    parent_parser.add_argument('--verbose', dest='verbose_logging', action='store_true', help='Log all debug messages.')
+    parent_parser.add_argument("--verbose", dest="verbose_logging", action="store_true", help="Log all debug messages.")
     parent_parser.add_argument("--display", "-d", choices=["silent", "ui", "logs"], default="logs", help="Choose display mode, silent will hide all output, logs will pipe the logs to stderr, and ui will display a small terminal ui. Default: logs")
-    parent_parser.add_argument('--output_folder', "-o", dest='folder_name', type=resolved_path, default=default_logging_path, help='Specify the folder into which the log file is written to. Can either be a relative or absolute path to folder. If nonexisting, a new folder will be created. Default: ~/.algobattle_logs/')
-    parent_parser.add_argument('--config_file', "-c", dest='config', type=resolved_path, default=default_config, help='Path to a .ini configuration file to be used for the run. Defaults to the packages config.ini')
-    parent_parser.add_argument('--no_overhead_calculation', dest='no_overhead_calculation', action='store_true', help='If set, the program does not benchmark the I/O of the host system to calculate the runtime overhead when started.')
+    parent_parser.add_argument("--output_folder", "-o", dest="folder_name", type=resolved_path, default=default_logging_path, help="Specify the folder into which the log file is written to. Can either be a relative or absolute path to folder. If nonexisting, a new folder will be created. Default: ~/.algobattle_logs/")
+    parent_parser.add_argument("--config_file", "-c", dest="config", type=resolved_path, default=default_config, help="Path to a .ini configuration file to be used for the run. Defaults to the packages config.ini")
+    parent_parser.add_argument("--no_overhead_calculation", dest="no_overhead_calculation", action="store_true", help="If set, the program does not benchmark the I/O of the host system to calculate the runtime overhead when started.")
     parent_parser.add_argument("--no_cleanup", action="store_true", help="Don't clean up any created docker images.")
-    parent_parser.add_argument('--rounds', "-r", dest='battle_rounds', type=int, default='5', help='Number of rounds that are to be fought in the battle (points are split between all rounds). Default: 5')
-    parent_parser.add_argument('--points', "-p", dest='points', type=int, default='100', help='Number of points that are to be fought for. Default: 100')
-    parent_parser.add_argument('--do_not_count_points', dest='do_not_count_points', action='store_true', help='If set, points are not calculated for the run.')
+    parent_parser.add_argument("--rounds", "-r", dest="battle_rounds", type=int, default="5", help="Number of rounds that are to be fought in the battle (points are split between all rounds). Default: 5")
+    parent_parser.add_argument("--points", "-p", dest="points", type=int, default="100", help="Number of points that are to be fought for. Default: 100")
+    parent_parser.add_argument("--do_not_count_points", dest="do_not_count_points", action="store_true", help="If set, points are not calculated for the run.")
     
     parser = ArgumentParser(parents=[parent_parser])
     parent_parser.add_argument("problem_path", type=resolved_path, help="Path to the parent directory of a problem file as argument.")
@@ -105,7 +105,7 @@ if __name__ == "__main__":
     options = parser.parse_args()
 
     if not options.problem_path.exists():
-        sys.exit(f'Problem path "{options.problem_path}" does not exist in the file system! Use "battle --help" for more information on usage and options.')
+        sys.exit(f"Problem path '{options.problem_path}' does not exist in the file system! Use 'battle --help' for more information on usage and options.")
     
     if options.teams is None:
         team_paths = [options.problem_path]
@@ -131,7 +131,7 @@ if __name__ == "__main__":
                 sys.exit(f"The {role} path {gen_path} used by team '{name}' does not exist in the file system! Use 'battle --help' for more information on usage and options.")
             
     if not options.config.exists():
-        sys.exit(f'Config path "{options.config}" does not exist in the file system! Use "battle --help" for more information on usage and options.')
+        sys.exit(f"Config path '{options.config}'' does not exist in the file system! Use 'battle --help' for more information on usage and options.")
 
     logger = setup_logging(options.folder_name, options.verbose_logging, options.display != "logs")
 
@@ -139,8 +139,8 @@ if __name__ == "__main__":
     if not problem:
         sys.exit(1)
 
-    logger.debug(f'Options for this run: {options}')
-    logger.debug(f'Contents of sys.argv: {sys.argv}')
+    logger.debug(f"Options for this run: {options}")
+    logger.debug(f"Contents of sys.argv: {sys.argv}")
 
     if options.display == "ui":
         ui = Ui(logger, logger.getEffectiveLevel())
@@ -150,9 +150,9 @@ if __name__ == "__main__":
 
     runtime_overhead = 0
     if not options.no_overhead_calculation:
-        logger.info('Running a benchmark to determine your machines I/O overhead to start and stop docker containers...')
+        logger.info("Running a benchmark to determine your machines I/O overhead to start and stop docker containers...")
         runtime_overhead = measure_runtime_overhead()
-        logger.info(f'Maximal measured runtime overhead is at {runtime_overhead} seconds. Adding this amount to the configured runtime.')
+        logger.info(f"Maximal measured runtime overhead is at {runtime_overhead} seconds. Adding this amount to the configured runtime.")
 
     
     match = Match(problem, options.config, team_info, ui, runtime_overhead=runtime_overhead, approximation_ratio=options.approximation_ratio)
@@ -165,12 +165,12 @@ if __name__ == "__main__":
     if ui is not None:
         ui.restore()
 
-    logger.info('#' * 78)
-    logger.info(f'\n{results.format()}')
+    logger.info("#" * 78)
+    logger.info(f"\n{results.format()}")
     if not options.do_not_count_points:
         points = results.calculate_points(options.points)
         for team, points in points.items():
-            logger.info(f'Group {team} gained {points:.1f} points.')
+            logger.info(f"Group {team} gained {points:.1f} points.")
     
     if not options.no_cleanup:
         match.cleanup()
