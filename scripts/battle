@@ -154,13 +154,15 @@ if __name__ == "__main__":
         runtime_overhead = measure_runtime_overhead()
         logger.info(f"Maximal measured runtime overhead is at {runtime_overhead} seconds. Adding this amount to the configured runtime.")
 
+    if options.approximation_ratio is None:
+        approximation_ratio = 1
+    else:
+        approximation_ratio = options.approximation_ratio
     
-    match = Match(problem, options.config, team_info, ui, runtime_overhead=runtime_overhead, approximation_ratio=options.approximation_ratio)
+    match = Match(problem, options.config, team_info, ui, runtime_overhead=runtime_overhead, approximation_ratio=approximation_ratio)
 
 
-    results = match.run(options.battle_type, rounds=options.battle_rounds, iterated_cap=options.iterated_cap,
-                        iterated_exponent=options.iterated_exponent, approximation_instance_size=options.approximation_instance_size,
-                        approximation_iterations=options.approximation_iterations)
+    results = match.run(**vars(options))
 
     if ui is not None:
         ui.restore()
