@@ -151,7 +151,7 @@ if __name__ == "__main__":
     else:
         ui = None
     
-    match = Match(problem, options.config, teams, ui, runtime_overhead=runtime_overhead, approximation_ratio=options.approximation_ratio)
+    match = Match(problem, options.config, teams, ui, runtime_overhead=runtime_overhead)
 
 
     results = match.run(options.battle_type, rounds=options.battle_rounds, iterated_cap=options.iterated_cap,

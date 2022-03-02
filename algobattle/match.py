@@ -19,9 +19,6 @@ import algobattle.battle_wrappers   # type: ignore
 
 logger = logging.getLogger('algobattle.match')
 
-class ConfigurationError(Exception):
-    pass
-
 class BuildError(Exception):
     pass
 
@@ -50,7 +47,7 @@ class Match:
     """Match class, provides functionality for setting up and executing battles between given teams."""
 
     def __init__(self, problem: Problem, config_path: Path, team_info: list[tuple[str, Path, Path]], ui: Ui | None = None,
-                 runtime_overhead: float = 0, approximation_ratio: float = 1.0, cache_docker_containers: bool = True) -> None:
+                 runtime_overhead: float = 0, cache_docker_containers: bool = True) -> None:
 
         config = configparser.ConfigParser()
         logger.debug(f'Using additional configuration options from file "{config_path}".')
@@ -59,12 +56,7 @@ class Match:
         self.run_parameters = RunParameters(config["run_parameters"], runtime_overhead)
         self.problem = problem
         self.config = config
-        self.approximation_ratio = approximation_ratio
         self.ui = ui
-        
-        if approximation_ratio != 1.0 and not problem.approximable:
-            logger.error('The given problem is not approximable and can only be run with an approximation ratio of 1.0!')
-            raise ConfigurationError
 
         self.teams: list[Team] = []
         for info in team_info:
@@ -107,6 +99,11 @@ class Match:
 
         WrapperClass = BattleWrapper.getWrapperClass(battle_type)
         ResultClass = WrapperClass.Result
+
+        if not WrapperClass.check_compatibility(self.problem, wrapper_options):
+            logger.critical(f"Battle type, problem, and chosen options are incompatible!")
+            raise SystemExit
+
         battle_wrapper = WrapperClass(self.problem, self.run_parameters, **wrapper_options)
         
         results = WrapperClass.MatchResult(self.battle_matchups, rounds)    # type: ignore

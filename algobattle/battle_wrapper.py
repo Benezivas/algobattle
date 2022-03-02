@@ -60,6 +60,10 @@ class BattleWrapper(ABC):
             logger.error(f'Unrecognized battle_type given: "{battle_type}"')
             raise ValueError
 
+    @classmethod
+    def check_compatibility(cls, problem: Problem, options: dict[str, Any]) -> bool:
+        return True
+    
     @abstractmethod
     def wrapper(self, matchup: Matchup) -> Generator[Result, None, None]:
         """The main base method for a wrapper.
