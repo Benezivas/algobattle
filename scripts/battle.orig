@@ -154,12 +154,28 @@ if __name__ == "__main__":
 
     team_info = parse_team_info(options.teams)
 
+<<<<<<< HEAD
+    if display_ui:
+        ui = Ui(logger, logger.getEffectiveLevel())
+        ui.update("Setting up match...")
+=======
+    runtime_overhead = 0
+    if not options.no_overhead_calculation:
+        logger.info("Running a benchmark to determine your machines I/O overhead to start and stop docker containers...")
+        runtime_overhead = measure_runtime_overhead()
+        logger.info(f"Maximal measured runtime overhead is at {runtime_overhead} seconds. Adding this amount to the configured runtime.")
+
     if options.approximation_ratio is None:
         approximation_ratio = 1
+>>>>>>> arg_rework
     else:
         approximation_ratio = options.approximation_ratio
     
-    match = Match(problem, options.config, team_info, ui, calculate_runtime_overhead=not options.no_overhead_calculation)
+<<<<<<< HEAD
+    match = Match(problem, options.config, teams, ui, calculate_runtime_overhead=not options.no_overhead_calculation)
+=======
+    match = Match(problem, options.config, team_info, ui, runtime_overhead=runtime_overhead, approximation_ratio=approximation_ratio)
+>>>>>>> arg_rework
 
 
     results = match.run(**vars(options))
@@ -174,7 +190,12 @@ if __name__ == "__main__":
         for team, points in points.items():
             logger.info(f"Group {team} gained {points:.1f} points.")
     
+<<<<<<< HEAD
+    match.cleanup()
+    if not options.silent:
+=======
     if not options.no_cleanup:
         match.cleanup()
     if options.display != "silent":
+>>>>>>> arg_rework
         print(results.format())

@@ -23,6 +23,8 @@ logger = logging.getLogger('algobattle.battle_wrapper')
 class BattleWrapper(ABC):
     """Base class for wrappers that execute a specific kind of battle.
     Its state contains information about the battle and its history."""
+
+    battle_args: list[tuple[list[str], dict[str, Any]]] = []
     
     wrapper_classes: dict[str, Type[BattleWrapper]] = {}
     def __init_subclass__(cls, **kwargs):

@@ -15,8 +15,6 @@ from algobattle.docker import DockerError
 from algobattle.ui import Ui
 from algobattle.docker import measure_runtime_overhead
 
-#! Don't remove, even when not accessed
-import algobattle.battle_wrappers   # type: ignore
 
 logger = logging.getLogger('algobattle.match')
 
