@@ -8,7 +8,7 @@ import logging
 import algobattle
 from algobattle.battle_wrappers.iterated import Iterated
 from algobattle.match import BuildError, Match
-from algobattle.matchups import Matchup
+from algobattle.team import Matchup
 import algobattle.problems.testsproblem as Problem
 
 logging.disable(logging.CRITICAL)

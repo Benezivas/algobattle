@@ -8,9 +8,8 @@ import logging
 from typing import Any
 
 import algobattle.battle_wrapper
-from algobattle.matchups import Matchup
 from algobattle.problem import Problem
-from algobattle.team import Team
+from algobattle.team import Matchup, Team
 from algobattle.util import format_table
 from typing import TYPE_CHECKING, Generator
 if TYPE_CHECKING:

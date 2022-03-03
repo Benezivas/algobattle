@@ -5,8 +5,7 @@ import logging
 
 from algobattle.battle_wrappers.averaged import Averaged
 from algobattle.battle_wrappers.iterated import Iterated
-from algobattle.matchups import BattleMatchups, Matchup
-from algobattle.team import Team
+from algobattle.team import Team, BattleMatchups, Matchup
 
 logging.disable(logging.CRITICAL)
 

@@ -8,8 +8,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from algobattle.battle_wrapper import BattleWrapper
-from algobattle.matchups import BattleMatchups
-from algobattle.team import Team
+from algobattle.team import Team, BattleMatchups
 from algobattle.problem import Problem
 from algobattle.docker import DockerError
 from algobattle.ui import Ui

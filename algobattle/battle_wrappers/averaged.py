@@ -7,9 +7,8 @@ import logging
 from collections import defaultdict
 
 import algobattle.battle_wrapper
-from algobattle.matchups import Matchup
 from algobattle.problem import Problem
-from algobattle.team import Team
+from algobattle.team import Team, Matchup
 from algobattle.util import format_table
 from typing import TYPE_CHECKING, Any, Generator
 

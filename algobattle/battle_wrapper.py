@@ -11,9 +11,8 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Generator, Type, TypeVar
 from inspect import isabstract
 
-from algobattle.matchups import BattleMatchups, Matchup
 from algobattle.problem import Problem
-from algobattle.team import Team
+from algobattle.team import Team, BattleMatchups, Matchup
 from algobattle.docker import DockerError
 if TYPE_CHECKING:
     from algobattle.match import RunParameters
