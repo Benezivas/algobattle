@@ -13,6 +13,7 @@ from algobattle.team import Team
 from algobattle.problem import Problem
 from algobattle.docker import DockerError
 from algobattle.ui import Ui
+from algobattle.docker import measure_runtime_overhead
 
 #! Don't remove, even when not accessed
 import algobattle.battle_wrappers   # type: ignore
@@ -47,12 +48,18 @@ class Match:
     """Match class, provides functionality for setting up and executing battles between given teams."""
 
     def __init__(self, problem: Problem, config_path: Path, team_info: list[tuple[str, Path, Path]], ui: Ui | None = None,
-                 runtime_overhead: float = 0, cache_docker_containers: bool = True) -> None:
+                 calculate_runtime_overhead: bool = False, cache_docker_containers: bool = True) -> None:
 
         config = configparser.ConfigParser()
         logger.debug(f'Using additional configuration options from file "{config_path}".')
         config.read(config_path)
 
+        runtime_overhead = 0
+        if not calculate_runtime_overhead:
+            logger.info('Running a benchmark to determine your machines I/O overhead to start and stop docker containers...')
+            runtime_overhead = measure_runtime_overhead()
+            logger.info(f'Maximal measured runtime overhead is at {runtime_overhead} seconds. Adding this amount to the configured runtime.')
+        
         self.run_parameters = RunParameters(config["run_parameters"], runtime_overhead)
         self.problem = problem
         self.config = config
