@@ -73,10 +73,7 @@ def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
 def resolved_path(path: str) -> Path:
     return Path(path).resolve()
 
-def extend_default_path(path: str, problem_path: Path) -> Path:
-    return resolved_path(path.format(problem_path=problem_path))
-
-if __name__ == "__main__":
+def create_parser() -> ArgumentParser:
     default_logging_path = Path.home() / ".algobattle_logs"
     default_config = Path(algobattle.__file__).resolve().parent / "config" / "config.ini"
 
@@ -101,13 +98,11 @@ if __name__ == "__main__":
         battle_parser = subparsers.add_parser(name, parents=[parent_parser])
         for args, kwargs in cls.battle_args:
             battle_parser.add_argument(*args, **kwargs)
-
-    options = parser.parse_args()
-
-    if not options.problem_path.exists():
-        sys.exit(f"Problem path '{options.problem_path}' does not exist in the file system! Use 'battle --help' for more information on usage and options.")
     
-    if options.teams is None:
+    return parser
+
+def parse_team_info(teams: list[str]) -> list[tuple[str, Path, Path]]:
+    if teams is None:
         team_paths = [options.problem_path]
     else:
         team_paths = [resolved_path(p) for p in options.teams]
@@ -129,11 +124,20 @@ if __name__ == "__main__":
         for role, path in [("generator", gen_path), ("solver", sol_path)]:
             if not path.exists:
                 sys.exit(f"The {role} path {gen_path} used by team '{name}' does not exist in the file system! Use 'battle --help' for more information on usage and options.")
-            
-    if not options.config.exists():
-        sys.exit(f"Config path '{options.config}'' does not exist in the file system! Use 'battle --help' for more information on usage and options.")
+    
+    return team_info
+
+if __name__ == "__main__":
+    
+    options = create_parser().parse_args()
 
     logger = setup_logging(options.folder_name, options.verbose_logging, options.display != "logs")
+
+    if not options.problem_path.exists():
+        sys.exit(f"Problem path '{options.problem_path}' does not exist in the file system! Use 'battle --help' for more information on usage and options.")
+          
+    if not options.config.exists():
+        sys.exit(f"Config path '{options.config}'' does not exist in the file system! Use 'battle --help' for more information on usage and options.")
 
     problem = import_problem_from_path(options.problem_path)
     if not problem:
@@ -147,6 +151,8 @@ if __name__ == "__main__":
         ui.update("Setting up match...")
     else:
         ui = None
+
+    team_info = parse_team_info(options.teams)
 
     runtime_overhead = 0
     if not options.no_overhead_calculation:
