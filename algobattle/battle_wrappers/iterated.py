@@ -53,13 +53,6 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
         self.approx_ratio = approximation_ratio
         
         super().__init__(problem, run_parameters, **options)
- 
-    @classmethod
-    def check_compatibility(cls, problem: Problem, options: dict[str, Any]) -> bool:
-        if options["approximation_ratio"] != 1.0 and not problem.approximable:
-            logger.error('The given problem is not approximable and can only be run with an approximation ratio of 1.0!')
-            return False
-        return super().check_compatibility(problem, **options)
     
     def wrapper(self, matchup: Matchup) -> Generator[Iterated.Result, None, None]:
         """Execute one iterative battle between a generating and a solving team.
