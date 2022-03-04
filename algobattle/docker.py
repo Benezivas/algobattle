@@ -162,7 +162,7 @@ class Image:
         elapsed_time = round(default_timer() - start_time, 2)
         logger.debug(f'Approximate elapsed runtime: {elapsed_time}/{timeout} seconds.')
 
-        return result.stdout
+        return result.stdout    # typing : ignore
     
     def remove(self) -> None:
         """Removes the image from the docker daemon.
