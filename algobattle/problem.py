@@ -1,9 +1,9 @@
 """Abstract base class for problem classes used in concrete problem implementations."""
 from __future__ import annotations, generators
-from dataclasses import dataclass
 from enum import Enum
 import logging
-from typing import Callable, Generic, TypeVar
+from abc import abstractmethod
+from typing import Generic, TypeVar, Protocol
 
 logger = logging.getLogger("algobattle.problem")
 
@@ -14,8 +14,7 @@ class ApproxType(Enum):
 
 Instance = TypeVar("Instance")
 Solution = TypeVar("Solution")
-@dataclass
-class Problem(Generic[Instance, Solution]):
+class Problem(Protocol, Generic[Instance, Solution]):
     """Problem Class, bundling together the verifier and parser of a problem.
     Enforces the attributes needed for the battle algorithm to work with the problem.
     """
@@ -26,141 +25,172 @@ class Problem(Generic[Instance, Solution]):
     """Minimum instance size."""
     approx_type: ApproxType
     """Wether the goal is to minimize or maximize the weight of the solution."""
-    generator_memory_scaler: Callable[[int, int], int]
-    """Scales the amount of memory the generator will be given.
-    
-    Parameters
-    ----------
-    memory: int
-        The amount of unscaled memory.
-    size: int
-        The size of the instance.
-    
-    Returns
-    -------
-    int
-        The scaled memory
-    """
-    solver_memory_scaler: Callable[[int, int], int]
-    """Scales the amount of memory the solver will be given.
-    
-    Parameters
-    ----------
-    memory: int
-        The amount of unscaled memory.
-    size: int
-        The size of the instance.
-    
-    Returns
-    -------
-    int
-        The scaled memory
-    """
-    
-    split_into_instance_and_solution: Callable[[str], tuple[str, str]]
-    """Split an input into instance and solution, discard anything else.
-
-    Parameters
-    ----------
-    input : str
-        The raw input.
-
-    Returns
-    -------
-    str, str
-        Returns a tuple containing the instance and the solution.
-        The lines may still be syntactially and semantically incorrect.
-    """
-    parse_instance: Callable[[str, int], Instance]
-    """Parses an instance removing syntactically wrong elements and checking its semantic correctness.
-
-    Parameters
-    ----------
-    instance : str
-        The raw instance.
-    instance_size : int
-        The size of the instance.
-
-    Returns
-    -------
-    Instance
-        Returns the parsed instance.
-    
-    Raises
-    ------
-    ValueError
-        If the input does not encode a valid instance.
-    """
-    parse_solution: Callable[[str, int], Solution]
-    """Parses a solution removing syntactically wrong elements and checking its semantic correctness.
-
-    Parameters
-    ----------
-    solution : str
-        The raw solution.
-    instance_size : int
-        The size of the instance.
-
-    Returns
-    -------
-    Solution
-        Returns the parsed solution.
-    
-    Raises
-    ------
-    ValueError
-        If the input does not encode a valid solution.
-    """
-    encode_instance: Callable[[Instance], str]
-    """Encodes an instance back into a string. Inverse of parse_instance.
-    
-    Parameters
-    ----------
-    instance: Instance
-        The instance to be encoded.
-    
-    Returns
-    -------
-    str
-        The encoded instance.
-    """
-    verify_solution: Callable[[Instance, int, Solution], bool]
-    """Check the validity of a solution against an instance.
-
-    Parameters
-    ----------
-    instance : Instance
-        The instance.
-    solution : Solution
-        The solution.
-    instance_size : int
-        The maximum instance size.
-    
-    Returns
-    -------
-    bool
-        Whether the solution is valid for the given instance.
-    """
-    solution_weight: Callable[[Instance, int, Solution], float]
-    """Calculates the weight of the given Solution.
-    Typically this is it's size or the sum of its elements or similar.
-    
-    Parameters
-    ----------
-    instance: Instance
-        The instance corresponding to the solution.
-    size: int
-        The size of the instance.
-    solution: Solution
-        The solution to calculate a weight of.
-    
-    Returns
-    -------
-    float
-        The weight of the solution.
-    """
     approx_cap: float = 5
     """The worst case cap for the approximation ratio. Only relevant to prevent outliers skewing any further calculations."""
+
+    @staticmethod
+    @abstractmethod
+    def generator_memory_scaler(memory: int, size: int) -> int:
+        """Scales the amount of memory the generator will be given.
+        
+        Parameters
+        ----------
+        memory: int
+            The amount of unscaled memory.
+        size: int
+            The size of the instance.
+        
+        Returns
+        -------
+        int
+            The scaled memory
+        """
+        raise NotImplementedError
+
+    @staticmethod
+    @abstractmethod
+    def solver_memory_scaler(memory: int, size: int) -> int:
+        """Scales the amount of memory the solver will be given.
+        
+        Parameters
+        ----------
+        memory: int
+            The amount of unscaled memory.
+        size: int
+            The size of the instance.
+        
+        Returns
+        -------
+        int
+            The scaled memory
+        """
+        raise NotImplementedError
+    
+    @staticmethod
+    @abstractmethod
+    def split(input: str) -> tuple[list[str], list[str]]:
+        """Split an input into instance and solution split into lines, discard anything else.
+
+        Parameters
+        ----------
+        input : str
+            The raw input.
+
+        Returns
+        -------
+        list[str], list[str]
+            Returns the instance and the solution split into lines.
+            The lines may still be syntactially and semantically incorrect.
+        """
+        raise NotImplementedError
+
+    @staticmethod
+    @abstractmethod
+    def parse_instance(instance: list[str], size: int) -> Instance:
+        """Parses an instance removing syntactically wrong elements and checking its semantic correctness.
+
+        Parameters
+        ----------
+        instance : list[str]
+            The raw instance.
+        size : int
+            The size of the instance.
+
+        Returns
+        -------
+        Instance
+            Returns the parsed instance.
+        
+        Raises
+        ------
+        ValueError
+            If the input does not encode a valid instance.
+        """
+        raise NotImplementedError
+    
+    @staticmethod
+    @abstractmethod
+    def parse_solution(solution: list[str], size: int) -> Solution:
+        """Parses a solution removing syntactically wrong elements and checking its semantic correctness.
+
+        Parameters
+        ----------
+        solution : str
+            The raw solution.
+        size : int
+            The size of the instance.
+
+        Returns
+        -------
+        Solution
+            Returns the parsed solution.
+        
+        Raises
+        ------
+        ValueError
+            If the input does not encode a valid solution.
+        """
+        raise NotImplementedError
+    
+    @staticmethod
+    @abstractmethod
+    def encode_instance(instance: Instance) -> str:
+        """Encodes an instance back into a string. Practically inverse of parse_instance.
+        
+        Parameters
+        ----------
+        instance: Instance
+            The instance to be encoded.
+        
+        Returns
+        -------
+        str
+            The encoded instance.
+        """
+        raise NotImplementedError
+    
+    @staticmethod
+    @abstractmethod
+    def verify_solution(instance: Instance, size: int, solution: Solution) -> bool:
+        """Check the validity of a solution against an instance.
+
+        Parameters
+        ----------
+        instance : Instance
+            The instance.
+        size : int
+            The maximum instance size.
+        solution : Solution
+            The solution.
+        
+        Returns
+        -------
+        bool
+            Whether the solution is valid for the given instance.
+        """
+        raise NotImplementedError
+    
+    @staticmethod
+    @abstractmethod
+    def solution_weight(instance: Instance, size: int, solutoion: Solution) -> float:
+        """Calculates the weight of the given Solution.
+        Typically this is it's size or the sum of its elements or similar.
+        
+        Parameters
+        ----------
+        instance: Instance
+            The instance corresponding to the solution.
+        size: int
+            The size of the instance.
+        solution: Solution
+            The solution to calculate a weight of.
+        
+        Returns
+        -------
+        float
+            The weight of the solution.
+        """
+        raise NotImplementedError
 
     def approximation_ratio(self, instance: Instance, size: int, generator: Solution, solver: Solution) -> float:
         """Calculates the approximation ratio of the solver's solution.
