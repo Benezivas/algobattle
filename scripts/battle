@@ -19,7 +19,7 @@ from algobattle.battle_wrapper import BattleWrapper
 
 #! do not remove, even when unused!
 import algobattle.sighandler
-import algobattle.battle_wrappers   # type: ignore
+import algobattle.battle_wrappers
 
 def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
     """Creates and returns a parent logger.
