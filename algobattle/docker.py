@@ -257,5 +257,5 @@ def measure_runtime_overhead() -> float:
             overheads.append(default_timer() - start_time)
         except DockerError:
             overheads.append(300)
-    
+    image.remove()
     return round(max(overheads), 2)
