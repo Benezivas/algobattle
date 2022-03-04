@@ -3,7 +3,7 @@ from __future__ import annotations, generators
 from enum import Enum
 import logging
 from abc import abstractmethod
-from typing import Generic, TypeVar, Protocol
+from typing import Generic, Sized, TypeVar, Protocol
 
 logger = logging.getLogger("algobattle.problem")
 
@@ -170,8 +170,7 @@ class Problem(Protocol, Generic[Instance, Solution]):
         raise NotImplementedError
     
     @staticmethod
-    @abstractmethod
-    def solution_weight(instance: Instance, size: int, solutoion: Solution) -> float:
+    def solution_weight(instance: Instance, size: int, solution: Solution) -> float:
         """Calculates the weight of the given Solution.
         Typically this is it's size or the sum of its elements or similar.
         
@@ -189,7 +188,10 @@ class Problem(Protocol, Generic[Instance, Solution]):
         float
             The weight of the solution.
         """
-        raise NotImplementedError
+        if isinstance(solution, Sized):
+            return len(solution)
+        else:
+            return 1
 
     def approximation_ratio(self, instance: Instance, size: int, generator: Solution, solver: Solution) -> float:
         """Calculates the approximation ratio of the solver's solution.
