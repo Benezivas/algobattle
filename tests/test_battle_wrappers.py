@@ -10,7 +10,7 @@ from algobattle.team import Team, BattleMatchups, Matchup
 logging.disable(logging.CRITICAL)
 
 
-@dataclass
+@dataclass(frozen=True)
 class TestTeam(Team):
     """Team class that doesn't build containers to make tests that don't need them run faster."""
     name: str
