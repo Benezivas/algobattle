@@ -99,15 +99,15 @@ class BattleWrapper(ABC, Generic[Instance, Solution]):
             the generator (1 if optimal, 0 if failed, >=1 if the
             generator solution is optimal).
         """
-        instance, generator_solution = self._run_generator(matchup.generator, instance_size)
+        try:
+            instance, generator_solution = self._run_generator(matchup.generator, instance_size)
+        except ValueError:
+            return self.problem.approx_cap
 
-        if not instance and not generator_solution:
-            return 1.0
-
-        solver_solution = self._run_solver(matchup.solver, instance_size, instance)
-
-        if not solver_solution:
-            return 0.0
+        try:
+            solver_solution = self._run_solver(matchup.solver, instance_size, instance)
+        except ValueError:
+            return 0
 
         approximation_ratio = self.problem.approximation_ratio(instance, instance_size, generator_solution, solver_solution)
         logger.info(f'Solver of group {matchup.solver} yields a valid solution with an approx. ratio of {approximation_ratio}.')
