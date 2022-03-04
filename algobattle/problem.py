@@ -29,7 +29,6 @@ class Problem(Protocol, Generic[Instance, Solution]):
     """The worst case cap for the approximation ratio. Only relevant to prevent outliers skewing any further calculations."""
 
     @staticmethod
-    @abstractmethod
     def generator_memory_scaler(memory: int, size: int) -> int:
         """Scales the amount of memory the generator will be given.
         
@@ -45,10 +44,9 @@ class Problem(Protocol, Generic[Instance, Solution]):
         int
             The scaled memory
         """
-        raise NotImplementedError
+        return memory
 
     @staticmethod
-    @abstractmethod
     def solver_memory_scaler(memory: int, size: int) -> int:
         """Scales the amount of memory the solver will be given.
         
@@ -64,7 +62,7 @@ class Problem(Protocol, Generic[Instance, Solution]):
         int
             The scaled memory
         """
-        raise NotImplementedError
+        return memory
     
     @staticmethod
     @abstractmethod
