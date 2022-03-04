@@ -8,7 +8,7 @@ their run, such that it contains the current state of the match.
 """
 import logging
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Generator, Type, TypeVar
+from typing import TYPE_CHECKING, Any, Generator, Generic, Type, TypeVar
 from inspect import isabstract
 
 from algobattle.problem import Problem
@@ -19,7 +19,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger('algobattle.battle_wrapper')
 
-class BattleWrapper(ABC):
+Instance = TypeVar("Instance")
+Solution = TypeVar("Solution")
+class BattleWrapper(ABC, Generic[Instance, Solution]):
     """Base class for wrappers that execute a specific kind of battle.
     Its state contains information about the battle and its history."""
 
@@ -31,7 +33,7 @@ class BattleWrapper(ABC):
         if not isabstract(cls):
             BattleWrapper.wrapper_classes[cls.__name__.lower()] = cls
 
-    def __init__(self, problem: Problem, run_parameters: RunParameters | None = None, **options: dict[str, Any]):
+    def __init__(self, problem: Problem[Instance, Solution], run_parameters: RunParameters | None = None, **options: dict[str, Any]):
         """Builds a battle wrapper object with the given option values.
         Logs warnings if there were options provided that this wrapper doesn't use. 
 
@@ -107,12 +109,11 @@ class BattleWrapper(ABC):
         if not solver_solution:
             return 0.0
 
-        approximation_ratio = self.problem.verifier.calculate_approximation_ratio(instance, instance_size,
-                                                                                  generator_solution, solver_solution)
+        approximation_ratio = self.problem.approximation_ratio(instance, instance_size, generator_solution, solver_solution)
         logger.info(f'Solver of group {matchup.solver} yields a valid solution with an approx. ratio of {approximation_ratio}.')
         return approximation_ratio
 
-    def _run_generator(self, team: Team, instance_size: int) -> tuple[Any, Any]:
+    def _run_generator(self, team: Team, instance_size: int) -> tuple[Instance, Solution]:
         """Execute the generator of match.generating_team and check the validity of the generated output.
 
         If the validity checks pass, return the instance and the certificate solution.
@@ -124,90 +125,103 @@ class BattleWrapper(ABC):
 
         Returns
         -------
-        any, any
-            If the validity checks pass, the (instance, solution) in whatever
-            format that is specified, else (None, None).
+        Instance, Solution
+            The generated instance and solution.
+        
+        Raises
+        ------
+        ValueError
+            If no valid instance and solution can be generated.
         """
-        scaled_memory = self.problem.generator_memory_scaler(self.run_parameters.space_generator, instance_size)
+        if self.run_parameters.space_generator is not None:
+            scaled_memory = self.problem.generator_memory_scaler(self.run_parameters.space_generator, instance_size)
+        else:
+            scaled_memory = None
 
-        logger.debug(f'Running generator of group {team}...\n')
+        logger.debug(f'Running generator of group {team}...')
         try:
             output = team.generator.run(str(instance_size), timeout=self.run_parameters.timeout_generator, memory=scaled_memory, cpus=self.run_parameters.cpus)
         except DockerError:
-            return None, None
+            logger.warning(f"generator of team '{team}' didn't run successfully!")
+            raise ValueError
 
         if not output:
             logger.warning(f'No output was generated when running {team.generator}!')
-            return None, None
-
-        raw_instance_with_solution = self.problem.parser.decode(output)
+            raise ValueError
 
         logger.debug('Checking generated instance and certificate...')
-
-        raw_instance, raw_solution = self.problem.parser.split_into_instance_and_solution(raw_instance_with_solution)
-        instance                   = self.problem.parser.parse_instance(raw_instance, instance_size)
-        generator_solution         = self.problem.parser.parse_solution(raw_solution, instance_size)
-
-        if not self.problem.verifier.verify_semantics_of_instance(instance, instance_size):
+        try:
+            raw_instance, raw_solution = self.problem.split(output)
+        except ValueError:
             logger.warning(f'Generator {team} created a malformed instance!')
-            return None, None
-
-        if not self.problem.verifier.verify_semantics_of_solution(generator_solution, instance_size, True):
+            raise
+        try:
+            instance = self.problem.parse_instance(raw_instance, instance_size)
+        except ValueError:
             logger.warning(f'Generator {team} created a malformed solution at instance size!')
-            return None, None
-
-        if not self.problem.verifier.verify_solution_against_instance(instance, generator_solution, instance_size, True):
+            raise
+        try:
+            solution = self.problem.parse_solution(raw_solution, instance_size)
+        except ValueError:
             logger.warning(f'Generator {team} failed due to a wrong certificate for its generated instance!')
-            return None, None
-
-        self.problem.parser.postprocess_instance(instance, instance_size)
-
+            raise
         logger.info(f'Generated instance and certificate by group {team} are valid!\n')
 
-        return instance, generator_solution
+        return instance, solution
 
-    def _run_solver(self, team: Team, instance_size: int, instance: Any) -> Any:
+    def _run_solver(self, team: Team, instance_size: int, instance: Instance) -> Solution:
         """Execute the solver of match.solving_team and check the validity of the generated output.
 
         If the validity checks pass, return the solver solution.
 
         Parameters
         ----------
+        team : Team
+            Solving team.
         instance_size : int
             The instance size, expected to be a positive int.
+        instance : Instance
+            The generated instance.
 
         Returns
         -------
-        any
-            If the validity checks pass, solution in whatever
-            format that is specified, else None.
+        Solution
+            The solver's solution.
+        
+        Raises
+        ------
+        ValueError
+            If no solution can be generated
         """
-        scaled_memory = self.problem.solver_memory_scaler(self.run_parameters.space_solver, instance_size)
-        instance_str = self.problem.parser.encode(instance)
+        if self.run_parameters.space_solver is not None:
+            scaled_memory = self.problem.solver_memory_scaler(self.run_parameters.space_solver, instance_size)
+        else:
+            scaled_memory = None
+        instance_str = self.problem.encode_instance(instance)
 
-        logger.debug(f'Running solver of group {team}...\n')
+        logger.debug(f'Running solver of group {team}...')
         try:
             output = team.solver.run(instance_str, timeout=self.run_parameters.timeout_solver, memory=scaled_memory, cpus=self.run_parameters.cpus)
         except DockerError:
-            return None
+            logger.warning(f"Solver of team '{team}' didn't run successfully!")
+            raise ValueError
         
         if not output:
             logger.warning(f'No output was generated when running the solver of group {team}!')
-            return None
-
-        raw_solver_solution = self.problem.parser.decode(output)
+            raise ValueError
 
         logger.debug('Checking validity of the solvers solution...')
-
-        solver_solution = self.problem.parser.parse_solution(raw_solver_solution, instance_size)
-        if not self.problem.verifier.verify_semantics_of_solution(solver_solution, instance_size, True):
+        try:
+            solution = self.problem.parse_solution(output.splitlines(), instance_size)
+        except ValueError:
             logger.warning(f'Solver of group {team} created a malformed solution at instance size {instance_size}!')
-            return None
-        elif not self.problem.verifier.verify_solution_against_instance(instance, solver_solution, instance_size, False):
-            logger.warning(f'Solver of group {team} yields a wrong solution at instance size {instance_size}!')
-            return None
+            raise
 
-        return solver_solution
+        if not self.problem.verify_solution(instance, instance_size, solution):
+            logger.warning(f'Solver of group {team} yields a wrong solution at instance size {instance_size}!')
+            raise ValueError
+
+        return solution
 
     class Result:
         pass
