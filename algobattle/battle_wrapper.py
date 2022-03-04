@@ -150,23 +150,24 @@ class BattleWrapper(ABC, Generic[Instance, Solution]):
             raise ValueError
 
         logger.debug('Checking generated instance and certificate...')
-        try:
-            raw_instance, raw_solution = self.problem.split(output)
-        except ValueError:
-            logger.warning(f'Generator {team} created a malformed instance!')
-            raise
+        raw_instance, raw_solution = self.problem.split(output)
         try:
             instance = self.problem.parse_instance(raw_instance, instance_size)
         except ValueError:
-            logger.warning(f'Generator {team} created a malformed solution at instance size!')
+            logger.warning(f'Generator {team} created a malformed instance!')
             raise
+        
         try:
             solution = self.problem.parse_solution(raw_solution, instance_size)
         except ValueError:
-            logger.warning(f'Generator {team} failed due to a wrong certificate for its generated instance!')
+            logger.warning(f'Generator {team} created a malformed solution at instance size!')
             raise
-        logger.info(f'Generated instance and certificate by group {team} are valid!\n')
 
+        if not self.problem.verify_solution(instance, instance_size, solution):
+            logger.warning(f'Generator {team} failed due to a wrong certificate for its generated instance!')
+            raise ValueError
+
+        logger.info(f'Generated instance and certificate by group {team} are valid!\n')
         return instance, solution
 
     def _run_solver(self, team: Team, instance_size: int, instance: Instance) -> Solution:
