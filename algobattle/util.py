@@ -1,5 +1,6 @@
 """Collection of utility functions."""
 from __future__ import annotations
+from genericpath import exists
 import logging
 import importlib.util
 from pathlib import Path
@@ -12,7 +13,7 @@ from algobattle.problem import Problem
 logger = logging.getLogger('algobattle.util')
 
 
-def import_problem_from_path(problem_path: Path) -> Problem | None:
+def import_problem_from_path(problem_path: Path) -> Problem:
     """Try to import and initialize a Problem object from a given path.
 
     Parameters
@@ -25,6 +26,10 @@ def import_problem_from_path(problem_path: Path) -> Problem | None:
     Problem
         Returns an object of the problem if successful, None otherwise.
     """
+    if not problem_path.exists():
+        logger.warning(f"Problem path '{problem_path}' does not exist in the file system!")
+        raise ValueError
+    
     try:
         spec = importlib.util.spec_from_file_location("problem", problem_path / "__init__.py")
         assert spec is not None
@@ -32,11 +37,11 @@ def import_problem_from_path(problem_path: Path) -> Problem | None:
         Problem = importlib.util.module_from_spec(spec)
         sys.modules[spec.name] = Problem
         spec.loader.exec_module(Problem)
-
         return Problem.Problem()
+
     except Exception as e:
         logger.critical(f'Importing the given problem failed with the following exception: "{e}"')
-        return None
+        raise RuntimeError
 
 def format_table(table: list[list[Any]], column_spacing: dict[int, int] = {}) -> str:
     if len(table) == 0:
