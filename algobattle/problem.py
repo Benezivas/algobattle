@@ -11,6 +11,7 @@ logger = logging.getLogger("algobattle.problem")
 class ApproxType(Enum):
     minimize = 1
     maximize = 2
+    exact = 3
 
 Instance = TypeVar("Instance")
 Solution = TypeVar("Solution")
@@ -220,11 +221,15 @@ class Problem(Protocol, Generic[Instance, Solution]):
                 return min(solver_weight / generator_weight, self.approx_cap)
             else:
                 return self.approx_cap
-        else:
+        elif self.approx_type == ApproxType.minimize:
             if solver_weight != 0:
                 return min(generator_weight / solver_weight, self.approx_cap)
             else:
                 return self.approx_cap
+        elif self.approx_type == ApproxType.exact:
+            return 1
+        else:
+            raise TypeError
 
     def __str__(self) -> str:
         return self.name
