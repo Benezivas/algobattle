@@ -12,7 +12,6 @@ from algobattle.team import Team, BattleMatchups
 from algobattle.problem import Problem
 from algobattle.docker import DockerError
 from algobattle.ui import Ui
-from algobattle.docker import measure_runtime_overhead
 
 
 logger = logging.getLogger('algobattle.match')
@@ -60,7 +59,7 @@ class Match:
                 logger.error(f"Removing team {info[0]} as their containers did not build successfully.")
             except ValueError as e:
                 logger.error(f"Team name '{info[0]}' is used twice!")
-                raise TypeError from e
+                raise ValueError from e
         if len(self.teams) == 0:
             logger.critical("None of the team's containers built successfully.")
             raise BuildError()

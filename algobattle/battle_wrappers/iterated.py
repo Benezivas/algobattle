@@ -5,7 +5,6 @@ from collections import defaultdict
 from dataclasses import dataclass
 import itertools
 import logging
-from typing import Any
 
 import algobattle.battle_wrapper
 from algobattle.problem import Problem
