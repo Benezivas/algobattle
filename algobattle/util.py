@@ -1,6 +1,5 @@
 """Collection of utility functions."""
 from __future__ import annotations
-from genericpath import exists
 import logging
 import importlib.util
 from pathlib import Path

@@ -162,7 +162,7 @@ if __name__ == "__main__":
         logger.info(f'Maximal measured runtime overhead is at {runtime_overhead} seconds. Adding this amount to the configured runtime.')
 
     team_info = parse_team_info(options.teams)
-    match = Match(problem, options.config, team_info, ui, runtime_overhead)
+    match = Match(problem, config, team_info, ui, runtime_overhead)
 
 
     results = match.run(**vars(options))

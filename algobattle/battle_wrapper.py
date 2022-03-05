@@ -167,7 +167,7 @@ class BattleWrapper(ABC, Generic[Instance, Solution]):
             logger.warning(f'Generator {team} failed due to a wrong certificate for its generated instance!')
             raise ValueError
 
-        logger.info(f'Generated instance and certificate by group {team} are valid!\n')
+        logger.info(f'Generated instance and certificate by group {team} are valid!')
         return instance, solution
 
     def _run_solver(self, team: Team, instance_size: int, instance: Instance) -> Solution:

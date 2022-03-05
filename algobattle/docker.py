@@ -128,7 +128,6 @@ class Image:
         cmd.append(self.id)
 
         result = None
-        logger.debug(f"Running {self.description}.")
         _running_containers.add((self, name))
         try:
             result = run(cmd, input=input, capture_output=True, timeout=timeout, check=True, text=True)
@@ -162,7 +161,7 @@ class Image:
         elapsed_time = round(default_timer() - start_time, 2)
         logger.debug(f'Approximate elapsed runtime: {elapsed_time}/{timeout} seconds.')
 
-        return result.stdout    # typing : ignore
+        return result.stdout    # type: ignore
     
     def remove(self) -> None:
         """Removes the image from the docker daemon.
