@@ -77,7 +77,7 @@ def create_parser() -> ArgumentParser:
     default_config = Path(algobattle.__file__).resolve().parent / "config" / "config.ini"
 
     parent_parser = ArgumentParser(add_help=False)
-    parent_parser.add_argument("--teams", "-t", action="extend", nargs="*", help="Any number of paths that specify teams. Either by the found folder structure or a team.ini file found there. Defaults to the problem path.")
+    parent_parser.add_argument("--teams", "-t", action="extend", type=resolved_path, nargs="*", help="Any number of paths that specify teams. Either by the found folder structure or a team.ini file found there. Defaults to the problem path.")
     parent_parser.add_argument("--version", action="version", version=f"Algobattle version {algobattle.__version__}")
     parent_parser.add_argument("--verbose", dest="verbose_logging", action="store_true", help="Log all debug messages.")
     parent_parser.add_argument("--display", "-d", choices=["silent", "ui", "logs"], default="logs", help="Choose display mode, silent will hide all output, logs will pipe the logs to stderr, and ui will display a small terminal ui. Default: logs")
@@ -101,14 +101,9 @@ def create_parser() -> ArgumentParser:
     
     return parser
 
-def parse_team_info(teams: list[str]) -> list[tuple[str, Path, Path]]:
-    if teams is None:
-        team_paths = [options.problem_path]
-    else:
-        team_paths = [resolved_path(p) for p in options.teams]
-
+def parse_team_info(teams: list[Path]) -> list[tuple[str, Path, Path]]:
     team_info: list[tuple[str, Path, Path]] = []
-    for path in team_paths:
+    for path in teams:
         if (path / "team.ini").exists():
             config = ConfigParser(converters={"path": resolved_path})
             config.read(path / "team.ini")
@@ -161,6 +156,8 @@ if __name__ == "__main__":
         runtime_overhead = measure_runtime_overhead()
         logger.info(f'Maximal measured runtime overhead is at {runtime_overhead} seconds. Adding this amount to the configured runtime.')
 
+    if len(options.teams) == 0:
+        options.teams.append(options.problem_path)
     team_info = parse_team_info(options.teams)
     match = Match(problem, config, team_info, ui, runtime_overhead)
 
