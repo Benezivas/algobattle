@@ -21,26 +21,22 @@ logger = logging.getLogger('algobattle.battle_wrappers.averaged')
 class Averaged(algobattle.battle_wrapper.BattleWrapper):
     """Class of an adveraged battle Wrapper."""
 
-    battle_args = [([
-            "--inst_size",
-        ], {
-            "dest": "instance_size",
-            "type": int,
-            "default": 10,
-            "help": "The instance size on which the averaged run is to be made. Default: 10",
-        }), ([
-            "--iterations",
-        ], {
-            "dest": "iterations",
-            "type": int,
-            "default": 25,
-            "help": "The number of iterations that are to be averaged. Default: 25",
-        }),
-    ]
-
     def __init__(self, problem: Problem, run_parameters: RunParameters | None = None,
                 instance_size: int = 10, iterations: int = 25,
                 **options: Any) -> None:
+        """Create a wrapper for an averaged battle.
+
+        Parameters
+        ----------
+        problem : Problem
+            The problem that the teams will have to solve.
+        run_parameters : RunParameters | None
+            Parameters for the runs.
+        instance_size : int
+            The instance size on which the averaged run is to be made.
+        iterations : int
+            The number of iterations that are to be averaged.
+        """
         self.instance_size = instance_size
         self.iterations = iterations
 
