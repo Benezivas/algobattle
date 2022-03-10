@@ -39,9 +39,9 @@ def import_problem_from_path(path: Path) -> Problem:
         raise ValueError
     
     if path.is_dir:
-        if (path / "__init__.py").is_file:
+        if (path / "__init__.py").is_file():
             path /= "__init__.py"
-        elif (path / "problem.py").is_file:
+        elif (path / "problem.py").is_file():
             path /= "problem.py"
         else:
             logger.warning(f"Problem path '{path}' points to a directory that doesn't contain a Problem.")
