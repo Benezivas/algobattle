@@ -94,3 +94,39 @@ def format_table(table: list[list[Any]], column_spacing: dict[int, int] = {}) ->
     res = top + middle.join(content_fmt.format(*row) for row in table) + bottom
 
     return res
+
+# this should probably be done with a library
+# (well really this should probably not be done at all but its cute)
+def parse_doc_for_param(doc: str, name: str) -> str:
+    """Parses a docstring to find the documentation of a single parameter.
+    
+    Parameters
+    ----------
+    doc : str
+        The docstring that will be parsed.
+    name
+        The name of the parameter.
+    
+    Returns
+    -------
+    str
+        The documentation of that parameter.
+    
+    Raises
+    ------
+    ValueError
+        If the parameter doesn't exist.
+    """
+    lines = doc.split("\n")
+    try:
+        start = next(i for i, line in enumerate(lines) if line.find(name) == 0)
+    except StopIteration:
+        raise ValueError
+
+    param_doc = []
+    for line in lines[start+1:]:
+        if not line.startswith(" "):
+            break
+        param_doc.append(line.strip())
+    
+    return " ".join(param_doc)

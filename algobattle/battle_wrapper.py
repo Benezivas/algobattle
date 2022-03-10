@@ -1,4 +1,3 @@
-from __future__ import annotations
 """Base class for wrappers that execute a specific kind of battle.
 
 The battle wrapper class is a base class for specific wrappers, which are
@@ -6,14 +5,16 @@ responsible for executing specific types of battle. They share the
 characteristic that they are responsible for updating some match data during
 their run, such that it contains the current state of the match.
 """
+from __future__ import annotations 
 import logging
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Generator, Generic, Type, TypeVar
-from inspect import isabstract
+from inspect import isabstract, signature, getdoc
 
 from algobattle.problem import Problem
 from algobattle.team import Team, BattleMatchups, Matchup
 from algobattle.docker import DockerError
+from algobattle.util import parse_doc_for_param
 if TYPE_CHECKING:
     from algobattle.match import RunParameters
 
@@ -24,8 +25,6 @@ Solution = TypeVar("Solution")
 class BattleWrapper(ABC, Generic[Instance, Solution]):
     """Base class for wrappers that execute a specific kind of battle.
     Its state contains information about the battle and its history."""
-
-    battle_args: list[tuple[list[str], dict[str, Any]]] = []
     
     wrapper_classes: dict[str, Type[BattleWrapper]] = {}
     def __init_subclass__(cls, **kwargs):
@@ -62,6 +61,45 @@ class BattleWrapper(ABC, Generic[Instance, Solution]):
         else:
             logger.error(f'Unrecognized battle_type given: "{battle_type}"')
             raise ValueError
+        
+    @classmethod
+    def get_cli_parameters(cls) -> list[tuple[list[str], dict[str, Any]]]:
+        """Gets the info needed to make a cli interface for a battle wrapper.
+        The argparse type argument will only be set if the type is available in the builtin or global namespace.
+
+        Returns
+        -------
+        list[tuple[list[str], dict[str, Any]]]
+            A list of (*args, **kwargs) for each parameter that can be passed to argparse.
+        """
+        base_params = [param for param in signature(BattleWrapper).parameters]
+        out = []
+        doc = getdoc(cls.__init__)
+        for param in signature(cls).parameters.values():
+            if param.kind != param.VAR_POSITIONAL and param.kind != param.VAR_KEYWORD and param.name not in base_params:
+                args = [f"--{param.name}"]
+                kwargs = {}
+
+                if param.annotation != param.empty:
+                    if param.annotation in globals():
+                        kwargs["type"] = globals()[param.annotation]
+                    elif param.annotation in __builtins__:
+                        kwargs["type"] = __builtins__[param.annotation]
+                
+                if param.default != param.empty:
+                    kwargs["default"] = param.default
+                    help_default = f" Default: {param.default}"
+                else:
+                    help_default = ""
+                
+                if doc is not None:
+                    try:
+                        kwargs["help"] = parse_doc_for_param(doc, param.name) + help_default
+                    except ValueError:
+                        pass
+
+                out.append((args, kwargs))
+        return out
 
     @classmethod
     def check_compatibility(cls, problem: Problem, options: dict[str, Any]) -> bool:

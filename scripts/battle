@@ -96,7 +96,7 @@ def create_parser() -> ArgumentParser:
     subparsers = parser.add_subparsers(help="Type of battle to run.", dest="battle_type", required=True)
     for name, cls in BattleWrapper.wrapper_classes.items():
         battle_parser = subparsers.add_parser(name, parents=[parent_parser])
-        for args, kwargs in cls.battle_args:
+        for args, kwargs in cls.get_cli_parameters():
             battle_parser.add_argument(*args, **kwargs)
     
     return parser
