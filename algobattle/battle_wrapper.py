@@ -26,11 +26,11 @@ class BattleWrapper(ABC, Generic[Instance, Solution]):
     """Base class for wrappers that execute a specific kind of battle.
     Its state contains information about the battle and its history."""
     
-    wrapper_classes: dict[str, Type[BattleWrapper]] = {}
+    _battle_wrappers: dict[str, Type[BattleWrapper]] = {}
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         if not isabstract(cls):
-            BattleWrapper.wrapper_classes[cls.__name__.lower()] = cls
+            BattleWrapper._battle_wrappers[cls.__name__.lower()] = cls
 
     def __init__(self, problem: Problem[Instance, Solution], run_parameters: RunParameters | None = None, **options: dict[str, Any]):
         """Builds a battle wrapper object with the given option values.
@@ -54,14 +54,6 @@ class BattleWrapper(ABC, Generic[Instance, Solution]):
             from algobattle.match import RunParameters
             self.run_parameters = RunParameters()
     
-    @staticmethod
-    def getWrapperClass(battle_type: str) -> Type[BattleWrapper]:
-        if battle_type.lower() in BattleWrapper.wrapper_classes.keys():
-            return BattleWrapper.wrapper_classes[battle_type]
-        else:
-            logger.error(f'Unrecognized battle_type given: "{battle_type}"')
-            raise ValueError
-        
     @classmethod
     def get_cli_parameters(cls) -> list[tuple[list[str], dict[str, Any]]]:
         """Gets the info needed to make a cli interface for a battle wrapper.

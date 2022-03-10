@@ -15,11 +15,10 @@ from algobattle.match import Match
 from algobattle.util import import_problem_from_path
 from algobattle.docker import measure_runtime_overhead
 from algobattle.ui import Ui
-from algobattle.battle_wrapper import BattleWrapper
+from algobattle.battle_wrappers import battle_wrappers
 
 #! do not remove, even when unused!
 import algobattle.sighandler
-import algobattle.battle_wrappers
 
 def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
     """Creates and returns a parent logger.
@@ -94,7 +93,7 @@ def create_parser() -> ArgumentParser:
     parent_parser.add_argument("problem_path", type=resolved_path, help="Path to the parent directory of a problem file as argument.")
 
     subparsers = parser.add_subparsers(help="Type of battle to run.", dest="battle_type", required=True)
-    for name, cls in BattleWrapper.wrapper_classes.items():
+    for name, cls in battle_wrappers.items():
         battle_parser = subparsers.add_parser(name, parents=[parent_parser])
         for args, kwargs in cls.get_cli_parameters():
             battle_parser.add_argument(*args, **kwargs)

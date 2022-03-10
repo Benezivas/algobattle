@@ -8,6 +8,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from algobattle.battle_wrapper import BattleWrapper
+from algobattle.battle_wrappers import get_battle_wrapper
 from algobattle.team import Team, BattleMatchups
 from algobattle.problem import Problem
 from algobattle.docker import DockerError
@@ -90,7 +91,7 @@ class Match:
             A wrapper instance containing information about the executed battle.
         """
 
-        WrapperClass = BattleWrapper.getWrapperClass(battle_type)
+        WrapperClass = get_battle_wrapper(battle_type)
         ResultClass = WrapperClass.Result
 
         if not WrapperClass.check_compatibility(self.problem, wrapper_options):
