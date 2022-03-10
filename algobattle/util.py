@@ -65,7 +65,8 @@ def import_problem_from_path(path: Path) -> Problem:
             logger.warning(f"Problem path '{path}' points to a module that doesn't contain a Problem.")
             raise ValueError
         if len(potential_problems) > 1:
-            logger.warning(f"Problem path '{path}' points to a module containing more than one Problem: {potential_problems}")
+            formatted_list = ", ".join(f"'{p.name}'" for p in potential_problems)
+            logger.warning(f"Problem path '{path}' points to a module containing more than one Problem: {formatted_list}")
             raise ValueError
         
         return potential_problems[0]()
