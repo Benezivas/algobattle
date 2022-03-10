@@ -55,25 +55,25 @@ def import_problem_from_path(path: Path) -> Problem:
         sys.modules[spec.name] = problem_module
         spec.loader.exec_module(problem_module)
 
-        potential_problems = []
-        for _, obj in getmembers(problem_module):
-            # issubclass won't work here til 3.11
-            if isclass(obj) and Problem in obj.__bases__:
-                potential_problems.append(obj)
-        
-        if len(potential_problems) == 0:
-            logger.warning(f"Problem path '{path}' points to a module that doesn't contain a Problem.")
-            raise ValueError
-        if len(potential_problems) > 1:
-            formatted_list = ", ".join(f"'{p.name}'" for p in potential_problems)
-            logger.warning(f"Problem path '{path}' points to a module containing more than one Problem: {formatted_list}")
-            raise ValueError
-        
-        return potential_problems[0]()
-
     except Exception as e:
         logger.critical(f'Importing the given problem failed with the following exception: "{e}"')
         raise RuntimeError
+
+    potential_problems = []
+    for _, obj in getmembers(problem_module):
+        # issubclass won't work here til 3.11
+        if isclass(obj) and Problem in obj.__bases__:
+            potential_problems.append(obj)
+    
+    if len(potential_problems) == 0:
+        logger.warning(f"Problem path '{path}' points to a module that doesn't contain a Problem.")
+        raise ValueError
+    if len(potential_problems) > 1:
+        formatted_list = ", ".join(f"'{p.name}'" for p in potential_problems)
+        logger.warning(f"Problem path '{path}' points to a module containing more than one Problem: {formatted_list}")
+        raise ValueError
+    
+    return potential_problems[0]()
 
 def format_table(table: list[list[Any]], column_spacing: dict[int, int] = {}) -> str:
     if len(table) == 0:

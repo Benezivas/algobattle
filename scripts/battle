@@ -143,7 +143,7 @@ if __name__ == "__main__":
     try:
         problem = import_problem_from_path(options.problem_path)
     except ValueError:
-        sys.exit(f"Problem path '{options.problem_path}' does not exist in the file system! Use 'battle --help' for more information on usage and options.")
+        sys.exit(f"Could not import the problem! Check the logs and use 'battle --help' for more information on usage and options.")
 
 
     logger.debug(f"Options for this run: {options}")
