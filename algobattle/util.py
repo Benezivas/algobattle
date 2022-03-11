@@ -7,7 +7,7 @@ import subprocess
 import importlib.util
 import sys
 import collections
-from typing import Callable
+from typing import Callable, Tuple
 
 from algobattle.problem import Problem
 import algobattle
@@ -105,7 +105,7 @@ def measure_runtime_overhead() -> float:
     return max_overhead
 
 
-def run_subprocess(run_command: list, input: bytes, timeout: float, suppress_output: bool = False) -> None:
+def run_subprocess(run_command: list, input: bytes, timeout: float, suppress_output: bool = False) -> Tuple:
     """Run a given command as a subprocess.
 
     Parameters
@@ -121,10 +121,8 @@ def run_subprocess(run_command: list, input: bytes, timeout: float, suppress_out
 
     Returns
     -------
-    any
-        The output that the process returns.
-    float
-        Actual running time of the process.
+    (any, float)
+        The output that the process returns and the actual running time of the process.
     """
     start_time = timeit.default_timer()
     raw_output = None
@@ -143,13 +141,13 @@ def run_subprocess(run_command: list, input: bytes, timeout: float, suppress_out
         except subprocess.TimeoutExpired:
             logger.warning('Time limit exceeded!')
             return None, None
-        except Exception as e:
-            logger.warning('An exception was thrown while running the subprocess:\n{}'.format(e))
-            return None, None
         finally:
             p.kill()
             p.wait()
             sigh._kill_spawned_docker_containers()
+        if p.returncode != 0:
+            logger.warning('The subprocess returned with a nonzero returncode!')
+            return None, None
 
     elapsed_time = round(timeit.default_timer() - start_time, 2)
     logger.debug('Approximate elapsed runtime: {}/{} seconds.'.format(elapsed_time, timeout))
@@ -246,8 +244,6 @@ def build_docker_container(container_path: str, docker_tag: str,
             logger.error('Build process for {} ran into a timeout!'.format(docker_tag))
             build_successful = False
         if process.returncode != 0:
-            process.kill()
-            process.wait()
             logger.error('Build process for {} failed!'.format(docker_tag))
             build_successful = False
 
