@@ -2,6 +2,7 @@
 """Main battle script. Executes all possible types of battles, see battle --help for all options."""
 from __future__ import annotations, generators
 from configparser import ConfigParser
+from random import choices
 import sys
 import os
 import logging
@@ -72,85 +73,54 @@ def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
 def resolved_path(path: str) -> Path:
     return Path(path).resolve()
 
-def split_paths(paths: str) -> list[Path] | Path:
-    out = [Path(p).resolve() for p in paths.strip().split(",") if p.strip() != ""]
-    if len(out) == 1:
-        return out[0]
-    else:
-        return out
-
-def create_parsers() -> dict[str, ArgumentParser]:
+def create_parser() -> ArgumentParser:
     default_logging_path = Path.home() / ".algobattle_logs"
 
-    parent_parser = ArgumentParser(add_help=False)
-    parent_parser.add_argument("--teams", "-t", action="extend", type=split_paths, nargs="*", help="Any number of paths that specify teams. Either by the found folder structure or a team.ini file found there. Defaults to the problem path.")
-    parent_parser.add_argument("--config", "-c", type=resolved_path, help="Path to a .ini configuration file to be used for the run. Defaults to either the 'config.ini' file in the problem folder if it exists or the packages config.ini")
-    parent_parser.add_argument("--logging_folder", "-o", type=resolved_path, default=default_logging_path, help="Specify the folder into which the log file is written to. Can either be a relative or absolute path to folder. If nonexisting, a new folder will be created. Default: ~/.algobattle_logs/")
-
-    parent_parser.add_argument("--version", action="version", version=f"Algobattle version {algobattle.__version__}")
-    parent_parser.add_argument("--verbose", action="store_true", help="Log all debug messages.")
-    parent_parser.add_argument("--display", "-d", choices=["silent", "ui", "logs"], default="logs", help="Choose display mode, silent will hide all output, logs will pipe the logs to stderr, and ui will display a small terminal ui. Default: logs")
-    parent_parser.add_argument("--no_overhead_calculation", action="store_true", help="If set, the program does not benchmark the I/O of the host system to calculate the runtime overhead when started.")
-    parent_parser.add_argument("--no_cleanup", action="store_true", help="Don't clean up any created docker images.")
-    parent_parser.add_argument("--rounds", "-r", type=int, default="5", help="Number of rounds that are to be fought in the battle (points are split between all rounds). Default: 5")
-    parent_parser.add_argument("--points", "-p", type=int, default="100", help="Number of points that are to be fought for. Default: 100")
-    parent_parser.add_argument("--do_not_count_points", action="store_true", help="If set, points are not calculated for the run.")
-    for action in parent_parser._actions:
-        if isinstance(action, _StoreConstAction):
-            action.type = lambda s: s.lower() == "true"
-
-    parser = ArgumentParser(parents=[parent_parser])
+    parser = ArgumentParser(add_help=False)
     parser.add_argument("problem_path", type=resolved_path, help="Path to the parent directory of a problem file as argument.")
+    parser.add_argument("--teams", "-t", action="extend", type=resolved_path, nargs="*", help="Any number of paths that specify teams. Either by the found folder structure or a team.ini file found there. Defaults to the problem path.")
+    parser.add_argument("--config", "-c", type=resolved_path, help="Path to a .ini configuration file to be used for the run. Defaults to either the 'config.ini' file in the problem folder if it exists or the packages config.ini")
+    parser.add_argument("--logging_folder", "-o", type=resolved_path, default=default_logging_path, help="Specify the folder into which the log file is written to. Can either be a relative or absolute path to folder. If nonexisting, a new folder will be created. Default: ~/.algobattle_logs/")
+    parser.add_argument("--version", action="version", version=f"Algobattle version {algobattle.__version__}")
+    parser.add_argument("--verbose", action="store_true", help="Log all debug messages.")
+    parser.add_argument("--display", "-d", choices=["silent", "ui", "logs"], default="logs", help="Choose display mode, silent will hide all output, logs will pipe the logs to stderr, and ui will display a small terminal ui. Default: logs")
+    parser.add_argument("--no_overhead_calculation", action="store_true", help="If set, the program does not benchmark the I/O of the host system to calculate the runtime overhead when started.")
+    parser.add_argument("--no_cleanup", action="store_true", help="Don't clean up any created docker images.")
+    parser.add_argument("--points", "-p", type=int, default="100", help="Number of points that are to be fought for. Default: 100")
+    parser.add_argument("--do_not_count_points", action="store_true", help="If set, points are not calculated for the run.")
 
-    subparsers = parser.add_subparsers(help="Type of battle to run.", dest="battle_type", required=True)
+    battle_args = parser.add_argument_group("battle arguments")
+    battle_args.add_argument("--rounds", "-r", type=int, default="5", help="Number of rounds that are to be fought in the battle (points are split between all rounds). Default: 5")
+    battle_args.add_argument("battle_type", choices=battle_wrappers.items(), nargs="?", help="Type of battle, has to be set in the command line or in config file")
     for name, cls in battle_wrappers.items():
-        battle_parser = subparsers.add_parser(name, parents=[parent_parser])
-        battle_args = battle_parser.add_argument_group(f"{name} battle arguments")
+        cls_args = battle_args.add_argument_group(name)
         for args, kwargs in cls.get_cli_parameters():
-            battle_args.add_argument(*args, **kwargs)
-    return subparsers.choices | {"battle": parser}
+            cls_args.add_argument(*args, **(kwargs | {"default": None}))
+    return parser
 
 def parse_args() -> Namespace:
-    pre_parser = ArgumentParser(add_help=False)
-    pre_parser.add_argument("path", nargs="?")
-    pre_parser.add_argument("type", nargs="?")
-    pre_parser.add_argument("--config", "-c", type=resolved_path)
-    pre_options, _ = pre_parser.parse_known_args()
-
-    argv = sys.argv[:]
-    parsers = create_parsers()
-
-    if pre_options.path is not None:
-        if pre_options.config == None:
-            config_path: Path = resolved_path(pre_options.path)
-        else:
-            config_path: Path = pre_options.config
-        if not config_path.is_file() and (config_path / "config.ini").is_file():
-            config_path /= "config.ini"
-
-        if config_path.is_file():
-            config = ConfigParser()
-            config.read(config_path)
-            for name, section in config.items():
-                if name in parsers:
-                    parsers[name].set_defaults(**section)
-                    if name == "battle" and "battle_type" in section and pre_options.type is None:
-                        argv.insert(argv.index(pre_options.path)+1, section["battle_type"])
-
-    options = parsers["battle"].parse_args(argv[1:])
+    options = create_parser().parse_args()
+    
+    if not options.problem_path.exists():
+        sys.exit(f"Problem path '{options.problem_path}' does not exist in the file system! Use 'battle --help' for more information on usage and options.")
+    
+    working_dir: Path = options.problem_path
+    if working_dir.is_file():
+        working_dir = working_dir.parent
 
     if options.config is None:
-        problem_path: Path = options.problem_path
-        if problem_path.is_file():
-            problem_path = problem_path.parent
-        if (problem_path / "config.ini").is_file():
-            options.config = problem_path / "config.ini"
+        if (working_dir / "config.ini").is_file():
+            options.config = options.problem_path / "config.ini"
         else:
             options.config = Path(algobattle.__file__).resolve().parent / "config" / "config.ini"
+    elif not options.config.exists():
+        sys.exit(f"Config path '{options.config}' does not exist in the file system! Use 'battle --help' for more information on usage and options.")
+    elif options.config.is_folder():
+        options.config /= "config.ini"
     
-    if options.teams is None or len(options.teams) == 0:
-        options.teams = [options.problem_path]
-    
+    if options.teams is None:
+        options.teams = [working_dir]
+
     return options
 
 def parse_team_info(teams: list[Path]) -> list[tuple[str, Path, Path]]:
@@ -179,9 +149,6 @@ if __name__ == "__main__":
     options = parse_args()
 
     logger = setup_logging(options.logging_folder, options.verbose, options.display != "logs")
-          
-    if not options.config.exists():
-        sys.exit(f"Config path '{options.config}'' does not exist in the file system! Use 'battle --help' for more information on usage and options.")
 
     config = ConfigParser()
     logger.debug(f'Using additional configuration options from file "{options.config}".')
