@@ -6,7 +6,7 @@ import sys
 import os
 import logging
 
-from argparse import ArgumentParser, Namespace
+from argparse import ArgumentParser, Namespace, Action, SUPPRESS
 import datetime as dt
 from pathlib import Path
 
@@ -74,13 +74,65 @@ battle_arg_spec = {
 }
 def create_parser() -> ArgumentParser:
 
+    class NestedHelp(Action):
+        def __init__(self,
+                    option_strings,
+                    dest=SUPPRESS,
+                    default=SUPPRESS,
+                    help=None):
+            super().__init__(
+                option_strings=option_strings,
+                dest=dest,
+                default=default,
+                nargs="?",
+                help=help)
+
+        def __call__(self, parser, namespace, values, option_string=None):
+            formatter = parser._get_formatter()
+
+            # usage
+            formatter.add_usage(parser.usage, parser._actions,
+                                parser._mutually_exclusive_groups)
+
+            # description
+            formatter.add_text(parser.description)
+
+            # positionals, optionals and user-defined groups
+            for action_group in parser._action_groups:
+                formatter.start_section(action_group.title)
+                formatter.add_text(action_group.description)
+                formatter.add_arguments(action_group._group_actions)
+                formatter.end_section()
+
+            battle_group = next(g for g in parser._action_groups if g.title == "battle arguments")
+            groups = []
+            if values == "all":
+                groups = battle_group._action_groups
+            elif values in battle_wrappers:
+                groups = [g for g in battle_group._action_groups if g.title == values]
+            
+            for action_group in groups:
+                formatter.start_section(action_group.title)
+                formatter.add_text(action_group.description)
+                formatter.add_arguments(action_group._group_actions)
+                formatter.end_section()
+
+            # epilog
+            formatter.add_text(parser.epilog)
+
+            # determine help from format above
+            print(formatter.format_help())
+            parser.exit()
+
     default_logging_path = Path.home() / ".algobattle_logs"
     def resolved_path(path: str) -> Path:
         return Path(path).resolve()
 
-    parser = ArgumentParser()
-    parser.add_argument("problem_path", type=resolved_path, help="Path to the parent directory of a problem file as argument.")
+    parser = ArgumentParser(add_help=False)
     parser.add_argument("--version", action="version", version=f"Algobattle version {algobattle.__version__}")
+    parser.add_argument("--help", "-h", action=NestedHelp, help="Battle type to display additional help for, or 'all' to display full help.")
+
+    parser.add_argument("problem_path", type=resolved_path, help="Path to the parent directory of a problem file as argument.")
     parser.add_argument("--teams", "-t", action="extend", type=resolved_path, nargs="*", help="Any number of paths that specify teams. Either by the found folder structure or a team.ini file found there. Defaults to the problem path.")
     parser.add_argument("--config", "-c", type=resolved_path, help="Path to a .ini configuration file to be used for the run. Defaults to either the 'config.ini' file in the problem folder if it exists or the packages config.ini")
     parser.add_argument("--logging_folder", "-o", type=resolved_path, default=default_logging_path, help="Specify the folder into which the log file is written to. Can either be a relative or absolute path to folder. If nonexisting, a new folder will be created. Default: ~/.algobattle_logs/")
