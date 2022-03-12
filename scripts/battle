@@ -81,11 +81,10 @@ def split_paths(paths: str) -> list[Path] | Path:
 
 def create_parsers() -> dict[str, ArgumentParser]:
     default_logging_path = Path.home() / ".algobattle_logs"
-    default_config = Path(algobattle.__file__).resolve().parent / "config" / "config.ini"
 
     parent_parser = ArgumentParser(add_help=False)
     parent_parser.add_argument("--teams", "-t", action="extend", type=split_paths, nargs="*", help="Any number of paths that specify teams. Either by the found folder structure or a team.ini file found there. Defaults to the problem path.")
-    parent_parser.add_argument("--config_file", "-c", dest="config", type=resolved_path, default=default_config, help="Path to a .ini configuration file to be used for the run. Defaults to the packages config.ini")
+    parent_parser.add_argument("--config_file", "-c", dest="config", type=resolved_path, help="Path to a .ini configuration file to be used for the run. Defaults to either the 'config.ini' file in the problem folder if it exists or the packages config.ini")
     parent_parser.add_argument("--output_folder", "-o", dest="folder_name", type=resolved_path, default=default_logging_path, help="Specify the folder into which the log file is written to. Can either be a relative or absolute path to folder. If nonexisting, a new folder will be created. Default: ~/.algobattle_logs/")
 
     parent_parser.add_argument("--version", action="version", version=f"Algobattle version {algobattle.__version__}")
@@ -138,7 +137,21 @@ def parse_args() -> Namespace:
                     if name == "battle" and "battle_type" in section and pre_options.type is None:
                         argv.insert(argv.index(pre_options.path)+1, section["battle_type"])
 
-    return parsers["battle"].parse_args(argv[1:])
+    options = parsers["battle"].parse_args(argv[1:])
+
+    if options.config is None:
+        problem_path: Path = options.problem_path
+        if problem_path.is_file():
+            problem_path = problem_path.parent
+        if (problem_path / "config.ini").is_file():
+            options.config = problem_path / "config.ini"
+        else:
+            options.config = Path(algobattle.__file__).resolve().parent / "config" / "config.ini"
+    
+    if options.teams is None or len(options.teams) == 0:
+        options.teams = [options.problem_path]
+    
+    return options
 
 def parse_team_info(teams: list[Path]) -> list[tuple[str, Path, Path]]:
     team_info: list[tuple[str, Path, Path]] = []
@@ -194,8 +207,6 @@ if __name__ == "__main__":
         runtime_overhead = measure_runtime_overhead()
         logger.info(f'Maximal measured runtime overhead is at {runtime_overhead} seconds. Adding this amount to the configured runtime.')
 
-    if options.teams is None or len(options.teams) == 0:
-        options.teams = [options.problem_path]
     team_info = parse_team_info(options.teams)
     match = Match(problem, config, team_info, ui, runtime_overhead)
 
