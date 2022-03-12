@@ -6,9 +6,10 @@ import sys
 import os
 import logging
 
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 import datetime as dt
 from pathlib import Path
+from typing import Callable
 
 import algobattle
 from algobattle.match import Match
@@ -72,17 +73,18 @@ def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
 def resolved_path(path: str) -> Path:
     return Path(path).resolve()
 
-def create_parser() -> ArgumentParser:
+def create_parsers() -> dict[str, ArgumentParser]:
     default_logging_path = Path.home() / ".algobattle_logs"
     default_config = Path(algobattle.__file__).resolve().parent / "config" / "config.ini"
 
     parent_parser = ArgumentParser(add_help=False)
     parent_parser.add_argument("--teams", "-t", action="extend", type=resolved_path, nargs="*", help="Any number of paths that specify teams. Either by the found folder structure or a team.ini file found there. Defaults to the problem path.")
+    parent_parser.add_argument("--config_file", "-c", dest="config", type=resolved_path, default=default_config, help="Path to a .ini configuration file to be used for the run. Defaults to the packages config.ini")
+    parent_parser.add_argument("--output_folder", "-o", dest="folder_name", type=resolved_path, default=default_logging_path, help="Specify the folder into which the log file is written to. Can either be a relative or absolute path to folder. If nonexisting, a new folder will be created. Default: ~/.algobattle_logs/")
+
     parent_parser.add_argument("--version", action="version", version=f"Algobattle version {algobattle.__version__}")
     parent_parser.add_argument("--verbose", dest="verbose_logging", action="store_true", help="Log all debug messages.")
     parent_parser.add_argument("--display", "-d", choices=["silent", "ui", "logs"], default="logs", help="Choose display mode, silent will hide all output, logs will pipe the logs to stderr, and ui will display a small terminal ui. Default: logs")
-    parent_parser.add_argument("--output_folder", "-o", dest="folder_name", type=resolved_path, default=default_logging_path, help="Specify the folder into which the log file is written to. Can either be a relative or absolute path to folder. If nonexisting, a new folder will be created. Default: ~/.algobattle_logs/")
-    parent_parser.add_argument("--config_file", "-c", dest="config", type=resolved_path, default=default_config, help="Path to a .ini configuration file to be used for the run. Defaults to the packages config.ini")
     parent_parser.add_argument("--no_overhead_calculation", dest="no_overhead_calculation", action="store_true", help="If set, the program does not benchmark the I/O of the host system to calculate the runtime overhead when started.")
     parent_parser.add_argument("--no_cleanup", action="store_true", help="Don't clean up any created docker images.")
     parent_parser.add_argument("--rounds", "-r", dest="battle_rounds", type=int, default="5", help="Number of rounds that are to be fought in the battle (points are split between all rounds). Default: 5")
@@ -90,16 +92,44 @@ def create_parser() -> ArgumentParser:
     parent_parser.add_argument("--do_not_count_points", dest="do_not_count_points", action="store_true", help="If set, points are not calculated for the run.")
     
     parser = ArgumentParser(parents=[parent_parser])
-    parent_parser.add_argument("problem_path", type=resolved_path, help="Path to the parent directory of a problem file as argument.")
+    parser.add_argument("problem_path", type=resolved_path, help="Path to the parent directory of a problem file as argument.")
 
     subparsers = parser.add_subparsers(help="Type of battle to run.", dest="battle_type", required=True)
     for name, cls in battle_wrappers.items():
         battle_parser = subparsers.add_parser(name, parents=[parent_parser])
-        battle_args = battle_parser.add_argument_group("battle arguments")
+        battle_args = battle_parser.add_argument_group(f"{name} battle arguments")
         for args, kwargs in cls.get_cli_parameters():
             battle_args.add_argument(*args, **kwargs)
-    
-    return parser
+    return subparsers.choices | {"battle": parser}
+
+def parse_args() -> Namespace:
+    pre_parser = ArgumentParser(add_help=False)
+    pre_parser.add_argument("path", nargs="?")
+    pre_parser.add_argument("type", nargs="?")
+    pre_parser.add_argument("--config", "-c", type=resolved_path)
+    pre_options, _ = pre_parser.parse_known_args()
+
+    argv = sys.argv[:]
+    parsers = create_parsers()
+
+    if pre_options.path is not None:
+        if pre_options.config == None:
+            config_path: Path = resolved_path(pre_options.path)
+        else:
+            config_path: Path = pre_options.config
+        if not config_path.is_file() and (config_path / "config.ini").is_file():
+            config_path /= "config.ini"
+
+        if config_path.is_file():
+            config = ConfigParser()
+            config.read(config_path)
+            for name, section in config.items():
+                if name in parsers:
+                    parsers[name].set_defaults(**section)
+                    if name == "battle" and "battle_type" in section and pre_options.type is None:
+                        argv.insert(argv.index(pre_options.path)+1, section["battle_type"])
+
+    return parsers["battle"].parse_args(argv[1:])
 
 def parse_team_info(teams: list[Path]) -> list[tuple[str, Path, Path]]:
     team_info: list[tuple[str, Path, Path]] = []
@@ -124,7 +154,7 @@ def parse_team_info(teams: list[Path]) -> list[tuple[str, Path, Path]]:
 
 if __name__ == "__main__":
     
-    options = create_parser().parse_args()
+    options = parse_args()
 
     logger = setup_logging(options.folder_name, options.verbose_logging, options.display != "logs")
           
@@ -142,7 +172,6 @@ if __name__ == "__main__":
 
 
     logger.debug(f"Options for this run: {options}")
-    logger.debug(f"Contents of sys.argv: {sys.argv}")
 
     if options.display == "ui":
         ui = Ui(logger, logger.getEffectiveLevel())
@@ -156,8 +185,8 @@ if __name__ == "__main__":
         runtime_overhead = measure_runtime_overhead()
         logger.info(f'Maximal measured runtime overhead is at {runtime_overhead} seconds. Adding this amount to the configured runtime.')
 
-    if len(options.teams) == 0:
-        options.teams.append(options.problem_path)
+    if options.teams is None:
+        options.teams = [options.problem_path]
     team_info = parse_team_info(options.teams)
     match = Match(problem, config, team_info, ui, runtime_overhead)
 
