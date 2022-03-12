@@ -84,17 +84,17 @@ def create_parsers() -> dict[str, ArgumentParser]:
 
     parent_parser = ArgumentParser(add_help=False)
     parent_parser.add_argument("--teams", "-t", action="extend", type=split_paths, nargs="*", help="Any number of paths that specify teams. Either by the found folder structure or a team.ini file found there. Defaults to the problem path.")
-    parent_parser.add_argument("--config_file", "-c", dest="config", type=resolved_path, help="Path to a .ini configuration file to be used for the run. Defaults to either the 'config.ini' file in the problem folder if it exists or the packages config.ini")
-    parent_parser.add_argument("--output_folder", "-o", dest="folder_name", type=resolved_path, default=default_logging_path, help="Specify the folder into which the log file is written to. Can either be a relative or absolute path to folder. If nonexisting, a new folder will be created. Default: ~/.algobattle_logs/")
+    parent_parser.add_argument("--config", "-c", type=resolved_path, help="Path to a .ini configuration file to be used for the run. Defaults to either the 'config.ini' file in the problem folder if it exists or the packages config.ini")
+    parent_parser.add_argument("--logging_folder", "-o", type=resolved_path, default=default_logging_path, help="Specify the folder into which the log file is written to. Can either be a relative or absolute path to folder. If nonexisting, a new folder will be created. Default: ~/.algobattle_logs/")
 
     parent_parser.add_argument("--version", action="version", version=f"Algobattle version {algobattle.__version__}")
-    parent_parser.add_argument("--verbose", dest="verbose_logging", action="store_true", help="Log all debug messages.")
+    parent_parser.add_argument("--verbose", action="store_true", help="Log all debug messages.")
     parent_parser.add_argument("--display", "-d", choices=["silent", "ui", "logs"], default="logs", help="Choose display mode, silent will hide all output, logs will pipe the logs to stderr, and ui will display a small terminal ui. Default: logs")
-    parent_parser.add_argument("--no_overhead_calculation", dest="no_overhead_calculation", action="store_true", help="If set, the program does not benchmark the I/O of the host system to calculate the runtime overhead when started.")
+    parent_parser.add_argument("--no_overhead_calculation", action="store_true", help="If set, the program does not benchmark the I/O of the host system to calculate the runtime overhead when started.")
     parent_parser.add_argument("--no_cleanup", action="store_true", help="Don't clean up any created docker images.")
-    parent_parser.add_argument("--rounds", "-r", dest="battle_rounds", type=int, default="5", help="Number of rounds that are to be fought in the battle (points are split between all rounds). Default: 5")
-    parent_parser.add_argument("--points", "-p", dest="points", type=int, default="100", help="Number of points that are to be fought for. Default: 100")
-    parent_parser.add_argument("--do_not_count_points", dest="do_not_count_points", action="store_true", help="If set, points are not calculated for the run.")
+    parent_parser.add_argument("--rounds", "-r", type=int, default="5", help="Number of rounds that are to be fought in the battle (points are split between all rounds). Default: 5")
+    parent_parser.add_argument("--points", "-p", type=int, default="100", help="Number of points that are to be fought for. Default: 100")
+    parent_parser.add_argument("--do_not_count_points", action="store_true", help="If set, points are not calculated for the run.")
     for action in parent_parser._actions:
         if isinstance(action, _StoreConstAction):
             action.type = lambda s: s.lower() == "true"
@@ -178,7 +178,7 @@ if __name__ == "__main__":
     
     options = parse_args()
 
-    logger = setup_logging(options.folder_name, options.verbose_logging, options.display != "logs")
+    logger = setup_logging(options.logging_folder, options.verbose, options.display != "logs")
           
     if not options.config.exists():
         sys.exit(f"Config path '{options.config}'' does not exist in the file system! Use 'battle --help' for more information on usage and options.")
