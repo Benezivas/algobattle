@@ -6,10 +6,9 @@ import sys
 import os
 import logging
 
-from argparse import ArgumentParser, Namespace
+from argparse import _StoreConstAction, ArgumentParser, Namespace
 import datetime as dt
 from pathlib import Path
-from typing import Callable
 
 import algobattle
 from algobattle.match import Match
@@ -90,7 +89,10 @@ def create_parsers() -> dict[str, ArgumentParser]:
     parent_parser.add_argument("--rounds", "-r", dest="battle_rounds", type=int, default="5", help="Number of rounds that are to be fought in the battle (points are split between all rounds). Default: 5")
     parent_parser.add_argument("--points", "-p", dest="points", type=int, default="100", help="Number of points that are to be fought for. Default: 100")
     parent_parser.add_argument("--do_not_count_points", dest="do_not_count_points", action="store_true", help="If set, points are not calculated for the run.")
-    
+    for action in parent_parser._actions:
+        if isinstance(action, _StoreConstAction):
+            action.type = lambda s: s.lower() == "true"
+
     parser = ArgumentParser(parents=[parent_parser])
     parser.add_argument("problem_path", type=resolved_path, help="Path to the parent directory of a problem file as argument.")
 
