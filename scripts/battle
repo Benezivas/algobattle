@@ -98,7 +98,7 @@ def create_parser() -> ArgumentParser:
     
     for name, cls in battle_wrappers.items():
         cls_args = battle_args.add_argument_group(name)
-        for name, kwargs in cls.get_cli_parameters().items():
+        for name, kwargs in cls.get_arg_spec().items():
             cls_args.add_argument(f"--{name}", **(kwargs | {"default": None}))
     
     return parser
@@ -148,7 +148,7 @@ def parse_config(options: Namespace) -> Namespace:
         else:
             setattr(battle_options, name, kwargs["default"])
     
-    for name, kwargs in battle_wrappers[battle_type].get_cli_parameters().items():
+    for name, kwargs in battle_wrappers[battle_type].get_arg_spec().items():
         if getattr(options, name) is not None:
             setattr(battle_options, name, options.name)
         elif battle_type in config and name in config[battle_type]:
@@ -157,7 +157,7 @@ def parse_config(options: Namespace) -> Namespace:
             setattr(battle_options, name, kwargs["default"])
     
     battle_options.battle_type = battle_type
-    battle_options.run_parametersAA = config["run_parameters"]
+    battle_options.run_parameters_raw = config["run_parameters"]
 
     return battle_options
     
@@ -211,7 +211,7 @@ if __name__ == "__main__":
         logger.info(f'Maximal measured runtime overhead is at {runtime_overhead} seconds. Adding this amount to the configured runtime.')
 
     team_info = parse_team_info(options.teams)
-    match = Match(problem, config.run_parametersAA, team_info, ui, runtime_overhead)
+    match = Match(problem, config.run_parameters_raw, team_info, ui, runtime_overhead)
     results = match.run(**vars(config))
 
     if ui is not None:

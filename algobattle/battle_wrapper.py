@@ -55,7 +55,7 @@ class BattleWrapper(ABC, Generic[Instance, Solution]):
             self.run_parameters = RunParameters()
     
     @classmethod
-    def get_cli_parameters(cls) -> dict[str, dict[str, Any]]:
+    def get_arg_spec(cls) -> dict[str, dict[str, Any]]:
         """Gets the info needed to make a cli interface for a battle wrapper.
         The argparse type argument will only be set if the type is available in the builtin or global namespace.
 
