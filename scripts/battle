@@ -2,12 +2,11 @@
 """Main battle script. Executes all possible types of battles, see battle --help for all options."""
 from __future__ import annotations, generators
 from configparser import ConfigParser
-from random import choices
 import sys
 import os
 import logging
 
-from argparse import _StoreConstAction, ArgumentParser, Namespace
+from argparse import ArgumentParser, Namespace
 import datetime as dt
 from pathlib import Path
 
@@ -70,18 +69,21 @@ def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
     logger.info(f"You can find the log files for this run in {logging_path}")
     return logger
 
-def resolved_path(path: str) -> Path:
-    return Path(path).resolve()
-
+battle_arg_spec = {
+    "rounds": {"type": int, "default": 5, "help": "Number of rounds that are to be fought in the battle (points are split between all rounds). Default: 5"},
+}
 def create_parser() -> ArgumentParser:
-    default_logging_path = Path.home() / ".algobattle_logs"
 
-    parser = ArgumentParser(add_help=False)
+    default_logging_path = Path.home() / ".algobattle_logs"
+    def resolved_path(path: str) -> Path:
+        return Path(path).resolve()
+
+    parser = ArgumentParser()
     parser.add_argument("problem_path", type=resolved_path, help="Path to the parent directory of a problem file as argument.")
+    parser.add_argument("--version", action="version", version=f"Algobattle version {algobattle.__version__}")
     parser.add_argument("--teams", "-t", action="extend", type=resolved_path, nargs="*", help="Any number of paths that specify teams. Either by the found folder structure or a team.ini file found there. Defaults to the problem path.")
     parser.add_argument("--config", "-c", type=resolved_path, help="Path to a .ini configuration file to be used for the run. Defaults to either the 'config.ini' file in the problem folder if it exists or the packages config.ini")
     parser.add_argument("--logging_folder", "-o", type=resolved_path, default=default_logging_path, help="Specify the folder into which the log file is written to. Can either be a relative or absolute path to folder. If nonexisting, a new folder will be created. Default: ~/.algobattle_logs/")
-    parser.add_argument("--version", action="version", version=f"Algobattle version {algobattle.__version__}")
     parser.add_argument("--verbose", action="store_true", help="Log all debug messages.")
     parser.add_argument("--display", "-d", choices=["silent", "ui", "logs"], default="logs", help="Choose display mode, silent will hide all output, logs will pipe the logs to stderr, and ui will display a small terminal ui. Default: logs")
     parser.add_argument("--no_overhead_calculation", action="store_true", help="If set, the program does not benchmark the I/O of the host system to calculate the runtime overhead when started.")
@@ -90,12 +92,15 @@ def create_parser() -> ArgumentParser:
     parser.add_argument("--do_not_count_points", action="store_true", help="If set, points are not calculated for the run.")
 
     battle_args = parser.add_argument_group("battle arguments")
-    battle_args.add_argument("--rounds", "-r", type=int, default="5", help="Number of rounds that are to be fought in the battle (points are split between all rounds). Default: 5")
-    battle_args.add_argument("battle_type", choices=battle_wrappers.items(), nargs="?", help="Type of battle, has to be set in the command line or in config file")
+    battle_args.add_argument("battle_type", choices=battle_wrappers.keys(), nargs="?", help="Type of battle, has to be set in the command line or in config file")
+    for name, kwargs in battle_arg_spec.items():
+        battle_args.add_argument(f"--{name}", **(kwargs | {"default": None}))
+    
     for name, cls in battle_wrappers.items():
         cls_args = battle_args.add_argument_group(name)
-        for args, kwargs in cls.get_cli_parameters():
-            cls_args.add_argument(*args, **(kwargs | {"default": None}))
+        for name, kwargs in cls.get_cli_parameters().items():
+            cls_args.add_argument(f"--{name}", **(kwargs | {"default": None}))
+    
     return parser
 
 def parse_args() -> Namespace:
@@ -122,6 +127,40 @@ def parse_args() -> Namespace:
         options.teams = [working_dir]
 
     return options
+
+def parse_config(options: Namespace) -> Namespace:
+    config = ConfigParser()
+    config.read(options.config)
+    battle_options = Namespace()
+
+    if options.battle_type is not None:
+        battle_type = options.battle_type
+    elif "battle_type" in config["battle"]:
+        battle_type = config["battle"]["battle_type"]
+    else:
+        sys.exit("The battle type was not specified in the command line or the config file! Use 'battle --help' for more information on usage and options.")
+    
+    for name, kwargs in battle_arg_spec.items():
+        if getattr(options, name) is not None:
+            setattr(battle_options, name, options.name)
+        elif "battle" in config and name in config["battle"]:
+            setattr(battle_options, name, kwargs["type"](config["battle"][name]))
+        else:
+            setattr(battle_options, name, kwargs["default"])
+    
+    for name, kwargs in battle_wrappers[battle_type].get_cli_parameters().items():
+        if getattr(options, name) is not None:
+            setattr(battle_options, name, options.name)
+        elif battle_type in config and name in config[battle_type]:
+            setattr(battle_options, name, kwargs["type"](config[battle_type][name]))
+        else:
+            setattr(battle_options, name, kwargs["default"])
+    
+    battle_options.battle_type = battle_type
+    battle_options.run_parametersAA = config["run_parameters"]
+
+    return battle_options
+    
 
 def parse_team_info(teams: list[Path]) -> list[tuple[str, Path, Path]]:
     team_info: list[tuple[str, Path, Path]] = []
@@ -150,15 +189,12 @@ if __name__ == "__main__":
 
     logger = setup_logging(options.logging_folder, options.verbose, options.display != "logs")
 
-    config = ConfigParser()
-    logger.debug(f'Using additional configuration options from file "{options.config}".')
-    config.read(options.config)
+    config = parse_config(options)
     
     try:
         problem = import_problem_from_path(options.problem_path)
     except ValueError:
         sys.exit(f"Could not import the problem! Check the logs and use 'battle --help' for more information on usage and options.")
-
 
     logger.debug(f"Options for this run: {options}")
 
@@ -175,10 +211,8 @@ if __name__ == "__main__":
         logger.info(f'Maximal measured runtime overhead is at {runtime_overhead} seconds. Adding this amount to the configured runtime.')
 
     team_info = parse_team_info(options.teams)
-    match = Match(problem, config, team_info, ui, runtime_overhead)
-
-
-    results = match.run(**vars(options))
+    match = Match(problem, config.run_parametersAA, team_info, ui, runtime_overhead)
+    results = match.run(**vars(config))
 
     if ui is not None:
         ui.restore()

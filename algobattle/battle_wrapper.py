@@ -55,21 +55,20 @@ class BattleWrapper(ABC, Generic[Instance, Solution]):
             self.run_parameters = RunParameters()
     
     @classmethod
-    def get_cli_parameters(cls) -> list[tuple[list[str], dict[str, Any]]]:
+    def get_cli_parameters(cls) -> dict[str, dict[str, Any]]:
         """Gets the info needed to make a cli interface for a battle wrapper.
         The argparse type argument will only be set if the type is available in the builtin or global namespace.
 
         Returns
         -------
-        list[tuple[list[str], dict[str, Any]]]
-            A list of (*args, **kwargs) for each parameter that can be passed to argparse.
+        dict[str, dict[str, Any]]
+            A mapping of the names of an arg and their kwargs.
         """
         base_params = [param for param in signature(BattleWrapper).parameters]
-        out = []
+        out = {}
         doc = getdoc(cls.__init__)
         for param in signature(cls).parameters.values():
             if param.kind != param.VAR_POSITIONAL and param.kind != param.VAR_KEYWORD and param.name not in base_params:
-                args = [f"--{param.name}"]
                 kwargs = {}
 
                 if param.annotation != param.empty:
@@ -90,7 +89,7 @@ class BattleWrapper(ABC, Generic[Instance, Solution]):
                     except ValueError:
                         pass
 
-                out.append((args, kwargs))
+                out[param.name] = kwargs
         return out
 
     @classmethod

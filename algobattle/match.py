@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import logging
-from configparser import ConfigParser
+from configparser import SectionProxy
 from pathlib import Path
 from collections.abc import Mapping
 from typing import Any
@@ -44,10 +44,10 @@ class RunParameters:
 class Match:
     """Match class, provides functionality for setting up and executing battles between given teams."""
 
-    def __init__(self, problem: Problem, config: ConfigParser, team_info: list[tuple[str, Path, Path]], ui: Ui | None = None,
+    def __init__(self, problem: Problem, config: SectionProxy, team_info: list[tuple[str, Path, Path]], ui: Ui | None = None,
                  runtime_overhead: float = 0, cache_docker_containers: bool = True) -> None:
 
-        self.run_parameters = RunParameters(config["run_parameters"], runtime_overhead)
+        self.run_parameters = RunParameters(config, runtime_overhead)
         self.problem = problem
         self.config = config
         self.ui = ui
