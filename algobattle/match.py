@@ -19,8 +19,7 @@ class Match:
     """Match class, provides functionality for setting up and executing battles between given teams."""
 
     def __init__(self, problem: Problem, docker_config: DockerConfig, team_info: list[tuple[str, Path, Path]], ui: Ui | None = None) -> None:
-
-        self.docker_config = docker_config
+        
         self.problem = problem
         self.ui = ui
 
@@ -34,8 +33,8 @@ class Match:
                 logger.error(f"Team name '{info[0]}' is used twice!")
                 raise ValueError from e
         if len(self.teams) == 0:
-            logger.critical("None of the team's containers built successfully.")
-            raise RuntimeError()
+            logger.critical("None of the teams containers built successfully.")
+            raise SystemExit
         
         self.battle_matchups = BattleMatchups(self.teams)
 
@@ -70,7 +69,7 @@ class Match:
             logger.critical(f"Battle type, problem, and chosen options are incompatible!")
             raise SystemExit
 
-        battle_wrapper = WrapperClass(self.problem, self.docker_config, **wrapper_options)
+        battle_wrapper = WrapperClass(self.problem, **wrapper_options)
         
         results = WrapperClass.MatchResult(self.battle_matchups, rounds)    # type: ignore
 

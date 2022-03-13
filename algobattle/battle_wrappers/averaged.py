@@ -20,7 +20,7 @@ logger = logging.getLogger('algobattle.battle_wrappers.averaged')
 class Averaged(algobattle.battle_wrapper.BattleWrapper):
     """Class of an adveraged battle Wrapper."""
 
-    def __init__(self, problem: Problem, doker_config: DockerConfig = DockerConfig(),
+    def __init__(self, problem: Problem, docker_config: DockerConfig = DockerConfig(),
                 instance_size: int = 10, iterations: int = 25,
                 **options: Any) -> None:
         """Create a wrapper for an averaged battle.
@@ -39,7 +39,7 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
         self.instance_size = instance_size
         self.iterations = iterations
 
-        super().__init__(problem, doker_config, **options)  
+        super().__init__(problem, docker_config, **options)  
 
     def wrapper(self, matchup: Matchup) -> Generator[Averaged.Result, None, None]:
         """Execute one averaged battle between a generating and a solving team.

@@ -168,7 +168,7 @@ def parse_config(options: Namespace) -> Namespace:
         kwargs[f"timeout_{role}"] = config["run_parameters"].getfloat(f"timeout_{role}", None)
         kwargs[f"space_{role}"] = config["run_parameters"].getint(f"space_{role}", None)
 
-    battle_options.run_parameters = DockerConfig(**kwargs)
+    battle_options.docker_config = DockerConfig(**kwargs)
 
     return battle_options
     
