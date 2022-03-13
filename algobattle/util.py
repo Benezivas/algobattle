@@ -9,8 +9,6 @@ from inspect import getmembers, isclass
 from argparse import Action, SUPPRESS
 
 from algobattle.problem import Problem
-from algobattle.battle_wrappers import battle_wrappers
-
 
 logger = logging.getLogger('algobattle.util')
 
@@ -163,18 +161,20 @@ class NestedHelp(Action):
             formatter.add_arguments(action_group._group_actions)
             formatter.end_section()
 
-        battle_group = next(g for g in parser._action_groups if g.title == "battle arguments")
-        groups = []
-        if values == "all":
-            groups = battle_group._action_groups
-        elif values in battle_wrappers:
-            groups = [g for g in battle_group._action_groups if g.title == values]
-        
-        for action_group in groups:
-            formatter.start_section(action_group.title)
-            formatter.add_text(action_group.description)
-            formatter.add_arguments(action_group._group_actions)
-            formatter.end_section()
+        if isinstance(values, str):
+            battle_group = next(g for g in parser._action_groups if g.title == "battle arguments")
+            arg_groups = {g.title: g for g in battle_group._action_groups}
+            groups = []
+            if values == "all":
+                groups = battle_group._action_groups
+            elif values in arg_groups:
+                groups = [arg_groups[values]]
+            
+            for action_group in groups:
+                formatter.start_section(action_group.title)
+                formatter.add_text(action_group.description)
+                formatter.add_arguments(action_group._group_actions)
+                formatter.end_section()
 
         # epilog
         formatter.add_text(parser.epilog)

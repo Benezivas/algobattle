@@ -5,13 +5,13 @@ from dataclasses import dataclass, field
 import itertools
 import logging
 from collections import defaultdict
+from typing import Any, Generator
 
 import algobattle.battle_wrapper
 from algobattle.problem import Problem
 from algobattle.team import Team, Matchup
 from algobattle.util import format_table
-from docker import DockerConfig
-from typing import Any, Generator
+from algobattle.docker import DockerConfig
 
 
 logger = logging.getLogger('algobattle.battle_wrappers.averaged')

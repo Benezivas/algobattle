@@ -159,7 +159,16 @@ def parse_config(options: Namespace) -> Namespace:
             setattr(battle_options, name, kwargs["default"])
     
     battle_options.battle_type = battle_type
-    battle_options.run_parameters = DockerConfig(**config["run_parameters"])
+    kwargs = {
+        "cpus": config["run_parameters"].getint("cpus", None),
+        "timeout_build": config["run_parameters"].getfloat("timeout_build", None),
+        "cache_containers": config["run_parameters"].getfloat("cache_containers", True),
+    }
+    for role in ("generator", "solver"):
+        kwargs[f"timeout_{role}"] = config["run_parameters"].getfloat(f"timeout_{role}", None)
+        kwargs[f"space_{role}"] = config["run_parameters"].getint(f"space_{role}", None)
+
+    battle_options.run_parameters = DockerConfig(**kwargs)
 
     return battle_options
     
