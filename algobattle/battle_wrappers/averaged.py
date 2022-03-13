@@ -29,7 +29,7 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
         ----------
         problem : Problem
             The problem that the teams will have to solve.
-        doker_config : DockerConfig | None
+        doker_config : DockerConfig
             Docker configuration for the runs.
         instance_size : int
             The instance size on which the averaged run is to be made.

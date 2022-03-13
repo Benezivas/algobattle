@@ -28,7 +28,7 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
         ----------
         problem : Problem
             The problem that the teams will have to solve.
-        docker_config : DockerConfig | None
+        docker_config : DockerConfig
             Docker config for the runs.
         cap : int
             The maximum instance size up to which a battle is to be fought.

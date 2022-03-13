@@ -18,7 +18,7 @@ logger = logging.getLogger('algobattle.match')
 class Match:
     """Match class, provides functionality for setting up and executing battles between given teams."""
 
-    def __init__(self, problem: Problem, docker_config: DockerConfig, team_info: list[tuple[str, Path, Path]], ui: Ui | None = None, cache_docker_containers: bool = True) -> None:
+    def __init__(self, problem: Problem, docker_config: DockerConfig, team_info: list[tuple[str, Path, Path]], ui: Ui | None = None) -> None:
 
         self.docker_config = docker_config
         self.problem = problem
@@ -27,7 +27,7 @@ class Match:
         self.teams: list[Team] = []
         for info in team_info:
             try:
-                self.teams.append(Team(*info, timeout_build=self.docker_config.timeout_build, cache_container=cache_docker_containers))
+                self.teams.append(Team(*info, timeout_build=docker_config.timeout_build, cache_container=docker_config.cache_containers))
             except DockerError:
                 logger.error(f"Removing team {info[0]} as their containers did not build successfully.")
             except ValueError as e:

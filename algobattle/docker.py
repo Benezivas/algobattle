@@ -32,6 +32,7 @@ class DockerConfig:
     space_generator: int | None = None
     space_solver: int | None = None
     cpus: int | None = None
+    cache_containers: bool = True
 
     def add_overhead(self, overhead: float) -> None:
         def _map(f):
