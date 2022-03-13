@@ -5,7 +5,6 @@ from configparser import ConfigParser
 import sys
 import os
 import logging
-
 from argparse import ArgumentParser, Namespace
 import datetime as dt
 from pathlib import Path
@@ -176,16 +175,29 @@ def parse_config(options: Namespace) -> Namespace:
 def parse_team_info(teams: list[Path]) -> list[tuple[str, Path, Path]]:
     team_info: list[tuple[str, Path, Path]] = []
     for path in teams:
-        if (path / "team.ini").exists():
-            config = ConfigParser(allow_no_value=True)
-            config.read(path / "team.ini")
-            config = config["team"]
-            name = config.get("name", path.name)
-            generator = config.getpath("generator", path / "generator")
-            solver = config.getpath("solver", path / "solver")
-            team_info.append((name, generator, solver))
-        else:
-            team_info.append((path.name, path / "generator", path / "solver"))
+        if not path.exists():
+            raise SystemExit(f"Path '{path}' to team info does not exist in the file system! Use 'battle --help' for more information on usage and options.")
+        elif path.is_dir():
+            if not (path / "team.ini").is_file():
+                team_info.append((path.name, path / "generator", path / "solver"))
+                continue
+            else:
+                path /= "team.ini"
+
+        config = ConfigParser()
+        try:
+            config.read(path)
+        except Exception as e:
+            logger.warning(f"Team config file '{path}' can't be parsed correctly, removing them from the battle. Raised error: {e}")
+            continue
+        if "team" not in config:
+            logger.warning(f"Team config file '{path}' does not contain a 'team' section, removing the team from the battle.")
+            continue
+        config = config["team"]
+        name = config.get("name", path.name)
+        generator = config.get("generator", "generator")
+        solver = config.get("solver", "solver")
+        team_info.append((name, (path / generator).resolve(), (path / solver).resolve()))
     
     for name, gen_path, sol_path in team_info:
         for role, path in [("generator", gen_path), ("solver", sol_path)]:
