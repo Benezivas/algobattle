@@ -6,13 +6,13 @@ import sys
 import os
 import logging
 
-from argparse import ArgumentParser, Namespace, Action, SUPPRESS
+from argparse import ArgumentParser, Namespace
 import datetime as dt
 from pathlib import Path
 
 import algobattle
 from algobattle.match import Match
-from algobattle.util import import_problem_from_path
+from algobattle.util import import_problem_from_path, NestedHelp
 from algobattle.docker import measure_runtime_overhead, DockerConfig
 from algobattle.ui import Ui
 from algobattle.battle_wrappers import battle_wrappers
@@ -73,56 +73,6 @@ battle_arg_spec = {
     "rounds": {"type": int, "default": 5, "help": "Number of rounds that are to be fought in the battle (points are split between all rounds). Default: 5"},
 }
 def create_parser() -> ArgumentParser:
-
-    class NestedHelp(Action):
-        def __init__(self,
-                    option_strings,
-                    dest=SUPPRESS,
-                    default=SUPPRESS,
-                    help=None):
-            super().__init__(
-                option_strings=option_strings,
-                dest=dest,
-                default=default,
-                nargs="?",
-                help=help)
-
-        def __call__(self, parser, namespace, values, option_string=None):
-            formatter = parser._get_formatter()
-
-            # usage
-            formatter.add_usage(parser.usage, parser._actions,
-                                parser._mutually_exclusive_groups)
-
-            # description
-            formatter.add_text(parser.description)
-
-            # positionals, optionals and user-defined groups
-            for action_group in parser._action_groups:
-                formatter.start_section(action_group.title)
-                formatter.add_text(action_group.description)
-                formatter.add_arguments(action_group._group_actions)
-                formatter.end_section()
-
-            battle_group = next(g for g in parser._action_groups if g.title == "battle arguments")
-            groups = []
-            if values == "all":
-                groups = battle_group._action_groups
-            elif values in battle_wrappers:
-                groups = [g for g in battle_group._action_groups if g.title == values]
-            
-            for action_group in groups:
-                formatter.start_section(action_group.title)
-                formatter.add_text(action_group.description)
-                formatter.add_arguments(action_group._group_actions)
-                formatter.end_section()
-
-            # epilog
-            formatter.add_text(parser.epilog)
-
-            # determine help from format above
-            print(formatter.format_help())
-            parser.exit()
 
     default_logging_path = Path.home() / ".algobattle_logs"
     def resolved_path(path: str) -> Path:

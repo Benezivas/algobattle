@@ -6,8 +6,10 @@ from pathlib import Path
 import sys
 from typing import Any
 from inspect import getmembers, isclass
+from argparse import Action, SUPPRESS
 
 from algobattle.problem import Problem
+from algobattle.battle_wrappers import battle_wrappers
 
 
 logger = logging.getLogger('algobattle.util')
@@ -130,3 +132,53 @@ def parse_doc_for_param(doc: str, name: str) -> str:
         param_doc.append(line.strip())
     
     return " ".join(param_doc)
+
+class NestedHelp(Action):
+    def __init__(self,
+                option_strings,
+                dest=SUPPRESS,
+                default=SUPPRESS,
+                help=None):
+        super().__init__(
+            option_strings=option_strings,
+            dest=dest,
+            default=default,
+            nargs="?",
+            help=help)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        formatter = parser._get_formatter()
+
+        # usage
+        formatter.add_usage(parser.usage, parser._actions,
+                            parser._mutually_exclusive_groups)
+
+        # description
+        formatter.add_text(parser.description)
+
+        # positionals, optionals and user-defined groups
+        for action_group in parser._action_groups:
+            formatter.start_section(action_group.title)
+            formatter.add_text(action_group.description)
+            formatter.add_arguments(action_group._group_actions)
+            formatter.end_section()
+
+        battle_group = next(g for g in parser._action_groups if g.title == "battle arguments")
+        groups = []
+        if values == "all":
+            groups = battle_group._action_groups
+        elif values in battle_wrappers:
+            groups = [g for g in battle_group._action_groups if g.title == values]
+        
+        for action_group in groups:
+            formatter.start_section(action_group.title)
+            formatter.add_text(action_group.description)
+            formatter.add_arguments(action_group._group_actions)
+            formatter.end_section()
+
+        # epilog
+        formatter.add_text(parser.epilog)
+
+        # determine help from format above
+        print(formatter.format_help())
+        parser.exit()
