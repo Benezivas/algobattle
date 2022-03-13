@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import importlib.util
 from pathlib import Path
-import sys
+from sys import modules
 from typing import Any
 from inspect import getmembers, isclass
 from argparse import Action, SUPPRESS
@@ -52,7 +52,7 @@ def import_problem_from_path(path: Path) -> Problem:
         assert spec is not None
         assert spec.loader is not None
         problem_module = importlib.util.module_from_spec(spec)
-        sys.modules[spec.name] = problem_module
+        modules[spec.name] = problem_module
         spec.loader.exec_module(problem_module)
 
     except Exception as e:

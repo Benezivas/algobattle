@@ -3,7 +3,7 @@ from __future__ import annotations
 import curses
 import logging
 from logging.handlers import MemoryHandler
-import sys
+from sys import stdout
 from typing import Callable, TypeVar
 from collections import deque
 
@@ -17,7 +17,7 @@ F = TypeVar("F", bound=Callable)
 def check_for_terminal(function: F) -> F:
     """Ensure that we are attached to a terminal."""
     def wrapper(self, *args, **kwargs):
-        if not sys.stdout.isatty():
+        if not stdout.isatty():
             logger.error('Not attached to a terminal.')
             return None
         else:
@@ -29,7 +29,7 @@ class Ui:
 
     @check_for_terminal
     def __init__(self, logger: logging.Logger, logging_level: int = logging.NOTSET, num_records: int = 10) -> None:
-        if sys.stdout.isatty():
+        if stdout.isatty():
             self.stdscr = curses.initscr()  # type: ignore
             curses.cbreak()                 # type: ignore
             curses.noecho()                 # type: ignore
@@ -42,7 +42,7 @@ class Ui:
     @check_for_terminal
     def restore(self) -> None:
         """Restore the console. This will be later moved into a proper deconstruction method."""
-        if sys.stdout.isatty():
+        if stdout.isatty():
             curses.nocbreak()               # type: ignore
             self.stdscr.keypad(False)
             curses.echo()                   # type: ignore

@@ -2,7 +2,7 @@
 """Main battle script. Executes all possible types of battles, see battle --help for all options."""
 from __future__ import annotations, generators
 from configparser import ConfigParser
-import sys
+from sys import stderr
 import os
 import logging
 from argparse import ArgumentParser, Namespace
@@ -58,7 +58,7 @@ def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
 
     if not silent:
         # Pipe logging out to console
-        _consolehandler = logging.StreamHandler(stream=sys.stderr)
+        _consolehandler = logging.StreamHandler(stream=stderr)
         _consolehandler.setLevel(common_logging_level)
 
         _consolehandler.setFormatter(logging.Formatter("%(message)s"))
@@ -108,7 +108,7 @@ def parse_args() -> Namespace:
     options = create_parser().parse_args()
     
     if not options.problem_path.exists():
-        sys.exit(f"Problem path '{options.problem_path}' does not exist in the file system! Use 'battle --help' for more information on usage and options.")
+        raise SystemExit(f"Problem path '{options.problem_path}' does not exist in the file system! Use 'battle --help' for more information on usage and options.")
     
     working_dir: Path = options.problem_path
     if working_dir.is_file():
@@ -120,7 +120,7 @@ def parse_args() -> Namespace:
         else:
             options.config = Path(algobattle.__file__).resolve().parent / "config" / "config.ini"
     elif not options.config.exists():
-        sys.exit(f"Config path '{options.config}' does not exist in the file system! Use 'battle --help' for more information on usage and options.")
+        raise SystemExit(f"Config path '{options.config}' does not exist in the file system! Use 'battle --help' for more information on usage and options.")
     elif options.config.is_folder():
         options.config /= "config.ini"
     
@@ -139,7 +139,7 @@ def parse_config(options: Namespace) -> Namespace:
     elif "battle_type" in config["battle"]:
         battle_type = config["battle"]["battle_type"]
     else:
-        sys.exit("The battle type was not specified in the command line or the config file! Use 'battle --help' for more information on usage and options.")
+        raise SystemExit("The battle type was not specified in the command line or the config file! Use 'battle --help' for more information on usage and options.")
     
     for name, kwargs in battle_arg_spec.items():
         if getattr(options, name) is not None:
@@ -202,7 +202,7 @@ def parse_team_info(teams: list[Path]) -> list[tuple[str, Path, Path]]:
     for name, gen_path, sol_path in team_info:
         for role, path in [("generator", gen_path), ("solver", sol_path)]:
             if not path.exists:
-                sys.exit(f"The {role} path {gen_path} used by team '{name}' does not exist in the file system! Use 'battle --help' for more information on usage and options.")
+                raise SystemExit(f"The {role} path {gen_path} used by team '{name}' does not exist in the file system! Use 'battle --help' for more information on usage and options.")
     
     return team_info
 
@@ -214,7 +214,7 @@ if __name__ == "__main__":
     try:
         problem = import_problem_from_path(options.problem_path)
     except ValueError:
-        sys.exit(f"Could not import the problem! Check the logs and use 'battle --help' for more information on usage and options.")
+        raise SystemExit(f"Could not import the problem! Check the logs and use 'battle --help' for more information on usage and options.")
 
     logger.debug(f"Options for this run: {options}")
 
