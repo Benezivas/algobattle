@@ -7,7 +7,6 @@ from sys import stdout
 from typing import Callable, TypeVar
 from collections import deque
 
-from algobattle.sighandler import signal_handler
 from algobattle import __version__ as version
 
 
@@ -87,7 +86,7 @@ class Ui:
         self.stdscr.nodelay(1)
         c = self.stdscr.getch()
         if c == 3:
-            signal_handler(None, None)
+            raise KeyboardInterrupt
         else:
             curses.flushinp() # type: ignore
 

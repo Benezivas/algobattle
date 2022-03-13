@@ -5,6 +5,7 @@ functionality like timeouts and windows support requires annoying workarounds at
 
 from __future__ import annotations
 import logging
+import os
 from pathlib import Path
 from subprocess import CalledProcessError, TimeoutExpired, run
 from timeit import default_timer
@@ -20,9 +21,6 @@ class DockerError(Exception):
     """Error type for any issue during the execution of a docker command.
     The only error raised by any function in the docker module."""
     pass
-
-_running_containers: set[tuple[Image, str]] = set()
-
 
 @dataclass
 class DockerConfig:
@@ -147,7 +145,6 @@ class Image:
         cmd.append(self.id)
 
         result = None
-        _running_containers.add((self, name))
         try:
             result = run(cmd, input=input, capture_output=True, timeout=timeout, check=True, text=True)
 
@@ -174,8 +171,8 @@ class Image:
         finally:
             if result is None:
                 _kill_container(self, name)
-            else:
-                _running_containers.discard((self, name))
+                if os.name == 'posix':
+                    os.killpg(os.getpid(), signal.SIGTERM)
         
         elapsed_time = round(default_timer() - start_time, 2)
         logger.debug(f'Approximate elapsed runtime: {elapsed_time}/{timeout} seconds.')
@@ -242,15 +239,6 @@ def _kill_container(image: Image, name: str) -> None:
         
         if e.stderr.find(f"No such container: {name}") == -1 and e.stderr.find(f"is not running") == -1:
             logger.warning(f"Could not kill container '{image.description}':\n{e.stderr}")
-    
-    _running_containers.discard((image, name))
-
-def kill_all_running_containers() -> None:
-    """Kills all currently running containers.
-    You should only call this in order to completely abort a match, it will cause many downstream errors.
-    """
-    for container in _running_containers.copy():
-        _kill_container(*container)
 
 def measure_runtime_overhead() -> float:
     """Calculate the I/O delay for starting and stopping docker on the host machine.

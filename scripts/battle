@@ -16,9 +16,6 @@ from algobattle.docker import measure_runtime_overhead, DockerConfig
 from algobattle.ui import Ui
 from algobattle.battle_wrappers import battle_wrappers
 
-#! do not remove, even when unused!
-import algobattle.sighandler
-
 def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
     """Creates and returns a parent logger.
 
@@ -207,45 +204,52 @@ def parse_team_info(teams: list[Path]) -> list[tuple[str, Path, Path]]:
     return team_info
 
 if __name__ == "__main__":
-    options = parse_args()
-    logger = setup_logging(options.logging_folder, options.verbose, options.display != "logs")
-    config = parse_config(options)
-    
     try:
-        problem = import_problem_from_path(options.problem_path)
-    except ValueError:
-        raise SystemExit(f"Could not import the problem! Check the logs and use 'battle --help' for more information on usage and options.")
+        options = parse_args()
+        logger = setup_logging(options.logging_folder, options.verbose, options.display != "logs")
+        config = parse_config(options)
+        
+        try:
+            problem = import_problem_from_path(options.problem_path)
+        except ValueError:
+            raise SystemExit(f"Could not import the problem! Check the logs and use 'battle --help' for more information on usage and options.")
 
-    logger.debug(f"Options for this run: {options}")
+        logger.debug(f"Options for this run: {options}")
 
-    if options.display == "ui":
-        ui = Ui(logger, logger.getEffectiveLevel())
-        ui.update("Setting up match...")
-    else:
-        ui = None
+        if options.display == "ui":
+            ui = Ui(logger, logger.getEffectiveLevel())
+            ui.update("Setting up match...")
+        else:
+            ui = None
+        
+        runtime_overhead = 0
+        if not options.no_overhead_calculation:
+            logger.info('Running a benchmark to determine your machines I/O overhead to start and stop docker containers...')
+            runtime_overhead = measure_runtime_overhead()
+            logger.info(f'Maximal measured runtime overhead is at {runtime_overhead} seconds. Adding this amount to the configured runtime.')
+            config.docker_config.add_overhead(runtime_overhead)
+
+        team_info = parse_team_info(options.teams)
+        match = Match(problem, config.docker_config, team_info, ui)
+        results = match.run(**vars(config))
+
+        if ui is not None:
+            ui.restore()
+
+        logger.info("#" * 78)
+        logger.info(f"\n{results.format()}")
+        if not options.do_not_count_points:
+            points = results.calculate_points(options.points)
+            for team, points in points.items():
+                logger.info(f"Group {team} gained {points:.1f} points.")
+        
+        if not options.no_cleanup:
+            match.cleanup()
+        if options.display != "silent":
+            print(results.format())
     
-    runtime_overhead = 0
-    if not options.no_overhead_calculation:
-        logger.info('Running a benchmark to determine your machines I/O overhead to start and stop docker containers...')
-        runtime_overhead = measure_runtime_overhead()
-        logger.info(f'Maximal measured runtime overhead is at {runtime_overhead} seconds. Adding this amount to the configured runtime.')
-        config.docker_config.add_overhead(runtime_overhead)
-
-    team_info = parse_team_info(options.teams)
-    match = Match(problem, config.docker_config, team_info, ui)
-    results = match.run(**vars(config))
-
-    if ui is not None:
-        ui.restore()
-
-    logger.info("#" * 78)
-    logger.info(f"\n{results.format()}")
-    if not options.do_not_count_points:
-        points = results.calculate_points(options.points)
-        for team, points in points.items():
-            logger.info(f"Group {team} gained {points:.1f} points.")
-    
-    if not options.no_cleanup:
-        match.cleanup()
-    if options.display != "silent":
-        print(results.format())
+    except KeyboardInterrupt:
+        if "logger" in locals():
+            logger.critical("Received keyboard interrupt, terminating execution.")  # type: ignore
+        else:
+            raise SystemExit("Received keyboard interrupt, terminating execution.")
