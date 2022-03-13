@@ -8,15 +8,13 @@ their run, such that it contains the current state of the match.
 from __future__ import annotations 
 import logging
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Generator, Generic, Type, TypeVar
+from typing import Any, Generator, Generic, Type, TypeVar
 from inspect import isabstract, signature, getdoc
 
 from algobattle.problem import Problem
 from algobattle.team import Team, BattleMatchups, Matchup
-from algobattle.docker import DockerError
+from algobattle.docker import DockerError, DockerConfig
 from algobattle.util import parse_doc_for_param
-if TYPE_CHECKING:
-    from algobattle.match import RunParameters
 
 logger = logging.getLogger('algobattle.battle_wrapper')
 
@@ -32,7 +30,7 @@ class BattleWrapper(ABC, Generic[Instance, Solution]):
         if not isabstract(cls):
             BattleWrapper._battle_wrappers[cls.__name__.lower()] = cls
 
-    def __init__(self, problem: Problem[Instance, Solution], run_parameters: RunParameters | None = None, **options: dict[str, Any]):
+    def __init__(self, problem: Problem[Instance, Solution], docker_config: DockerConfig = DockerConfig(), **options: dict[str, Any]):
         """Builds a battle wrapper object with the given option values.
         Logs warnings if there were options provided that this wrapper doesn't use. 
 
@@ -48,11 +46,7 @@ class BattleWrapper(ABC, Generic[Instance, Solution]):
             Dict containing option values.
         """
         self.problem = problem
-        if run_parameters is not None:
-            self.run_parameters = run_parameters
-        else:
-            from algobattle.match import RunParameters
-            self.run_parameters = RunParameters()
+        self.docker_config = docker_config
     
     @classmethod
     def get_arg_spec(cls) -> dict[str, dict[str, Any]]:
@@ -162,14 +156,14 @@ class BattleWrapper(ABC, Generic[Instance, Solution]):
         ValueError
             If no valid instance and solution can be generated.
         """
-        if self.run_parameters.space_generator is not None:
-            scaled_memory = self.problem.generator_memory_scaler(self.run_parameters.space_generator, instance_size)
+        if self.docker_config.space_generator is not None:
+            scaled_memory = self.problem.generator_memory_scaler(self.docker_config.space_generator, instance_size)
         else:
             scaled_memory = None
 
         logger.debug(f'Running generator of group {team}...')
         try:
-            output = team.generator.run(str(instance_size), timeout=self.run_parameters.timeout_generator, memory=scaled_memory, cpus=self.run_parameters.cpus)
+            output = team.generator.run(str(instance_size), timeout=self.docker_config.timeout_generator, memory=scaled_memory, cpus=self.docker_config.cpus)
         except DockerError:
             logger.warning(f"generator of team '{team}' didn't run successfully!")
             raise ValueError
@@ -223,15 +217,15 @@ class BattleWrapper(ABC, Generic[Instance, Solution]):
         ValueError
             If no solution can be generated
         """
-        if self.run_parameters.space_solver is not None:
-            scaled_memory = self.problem.solver_memory_scaler(self.run_parameters.space_solver, instance_size)
+        if self.docker_config.space_solver is not None:
+            scaled_memory = self.problem.solver_memory_scaler(self.docker_config.space_solver, instance_size)
         else:
             scaled_memory = None
         instance_str = self.problem.encode_instance(instance)
 
         logger.debug(f'Running solver of group {team}...')
         try:
-            output = team.solver.run(instance_str, timeout=self.run_parameters.timeout_solver, memory=scaled_memory, cpus=self.run_parameters.cpus)
+            output = team.solver.run(instance_str, timeout=self.docker_config.timeout_solver, memory=scaled_memory, cpus=self.docker_config.cpus)
         except DockerError:
             logger.warning(f"Solver of team '{team}' didn't run successfully!")
             raise ValueError

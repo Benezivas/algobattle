@@ -13,7 +13,7 @@ from pathlib import Path
 import algobattle
 from algobattle.match import Match
 from algobattle.util import import_problem_from_path
-from algobattle.docker import measure_runtime_overhead
+from algobattle.docker import measure_runtime_overhead, DockerConfig
 from algobattle.ui import Ui
 from algobattle.battle_wrappers import battle_wrappers
 
@@ -144,7 +144,7 @@ def create_parser() -> ArgumentParser:
     parser.add_argument("--do_not_count_points", action="store_true", help="If set, points are not calculated for the run.")
 
     battle_args = parser.add_argument_group("battle arguments")
-    battle_args.add_argument("battle_type", choices=battle_wrappers.keys(), nargs="?", help="Type of battle, has to be set in the command line or in config file")
+    battle_args.add_argument("battle_type", choices=battle_wrappers.keys(), nargs="?", help="Type of battle, has to be set in the command line or config file")
     for name, kwargs in battle_arg_spec.items():
         battle_args.add_argument(f"--{name}", **(kwargs | {"default": None}))
     
@@ -209,7 +209,7 @@ def parse_config(options: Namespace) -> Namespace:
             setattr(battle_options, name, kwargs["default"])
     
     battle_options.battle_type = battle_type
-    battle_options.run_parameters_raw = config["run_parameters"]
+    battle_options.run_parameters = DockerConfig(**config["run_parameters"])
 
     return battle_options
     
@@ -236,11 +236,8 @@ def parse_team_info(teams: list[Path]) -> list[tuple[str, Path, Path]]:
     return team_info
 
 if __name__ == "__main__":
-    
     options = parse_args()
-
     logger = setup_logging(options.logging_folder, options.verbose, options.display != "logs")
-
     config = parse_config(options)
     
     try:
@@ -261,9 +258,10 @@ if __name__ == "__main__":
         logger.info('Running a benchmark to determine your machines I/O overhead to start and stop docker containers...')
         runtime_overhead = measure_runtime_overhead()
         logger.info(f'Maximal measured runtime overhead is at {runtime_overhead} seconds. Adding this amount to the configured runtime.')
+        config.docker_config.add_overhead(runtime_overhead)
 
     team_info = parse_team_info(options.teams)
-    match = Match(problem, config.run_parameters_raw, team_info, ui, runtime_overhead)
+    match = Match(problem, config.docker_config, team_info, ui)
     results = match.run(**vars(config))
 
     if ui is not None:

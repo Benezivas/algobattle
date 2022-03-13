@@ -10,10 +10,9 @@ import algobattle.battle_wrapper
 from algobattle.problem import Problem
 from algobattle.team import Team, Matchup
 from algobattle.util import format_table
-from typing import TYPE_CHECKING, Any, Generator
+from docker import DockerConfig
+from typing import Any, Generator
 
-if TYPE_CHECKING:
-    from algobattle.match import RunParameters
 
 logger = logging.getLogger('algobattle.battle_wrappers.averaged')
 
@@ -21,7 +20,7 @@ logger = logging.getLogger('algobattle.battle_wrappers.averaged')
 class Averaged(algobattle.battle_wrapper.BattleWrapper):
     """Class of an adveraged battle Wrapper."""
 
-    def __init__(self, problem: Problem, run_parameters: RunParameters | None = None,
+    def __init__(self, problem: Problem, doker_config: DockerConfig = DockerConfig(),
                 instance_size: int = 10, iterations: int = 25,
                 **options: Any) -> None:
         """Create a wrapper for an averaged battle.
@@ -30,8 +29,8 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
         ----------
         problem : Problem
             The problem that the teams will have to solve.
-        run_parameters : RunParameters | None
-            Parameters for the runs.
+        doker_config : DockerConfig | None
+            Docker configuration for the runs.
         instance_size : int
             The instance size on which the averaged run is to be made.
         iterations : int
@@ -40,7 +39,7 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
         self.instance_size = instance_size
         self.iterations = iterations
 
-        super().__init__(problem, run_parameters, **options)  
+        super().__init__(problem, doker_config, **options)  
 
     def wrapper(self, matchup: Matchup) -> Generator[Averaged.Result, None, None]:
         """Execute one averaged battle between a generating and a solving team.

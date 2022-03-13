@@ -9,6 +9,7 @@ from pathlib import Path
 from subprocess import CalledProcessError, TimeoutExpired, run
 from timeit import default_timer
 from uuid import uuid1
+from dataclasses import dataclass
 
 import algobattle.problems.delaytest as DelaytestProblem
 
@@ -21,6 +22,23 @@ class DockerError(Exception):
     pass
 
 _running_containers: set[tuple[Image, str]] = set()
+
+
+@dataclass
+class DockerConfig:
+    timeout_build: float | None = None
+    timeout_generator: float | None = None
+    timeout_solver: float | None = None
+    space_generator: int | None = None
+    space_solver: int | None = None
+    cpus: int | None = None
+
+    def add_overhead(self, overhead: float) -> None:
+        def _map(f):
+            return f if f is None else f + overhead
+        self.timeout_build = _map(self.timeout_build)
+        self.timeout_generator = _map(self.timeout_generator)
+        self.timeout_solver = _map(self.timeout_solver)
 
 class Image:
     """Class defining a docker image.

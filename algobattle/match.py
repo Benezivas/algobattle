@@ -2,60 +2,32 @@
 from __future__ import annotations
 
 import logging
-from configparser import SectionProxy
 from pathlib import Path
-from collections.abc import Mapping
 from typing import Any
 
 from algobattle.battle_wrapper import BattleWrapper
 from algobattle.battle_wrappers import get_battle_wrapper
 from algobattle.team import Team, BattleMatchups
 from algobattle.problem import Problem
-from algobattle.docker import DockerError
+from algobattle.docker import DockerConfig, DockerError
 from algobattle.ui import Ui
 
 
 logger = logging.getLogger('algobattle.match')
 
-class BuildError(Exception):
-    pass
-
-class RunParameters:
-    def __init__(self, config: Mapping[str, str] = {}, runtime_overhead: float = 0) -> None:
-        def __access(key: str) -> int | None:
-            if key in config.keys():
-                return int(config[key])
-            else:
-                return None
-        def __map(i: int | None, x: float) -> float | None:
-            if i is not None:
-                return i + x
-            else:
-                return None
-
-        self.timeout_build      = __map(__access('timeout_build'), runtime_overhead)
-        self.timeout_generator  = __map(__access('timeout_generator'), runtime_overhead)
-        self.timeout_solver     = __map(__access('timeout_solver'), runtime_overhead)
-        self.space_generator    = __access('space_generator')
-        self.space_solver       = __access('space_solver')
-        self.cpus               = __access('cpus')
-
-
 class Match:
     """Match class, provides functionality for setting up and executing battles between given teams."""
 
-    def __init__(self, problem: Problem, config: SectionProxy, team_info: list[tuple[str, Path, Path]], ui: Ui | None = None,
-                 runtime_overhead: float = 0, cache_docker_containers: bool = True) -> None:
+    def __init__(self, problem: Problem, docker_config: DockerConfig, team_info: list[tuple[str, Path, Path]], ui: Ui | None = None, cache_docker_containers: bool = True) -> None:
 
-        self.run_parameters = RunParameters(config, runtime_overhead)
+        self.docker_config = docker_config
         self.problem = problem
-        self.config = config
         self.ui = ui
 
         self.teams: list[Team] = []
         for info in team_info:
             try:
-                self.teams.append(Team(*info, timeout_build=self.run_parameters.timeout_build, cache_container=cache_docker_containers))
+                self.teams.append(Team(*info, timeout_build=self.docker_config.timeout_build, cache_container=cache_docker_containers))
             except DockerError:
                 logger.error(f"Removing team {info[0]} as their containers did not build successfully.")
             except ValueError as e:
@@ -63,7 +35,7 @@ class Match:
                 raise ValueError from e
         if len(self.teams) == 0:
             logger.critical("None of the team's containers built successfully.")
-            raise BuildError()
+            raise RuntimeError()
         
         self.battle_matchups = BattleMatchups(self.teams)
 
@@ -98,7 +70,7 @@ class Match:
             logger.critical(f"Battle type, problem, and chosen options are incompatible!")
             raise SystemExit
 
-        battle_wrapper = WrapperClass(self.problem, self.run_parameters, **wrapper_options)
+        battle_wrapper = WrapperClass(self.problem, self.docker_config, **wrapper_options)
         
         results = WrapperClass.MatchResult(self.battle_matchups, rounds)    # type: ignore
 

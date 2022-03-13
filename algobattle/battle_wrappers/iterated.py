@@ -10,9 +10,8 @@ import algobattle.battle_wrapper
 from algobattle.problem import Problem
 from algobattle.team import Matchup, Team
 from algobattle.util import format_table
-from typing import TYPE_CHECKING, Generator
-if TYPE_CHECKING:
-    from algobattle.match import RunParameters
+from algobattle.docker import DockerConfig
+from typing import Generator
 
 logger = logging.getLogger('algobattle.battle_wrappers.iterated')
 
@@ -20,7 +19,7 @@ logger = logging.getLogger('algobattle.battle_wrappers.iterated')
 class Iterated(algobattle.battle_wrapper.BattleWrapper):
     """Class of an iterated battle Wrapper."""
 
-    def __init__(self, problem: Problem, run_parameters: RunParameters | None = None,
+    def __init__(self, problem: Problem, docker_config: DockerConfig = DockerConfig(),
                 cap: int = 50000, exponent: int = 2, approximation_ratio: float = 1,
                 **options) -> None:
         """Create a wrapper for an iterated battle.
@@ -29,8 +28,8 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
         ----------
         problem : Problem
             The problem that the teams will have to solve.
-        run_parameters : RunParameters | None
-            Parameters for the runs.
+        docker_config : DockerConfig | None
+            Docker config for the runs.
         cap : int
             The maximum instance size up to which a battle is to be fought.
         exponent : int
@@ -42,7 +41,7 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
         self.cap = cap
         self.approx_ratio = approximation_ratio
         
-        super().__init__(problem, run_parameters, **options)
+        super().__init__(problem, docker_config, **options)
     
     def wrapper(self, matchup: Matchup) -> Generator[Iterated.Result, None, None]:
         """Execute one iterative battle between a generating and a solving team.
