@@ -1,7 +1,7 @@
 """Dummy problem class for delaytest."""
 import logging
 
-from algobattle.problem import ApproxType, Problem
+from algobattle.problem import WeightType, Problem
 
 logger = logging.getLogger("algobattle.problems.delaytest")
 
@@ -11,7 +11,7 @@ class Delaytest(Problem[None, None]):
 
     name = "Runtime Delay Test"
     n_start: int = 1
-    approx_type = ApproxType.maximize
+    weight_type = WeightType.maximize
 
     @staticmethod
     def split(input: str) -> tuple[list[str], list[str]]:

@@ -8,10 +8,10 @@ from typing import Generic, Sized, TypeVar, Protocol
 logger = logging.getLogger("algobattle.problem")
 
 
-class ApproxType(Enum):
+class WeightType(Enum):
+    unweighted = 0
     minimize = 1
     maximize = 2
-    exact = 3
 
 
 Instance = TypeVar("Instance")
@@ -28,8 +28,8 @@ class Problem(Protocol, Generic[Instance, Solution]):
     """Name of the Problem."""
     n_start: int
     """Minimum instance size."""
-    approx_type: ApproxType
-    """Wether the goal is to minimize or maximize the weight of the solution."""
+    weight_type: WeightType
+    """Wether the goal is to minimize or maximize the weight of the solution, or if there is no well defined weight."""
     approx_cap: float = 5
     """The worst case cap for the approximation ratio. Only relevant to prevent outliers skewing any further calculations."""
 
@@ -177,7 +177,7 @@ class Problem(Protocol, Generic[Instance, Solution]):
     def solution_weight(instance: Instance, size: int, solution: Solution) -> float:
         """Calculates the weight of the given Solution.
 
-        Typically this is it's size or the sum of its elements or similar.
+        Typically this is its size or the sum of its elements or similar.
 
         Parameters
         ----------
@@ -225,17 +225,17 @@ class Problem(Protocol, Generic[Instance, Solution]):
         generator_weight = self.solution_weight(instance, size, generator)
         solver_weight = self.solution_weight(instance, size, solver)
 
-        if self.approx_type == ApproxType.maximize:
+        if self.weight_type == WeightType.maximize:
             if generator_weight != 0:
                 return min(solver_weight / generator_weight, self.approx_cap)
             else:
                 return self.approx_cap
-        elif self.approx_type == ApproxType.minimize:
+        elif self.weight_type == WeightType.minimize:
             if solver_weight != 0:
                 return min(generator_weight / solver_weight, self.approx_cap)
             else:
                 return self.approx_cap
-        elif self.approx_type == ApproxType.exact:
+        elif self.weight_type == WeightType.unweighted:
             return 1
         else:
             raise TypeError

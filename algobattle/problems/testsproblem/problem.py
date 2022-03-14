@@ -1,7 +1,7 @@
 """Problem class built for tests."""
 import logging
 
-from algobattle.problem import Problem, ApproxType
+from algobattle.problem import Problem, WeightType
 
 logger = logging.getLogger("algobattle.problems.testsproblem")
 
@@ -11,7 +11,7 @@ class Tests(Problem[list[list[str]], list[str]]):
 
     name: str = "Tests"
     n_start: int = 1
-    approx_type = ApproxType.minimize
+    weight_type = WeightType.minimize
 
     @staticmethod
     def split(input: str) -> tuple[list[str], list[str]]:
