@@ -5,13 +5,13 @@ statistics = True
 max_complexity = 10
 max_line_length = 127
 per_file_ignores = 
-    __init__.py:F401,D104
-    */solver_execution_error/main.py:E999
-    */generator_execution_error/main.py:E999
-    match.py:E221 setup.py:D102,D100
-    */problems/*/verifier.py:D102
-    */problems/*/parser.py:D102
-    tests/*:D102 tests/__init__.py:D104
-    scripts/battle:E501,C901
+    __init__.py: F401, D104
+    setup.py: D102, D100, D104
+    */problems/*/problem.py: D102
+    tests/*: D102
+    tests/__init__.py: D104
 docstring_convention = numpy
 ignore = D105, D401
+exclude =
+    .git,
+    __pycache__
