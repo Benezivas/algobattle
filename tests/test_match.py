@@ -76,7 +76,7 @@ class Matchtests(unittest.TestCase):
         self.assertEqual(self.match_iter.calculate_points(100), {'0': 50, '1': 50})
 
     def test_calculate_points_iterated_domination(self):
-        """One team should get all points if it solved anything and the other team nothing"""
+        """One team should get all points if it solved anything and the other team nothing."""
         self.match_iter.rounds = 2
         self.match_iter.match_data = {'rounds': 2,
                                       'type': 'iterated',
@@ -115,7 +115,7 @@ class Matchtests(unittest.TestCase):
         self.assertEqual(self.match_avg.calculate_points(100), {'0': 50, '1': 50})
 
     def test_calculate_points_averaged_domination(self):
-        """One team should get all points if it solved anything and the other team nothing"""
+        """One team should get all points if it solved anything and the other team nothing."""
         self.match_avg.rounds = 2
         self.match_avg.match_data = {'type': 'averaged',
                                      ('0', '1'): {0: {'approx_ratios': [0, 0, 0]},
