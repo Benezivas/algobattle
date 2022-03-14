@@ -5,7 +5,7 @@ responsible for executing specific types of battle. They share the
 characteristic that they are responsible for updating some match data during
 their run, such that it contains the current state of the match.
 """
-from __future__ import annotations 
+from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from typing import Any, Generator, Generic, Type, TypeVar
@@ -16,23 +16,31 @@ from algobattle.team import Team, BattleMatchups, Matchup
 from algobattle.docker import DockerError, DockerConfig
 from algobattle.util import parse_doc_for_param
 
-logger = logging.getLogger('algobattle.battle_wrapper')
+logger = logging.getLogger("algobattle.battle_wrapper")
 
 Instance = TypeVar("Instance")
 Solution = TypeVar("Solution")
+
+
 class BattleWrapper(ABC, Generic[Instance, Solution]):
     """Base class for wrappers that execute a specific kind of battle.
-    Its state contains information about the battle and its history."""
-    
+
+    Its state contains information about the battle and its history.
+    """
+
     _battle_wrappers: dict[str, Type[BattleWrapper]] = {}
+
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         if not isabstract(cls):
             BattleWrapper._battle_wrappers[cls.__name__.lower()] = cls
 
-    def __init__(self, problem: Problem[Instance, Solution], docker_config: DockerConfig = DockerConfig(), **options: dict[str, Any]):
+    def __init__(
+        self, problem: Problem[Instance, Solution], docker_config: DockerConfig = DockerConfig(), **options: dict[str, Any]
+    ):
         """Builds a battle wrapper object with the given option values.
-        Logs warnings if there were options provided that this wrapper doesn't use. 
+
+        Logs warnings if there were options provided that this wrapper doesn't use.
 
         Parameters
         ----------
@@ -47,10 +55,11 @@ class BattleWrapper(ABC, Generic[Instance, Solution]):
         """
         self.problem = problem
         self.docker_config = docker_config
-    
+
     @classmethod
     def get_arg_spec(cls) -> dict[str, dict[str, Any]]:
         """Gets the info needed to make a cli interface for a battle wrapper.
+
         The argparse type argument will only be set if the type is available in the builtin or global namespace.
 
         Returns
@@ -70,13 +79,13 @@ class BattleWrapper(ABC, Generic[Instance, Solution]):
                         kwargs["type"] = globals()[param.annotation]
                     elif param.annotation in __builtins__:
                         kwargs["type"] = __builtins__[param.annotation]
-                
+
                 if param.default != param.empty:
                     kwargs["default"] = param.default
                     help_default = f" Default: {param.default}"
                 else:
                     help_default = ""
-                
+
                 if doc is not None:
                     try:
                         kwargs["help"] = parse_doc_for_param(doc, param.name) + help_default
@@ -89,7 +98,7 @@ class BattleWrapper(ABC, Generic[Instance, Solution]):
     @classmethod
     def check_compatibility(cls, problem: Problem, options: dict[str, Any]) -> bool:
         return True
-    
+
     @abstractmethod
     def wrapper(self, matchup: Matchup) -> Generator[Result, None, None]:
         """The main base method for a wrapper.
@@ -106,7 +115,7 @@ class BattleWrapper(ABC, Generic[Instance, Solution]):
             The Match object on which the battle wrapper is to be executed on.
         """
         raise NotImplementedError
-    
+
     def _one_fight(self, matchup: Matchup, instance_size: int) -> float:
         """Execute a single fight of a battle between a given generator and solver for a given instance size.
 
@@ -133,7 +142,9 @@ class BattleWrapper(ABC, Generic[Instance, Solution]):
             return 0
 
         approximation_ratio = self.problem.approximation_ratio(instance, instance_size, generator_solution, solver_solution)
-        logger.info(f'Solver of group {matchup.solver} yields a valid solution with an approx. ratio of {approximation_ratio}.')
+        logger.info(
+            f"Solver of group {matchup.solver} yields a valid solution with an approx. ratio of {approximation_ratio}."
+        )
         return approximation_ratio
 
     def _run_generator(self, team: Team, instance_size: int) -> tuple[Instance, Solution]:
@@ -150,7 +161,7 @@ class BattleWrapper(ABC, Generic[Instance, Solution]):
         -------
         Instance, Solution
             The generated instance and solution.
-        
+
         Raises
         ------
         ValueError
@@ -161,36 +172,41 @@ class BattleWrapper(ABC, Generic[Instance, Solution]):
         else:
             scaled_memory = None
 
-        logger.debug(f'Running generator of group {team}...')
+        logger.debug(f"Running generator of group {team}...")
         try:
-            output = team.generator.run(str(instance_size), timeout=self.docker_config.timeout_generator, memory=scaled_memory, cpus=self.docker_config.cpus)
+            output = team.generator.run(
+                str(instance_size),
+                timeout=self.docker_config.timeout_generator,
+                memory=scaled_memory,
+                cpus=self.docker_config.cpus,
+            )
         except DockerError:
             logger.warning(f"generator of team '{team}' didn't run successfully!")
             raise ValueError
 
         if not output:
-            logger.warning(f'No output was generated when running {team.generator}!')
+            logger.warning(f"No output was generated when running {team.generator}!")
             raise ValueError
 
-        logger.debug('Checking generated instance and certificate...')
+        logger.debug("Checking generated instance and certificate...")
         raw_instance, raw_solution = self.problem.split(output)
         try:
             instance = self.problem.parse_instance(raw_instance, instance_size)
         except ValueError:
-            logger.warning(f'Generator {team} created a malformed instance!')
+            logger.warning(f"Generator {team} created a malformed instance!")
             raise
-        
+
         try:
             solution = self.problem.parse_solution(raw_solution, instance_size)
         except ValueError:
-            logger.warning(f'Generator {team} created a malformed solution at instance size!')
+            logger.warning(f"Generator {team} created a malformed solution at instance size!")
             raise
 
         if not self.problem.verify_solution(instance, instance_size, solution):
-            logger.warning(f'Generator {team} failed due to a wrong certificate for its generated instance!')
+            logger.warning(f"Generator {team} failed due to a wrong certificate for its generated instance!")
             raise ValueError
 
-        logger.info(f'Generated instance and certificate by group {team} are valid!')
+        logger.info(f"Generated instance and certificate by group {team} are valid!")
         return instance, solution
 
     def _run_solver(self, team: Team, instance_size: int, instance: Instance) -> Solution:
@@ -211,7 +227,7 @@ class BattleWrapper(ABC, Generic[Instance, Solution]):
         -------
         Solution
             The solver's solution.
-        
+
         Raises
         ------
         ValueError
@@ -223,26 +239,28 @@ class BattleWrapper(ABC, Generic[Instance, Solution]):
             scaled_memory = None
         instance_str = self.problem.encode_instance(instance)
 
-        logger.debug(f'Running solver of group {team}...')
+        logger.debug(f"Running solver of group {team}...")
         try:
-            output = team.solver.run(instance_str, timeout=self.docker_config.timeout_solver, memory=scaled_memory, cpus=self.docker_config.cpus)
+            output = team.solver.run(
+                instance_str, timeout=self.docker_config.timeout_solver, memory=scaled_memory, cpus=self.docker_config.cpus
+            )
         except DockerError:
             logger.warning(f"Solver of team '{team}' didn't run successfully!")
             raise ValueError
-        
+
         if not output:
-            logger.warning(f'No output was generated when running the solver of group {team}!')
+            logger.warning(f"No output was generated when running the solver of group {team}!")
             raise ValueError
 
-        logger.debug('Checking validity of the solvers solution...')
+        logger.debug("Checking validity of the solvers solution...")
         try:
             solution = self.problem.parse_solution(output.splitlines(), instance_size)
         except ValueError:
-            logger.warning(f'Solver of group {team} created a malformed solution at instance size {instance_size}!')
+            logger.warning(f"Solver of group {team} created a malformed solution at instance size {instance_size}!")
             raise
 
         if not self.problem.verify_solution(instance, instance_size, solution):
-            logger.warning(f'Solver of group {team} yields a wrong solution at instance size {instance_size}!')
+            logger.warning(f"Solver of group {team} yields a wrong solution at instance size {instance_size}!")
             raise ValueError
 
         return solution
@@ -251,13 +269,13 @@ class BattleWrapper(ABC, Generic[Instance, Solution]):
         pass
 
     Res = TypeVar("Res", covariant=True, bound=Result)
-    class MatchResult(dict[Matchup, list[Res]], ABC):
 
+    class MatchResult(dict[Matchup, list[Res]], ABC):
         def __init__(self, matchups: BattleMatchups, rounds: int) -> None:
             self.rounds = rounds
             for matchup in matchups:
                 self[matchup] = []
-        
+
         def format(self) -> str:
             """Format the match_data for the battle wrapper as a UTF-8 string.
 
@@ -269,13 +287,12 @@ class BattleWrapper(ABC, Generic[Instance, Solution]):
             str
                 A formatted string on the basis of the match_data.
             """
-
-            formatted_output_string = f"Battles of this type are currently not compatible with the ui.\n"
+            formatted_output_string = "Battles of this type are currently not compatible with the ui.\n"
             formatted_output_string += "Here is a dump of the result objects anyway:\n"
             formatted_output_string += "\n".join(f"{matchup}: {res}" for (matchup, res) in self.items())
 
             return formatted_output_string
-        
+
         def __str__(self) -> str:
             return self.format()
 
