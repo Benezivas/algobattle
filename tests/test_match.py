@@ -7,7 +7,7 @@ import unittest
 import logging
 
 import algobattle
-from algobattle.battle_wrappers.iterated import Iterated
+from algobattle.fight import Fight
 from algobattle.match import Match
 from algobattle.team import Matchup, Team
 from algobattle.docker import DockerConfig
@@ -46,12 +46,8 @@ class Matchtests(unittest.TestCase):
         cls.config = _parse_docker_config(config_directory / "config.ini")
         cls.config.cache_containers = False
         cls.config_short_build_timeout = _parse_docker_config(config_directory / 'config_short_build_timeout.ini')
-        cls.config_short_timeout = _parse_docker_config(config_directory / 'config_short_run_timeout.ini')
 
         cls.team = ('0', cls.tests_path / 'generator', cls.tests_path / 'solver')
-        cls.wrapper_normal = Iterated(cls.problem, cls.config)
-        cls.wrapper_build_timeout = Iterated(cls.problem, cls.config_short_build_timeout)
-        cls.wrapper_run_timeout = Iterated(cls.problem, cls.config_short_timeout)
 
         cls.match = None
 
@@ -91,7 +87,7 @@ class Matchtests(unittest.TestCase):
         self.assertRaises(ValueError, lambda: cast(Match, self.match).run(battle_type='foo'))
 
 
-class WrapperTests(unittest.TestCase):
+class FightTests(unittest.TestCase):
     """Tests for the BattleWrapper object."""
 
     @classmethod
@@ -107,9 +103,9 @@ class WrapperTests(unittest.TestCase):
         cls.config_short_build_timeout = _parse_docker_config(config_directory / 'config_short_build_timeout.ini')
         cls.config_short_timeout = _parse_docker_config(config_directory / 'config_short_run_timeout.ini')
 
-        cls.wrapper_normal = Iterated(cls.problem, cls.config)
-        cls.wrapper_build_timeout = Iterated(cls.problem, cls.config_short_build_timeout)
-        cls.wrapper_run_timeout = Iterated(cls.problem, cls.config_short_timeout)
+        cls.fight_normal = Fight(cls.problem, cls.config)
+        cls.fight_build_timeout = Fight(cls.problem, cls.config_short_build_timeout)
+        cls.fight_run_timeout = Fight(cls.problem, cls.config_short_timeout)
         cls.team: Team | None = None
 
     def tearDown(self) -> None:
@@ -119,57 +115,57 @@ class WrapperTests(unittest.TestCase):
     def test_one_fight_gen_timeout(self):
         self.team = Team('0', self.tests_path / 'generator_timeout', self.tests_path / 'solver', cache_container=False)
         matchup = Matchup(self.team, self.team)
-        self.assertEqual(self.wrapper_run_timeout._one_fight(matchup, 1), self.problem.approx_cap)
+        self.assertEqual(self.fight_run_timeout(matchup, 1), self.problem.approx_cap)
 
     def test_one_fight_gen_exec_error(self):
         self.team = Team('0', self.tests_path / 'generator_execution_error', self.tests_path / 'solver', cache_container=False)
         matchup = Matchup(self.team, self.team)
-        self.assertEqual(self.wrapper_normal._one_fight(matchup, 1), self.problem.approx_cap)
+        self.assertEqual(self.fight_normal(matchup, 1), self.problem.approx_cap)
 
     def test_one_fight_gen_wrong_instance(self):
         self.team = Team('0', self.tests_path / 'generator_wrong_instance', self.tests_path / 'solver', cache_container=False)
         matchup = Matchup(self.team, self.team)
-        self.assertEqual(self.wrapper_normal._one_fight(matchup, 1), self.problem.approx_cap)
+        self.assertEqual(self.fight_normal(matchup, 1), self.problem.approx_cap)
 
     def test_one_fight_gen_malformed_sol(self):
         self.team = Team('0', self.tests_path / 'generator_malformed_solution',
                          self.tests_path / 'solver', cache_container=False)
         matchup = Matchup(self.team, self.team)
-        self.assertEqual(self.wrapper_normal._one_fight(matchup, 1), self.problem.approx_cap)
+        self.assertEqual(self.fight_normal(matchup, 1), self.problem.approx_cap)
 
     def test_one_fight_gen_wrong_cert(self):
         self.team = Team('0', self.tests_path / 'generator_wrong_certificate',
                          self.tests_path / 'solver', cache_container=False)
         matchup = Matchup(self.team, self.team)
-        self.assertEqual(self.wrapper_normal._one_fight(matchup, 1), self.problem.approx_cap)
+        self.assertEqual(self.fight_normal(matchup, 1), self.problem.approx_cap)
 
     def test_one_fight_sol_timeout(self):
         self.team = Team('0', self.tests_path / 'generator', self.tests_path / 'solver_timeout', cache_container=False)
         matchup = Matchup(self.team, self.team)
-        self.assertEqual(self.wrapper_run_timeout._one_fight(matchup, 1), 0.0)
+        self.assertEqual(self.fight_run_timeout(matchup, 1), 0.0)
 
     def test_one_fight_sol_exec_error(self):
         self.team = Team('0', self.tests_path / 'generator',
                          self.tests_path / 'solver_execution_error', cache_container=False)
         matchup = Matchup(self.team, self.team)
-        self.assertEqual(self.wrapper_run_timeout._one_fight(matchup, 1), 0.0)
+        self.assertEqual(self.fight_run_timeout(matchup, 1), 0.0)
 
     def test_one_fight_sol_malformed(self):
         self.team = Team('0', self.tests_path / 'generator',
                          self.tests_path / 'solver_malformed_solution', cache_container=False)
         matchup = Matchup(self.team, self.team)
-        self.assertEqual(self.wrapper_run_timeout._one_fight(matchup, 1), 0.0)
+        self.assertEqual(self.fight_run_timeout(matchup, 1), 0.0)
 
     def test_one_fight_sol_wrong_cert(self):
         self.team = Team('0', self.tests_path / 'generator',
                          self.tests_path / 'solver_wrong_certificate', cache_container=False)
         matchup = Matchup(self.team, self.team)
-        self.assertEqual(self.wrapper_run_timeout._one_fight(matchup, 1), 0.0)
+        self.assertEqual(self.fight_run_timeout(matchup, 1), 0.0)
 
     def test_one_fight_successful(self):
         self.team = Team('0', self.tests_path / 'generator', self.tests_path / 'solver', cache_container=False)
         matchup = Matchup(self.team, self.team)
-        self.assertEqual(self.wrapper_normal._one_fight(matchup, 1), 1.0)
+        self.assertEqual(self.fight_normal(matchup, 1), 1.0)
 
 
 if __name__ == '__main__':
