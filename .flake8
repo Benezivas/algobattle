@@ -11,7 +11,7 @@ per_file_ignores =
     tests/*: D102
     tests/__init__.py: D104
 docstring_convention = numpy
-ignore = D105, D401
+ignore = D105, D401, E203
 exclude =
     .git,
     __pycache__
