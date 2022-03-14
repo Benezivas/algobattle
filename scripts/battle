@@ -18,12 +18,12 @@ from algobattle.ui import Ui
 
 if __name__ == "__main__":
 
-    def setup_logging(logging_path, verbose_logging, silent):
+    def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
         """Creates and returns a parent logger.
 
         Parameters:
         ----------
-        logging_path : str
+        logging_path : Path
             Path to folder where the logfile should be stored at.
         verbose_logging : bool
             Flag indicating whether to include debug messages in the output
@@ -40,8 +40,7 @@ if __name__ == "__main__":
         if verbose_logging:
             common_logging_level = logging.DEBUG
 
-        if not os.path.exists(logging_path):
-            os.makedirs(logging_path)
+        Path(logging_path).mkdir(exist_ok=True)
 
         _now = dt.datetime.now()
 
@@ -68,15 +67,15 @@ if __name__ == "__main__":
         logger.info('You can find the log files for this run in {}'.format(logging_path))
         return logger
 
-    def _exit_if_path_nonexistent(path: str):
+    def _exit_if_path_nonexistent(path: Path):
         """Check if a given path can be found in the os, exit otherwise.
 
         Parameters
         ----------
-        path : str
+        path : Path
             The path to be checked for existence.
         """
-        if not os.path.exists(path):
+        if not Path(path).exists():
             sys.exit('Path "{}" does not exist in the file system! Use "battle --help" for more information on usage and options.'.format(path))
 
     if len(sys.argv) < 2:
@@ -84,17 +83,17 @@ if __name__ == "__main__":
 
     problem_path = str(Path(sys.argv[1]).resolve())
 
-    default_logging_path = os.path.join(str(Path.home()), '.algobattle_logs')
-    default_config = os.path.join(os.path.dirname(os.path.abspath(algobattle.__file__)), 'config', 'config.ini')
+    default_logging_path = Path(Path.home(), '.algobattle_logs')
+    default_config_file = Path(Path(algobattle.__file__).parent, 'config', 'config.ini')
 
     # Option parser to process arguments from the console.
     usage = 'usage: %prog FILE [options]\nExpecting (relative) path to the directory of the problem as first argument.\nIf you provide generators, solvers and group numbers for multiple teams, make sure that the order is the same for all three arguments.'
     parser = OptionParser(usage=usage, version=algobattle.__version__)
     parser.add_option('--verbose', dest='verbose_logging', action='store_true', help='Log all debug messages.')
-    parser.add_option('--output_folder', dest='folder_name', default=default_logging_path, help='Specify the folder into which the log file is written to. Can either be a relative or absolute path to folder. If nonexisting, a new folder will be created. Default: ~/.algobattle_logs/')
-    parser.add_option('--config_file', dest='config', default=default_config, help='Path to a .ini configuration file to be used for the run. Defaults to the packages config.ini')
-    parser.add_option('--solvers', dest='solvers', default=os.path.join(problem_path, 'solver'), help='Specify the folder names containing the solvers of all involved teams as a comma-seperated list. Default: arg1/solver/')
-    parser.add_option('--generators', dest='generators', default=os.path.join(problem_path, 'generator'), help='Specify the folder names containing the generators of all involved teams as a comma-seperated list. Default: arg1/generator/')
+    parser.add_option('--logging_path', dest='logging_path', default=default_logging_path, help='Specify the folder into which the log file is written to. Can either be a relative or absolute path to folder. If nonexisting, a new folder will be created. Default: ~/.algobattle_logs/')
+    parser.add_option('--config_file', dest='config', default=default_config_file, help='Path to a .ini configuration file to be used for the run. Defaults to the packages config.ini')
+    parser.add_option('--solvers', dest='solvers', default=str(Path(problem_path, 'solver')), help='Specify the folder names containing the solvers of all involved teams as a comma-seperated list. Default: arg1/solver/')
+    parser.add_option('--generators', dest='generators', default=str(Path(problem_path, 'generator')), help='Specify the folder names containing the generators of all involved teams as a comma-seperated list. Default: arg1/generator/')
     parser.add_option('--team_names', dest='team_names', default='0', help='Specify the team names of all involved teams as a list strings as a comma-seperated list. Default: "0"')
     parser.add_option('--rounds', dest='battle_rounds', type=int, default='5', help='Number of rounds that are to be fought in the battle (points are split between all rounds). Default: 5')
     parser.add_option('--battle_type', dest='battle_type', choices=['iterated', 'averaged'], default='iterated', help='Type of battle wrapper to be used. Possible options: iterated, averaged. Default: iterated')
@@ -124,7 +123,7 @@ if __name__ == "__main__":
     for generator_path in generators:
         _exit_if_path_nonexistent(generator_path)
 
-    logger = setup_logging(options.folder_name, options.verbose_logging, options.silent)
+    logger = setup_logging(options.logging_path, options.verbose_logging, options.silent)
 
     problem = import_problem_from_path(problem_path)
     if not problem:

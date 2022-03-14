@@ -1,5 +1,4 @@
 """Collection of utility functions."""
-from configparser import ConfigParser
 import os
 import logging
 import timeit
@@ -7,6 +6,9 @@ import subprocess
 import importlib.util
 import sys
 import collections
+
+from configparser import ConfigParser
+from pathlib import Path
 from typing import Callable, Tuple
 
 from algobattle.problem import Problem
@@ -17,12 +19,12 @@ import algobattle.sighandler as sigh
 logger = logging.getLogger('algobattle.util')
 
 
-def import_problem_from_path(problem_path: str) -> Problem:
+def import_problem_from_path(problem_path: Path) -> Problem:
     """Try to import and initialize a Problem object from a given path.
 
     Parameters
     ----------
-    problem_path : str
+    problem_path : Path
         Path in the file system to a problem folder.
 
     Returns
@@ -31,7 +33,7 @@ def import_problem_from_path(problem_path: str) -> Problem:
         Returns an object of the problem.
     """
     try:
-        spec = importlib.util.spec_from_file_location("problem", problem_path + "/__init__.py")
+        spec = importlib.util.spec_from_file_location("problem", Path(problem_path, "__init__.py"))
         Problem = importlib.util.module_from_spec(spec)
         sys.modules[spec.name] = Problem
         spec.loader.exec_module(Problem)
@@ -79,8 +81,8 @@ def measure_runtime_overhead() -> float:
     """
     problem = DelaytestProblem.Problem()
     config = ConfigParser()
-    config.read(os.path.join(os.path.dirname(os.path.abspath(algobattle.__file__)), 'config', 'config_delaytest.ini'))
-    delaytest_path = DelaytestProblem.__file__[:-12] + '/generator'  # remove /__init__.py
+    config.read(Path(Path(algobattle.__file__).parent, 'config', 'config_delaytest.ini'))
+    delaytest_path = Path(Path(DelaytestProblem.__file__).parent, 'generator')
     build_successful = build_docker_container(delaytest_path,
                                               'runtime-checker',
                                               timeout_build=int(config['run_parameters']['timeout_build']))
@@ -196,7 +198,7 @@ def docker_running(function: Callable) -> Callable:
 
 
 @docker_running
-def build_docker_container(container_path: str, docker_tag: str,
+def build_docker_container(container_path: Path, docker_tag: str,
                            timeout_build: int = 600, cache_docker_container: bool = True) -> bool:
     """Build docker containers for the given container_path.
 
@@ -204,7 +206,7 @@ def build_docker_container(container_path: str, docker_tag: str,
 
     Parameters
     ----------
-    container_path : str
+    container_path : Path
         Path to folder containing a Dockerfile in the file system.
     docker_tag : str
         The tag by which the built container can be referenced by.
@@ -225,7 +227,7 @@ def build_docker_container(container_path: str, docker_tag: str,
         "--network=host",
         "-t",
         docker_tag,
-        container_path
+        str(container_path)
     ]
 
     build_successful = True

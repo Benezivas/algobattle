@@ -2,9 +2,10 @@
 import unittest
 import logging
 import importlib
-import os
 import random
+
 from configparser import ConfigParser
+from pathlib import Path
 
 import algobattle
 from algobattle.battle_wrappers.iterated import Iterated
@@ -21,13 +22,13 @@ class Utiltests(unittest.TestCase):
         """Set up a problem, default config, fight handler and get a file name not existing on the file system."""
         Problem = importlib.import_module('algobattle.problems.testsproblem')
         self.problem = Problem.Problem()
-        config_path = os.path.join(os.path.dirname(os.path.abspath(algobattle.__file__)), 'config', 'config.ini')
+        config_path = Path(Path(algobattle.__file__).parent, 'config', 'config.ini')
         self.config = ConfigParser()
         self.config.read(config_path)
         self.fight_handler = FightHandler(self.problem, self.config)
-        self.problem_path = Problem.__file__[:-12]  # remove /__init__.py
+        self.problem_path = Path(Problem.__file__).parent
         self.rand_file_name = random.randint(0, 2 ** 80)
-        while(os.path.exists(str(self.rand_file_name))):
+        while(Path(str(self.rand_file_name)).exists()):
             self.rand_file_name = random.randint(0, 2 ** 80)
 
     def test_import_problem_from_path_existing_path(self):
@@ -52,33 +53,33 @@ class Utiltests(unittest.TestCase):
 
     def test_build_docker_container_timeout(self):
         """False is returned if building a container runs into a timeout."""
-        self.assertFalse(util.build_docker_container(os.path.join(self.problem_path, 'generator_build_timeout'),
+        self.assertFalse(util.build_docker_container(Path(self.problem_path, 'generator_build_timeout'),
                                                      docker_tag='gen_bld_to',
                                                      timeout_build=0.5,
                                                      cache_docker_container=False))
 
     def test_build_docker_container_failed_build(self):
         """False is returned if building a docker container fails for any reason other than a timeout."""
-        self.assertFalse(util.build_docker_container(os.path.join(self.problem_path, 'generator_build_error'),
+        self.assertFalse(util.build_docker_container(Path(self.problem_path, 'generator_build_error'),
                                                      docker_tag='gen_bld_err',
                                                      cache_docker_container=False))
 
     def test_build_docker_container_successful_build(self):
         """True is returned if a docker container builds successfully."""
-        self.assertTrue(util.build_docker_container(os.path.join(self.problem_path, 'generator'),
+        self.assertTrue(util.build_docker_container(Path(self.problem_path, 'generator'),
                                                     docker_tag='gen_succ',
                                                     cache_docker_container=False))
 
     def test_build_docker_container_nonexistant_path(self):
         """False is returned if the path to the container does not exist in the file system."""
-        self.assertFalse(util.build_docker_container(os.path.join(self.problem_path, 'foobar'),
+        self.assertFalse(util.build_docker_container(Path(self.problem_path, 'foobar'),
                                                      docker_tag='foo_bar',
                                                      cache_docker_container=False))
 
     def test_run_subprocess_timeout(self):
         """run_subprocess returns None on a subprocess timeout."""
         docker_tag = 'gen_to'
-        util.build_docker_container(os.path.join(self.problem_path, 'generator_timeout'),
+        util.build_docker_container(Path(self.problem_path, 'generator_timeout'),
                                     docker_tag,
                                     cache_docker_container=False)
         run_command = self.fight_handler.base_run_command(self.fight_handler.space_generator) + [docker_tag]
@@ -88,7 +89,7 @@ class Utiltests(unittest.TestCase):
     def test_run_subprocess_execution_error(self):
         """run_subprocess returns None if an exception is thrown during execution of the subprocess."""
         docker_tag = 'gen_err'
-        util.build_docker_container(os.path.join(self.problem_path, 'generator_execution_error'),
+        util.build_docker_container(Path(self.problem_path, 'generator_execution_error'),
                                     docker_tag,
                                     cache_docker_container=False)
         run_command = self.fight_handler.base_run_command(self.fight_handler.space_generator) + [docker_tag]

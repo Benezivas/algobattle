@@ -1,9 +1,10 @@
 """Tests for the Match class."""
-from configparser import ConfigParser
 import unittest
 import logging
 import importlib
-import os
+
+from configparser import ConfigParser
+from pathlib import Path
 
 import algobattle
 from algobattle.battle_wrappers.iterated import Iterated
@@ -25,14 +26,14 @@ class Matchtests(unittest.TestCase):
         self.problem = Problem.Problem()
         self.problem_path = Problem.__file__[:-12]  # remove /__init__.py
 
-        util.build_docker_container(os.path.join(self.problem_path, 'generator'),
+        util.build_docker_container(Path(self.problem_path, 'generator'),
                                     docker_tag='gen')
-        util.build_docker_container(os.path.join(self.problem_path, 'solver'),
+        util.build_docker_container(Path(self.problem_path, 'solver'),
                                     docker_tag='sol')
         self.team0 = Team('0', 'gen', 'sol')
         self.team1 = Team('1', 'gen', 'sol')
 
-        config_path = os.path.join(os.path.dirname(os.path.abspath(algobattle.__file__)), 'config', 'config.ini')
+        config_path = Path(Path(algobattle.__file__).parent, 'config', 'config.ini')
         self.config = ConfigParser()
         self.config.read(config_path)
 
