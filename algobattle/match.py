@@ -3,10 +3,9 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, Type
 
 from algobattle.battle_wrapper import BattleWrapper
-from algobattle.battle_wrappers import get_battle_wrapper
 from algobattle.fight import Fight
 from algobattle.team import Team, BattleMatchups
 from algobattle.problem import Problem
@@ -46,7 +45,7 @@ class Match:
         self.battle_matchups = BattleMatchups(self.teams)
 
     def run(
-        self, battle_type: str = "iterated", rounds: int = 5, **wrapper_options: dict[str, Any]
+        self, battle_type: Type[BattleWrapper], rounds: int = 5, **wrapper_options: dict[str, Any]
     ) -> BattleWrapper.MatchResult:
         """Match entry point, executes rounds fights between all teams and returns the results of the battles.
 
@@ -71,13 +70,8 @@ class Match:
             A wrapper instance containing information about the executed battle.
         """
         fight = Fight(self.problem, self.docker_config)
-        WrapperClass = get_battle_wrapper(battle_type)
-        ResultClass = WrapperClass.Result
-
-
-        battle_wrapper = WrapperClass(self.problem, fight, **wrapper_options)
-
-        results = WrapperClass.MatchResult(self.battle_matchups, rounds)  # type: ignore
+        battle_wrapper = battle_type(self.problem, fight, **wrapper_options)
+        results = battle_wrapper.MatchResult(self.battle_matchups, rounds)  # type: ignore
 
         if self.ui is not None:
             self.ui.update(results.format())
@@ -85,7 +79,7 @@ class Match:
         for matchup in self.battle_matchups:
             for i in range(rounds):
                 logger.info(f'{"#" * 20}  Running Battle {i + 1}/{rounds}  {"#" * 20}')
-                results[matchup].append(ResultClass())
+                results[matchup].append(battle_wrapper.Result())
 
                 for result in battle_wrapper.wrapper(matchup):
                     results[matchup][i] = result

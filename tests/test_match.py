@@ -82,10 +82,6 @@ class Matchtests(unittest.TestCase):
             self.match = Match(self.problem, self.config_short_build_timeout, [team])
         self.assertRaises(SystemExit, build_match)
 
-    def test_run(self):
-        self.match = Match(self.problem, self.config, [self.team])
-        self.assertRaises(ValueError, lambda: cast(Match, self.match).run(battle_type='foo'))
-
 
 class FightTests(unittest.TestCase):
     """Tests for the BattleWrapper object."""

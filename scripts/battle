@@ -14,7 +14,7 @@ from algobattle.match import Match
 from algobattle.util import import_problem_from_path, NestedHelp
 from algobattle.docker import measure_runtime_overhead, DockerConfig
 from algobattle.ui import Ui
-from algobattle.battle_wrappers import battle_wrappers
+from algobattle.battle_wrappers import battle_wrappers, get_battle_wrapper
 
 
 def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
@@ -98,6 +98,7 @@ def create_parser() -> ArgumentParser:
     parser.add_argument("--version", action="version", version=f"Algobattle version {algobattle.__version__}")
     parser.add_argument("--help", "-h", action=NestedHelp,
                         help="Battle type to display additional help for, or 'all' to display full help.")
+
     parser.add_argument("problem_path", type=resolved_path, help="Path to the parent directory of a problem file as argument.")
     parser.add_argument("--teams", "-t", action="extend", type=resolved_path, nargs="*",
                         help="Any number of paths that specify teams. Either by the found folder structure or a team.ini "
@@ -119,15 +120,12 @@ def create_parser() -> ArgumentParser:
     parser.add_argument("--points", "-p", type=int, default="100",
                         help="Number of points that are to be fought for. Default: 100")
     parser.add_argument("--do_not_count_points", action="store_true", help="If set, points are not calculated for the run.")
-    # fmt: on
 
     battle_args = parser.add_argument_group("battle arguments")
-    battle_args.add_argument(
-        "battle_type",
-        choices=battle_wrappers.keys(),
-        nargs="?",
-        help="Type of battle, has to be set in the command line or config file",
-    )
+    battle_args.add_argument("--battle_type", choices=battle_wrappers.keys(), type=get_battle_wrapper,
+                             help="Type of battle, has to be set in the command line or config file")
+    # fmt: on
+
     for name, kwargs in battle_arg_spec.items():
         battle_args.add_argument(f"--{name}", **(kwargs | {"default": None}))
 
@@ -172,10 +170,17 @@ def parse_config(options: Namespace) -> Namespace:
 
     if options.battle_type is not None:
         battle_type = options.battle_type
-    elif "battle_type" in config["battle"]:
-        battle_type = config["battle"]["battle_type"]
+    elif "battle" in config and "battle_type" in config["battle"]:
+        type_str = config["battle"]["battle_type"]
+        try:
+            battle_type = get_battle_wrapper(type_str)
+        except ValueError:
+            wrappers = ", ".join(f"'{battle_wrappers.keys()}'")
+            raise SystemExit(f"The config file contains an invalid battle type '{type_str}', choose one of {wrappers}.")
     else:
         raise SystemExit(f"The battle type was not specified in the command line or the config file! {help_msg}")
+    battle_options.battle_type = battle_type
+    battle_type = str(battle_type)
 
     for name, kwargs in battle_arg_spec.items():
         if getattr(options, name) is not None:
@@ -193,7 +198,6 @@ def parse_config(options: Namespace) -> Namespace:
         else:
             setattr(battle_options, name, kwargs["default"])
 
-    battle_options.battle_type = battle_type
     kwargs = {
         "cpus": config["run_parameters"].getint("cpus", None),
         "timeout_build": config["run_parameters"].getfloat("timeout_build", None),
