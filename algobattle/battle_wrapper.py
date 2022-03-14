@@ -12,7 +12,6 @@ from typing import Callable, List, Tuple
 from algobattle.fight_handler import FightHandler
 from algobattle.observer import Observer
 from algobattle.subject import Subject
-from algobattle.util import update_nested_dict
 
 logger = logging.getLogger('algobattle.battle_wrapper')
 

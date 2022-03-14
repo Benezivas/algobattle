@@ -6,6 +6,7 @@ from typing import Tuple
 
 from algobattle.battle_wrapper import BattleWrapper
 from algobattle.fight_handler import FightHandler
+from algobattle.util import update_nested_dict
 
 logger = logging.getLogger('algobattle.battle_wrappers.averaged')
 
