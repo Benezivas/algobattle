@@ -147,13 +147,8 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
 
                     ratios1 = self[Matchup(*pair)][i].approx_ratios  # pair[1] was solver
                     ratios0 = self[Matchup(*pair[::-1])][i].approx_ratios  # pair[0] was solver
-
-                    valuation0 = 0
-                    valuation1 = 0
-                    if ratios0 and sum(ratios0) != 0:
-                        valuation0 = sum(1 / x if x != 0 else 0 for x in ratios0) / len(ratios0)
-                    if ratios1 and sum(ratios1) != 0:
-                        valuation1 = sum(1 / x if x != 0 else 0 for x in ratios1) / len(ratios1)
+                    valuation0 = sum(ratios0) / len(ratios0)
+                    valuation1 = sum(ratios1) / len(ratios1)
 
                     # Default values for proportions, assuming no team manages to solve anything
                     points_proportion0 = 0.5
