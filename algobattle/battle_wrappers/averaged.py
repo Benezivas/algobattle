@@ -14,15 +14,20 @@ from algobattle.util import format_table
 from algobattle.docker import DockerConfig
 
 
-logger = logging.getLogger('algobattle.battle_wrappers.averaged')
+logger = logging.getLogger("algobattle.battle_wrappers.averaged")
 
 
 class Averaged(algobattle.battle_wrapper.BattleWrapper):
     """Class of an adveraged battle Wrapper."""
 
-    def __init__(self, problem: Problem, docker_config: DockerConfig = DockerConfig(),
-                instance_size: int = 10, iterations: int = 25,
-                **options: Any) -> None:
+    def __init__(
+        self,
+        problem: Problem,
+        docker_config: DockerConfig = DockerConfig(),
+        instance_size: int = 10,
+        iterations: int = 25,
+        **options: Any,
+    ) -> None:
         """Create a wrapper for an averaged battle.
 
         Parameters
@@ -39,7 +44,7 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
         self.instance_size = instance_size
         self.iterations = iterations
 
-        super().__init__(problem, docker_config, **options)  
+        super().__init__(problem, docker_config, **options)
 
     def wrapper(self, matchup: Matchup) -> Generator[Averaged.Result, None, None]:
         """Execute one averaged battle between a generating and a solving team.
@@ -56,9 +61,11 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
             The Match object on which the battle wrapper is to be executed on.
         """
         res = self.Result()
-        logger.info(f'==================== Averaged Battle, Instance Size: {self.instance_size}, Rounds: {self.iterations} ====================')
+        logger.info(
+            f"==================== Averaged Battle, Instance Size: {self.instance_size}, Rounds: {self.iterations} ===================="
+        )
         for i in range(self.iterations):
-            logger.info(f'=============== Iteration: {i + 1}/{self.iterations} ===============')
+            logger.info(f"=============== Iteration: {i + 1}/{self.iterations} ===============")
             approx_ratio = self._one_fight(matchup, instance_size=self.instance_size)
             res.approx_ratios.append(approx_ratio)
             yield res
@@ -73,12 +80,11 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
 
         def __str__(self) -> str:
             return str(float(self))
-        
+
         def __repr__(self) -> str:
             return str(self.approx_ratios)
-    
-    class MatchResult(algobattle.battle_wrapper.BattleWrapper.MatchResult[Result]):
 
+    class MatchResult(algobattle.battle_wrapper.BattleWrapper.MatchResult[Result]):
         def format(self) -> str:
             table = []
             table.append(["GEN", "SOL", *range(1, self.rounds + 1), "LAST"])
@@ -98,7 +104,7 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
                 table.append([matchup.generator, matchup.solver, *res, *padding, last_ratio])
 
             return "Battle Type: Averaged Battle\n" + format_table(table)
-    
+
         def calculate_points(self, achievable_points: int) -> dict[Team, float]:
             """Calculate the number of achieved points.
 
@@ -125,14 +131,13 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
             for pair in self.keys():
                 teams = teams.union(set(pair))
             team_combinations = itertools.combinations(teams, 2)
-            
 
             if len(teams) == 1:
                 return {teams.pop(): achievable_points}
 
             if self.rounds == 0:
                 return {}
-            
+
             points_per_round = round(achievable_points / self.rounds, 1)
             for pair in team_combinations:
                 for i in range(self.rounds):
@@ -155,8 +160,8 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
 
                     # Normalize valuations
                     if valuation0 + valuation1 > 0:
-                        points_proportion0 = (valuation0 / (valuation0 + valuation1))
-                        points_proportion1 = (valuation1 / (valuation0 + valuation1))
+                        points_proportion0 = valuation0 / (valuation0 + valuation1)
+                        points_proportion1 = valuation1 / (valuation0 + valuation1)
 
                     points[pair[0]] += round(points_per_round * points_proportion0, 1)
                     points[pair[1]] += round(points_per_round * points_proportion1, 1)
