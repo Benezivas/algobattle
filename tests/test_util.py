@@ -24,8 +24,7 @@ class Utiltests(unittest.TestCase):
 
     def test_import_problem_from_path(self):
         self.assertIsNotNone(import_problem_from_path(self.tests_path))
-        f = lambda: import_problem_from_path(Path("foo"))
-        self.assertRaises(ValueError, f)
+        self.assertRaises(ValueError, lambda: import_problem_from_path(Path("foo")))
 
     def test_measure_runtime_overhead(self):
         self.assertGreater(measure_runtime_overhead(), 0)

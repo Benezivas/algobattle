@@ -73,7 +73,6 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
         match: Match
             The Match object on which the battle wrapper is to be executed on.
         """
-
         n = self.problem.n_start
         maximum_reached_n = 0
         i = 0

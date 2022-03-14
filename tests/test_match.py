@@ -37,9 +37,9 @@ class Matchtests(unittest.TestCase):
         cls.wrapper_normal = Iterated(cls.problem, RunParameters(cls.config["run_parameters"]))
         cls.wrapper_build_timeout = Iterated(cls.problem, RunParameters(cls.config_short_build_timeout["run_parameters"]))
         cls.wrapper_run_timeout = Iterated(cls.problem, RunParameters(cls.config_short_timeout["run_parameters"]))
-    
+
         cls.match = None
-    
+
     def tearDown(self) -> None:
         if self.match is not None:
             self.match.cleanup()
@@ -59,6 +59,7 @@ class Matchtests(unittest.TestCase):
     def test_build_timeout(self):
         # Build timeout
         team = ('0', self.tests_path / 'generator_build_timeout', self.tests_path / 'solver')
+
         def build_match():
             self.match = Match(self.problem, self.config_short_build_timeout, [team], cache_docker_containers=False)
         self.assertRaises(BuildError, build_match)
@@ -96,9 +97,8 @@ class WrapperTests(unittest.TestCase):
         cls.wrapper_normal = Iterated(cls.problem, RunParameters(cls.config["run_parameters"]))
         cls.wrapper_build_timeout = Iterated(cls.problem, RunParameters(cls.config_short_build_timeout["run_parameters"]))
         cls.wrapper_run_timeout = Iterated(cls.problem, RunParameters(cls.config_short_timeout["run_parameters"]))
-    
         cls.team: Team | None = None
-    
+
     def tearDown(self) -> None:
         if self.team is not None:
             self.team.cleanup()
@@ -119,12 +119,14 @@ class WrapperTests(unittest.TestCase):
         self.assertEqual(self.wrapper_normal._one_fight(matchup, 1), self.problem.approx_cap)
 
     def test_one_fight_gen_malformed_sol(self):
-        self.team = Team('0', self.tests_path / 'generator_malformed_solution', self.tests_path / 'solver', cache_container=False)
+        self.team = Team('0', self.tests_path / 'generator_malformed_solution',
+                         self.tests_path / 'solver', cache_container=False)
         matchup = Matchup(self.team, self.team)
         self.assertEqual(self.wrapper_normal._one_fight(matchup, 1), self.problem.approx_cap)
 
     def test_one_fight_gen_wrong_cert(self):
-        self.team = Team('0', self.tests_path / 'generator_wrong_certificate', self.tests_path / 'solver', cache_container=False)
+        self.team = Team('0', self.tests_path / 'generator_wrong_certificate',
+                         self.tests_path / 'solver', cache_container=False)
         matchup = Matchup(self.team, self.team)
         self.assertEqual(self.wrapper_normal._one_fight(matchup, 1), self.problem.approx_cap)
 
@@ -134,17 +136,20 @@ class WrapperTests(unittest.TestCase):
         self.assertEqual(self.wrapper_run_timeout._one_fight(matchup, 1), 0.0)
 
     def test_one_fight_sol_exec_error(self):
-        self.team = Team('0', self.tests_path / 'generator', self.tests_path / 'solver_execution_error', cache_container=False)
+        self.team = Team('0', self.tests_path / 'generator',
+                         self.tests_path / 'solver_execution_error', cache_container=False)
         matchup = Matchup(self.team, self.team)
         self.assertEqual(self.wrapper_run_timeout._one_fight(matchup, 1), 0.0)
 
     def test_one_fight_sol_malformed(self):
-        self.team = Team('0', self.tests_path / 'generator', self.tests_path / 'solver_malformed_solution', cache_container=False)
+        self.team = Team('0', self.tests_path / 'generator',
+                         self.tests_path / 'solver_malformed_solution', cache_container=False)
         matchup = Matchup(self.team, self.team)
         self.assertEqual(self.wrapper_run_timeout._one_fight(matchup, 1), 0.0)
 
     def test_one_fight_sol_wrong_cert(self):
-        self.team = Team('0', self.tests_path / 'generator', self.tests_path / 'solver_wrong_certificate', cache_container=False)
+        self.team = Team('0', self.tests_path / 'generator',
+                         self.tests_path / 'solver_wrong_certificate', cache_container=False)
         matchup = Matchup(self.team, self.team)
         self.assertEqual(self.wrapper_run_timeout._one_fight(matchup, 1), 0.0)
 

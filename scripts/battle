@@ -20,7 +20,7 @@ from algobattle.battle_wrappers import battle_wrappers
 def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
     """Creates and returns a parent logger.
 
-    Parameters:
+    Parameters
     ----------
     logging_path : Path
         Path to folder where the logfile should be stored at.
@@ -29,9 +29,9 @@ def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
     silent : bool
         Flag indicating whether not to pipe the logging output to stderr.
 
-    Returns:
-    ----------
-    Logger:
+    Returns
+    -------
+    Logger
         The Logger object.
     """
     common_logging_level = logging.INFO

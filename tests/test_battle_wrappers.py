@@ -13,11 +13,14 @@ logging.disable(logging.CRITICAL)
 @dataclass(frozen=True)
 class TestTeam(Team):
     """Team class that doesn't build containers to make tests that don't need them run faster."""
+
     name: str
+
 
 def team(name: str) -> Team:
     """Aliasing function to deal with invariance issues."""
     return TestTeam(name)
+
 
 class PointsCalculationTests(TestCase):
     """Tests for the points calculation functions."""
@@ -69,9 +72,10 @@ class PointsCalculationTests(TestCase):
         results[self.matchups[1]] = [Averaged.Result([0, 0, 0]), Averaged.Result([0, 0, 0])]
         self.assertEqual(results.calculate_points(100), {self.teams[0]: 50, self.teams[1]: 50})
 
+
 class MatchupsTests(TestCase):
     """Tests for the matchup generators."""
-    
+
     def test_all_battle_pairs(self):
         team0 = team("0")
         team1 = team("1")
@@ -81,6 +85,7 @@ class MatchupsTests(TestCase):
     def test_all_battle_pairs_solo_battle(self):
         team0 = team("0")
         self.assertEqual(list(BattleMatchups([team0])), [Matchup(team0, team0)])
+
 
 if __name__ == '__main__':
     main()

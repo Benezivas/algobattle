@@ -62,7 +62,8 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
         """
         res = self.Result()
         logger.info(
-            f"==================== Averaged Battle, Instance Size: {self.instance_size}, Rounds: {self.iterations} ===================="
+            f"==================== Averaged Battle, Instance Size: {self.instance_size}, "
+            "Rounds: {self.iterations} ===================="
         )
         for i in range(self.iterations):
             logger.info(f"=============== Iteration: {i + 1}/{self.iterations} ===============")

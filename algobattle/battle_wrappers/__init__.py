@@ -13,6 +13,8 @@ for path in Path(__file__).resolve().parent.iterdir():
         import_module(f".{path.name[:-3]}", "algobattle.battle_wrappers")
 
 battle_wrappers = BattleWrapper._battle_wrappers
+
+
 def get_battle_wrapper(battle_type: str) -> Type[BattleWrapper]:
     """Get the battle wrapper for the given type of battle.
 
