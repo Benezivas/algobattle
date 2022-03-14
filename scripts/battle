@@ -182,21 +182,15 @@ def parse_config(options: Namespace) -> Namespace:
     battle_options.battle_type = battle_type
     battle_type = str(battle_type)
 
-    for name, kwargs in battle_arg_spec.items():
-        if getattr(options, name) is not None:
-            setattr(battle_options, name, options.name)
-        elif "battle" in config and name in config["battle"]:
-            setattr(battle_options, name, kwargs["type"](config["battle"][name]))
-        else:
-            setattr(battle_options, name, kwargs["default"])
-
-    for name, kwargs in battle_wrappers[battle_type].get_arg_spec().items():
-        if getattr(options, name) is not None:
-            setattr(battle_options, name, options.name)
-        elif battle_type in config and name in config[battle_type]:
-            setattr(battle_options, name, kwargs["type"](config[battle_type][name]))
-        else:
-            setattr(battle_options, name, kwargs["default"])
+    arg_specs = [("battle", battle_arg_spec), (battle_type, battle_wrappers[battle_type].get_arg_spec())]
+    for spec_name, spec in arg_specs:
+        for name, kwargs in spec.items():
+            if getattr(options, name) is not None:
+                setattr(battle_options, name, options.name)
+            elif spec_name in config and name in config[spec_name]:
+                setattr(battle_options, name, kwargs["type"](config[spec_name][name]))
+            else:
+                setattr(battle_options, name, kwargs["default"])
 
     kwargs = {
         "cpus": config["run_parameters"].getint("cpus", None),
