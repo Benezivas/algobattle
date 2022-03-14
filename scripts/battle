@@ -68,29 +68,51 @@ def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
 battle_arg_spec = {
     "rounds": {"type": int, "default": 5, "help": "Number of rounds that are to be fought in the battle (points are split between all rounds). Default: 5"},
 }
+
+help_msg = "Use 'battle --help' for more information on usage and options."
+
+
+def _missing_path(path: Path, desc: str | None = None):
+    start = "Path" if desc is None else f"{desc} path"
+    return f"{start} '{path}' does not exist in the file system! {help_msg}"
+
 def create_parser() -> ArgumentParser:
 
     default_logging_path = Path.home() / ".algobattle_logs"
     def resolved_path(path: str) -> Path:
         return Path(path).resolve()
 
+    # fmt: off
     parser = ArgumentParser(add_help=False)
     parser.add_argument("--version", action="version", version=f"Algobattle version {algobattle.__version__}")
-    parser.add_argument("--help", "-h", action=NestedHelp, help="Battle type to display additional help for, or 'all' to display full help.")
-
+    parser.add_argument("--help", "-h", action=NestedHelp,
+                        help="Battle type to display additional help for, or 'all' to display full help.")
     parser.add_argument("problem_path", type=resolved_path, help="Path to the parent directory of a problem file as argument.")
-    parser.add_argument("--teams", "-t", action="extend", type=resolved_path, nargs="*", help="Any number of paths that specify teams. Either by the found folder structure or a team.ini file found there. Defaults to the problem path.")
-    parser.add_argument("--config", "-c", type=resolved_path, help="Path to a .ini configuration file to be used for the run. Defaults to either the 'config.ini' file in the problem folder if it exists or the packages config.ini")
-    parser.add_argument("--logging_folder", "-o", type=resolved_path, default=default_logging_path, help="Specify the folder into which the log file is written to. Can either be a relative or absolute path to folder. If nonexisting, a new folder will be created. Default: ~/.algobattle_logs/")
+    parser.add_argument("--teams", "-t", action="extend", type=resolved_path, nargs="*",
+                        help="Any number of paths that specify teams. Either by the found folder structure or a team.ini "
+                        "file found there. Defaults to the problem path.")
+    parser.add_argument("--config", "-c", type=resolved_path,
+                        help="Path to a .ini configuration file to be used for the run. Defaults to either the 'config.ini' "
+                        " file in the problem folder if it exists or the packages config.ini")
+    parser.add_argument("--logging_folder", "-o", type=resolved_path, default=default_logging_path,
+                        help="Specify the folder into which the log file is written to. Can either be a relative or absolute "
+                        "path to folder. If nonexisting, a new folder will be created. Default: ~/.algobattle_logs/")
     parser.add_argument("--verbose", action="store_true", help="Log all debug messages.")
-    parser.add_argument("--display", "-d", choices=["silent", "ui", "logs"], default="logs", help="Choose display mode, silent will hide all output, logs will pipe the logs to stderr, and ui will display a small terminal ui. Default: logs")
-    parser.add_argument("--no_overhead_calculation", action="store_true", help="If set, the program does not benchmark the I/O of the host system to calculate the runtime overhead when started.")
+    parser.add_argument("--display", "-d", choices=["silent", "ui", "logs"], default="logs",
+                        help="Choose display mode, silent will hide all output, logs will pipe the logs to stderr, and ui "
+                        "will display a small terminal ui. Default: logs")
+    parser.add_argument("--no_overhead_calculation", action="store_true",
+                        help="If set, the program does not benchmark the I/O of the host system to calculate "
+                        "the runtime overhead when started.")
     parser.add_argument("--no_cleanup", action="store_true", help="Don't clean up any created docker images.")
-    parser.add_argument("--points", "-p", type=int, default="100", help="Number of points that are to be fought for. Default: 100")
+    parser.add_argument("--points", "-p", type=int, default="100",
+                        help="Number of points that are to be fought for. Default: 100")
     parser.add_argument("--do_not_count_points", action="store_true", help="If set, points are not calculated for the run.")
+    # fmt: on
 
     battle_args = parser.add_argument_group("battle arguments")
-    battle_args.add_argument("battle_type", choices=battle_wrappers.keys(), nargs="?", help="Type of battle, has to be set in the command line or config file")
+    battle_args.add_argument("battle_type", choices=battle_wrappers.keys(), nargs="?",
+                             help="Type of battle, has to be set in the command line or config file")
     for name, kwargs in battle_arg_spec.items():
         battle_args.add_argument(f"--{name}", **(kwargs | {"default": None}))
     
@@ -105,7 +127,7 @@ def parse_args() -> Namespace:
     options = create_parser().parse_args()
     
     if not options.problem_path.exists():
-        raise SystemExit(f"Problem path '{options.problem_path}' does not exist in the file system! Use 'battle --help' for more information on usage and options.")
+        raise SystemExit(_missing_path(options.problem_path, "Problem"))
     
     working_dir: Path = options.problem_path
     if working_dir.is_file():
@@ -117,7 +139,7 @@ def parse_args() -> Namespace:
         else:
             options.config = Path(algobattle.__file__).resolve().parent / "config" / "config.ini"
     elif not options.config.exists():
-        raise SystemExit(f"Config path '{options.config}' does not exist in the file system! Use 'battle --help' for more information on usage and options.")
+        raise SystemExit(_missing_path(options.config, "Config"))
     elif options.config.is_folder():
         options.config /= "config.ini"
     
@@ -136,7 +158,7 @@ def parse_config(options: Namespace) -> Namespace:
     elif "battle_type" in config["battle"]:
         battle_type = config["battle"]["battle_type"]
     else:
-        raise SystemExit("The battle type was not specified in the command line or the config file! Use 'battle --help' for more information on usage and options.")
+        raise SystemExit(f"The battle type was not specified in the command line or the config file! {help_msg}")
     
     for name, kwargs in battle_arg_spec.items():
         if getattr(options, name) is not None:
@@ -173,7 +195,7 @@ def parse_team_info(teams: list[Path]) -> list[tuple[str, Path, Path]]:
     team_info: list[tuple[str, Path, Path]] = []
     for path in teams:
         if not path.exists():
-            raise SystemExit(f"Path '{path}' to team info does not exist in the file system! Use 'battle --help' for more information on usage and options.")
+            raise SystemExit(_missing_path(path, "Team info"))
         elif path.is_dir():
             if not (path / "team.ini").is_file():
                 team_info.append((path.name, path / "generator", path / "solver"))
@@ -199,7 +221,7 @@ def parse_team_info(teams: list[Path]) -> list[tuple[str, Path, Path]]:
     for name, gen_path, sol_path in team_info:
         for role, path in [("generator", gen_path), ("solver", sol_path)]:
             if not path.exists:
-                raise SystemExit(f"The {role} path {gen_path} used by team '{name}' does not exist in the file system! Use 'battle --help' for more information on usage and options.")
+                raise SystemExit(_missing_path(path, f"{name}'s {role}"))
     
     return team_info
 
@@ -212,7 +234,7 @@ if __name__ == "__main__":
         try:
             problem = import_problem_from_path(options.problem_path)
         except ValueError:
-            raise SystemExit(f"Could not import the problem! Check the logs and use 'battle --help' for more information on usage and options.")
+            raise SystemExit(f"Could not import the problem! {help_msg}")
 
         logger.debug(f"Options for this run: {options}")
 
@@ -226,7 +248,8 @@ if __name__ == "__main__":
         if not options.no_overhead_calculation:
             logger.info('Running a benchmark to determine your machines I/O overhead to start and stop docker containers...')
             runtime_overhead = measure_runtime_overhead()
-            logger.info(f'Maximal measured runtime overhead is at {runtime_overhead} seconds. Adding this amount to the configured runtime.')
+            logger.info(f"Maximal measured runtime overhead is at {runtime_overhead} seconds. "
+                        "Adding this amount to the configured runtime.")
             config.docker_config.add_overhead(runtime_overhead)
 
         team_info = parse_team_info(options.teams)
