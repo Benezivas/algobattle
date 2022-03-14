@@ -1,10 +1,4 @@
-"""Base class for wrappers that execute a specific kind of battle.
-
-The battle wrapper class is a base class for specific wrappers, which are
-responsible for executing specific types of battle. They share the
-characteristic that they are responsible for updating some match data during
-their run, such that it contains the current state of the match.
-"""
+"""Module for the abstract base class for battle types."""
 from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
@@ -25,7 +19,9 @@ Solution = TypeVar("Solution")
 class BattleWrapper(ABC, Generic[Instance, Solution]):
     """Base class for wrappers that execute a specific kind of battle.
 
-    Its state contains information about the battle and its history.
+    All battle wrappers should inherit from this explicitly so they are integrated into the match structure properly.
+    A battle wrapper is responsible for deciding the sequence of fights that are executed and processing their results.
+    It also handles further processing of match results through its associated types.
     """
 
     _battle_wrappers: dict[str, Type[BattleWrapper]] = {}
@@ -35,21 +31,17 @@ class BattleWrapper(ABC, Generic[Instance, Solution]):
         if not isabstract(cls):
             BattleWrapper._battle_wrappers[cls.__name__.lower()] = cls
 
-    def __init__(self, problem: Problem[Instance, Solution], fight: Fight, **options: dict[str, Any]):
+    def __init__(self, problem: Problem[Instance, Solution], fight: Fight, **kwargs: dict[str, Any]):
         """Builds a battle wrapper object with the given option values.
-
-        Logs warnings if there were options provided that this wrapper doesn't use.
 
         Parameters
         ----------
-        match: Match
-            The match object this wrapper will be used for.
-        problem: str
+        problem: Problem
             The problem this wrapper will be used for.
-        rounds: int
-            The number of rounds that will be executed.
-        options: dict[str, Any]
-            Dict containing option values.
+        fight:
+            Fight that will be executed.
+        kwargs: dict[str, Any]
+            Further options that each battle wrapper can use.
         """
         self.problem = problem
         self.fight = fight
@@ -63,7 +55,7 @@ class BattleWrapper(ABC, Generic[Instance, Solution]):
         Returns
         -------
         dict[str, dict[str, Any]]
-            A mapping of the names of an arg and their kwargs.
+            A mapping of the names of a cli argument and the **kwargs for it.
         """
         base_params = [param for param in signature(BattleWrapper).parameters]
         out = {}
@@ -111,11 +103,18 @@ class BattleWrapper(ABC, Generic[Instance, Solution]):
         raise NotImplementedError
 
     class Result:
+        """The result of a battle."""
+
         pass
 
     Res = TypeVar("Res", covariant=True, bound=Result)
 
     class MatchResult(dict[Matchup, list[Res]], ABC):
+        """The result of a whole match.
+
+        Generally a mapping of matchups to a list of Results, one per round.
+        """
+
         def __init__(self, matchups: BattleMatchups, rounds: int) -> None:
             self.rounds = rounds
             for matchup in matchups:
