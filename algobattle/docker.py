@@ -11,6 +11,7 @@ from subprocess import CalledProcessError, TimeoutExpired, run
 from timeit import default_timer
 from uuid import uuid1
 from dataclasses import dataclass
+from signal import SIGTERM
 
 import algobattle.problems.delaytest as DelaytestProblem
 
@@ -21,7 +22,8 @@ logger = logging.getLogger("algobattle.docker")
 class DockerError(Exception):
     """Error type for any issue during the execution of a docker command.
 
-    The only error raised by any function in the docker module."""
+    The only error raised by any function in the docker module.
+    """
 
     pass
 
@@ -48,7 +50,8 @@ class DockerConfig:
 class Image:
     """Class defining a docker image.
 
-    Constructor execution may take several seconds and should not be interrupted."""
+    Constructor execution may take several seconds and should not be interrupted.
+    """
 
     def __init__(
         self,
@@ -154,7 +157,7 @@ class Image:
         try:
             result = run(cmd, input=input, capture_output=True, timeout=timeout, check=True, text=True)
 
-        except TimeoutExpired as e:
+        except TimeoutExpired:
             logger.warning(f"'{self.description}' exceeded time limit!")
             return ""
 
@@ -178,7 +181,7 @@ class Image:
             if result is None:
                 _kill_container(self, name)
                 if os.name == "posix":
-                    os.killpg(os.getpid(), signal.SIGTERM)
+                    os.killpg(os.getpid(), SIGTERM)
 
         elapsed_time = round(default_timer() - start_time, 2)
         logger.debug(f"Approximate elapsed runtime: {elapsed_time}/{timeout} seconds.")
