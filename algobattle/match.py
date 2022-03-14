@@ -13,20 +13,25 @@ from algobattle.docker import DockerConfig, DockerError
 from algobattle.ui import Ui
 
 
-logger = logging.getLogger('algobattle.match')
+logger = logging.getLogger("algobattle.match")
+
 
 class Match:
     """Match class, provides functionality for setting up and executing battles between given teams."""
 
-    def __init__(self, problem: Problem, docker_config: DockerConfig, team_info: list[tuple[str, Path, Path]], ui: Ui | None = None) -> None:
-        
+    def __init__(
+        self, problem: Problem, docker_config: DockerConfig, team_info: list[tuple[str, Path, Path]], ui: Ui | None = None
+    ) -> None:
+
         self.problem = problem
         self.ui = ui
 
         self.teams: list[Team] = []
         for info in team_info:
             try:
-                self.teams.append(Team(*info, timeout_build=docker_config.timeout_build, cache_container=docker_config.cache_containers))
+                self.teams.append(
+                    Team(*info, timeout_build=docker_config.timeout_build, cache_container=docker_config.cache_containers)
+                )
             except DockerError:
                 logger.error(f"Removing team {info[0]} as their containers did not build successfully.")
             except ValueError as e:
@@ -35,10 +40,12 @@ class Match:
         if len(self.teams) == 0:
             logger.critical("None of the teams containers built successfully.")
             raise SystemExit
-        
+
         self.battle_matchups = BattleMatchups(self.teams)
 
-    def run(self, battle_type: str = 'iterated', rounds: int = 5, **wrapper_options: dict[str, Any]) -> BattleWrapper.MatchResult:
+    def run(
+        self, battle_type: str = "iterated", rounds: int = 5, **wrapper_options: dict[str, Any]
+    ) -> BattleWrapper.MatchResult:
         """Match entry point, executes rounds fights between all teams and returns the results of the battles.
 
         Parameters
@@ -61,21 +68,20 @@ class Match:
         BattleWrapper
             A wrapper instance containing information about the executed battle.
         """
-
         WrapperClass = get_battle_wrapper(battle_type)
         ResultClass = WrapperClass.Result
 
         if not WrapperClass.check_compatibility(self.problem, wrapper_options):
-            logger.critical(f"Battle type, problem, and chosen options are incompatible!")
+            logger.critical("Battle type, problem, and chosen options are incompatible!")
             raise SystemExit
 
         battle_wrapper = WrapperClass(self.problem, **wrapper_options)
-        
-        results = WrapperClass.MatchResult(self.battle_matchups, rounds)    # type: ignore
+
+        results = WrapperClass.MatchResult(self.battle_matchups, rounds)  # type: ignore
 
         if self.ui is not None:
             self.ui.update(results.format())
-        
+
         for matchup in self.battle_matchups:
             for i in range(rounds):
                 logger.info(f'{"#" * 20}  Running Battle {i + 1}/{rounds}  {"#" * 20}')
@@ -85,7 +91,6 @@ class Match:
                     results[matchup][i] = result
                     if self.ui is not None:
                         self.ui.update(results.format())
-
 
         return results
 
