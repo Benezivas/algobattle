@@ -8,11 +8,28 @@ import logging
 
 import algobattle
 from algobattle.battle_wrappers.iterated import Iterated
-from algobattle.match import BuildError, Match, RunParameters
+from algobattle.match import Match
 from algobattle.team import Matchup, Team
+from algobattle.docker import DockerConfig
 import algobattle.problems.testsproblem as Problem
 
 logging.disable(logging.CRITICAL)
+
+
+def _parse_docker_config(path: Path) -> DockerConfig:
+    config = ConfigParser()
+    config.read(path)
+
+    kwargs = {
+        "cpus": config["run_parameters"].getint("cpus", None),
+        "timeout_build": config["run_parameters"].getfloat("timeout_build", None),
+        "cache_containers": config["run_parameters"].getboolean("cache_containers", True),
+    }
+    for role in ("generator", "solver"):
+        kwargs[f"timeout_{role}"] = config["run_parameters"].getfloat(f"timeout_{role}", None)
+        kwargs[f"space_{role}"] = config["run_parameters"].getint(f"space_{role}", None)
+
+    return DockerConfig(**kwargs)
 
 
 class Matchtests(unittest.TestCase):
@@ -26,17 +43,15 @@ class Matchtests(unittest.TestCase):
         cls.tests_path = Path(problem_file).parent
 
         config_directory = Path(algobattle.__file__).resolve().parent / 'config'
-        cls.config = ConfigParser()
-        cls.config.read(config_directory / "config.ini")
-        cls.config_short_build_timeout = ConfigParser()
-        cls.config_short_build_timeout.read(config_directory / 'config_short_build_timeout.ini')
-        cls.config_short_timeout = ConfigParser()
-        cls.config_short_timeout.read(config_directory / 'config_short_run_timeout.ini')
+        cls.config = _parse_docker_config(config_directory / "config.ini")
+        cls.config.cache_containers = False
+        cls.config_short_build_timeout = _parse_docker_config(config_directory / 'config_short_build_timeout.ini')
+        cls.config_short_timeout = _parse_docker_config(config_directory / 'config_short_run_timeout.ini')
 
         cls.team = ('0', cls.tests_path / 'generator', cls.tests_path / 'solver')
-        cls.wrapper_normal = Iterated(cls.problem, RunParameters(cls.config["run_parameters"]))
-        cls.wrapper_build_timeout = Iterated(cls.problem, RunParameters(cls.config_short_build_timeout["run_parameters"]))
-        cls.wrapper_run_timeout = Iterated(cls.problem, RunParameters(cls.config_short_timeout["run_parameters"]))
+        cls.wrapper_normal = Iterated(cls.problem, cls.config)
+        cls.wrapper_build_timeout = Iterated(cls.problem, cls.config_short_build_timeout)
+        cls.wrapper_run_timeout = Iterated(cls.problem, cls.config_short_timeout)
 
         cls.match = None
 
@@ -47,7 +62,7 @@ class Matchtests(unittest.TestCase):
     def assertBuild(self, build: Callable):
         try:
             build()
-        except BuildError:
+        except RuntimeError:
             self.fail("Docker build did not finish successfully.")
 
     def test_build_normal(self):
@@ -61,15 +76,15 @@ class Matchtests(unittest.TestCase):
         team = ('0', self.tests_path / 'generator_build_timeout', self.tests_path / 'solver')
 
         def build_match():
-            self.match = Match(self.problem, self.config_short_build_timeout, [team], cache_docker_containers=False)
-        self.assertRaises(BuildError, build_match)
+            self.match = Match(self.problem, self.config_short_build_timeout, [team])
+        self.assertRaises(SystemExit, build_match)
 
     def test_build_error(self):
         # Build error
         team = ('0', self.tests_path / 'generator_build_error', self.tests_path / 'solver')
         def build_match():
-            self.match = Match(self.problem, self.config_short_build_timeout, [team], cache_docker_containers=False)
-        self.assertRaises(BuildError, build_match)
+            self.match = Match(self.problem, self.config_short_build_timeout, [team])
+        self.assertRaises(SystemExit, build_match)
 
     def test_run(self):
         self.match = Match(self.problem, self.config, [self.team])
@@ -87,16 +102,14 @@ class WrapperTests(unittest.TestCase):
         cls.tests_path = Path(problem_file).parent
 
         config_directory = Path(algobattle.__file__).resolve().parent / 'config'
-        cls.config = ConfigParser()
-        cls.config.read(config_directory / "config.ini")
-        cls.config_short_build_timeout = ConfigParser()
-        cls.config_short_build_timeout.read(config_directory / 'config_short_build_timeout.ini')
-        cls.config_short_timeout = ConfigParser()
-        cls.config_short_timeout.read(config_directory / 'config_short_run_timeout.ini')
+        cls.config = _parse_docker_config(config_directory / "config.ini")
+        cls.config.cache_containers = False
+        cls.config_short_build_timeout = _parse_docker_config(config_directory / 'config_short_build_timeout.ini')
+        cls.config_short_timeout = _parse_docker_config(config_directory / 'config_short_run_timeout.ini')
 
-        cls.wrapper_normal = Iterated(cls.problem, RunParameters(cls.config["run_parameters"]))
-        cls.wrapper_build_timeout = Iterated(cls.problem, RunParameters(cls.config_short_build_timeout["run_parameters"]))
-        cls.wrapper_run_timeout = Iterated(cls.problem, RunParameters(cls.config_short_timeout["run_parameters"]))
+        cls.wrapper_normal = Iterated(cls.problem, cls.config)
+        cls.wrapper_build_timeout = Iterated(cls.problem, cls.config_short_build_timeout)
+        cls.wrapper_run_timeout = Iterated(cls.problem, cls.config_short_timeout)
         cls.team: Team | None = None
 
     def tearDown(self) -> None:
