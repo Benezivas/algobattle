@@ -25,21 +25,21 @@ class Match(Subject, Observer):
         self.match_data = {'type': str(self.battle_wrapper),
                            'problem': str(self.fight_handler.problem),
                            'teams': [str(team) for team in self.teams],
-                           'rounds': self.rounds}  # match_data is a property with special getters and setters
+                           'rounds': self.rounds}
         for pair in self.all_battle_pairs():
             for round in range(rounds):
-                self.match_data = {pair: {'curr_round': 0, round: self.battle_wrapper.round_data}}
+                update_nested_dict(self.match_data, {pair: {'curr_round': 0, round: self.battle_wrapper.round_data}})
 
     def run(self) -> None:
         """Match entry point, executes fights between all teams."""
         for pair in self.all_battle_pairs(as_team_objects=True):
-            self.match_data = {'curr_pair': (str(pair[0]), str(pair[1]))}
+            update_nested_dict(self.match_data, {'curr_pair': (str(pair[0]), str(pair[1]))})
             self.fight_handler.set_roles(generating=pair[0], solving=pair[1])
             print(self.match_data)
 
             for i in range(self.rounds):
                 logger.info('{}  Running Battle {}/{}  {}'.format('#' * 20, i + 1, self.rounds, '#' * 20))
-                self.match_data = {str(pair): {'curr_round': i}}
+                update_nested_dict(self.match_data, {str(pair): {'curr_round': i}})
                 self.battle_wrapper.run_round(self.fight_handler)
                 print(self.match_data)
 
@@ -221,30 +221,12 @@ class Match(Subject, Observer):
         battle_wrapper : BattleWrapper
             The observed battle_wrapper object.
         """
-        if 'curr_pair' in self._match_data.keys():
-            current_pair = self._match_data['curr_pair']
-            if 'curr_round' in self._match_data[current_pair]:
-                current_round = self._match_data[current_pair]['curr_round']
-                update_nested_dict(self._match_data, {current_pair: {current_round: battle_wrapper.round_data}})
+        if 'curr_pair' in self.match_data.keys():
+            current_pair = self.match_data['curr_pair']
+            if 'curr_round' in self.match_data[current_pair]:
+                current_round = self.match_data[current_pair]['curr_round']
+                update_nested_dict(self.match_data, {current_pair: {current_round: battle_wrapper.round_data}})
         self.notify()
-
-    def _update_match_data(self, new_data: dict) -> bool:
-        """Update the internal match dict with new (partial) information and notify observers.
-
-        Parameters
-        ----------
-        new_data : dict
-            A dict containing information that (over-)writes data (of/)to the match_data dict.
-        """
-        self._match_data = update_nested_dict(self._match_data, new_data)
-        self.notify()
-
-    def _get_match_data(self) -> dict:
-        """Return the current match data."""
-        return self._match_data
-
-    _match_data = {}
-    match_data = property(_get_match_data, _update_match_data)  # Decorator to reduce updating overhead.
 
     def attach(self, observer: Observer) -> None:
         """Subscribe a new Observer by adding them to the list of observers."""
