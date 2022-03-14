@@ -35,13 +35,11 @@ class Match(Subject, Observer):
         for pair in self.all_battle_pairs(as_team_objects=True):
             update_nested_dict(self.match_data, {'curr_pair': (str(pair[0]), str(pair[1]))})
             self.fight_handler.set_roles(generating=pair[0], solving=pair[1])
-            print(self.match_data)
 
             for i in range(self.rounds):
                 logger.info('{}  Running Battle {}/{}  {}'.format('#' * 20, i + 1, self.rounds, '#' * 20))
                 update_nested_dict(self.match_data, {str(pair): {'curr_round': i}})
                 self.battle_wrapper.run_round(self.fight_handler)
-                print(self.match_data)
 
     def calculate_points(self, achievable_points: int) -> dict:
         """Calculate the number of points achieved through the match.
