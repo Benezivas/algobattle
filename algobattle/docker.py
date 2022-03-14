@@ -17,10 +17,14 @@ import algobattle.problems.delaytest as DelaytestProblem
 
 logger = logging.getLogger("algobattle.docker")
 
+
 class DockerError(Exception):
     """Error type for any issue during the execution of a docker command.
+
     The only error raised by any function in the docker module."""
+
     pass
+
 
 @dataclass
 class DockerConfig:
@@ -35,22 +39,27 @@ class DockerConfig:
     def add_overhead(self, overhead: float) -> None:
         def _map(f):
             return f if f is None else f + overhead
+
         self.timeout_build = _map(self.timeout_build)
         self.timeout_generator = _map(self.timeout_generator)
         self.timeout_solver = _map(self.timeout_solver)
 
+
 class Image:
     """Class defining a docker image.
+
     Constructor execution may take several seconds and should not be interrupted."""
-    def __init__(self,
-                path: Path,
-                image_name: str,
-                description: str | None,
-                timeout: float | None = None,
-                cache: bool = True,
-                )-> None:
+
+    def __init__(
+        self,
+        path: Path,
+        image_name: str,
+        description: str | None,
+        timeout: float | None = None,
+        cache: bool = True,
+    ) -> None:
         """Constructs the python Image object and uses the docker daemon to build the image.
-        
+
         Parameters
         ----------
         path
@@ -63,11 +72,11 @@ class Image:
             Build timeout in seconds, raises DockerError if exceeded.
         cache
             Unset to instruct docker to not cache the image build.
-        
+
         Raises
         ------
         DockerError
-        	On almost all common issues that might happen during the build, including timeouts, syntax errors,
+                On almost all common issues that might happen during the build, including timeouts, syntax errors,
             OS errors, and errors thrown by the docker daemon.
         """
         cmd = ["docker", "build", "-q", "--network=host"]
@@ -76,7 +85,7 @@ class Image:
         if not cache:
             cmd.append("--no-cache")
         cmd.append(str(path))
-        
+
         logger.debug(f"Building docker container with the following command: {' '.join(cmd)}")
         try:
             result = run(cmd, capture_output=True, timeout=timeout, check=True, text=True)
@@ -105,12 +114,9 @@ class Image:
         self.id = result.stdout.strip()[7:]
         self.description = description if description is not None else image_name
 
-    def run(self,
-            input: str | None = None,
-            timeout: float | None = None,
-            memory: int | None = None,
-            cpus: int | None = None
-            ) -> str:
+    def run(
+        self, input: str | None = None, timeout: float | None = None, memory: int | None = None, cpus: int | None = None
+    ) -> str:
         """Runs a docker image with the provided input and returns its output.
 
         Parameters
@@ -123,7 +129,7 @@ class Image:
             Maximum memory the container will be allocated in MB
         cpus
             Number of cpus the container will be allocated
-        
+
         Returns
         -------
         Output string of the container
@@ -131,7 +137,7 @@ class Image:
         Raises
         ------
         DockerError
-        	On almost all common issues that might happen during the execution, including syntax errors,
+                On almost all common issues that might happen during the execution, including syntax errors,
             OS errors, and errors thrown by the docker daemon.
 
         """
@@ -167,29 +173,29 @@ class Image:
         except ValueError as e:
             logger.warning(f"Process '{self.description}' created with invalid arguments:\n{e}")
             raise DockerError from e
-        
+
         finally:
             if result is None:
                 _kill_container(self, name)
-                if os.name == 'posix':
+                if os.name == "posix":
                     os.killpg(os.getpid(), signal.SIGTERM)
-        
-        elapsed_time = round(default_timer() - start_time, 2)
-        logger.debug(f'Approximate elapsed runtime: {elapsed_time}/{timeout} seconds.')
 
-        return result.stdout    # type: ignore
-    
+        elapsed_time = round(default_timer() - start_time, 2)
+        logger.debug(f"Approximate elapsed runtime: {elapsed_time}/{timeout} seconds.")
+
+        return result.stdout  # type: ignore
+
     def remove(self) -> None:
         """Removes the image from the docker daemon.
-        
+
         **This will not cause the python object to be deleted.** Attempting to run the image after it has been removed will
-        cause runtime errors not caught by the linter or typechecker. 
+        cause runtime errors not caught by the linter or typechecker.
         Will not throw an error if the image has been removed already.
 
         Raises
         ------
         DockerError
-        	On almost all common issues that might happen during the execution, including syntax errors,
+                On almost all common issues that might happen during the execution, including syntax errors,
             OS errors, and errors thrown by the docker daemon.
 
         """
@@ -201,10 +207,10 @@ class Image:
             if e.stderr.find("error during connect") != -1:
                 logger.error("Could not connect to the docker daemon. Is docker running?")
                 raise SystemExit("Exited algobattle: Could not connect to the docker daemon. Is docker running?")
-            
+
             if e.stderr.find("No such image") == -1:
                 logger.warning(f"Removing '{self.description}' did not complete successfully:\n{e.stderr}")
-            
+
             raise DockerError from e
 
         except OSError as e:
@@ -216,12 +222,12 @@ class Image:
             raise DockerError from e
 
 
-
 def _kill_container(image: Image, name: str) -> None:
     """Kills a running container.
+
     Do not call this function if you didn't start the container,
     it's rather unsafe and will cause many downstream errors.
-    
+
     Parameters
     ----------
     image
@@ -231,14 +237,15 @@ def _kill_container(image: Image, name: str) -> None:
     """
     try:
         run(["docker", "kill", name], capture_output=True, check=True, text=True)
-    
+
     except CalledProcessError as e:
         if e.stderr.find("error during connect") != -1:
             logger.error("Could not connect to the docker daemon. Is docker running?")
             raise SystemExit("Exited algobattle: Could not connect to the docker daemon. Is docker running?")
-        
-        if e.stderr.find(f"No such container: {name}") == -1 and e.stderr.find(f"is not running") == -1:
+
+        if e.stderr.find(f"No such container: {name}") == -1 and e.stderr.find("is not running") == -1:
             logger.warning(f"Could not kill container '{image.description}':\n{e.stderr}")
+
 
 def measure_runtime_overhead() -> float:
     """Calculate the I/O delay for starting and stopping docker on the host machine.
@@ -248,8 +255,7 @@ def measure_runtime_overhead() -> float:
     float
         I/O overhead in seconds, rounded to two decimal places.
     """
-
-    delaytest_path = Path(DelaytestProblem.__file__).parent / 'generator'
+    delaytest_path = Path(DelaytestProblem.__file__).parent / "generator"
     try:
         image = Image(delaytest_path, "delaytest_generator", "delaytest generator", timeout=300)
     except DockerError:
