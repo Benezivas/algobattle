@@ -64,19 +64,14 @@ def import_problem_from_path(path: Path) -> Problem:
     RuntimeError
         If some unexpected error occurs while importing the Problem.
     """
-    path = path.resolve()
-    if not path.exists():
+    try:
+        path = get_matching_file(path.resolve(), "__init__.py", "problem.py")
+    except RuntimeError:
         logger.warning(f"Problem path '{path}' does not exist in the file system!")
         raise ValueError
-
-    if path.is_dir:
-        if (path / "__init__.py").is_file():
-            path /= "__init__.py"
-        elif (path / "problem.py").is_file():
-            path /= "problem.py"
-        else:
-            logger.warning(f"Problem path '{path}' points to a directory that doesn't contain a Problem.")
-            raise ValueError
+    except ValueError:
+        logger.warning(f"Problem path '{path}' points to a directory that doesn't contain a Problem.")
+        raise ValueError
 
     try:
         spec = importlib.util.spec_from_file_location("problem", path)
