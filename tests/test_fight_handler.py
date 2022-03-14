@@ -1,4 +1,4 @@
-"""Tests for the Match class."""
+"""Tests for the Fight Handler class."""
 from configparser import ConfigParser
 import unittest
 import logging
@@ -13,7 +13,7 @@ from algobattle.team import Team
 logging.disable(logging.CRITICAL)
 
 
-class Matchtests(unittest.TestCase):
+class FightHandlertests(unittest.TestCase):
     """Tests for the match object."""
 
     def setUp(self) -> None:
