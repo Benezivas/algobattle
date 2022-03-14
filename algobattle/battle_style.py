@@ -50,7 +50,7 @@ class BattleStyle(ABC, Generic[Instance, Solution]):
     def get_arg_spec(cls) -> dict[str, dict[str, Any]]:
         """Gets the info needed to make a cli interface for a battle style.
 
-        The argparse type argument will only be set if the type is available in the builtin or global namespace.
+        The argparse 'type' argument will only be set if the type is available in the builtin or global namespace.
 
         Returns
         -------
@@ -87,18 +87,17 @@ class BattleStyle(ABC, Generic[Instance, Solution]):
 
     @abstractmethod
     def run(self, matchup: Matchup) -> Generator[Result, None, None]:
-        """The main base method for a battle style.
-
-        A battle style should update the match.match_data object during its run. The callback functionality
-        around it is executed automatically.
-
-        It is assumed that the match.generating_team and match.solving_team are
-        set before calling a battle style.
+        """Executes a battle between the given matchup.
 
         Parameters
         ----------
-        match: Match
-            The Match object on which the battle battle style is to be executed on.
+        matchup: Matchup
+            The matchup of teams that participate in this battle.
+        
+        Returns
+        -------
+        Generator[Result, None, None]
+            A generator of intermediate results, the last yielded is the final result.
         """
         raise NotImplementedError
 
