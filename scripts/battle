@@ -2,6 +2,7 @@
 """Main battle script. Executes all possible types of battles, see battle --help for all options."""
 from __future__ import annotations, generators
 from configparser import ConfigParser
+from genericpath import exists
 from sys import stderr
 import os
 import logging
@@ -11,7 +12,7 @@ from pathlib import Path
 
 import algobattle
 from algobattle.match import Match
-from algobattle.util import import_problem_from_path, NestedHelp
+from algobattle.util import get_matching_file, import_problem_from_path, NestedHelp, get_matching_file
 from algobattle.docker import measure_runtime_overhead, DockerConfig
 from algobattle.ui import Ui
 from algobattle.battle_wrappers import battle_wrappers, get_battle_wrapper
@@ -206,17 +207,16 @@ def parse_config(options: Namespace) -> Namespace:
     return battle_options
 
 
-def parse_team_info(teams: list[Path]) -> list[tuple[str, Path, Path]]:
+def parse_team_info(teams: list[Path]) -> list[tuple[str, Path, Path]]:     # noqa: C901
     team_info: list[tuple[str, Path, Path]] = []
     for path in teams:
-        if not path.exists():
+        try:
+            path = get_matching_file(path.resolve(), "teams.ini")
+        except RuntimeError:
             raise SystemExit(_missing_path(path, "Team info"))
-        elif path.is_dir():
-            if not (path / "team.ini").is_file():
-                team_info.append((path.name, path / "generator", path / "solver"))
-                continue
-            else:
-                path /= "team.ini"
+        except ValueError:
+            team_info.append((path.name, path / "generator", path / "solver"))
+            continue
 
         config = ConfigParser()
         try:
@@ -260,7 +260,6 @@ if __name__ == "__main__":
         else:
             ui = None
 
-        runtime_overhead = 0
         if not options.no_overhead_calculation:
             logger.info("Running a benchmark to determine your machines I/O overhead to start and stop docker containers...")
             runtime_overhead = measure_runtime_overhead()
