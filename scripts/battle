@@ -16,6 +16,7 @@ from algobattle.docker import measure_runtime_overhead, DockerConfig
 from algobattle.ui import Ui
 from algobattle.battle_wrappers import battle_wrappers
 
+
 def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
     """Creates and returns a parent logger.
 
@@ -42,14 +43,17 @@ def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
 
     _now = dt.datetime.now()
 
-    time_seperator = ":" if os.name == "posix" else "-"
-    current_timestamp = f"{_now.year:04d}-{_now.month:02d}-{_now.day:02d}_{_now.hour:02d}{time_seperator}{_now.minute:02d}{time_seperator}{_now.second:02d}"
+    sep = ":" if os.name == "posix" else "-"
+    current_timestamp = (f"{_now.year:04d}-{_now.month:02d}-{_now.day:02d}_"
+                         f"{_now.hour:02d}{sep}{_now.minute:02d}{sep}{_now.second:02d}")
     logging_path /= current_timestamp + ".log"
 
-    logging.basicConfig(handlers=[logging.FileHandler(logging_path, "w", "utf-8")],
-                        level=common_logging_level,
-                        format="%(asctime)s %(levelname)s: %(message)s",
-                        datefmt="%H:%M:%S")
+    logging.basicConfig(
+        handlers=[logging.FileHandler(logging_path, "w", "utf-8")],
+        level=common_logging_level,
+        format="%(asctime)s %(levelname)s: %(message)s",
+        datefmt="%H:%M:%S",
+    )
 
     logger = logging.getLogger("algobattle")
 
@@ -65,8 +69,13 @@ def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
     logger.info(f"You can find the log files for this run in {logging_path}")
     return logger
 
+
 battle_arg_spec = {
-    "rounds": {"type": int, "default": 5, "help": "Number of rounds that are to be fought in the battle (points are split between all rounds). Default: 5"},
+    "rounds": {
+        "type": int,
+        "default": 5,
+        "help": "Number of rounds that are to be fought in the battle (points are split between all rounds). Default: 5",
+    },
 }
 
 help_msg = "Use 'battle --help' for more information on usage and options."
@@ -76,9 +85,11 @@ def _missing_path(path: Path, desc: str | None = None):
     start = "Path" if desc is None else f"{desc} path"
     return f"{start} '{path}' does not exist in the file system! {help_msg}"
 
+
 def create_parser() -> ArgumentParser:
 
     default_logging_path = Path.home() / ".algobattle_logs"
+
     def resolved_path(path: str) -> Path:
         return Path(path).resolve()
 
@@ -111,24 +122,29 @@ def create_parser() -> ArgumentParser:
     # fmt: on
 
     battle_args = parser.add_argument_group("battle arguments")
-    battle_args.add_argument("battle_type", choices=battle_wrappers.keys(), nargs="?",
-                             help="Type of battle, has to be set in the command line or config file")
+    battle_args.add_argument(
+        "battle_type",
+        choices=battle_wrappers.keys(),
+        nargs="?",
+        help="Type of battle, has to be set in the command line or config file",
+    )
     for name, kwargs in battle_arg_spec.items():
         battle_args.add_argument(f"--{name}", **(kwargs | {"default": None}))
-    
+
     for name, cls in battle_wrappers.items():
         cls_args = battle_args.add_argument_group(name)
         for name, kwargs in cls.get_arg_spec().items():
             cls_args.add_argument(f"--{name}", **(kwargs | {"default": None}))
-    
+
     return parser
+
 
 def parse_args() -> Namespace:
     options = create_parser().parse_args()
-    
+
     if not options.problem_path.exists():
         raise SystemExit(_missing_path(options.problem_path, "Problem"))
-    
+
     working_dir: Path = options.problem_path
     if working_dir.is_file():
         working_dir = working_dir.parent
@@ -142,11 +158,12 @@ def parse_args() -> Namespace:
         raise SystemExit(_missing_path(options.config, "Config"))
     elif options.config.is_folder():
         options.config /= "config.ini"
-    
+
     if options.teams is None:
         options.teams = [working_dir]
 
     return options
+
 
 def parse_config(options: Namespace) -> Namespace:
     config = ConfigParser()
@@ -159,7 +176,7 @@ def parse_config(options: Namespace) -> Namespace:
         battle_type = config["battle"]["battle_type"]
     else:
         raise SystemExit(f"The battle type was not specified in the command line or the config file! {help_msg}")
-    
+
     for name, kwargs in battle_arg_spec.items():
         if getattr(options, name) is not None:
             setattr(battle_options, name, options.name)
@@ -167,7 +184,7 @@ def parse_config(options: Namespace) -> Namespace:
             setattr(battle_options, name, kwargs["type"](config["battle"][name]))
         else:
             setattr(battle_options, name, kwargs["default"])
-    
+
     for name, kwargs in battle_wrappers[battle_type].get_arg_spec().items():
         if getattr(options, name) is not None:
             setattr(battle_options, name, options.name)
@@ -175,7 +192,7 @@ def parse_config(options: Namespace) -> Namespace:
             setattr(battle_options, name, kwargs["type"](config[battle_type][name]))
         else:
             setattr(battle_options, name, kwargs["default"])
-    
+
     battle_options.battle_type = battle_type
     kwargs = {
         "cpus": config["run_parameters"].getint("cpus", None),
@@ -189,7 +206,7 @@ def parse_config(options: Namespace) -> Namespace:
     battle_options.docker_config = DockerConfig(**kwargs)
 
     return battle_options
-    
+
 
 def parse_team_info(teams: list[Path]) -> list[tuple[str, Path, Path]]:
     team_info: list[tuple[str, Path, Path]] = []
@@ -207,7 +224,7 @@ def parse_team_info(teams: list[Path]) -> list[tuple[str, Path, Path]]:
         try:
             config.read(path)
         except Exception as e:
-            logger.warning(f"Team config file '{path}' can't be parsed correctly, removing them from the battle. Raised error: {e}")
+            logger.warning(f"Team config file '{path}' can't be parsed correctly, removing them from the battle.\nError: {e}")
             continue
         if "team" not in config:
             logger.warning(f"Team config file '{path}' does not contain a 'team' section, removing the team from the battle.")
@@ -217,20 +234,21 @@ def parse_team_info(teams: list[Path]) -> list[tuple[str, Path, Path]]:
         generator = config.get("generator", "generator")
         solver = config.get("solver", "solver")
         team_info.append((name, (path / generator).resolve(), (path / solver).resolve()))
-    
+
     for name, gen_path, sol_path in team_info:
         for role, path in [("generator", gen_path), ("solver", sol_path)]:
             if not path.exists:
                 raise SystemExit(_missing_path(path, f"{name}'s {role}"))
-    
+
     return team_info
+
 
 if __name__ == "__main__":
     try:
         options = parse_args()
         logger = setup_logging(options.logging_folder, options.verbose, options.display != "logs")
         config = parse_config(options)
-        
+
         try:
             problem = import_problem_from_path(options.problem_path)
         except ValueError:
@@ -243,13 +261,15 @@ if __name__ == "__main__":
             ui.update("Setting up match...")
         else:
             ui = None
-        
+
         runtime_overhead = 0
         if not options.no_overhead_calculation:
-            logger.info('Running a benchmark to determine your machines I/O overhead to start and stop docker containers...')
+            logger.info("Running a benchmark to determine your machines I/O overhead to start and stop docker containers...")
             runtime_overhead = measure_runtime_overhead()
-            logger.info(f"Maximal measured runtime overhead is at {runtime_overhead} seconds. "
-                        "Adding this amount to the configured runtime.")
+            logger.info(
+                f"Maximal measured runtime overhead is at {runtime_overhead} seconds. "
+                "Adding this amount to the configured runtime."
+            )
             config.docker_config.add_overhead(runtime_overhead)
 
         team_info = parse_team_info(options.teams)
@@ -265,12 +285,12 @@ if __name__ == "__main__":
             points = results.calculate_points(options.points)
             for team, points in points.items():
                 logger.info(f"Group {team} gained {points:.1f} points.")
-        
+
         if not options.no_cleanup:
             match.cleanup()
         if options.display != "silent":
             print(results.format())
-    
+
     except KeyboardInterrupt:
         if "logger" in locals():
             logger.critical("Received keyboard interrupt, terminating execution.")  # type: ignore
