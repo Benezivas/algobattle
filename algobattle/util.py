@@ -13,6 +13,37 @@ from algobattle.problem import Problem
 logger = logging.getLogger("algobattle.util")
 
 
+def get_matching_file(path: Path, *files: str) -> Path:
+    """Searches the file structure for the first file found in the targeted directory.
+
+    Parameters
+    ----------
+    path : Path
+        Path to a directory or file, if it's a file the path will be returned unaltered.
+
+    Returns
+    -------
+    Path
+        Path to the first found file or the parent directory if it contains no matching files.
+
+    Raises
+    ------
+    RuntimeError
+        If the path doesn't exist in the file system.
+    ValueError
+        If the targeted directory contains no matching files.
+    """
+    if not path.exists():
+        raise RuntimeError
+    elif path.is_dir():
+        for ending in files:
+            if (path / ending).is_file():
+                return path / ending
+        raise ValueError
+    else:
+        return path
+
+
 def import_problem_from_path(path: Path) -> Problem:
     """Try to import and initialize a Problem object from a given path.
 
