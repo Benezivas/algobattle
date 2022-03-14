@@ -75,91 +75,9 @@ class Averaged(algobattle.battle_style.BattleStyle):
     class Result(algobattle.battle_style.BattleStyle.Result):
         approx_ratios: list[float] = field(default_factory=list)
 
-        def __float__(self) -> float:
-            successful_iters = [x for x in self.approx_ratios if x != 0]
-            return sum(successful_iters) / len(successful_iters)
-
-        def __str__(self) -> str:
-            return str(float(self))
-
-        def __repr__(self) -> str:
-            return str(self.approx_ratios)
-
-    class MatchResult(algobattle.battle_style.BattleStyle.MatchResult[Result]):
-        def format(self) -> str:
-            table = []
-            table.append(["GEN", "SOL", *range(1, self.rounds + 1), "LAST"])
-            for matchup, res in self.items():
-                if len(res) == 0:
-                    last_ratio = ""
-                else:
-                    if len(res[-1].approx_ratios) == 0:
-                        if len(res) == 1:
-                            last_ratio = ""
-                        else:
-                            last_ratio = res[-2].approx_ratios[-1]
-                    else:
-                        last_ratio = res[-1].approx_ratios[-1]
-                padding = [""] * (self.rounds - len(res))
-
-                table.append([matchup.generator, matchup.solver, *res, *padding, last_ratio])
-
-            return "Battle Type: Averaged Battle\n" + format_table(table)
-
-        def calculate_points(self, achievable_points: int) -> dict[Team, float]:
-            """Calculate the number of achieved points.
-
-            The valuation of an averaged battle is calculating by summing up
-            the reciprocals of each solved fight. This sum is then divided by
-            the total number of ratios to account for unsuccessful battles.
-
-            Parameters
-            ----------
-            achievable_points : int
-                Number of achievable points.
-
-            Returns
-            -------
-            dict
-                A mapping between team names and their achieved points.
-                The format is {team_name: points [...]} for each
-                team for which there is an entry in match_data and points is a
-                float value. Returns an empty dict if no battle was fought.
-            """
-            points: defaultdict[Team, float] = defaultdict(lambda: 0)
-
-            teams: set[Team] = set()
-            for pair in self.keys():
-                teams = teams.union(set(pair))
-            team_combinations = itertools.combinations(teams, 2)
-
-            if len(teams) == 1:
-                return {teams.pop(): achievable_points}
-
-            if self.rounds == 0:
-                return {}
-
-            points_per_round = round(achievable_points / self.rounds, 1)
-            for pair in team_combinations:
-                for i in range(self.rounds):
-                    points[pair[0]] = points.get(pair[0], 0)
-                    points[pair[1]] = points.get(pair[1], 0)
-
-                    ratios1 = self[Matchup(*pair)][i].approx_ratios  # pair[1] was solver
-                    ratios0 = self[Matchup(*pair[::-1])][i].approx_ratios  # pair[0] was solver
-                    valuation0 = sum(ratios0) / len(ratios0)
-                    valuation1 = sum(ratios1) / len(ratios1)
-
-                    # Default values for proportions, assuming no team manages to solve anything
-                    points_proportion0 = 0.5
-                    points_proportion1 = 0.5
-
-                    # Normalize valuations
-                    if valuation0 + valuation1 > 0:
-                        points_proportion0 = valuation0 / (valuation0 + valuation1)
-                        points_proportion1 = valuation1 / (valuation0 + valuation1)
-
-                    points[pair[0]] += round(points_per_round * points_proportion0, 1)
-                    points[pair[1]] += round(points_per_round * points_proportion1, 1)
-
-            return points
+        @property
+        def score(self) -> float:
+            if len(self.approx_ratios) == 0:
+                return 0
+            else:
+                return sum(self.approx_ratios) / len(self.approx_ratios)

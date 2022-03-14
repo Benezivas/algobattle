@@ -46,6 +46,9 @@ class BattleStyle(ABC, Generic[Instance, Solution]):
         self.problem = problem
         self.fight = fight
 
+    def __str__(self) -> str:
+        return type(self).__name__.lower()
+
     @classmethod
     def get_arg_spec(cls) -> dict[str, dict[str, Any]]:
         """Gets the info needed to make a cli interface for a battle style.
@@ -101,63 +104,19 @@ class BattleStyle(ABC, Generic[Instance, Solution]):
         """
         raise NotImplementedError
 
-    class Result:
+    class Result(ABC):
         """The result of a battle."""
 
-        pass
-
-    Res = TypeVar("Res", covariant=True, bound=Result)
-
-    class MatchResult(dict[Matchup, list[Res]], ABC):
-        """The result of a whole match.
-
-        Generally a mapping of matchups to a list of Results, one per round.
-        """
-
-        def __init__(self, matchups: BattleMatchups, rounds: int) -> None:
-            self.rounds = rounds
-            for matchup in matchups:
-                self[matchup] = []
-
-        def format(self) -> str:
-            """Format the match_data for the battle battle style as a UTF-8 string.
-
-            The output should not exceed 80 characters, assuming the default
-            of a battle of 5 rounds.
-
-            Returns
-            -------
-            str
-                A formatted string on the basis of the match_data.
-            """
-            formatted_output_string = "Battles of this type are currently not compatible with the ui.\n"
-            formatted_output_string += "Here is a dump of the result objects anyway:\n"
-            formatted_output_string += "\n".join(f"{matchup}: {res}" for (matchup, res) in self.items())
-
-            return formatted_output_string
-
-        def __str__(self) -> str:
-            return self.format()
-
+        @property
         @abstractmethod
-        def calculate_points(self, achievable_points: int) -> dict[Team, float]:
-            """Calculate the number of achieved points, given results.
-
-            As awarding points completely depends on the type of battle that
-            was fought, each battle style should implement a method that determines
-            how to split up the achievable points among all teams.
-
-            Parameters
-            ----------
-            achievable_points : int
-                Number of achievable points.
-
-            Returns
-            -------
-            dict
-                A mapping between team names and their achieved points.
-                The format is {team_name: points [...]} for each
-                team for which there is an entry in match_data and points is a
-                float value. Returns an empty dict if no battle was fought.
-            """
+        def score(self) -> float:
+            """The score of this result."""
             raise NotImplementedError
+        
+        def __str__(self) -> str:
+            if self.score.is_integer():
+                return f"{int(self.score): >6}"
+            elif 0 <= self.score <= 10:
+                return f"{self.score: >3.1%}"
+            else:
+                return f"{self.score: >4.2}"
