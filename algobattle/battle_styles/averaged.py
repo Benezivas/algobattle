@@ -1,4 +1,4 @@
-"""Wrapper that iterates the instance size up to a point where the solving team is no longer able to solve an instance."""
+"""Battle style that iterates the instance size up to a point where the solving team is no longer able to solve an instance."""
 
 from __future__ import annotations
 from dataclasses import dataclass, field
@@ -7,18 +7,18 @@ import logging
 from collections import defaultdict
 from typing import Any, Generator
 
-import algobattle.battle_wrapper
+import algobattle.battle_style
 from algobattle.fight import Fight
 from algobattle.problem import Problem
 from algobattle.team import Team, Matchup
 from algobattle.util import format_table
 
 
-logger = logging.getLogger("algobattle.battle_wrappers.averaged")
+logger = logging.getLogger("algobattle.battle_styles.averaged")
 
 
-class Averaged(algobattle.battle_wrapper.BattleWrapper):
-    """Class of an adveraged battle Wrapper."""
+class Averaged(algobattle.battle_style.BattleStyle):
+    """Class of an adveraged battle style."""
 
     def __init__(
         self,
@@ -28,7 +28,7 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
         iterations: int = 25,
         **options: Any,
     ) -> None:
-        """Create a wrapper for an averaged battle.
+        """Create a battle style for an averaged battle.
 
         Parameters
         ----------
@@ -46,7 +46,7 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
 
         super().__init__(problem, fight, **options)
 
-    def wrapper(self, matchup: Matchup) -> Generator[Averaged.Result, None, None]:
+    def run(self, matchup: Matchup) -> Generator[Averaged.Result, None, None]:
         """Execute one averaged battle between a generating and a solving team.
 
         Execute several fights between two teams on a fixed instance size
@@ -58,7 +58,7 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
         Parameters
         ----------
         match: Match
-            The Match object on which the battle wrapper is to be executed on.
+            The Match object on which the battle style is to be executed on.
         """
         res = self.Result()
         logger.info(
@@ -72,7 +72,7 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
             yield res
 
     @dataclass
-    class Result(algobattle.battle_wrapper.BattleWrapper.Result):
+    class Result(algobattle.battle_style.BattleStyle.Result):
         approx_ratios: list[float] = field(default_factory=list)
 
         def __float__(self) -> float:
@@ -85,7 +85,7 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
         def __repr__(self) -> str:
             return str(self.approx_ratios)
 
-    class MatchResult(algobattle.battle_wrapper.BattleWrapper.MatchResult[Result]):
+    class MatchResult(algobattle.battle_style.BattleStyle.MatchResult[Result]):
         def format(self) -> str:
             table = []
             table.append(["GEN", "SOL", *range(1, self.rounds + 1), "LAST"])

@@ -1,4 +1,4 @@
-"""Wrapper that repeats a battle on an instance size a number of times and averages the competitive ratio over all runs."""
+"""Battle style that repeats a battle on an instance size a number of times and averages the competitive ratio over all runs."""
 
 from __future__ import annotations
 from collections import defaultdict
@@ -6,18 +6,18 @@ from dataclasses import dataclass
 import itertools
 import logging
 
-import algobattle.battle_wrapper
+import algobattle.battle_style
 from algobattle.problem import Problem
 from algobattle.fight import Fight
 from algobattle.team import Matchup, Team
 from algobattle.util import format_table
 from typing import Generator
 
-logger = logging.getLogger("algobattle.battle_wrappers.iterated")
+logger = logging.getLogger("algobattle.battle_styles.iterated")
 
 
-class Iterated(algobattle.battle_wrapper.BattleWrapper):
-    """Class of an iterated battle Wrapper."""
+class Iterated(algobattle.battle_style.BattleStyle):
+    """Class of an iterated battle style."""
 
     def __init__(
         self,
@@ -28,7 +28,7 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
         approximation_ratio: float = 1,
         **options,
     ) -> None:
-        """Create a wrapper for an iterated battle.
+        """Create a battle style for an iterated battle.
 
         Parameters
         ----------
@@ -49,7 +49,7 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
 
         super().__init__(problem, fight, **options)
 
-    def wrapper(self, matchup: Matchup) -> Generator[Iterated.Result, None, None]:
+    def run(self, matchup: Matchup) -> Generator[Iterated.Result, None, None]:
         """Execute one iterative battle between a generating and a solving team.
 
         Incrementally try to search for the highest n for which the solver is
@@ -62,7 +62,7 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
         size on a second try), we cap the maximum solution size by the first
         value that an algorithm has failed on.
 
-        The wrapper automatically ends the battle and declares the solver as the
+        The battle style automatically ends the battle and declares the solver as the
         winner once the iteration cap is reached.
 
         During execution, this function updates the match_data of the match
@@ -71,7 +71,7 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
         Parameters
         ----------
         match: Match
-            The Match object on which the battle wrapper is to be executed on.
+            The Match object on which the battle style is to be executed on.
         """
         n = self.problem.n_start
         maximum_reached_n = 0
@@ -118,7 +118,7 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
             yield self.Result(n_cap, maximum_reached_n, n)
 
     @dataclass
-    class Result(algobattle.battle_wrapper.BattleWrapper.Result):
+    class Result(algobattle.battle_style.BattleStyle.Result):
         cap: int = 0
         solved: int = 0
         attempting: int = 0
@@ -132,7 +132,7 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
         def __repr__(self) -> str:
             return f"Result(cap={self.cap}, solved={self.solved}, attempting={self.attempting}"
 
-    class MatchResult(algobattle.battle_wrapper.BattleWrapper.MatchResult[Result]):
+    class MatchResult(algobattle.battle_style.BattleStyle.MatchResult[Result]):
         def format(self) -> str:
             table = []
             table.append(["GEN", "SOL", *range(1, self.rounds + 1), "CAP", "AVG"])

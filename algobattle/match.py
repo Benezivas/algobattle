@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 from typing import Any, Type
 
-from algobattle.battle_wrapper import BattleWrapper
+from algobattle.battle_style import BattleStyle
 from algobattle.fight import Fight
 from algobattle.team import Team, BattleMatchups
 from algobattle.problem import Problem
@@ -45,13 +45,13 @@ class Match:
         self.battle_matchups = BattleMatchups(self.teams)
 
     def run(
-        self, battle_type: Type[BattleWrapper], rounds: int = 5, **wrapper_options: dict[str, Any]
-    ) -> BattleWrapper.MatchResult:
+        self, battle_style: Type[BattleStyle], rounds: int = 5, **battle_options: dict[str, Any]
+    ) -> BattleStyle.MatchResult:
         """Match entry point, executes rounds fights between all teams and returns the results of the battles.
 
         Parameters
         ----------
-        battle_type : str
+        battle_style : str
             Type of battle that is to be run.
         rounds : int
             Number of Battles between each pair of teams (used for averaging results).
@@ -66,12 +66,12 @@ class Match:
 
         Returns
         -------
-        BattleWrapper
-            A wrapper instance containing information about the executed battle.
+        BattleStyle
+            A battle style instance containing information about the executed battle.
         """
         fight = Fight(self.problem, self.docker_config)
-        battle_wrapper = battle_type(self.problem, fight, **wrapper_options)
-        results = battle_wrapper.MatchResult(self.battle_matchups, rounds)  # type: ignore
+        battle = battle_style(self.problem, fight, **battle_options)
+        results = battle.MatchResult(self.battle_matchups, rounds)  # type: ignore
 
         if self.ui is not None:
             self.ui.update(results.format())
@@ -79,9 +79,9 @@ class Match:
         for matchup in self.battle_matchups:
             for i in range(rounds):
                 logger.info(f'{"#" * 20}  Running Battle {i + 1}/{rounds}  {"#" * 20}')
-                results[matchup].append(battle_wrapper.Result())
+                results[matchup].append(battle.Result())
 
-                for result in battle_wrapper.wrapper(matchup):
+                for result in battle.run(matchup):
                     results[matchup][i] = result
                     if self.ui is not None:
                         self.ui.update(results.format())

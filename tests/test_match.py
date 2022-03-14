@@ -84,7 +84,7 @@ class Matchtests(unittest.TestCase):
 
 
 class FightTests(unittest.TestCase):
-    """Tests for the BattleWrapper object."""
+    """Tests for the Battlestyle object."""
 
     @classmethod
     def setUpClass(cls) -> None:

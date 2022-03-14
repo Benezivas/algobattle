@@ -15,7 +15,7 @@ from algobattle.match import Match
 from algobattle.util import get_matching_file, import_problem_from_path, NestedHelp, get_matching_file
 from algobattle.docker import measure_runtime_overhead, DockerConfig
 from algobattle.ui import Ui
-from algobattle.battle_wrappers import battle_wrappers, get_battle_wrapper
+from algobattle.battle_styles import battle_styles, get_battle_style
 
 
 def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
@@ -123,14 +123,14 @@ def create_parser() -> ArgumentParser:
     parser.add_argument("--do_not_count_points", action="store_true", help="If set, points are not calculated for the run.")
 
     battle_args = parser.add_argument_group("battle arguments")
-    battle_args.add_argument("--battle_type", choices=battle_wrappers.keys(), type=get_battle_wrapper,
+    battle_args.add_argument("--battle_type", choices=battle_styles.keys(), type=get_battle_style,
                              help="Type of battle, has to be set in the command line or config file")
     # fmt: on
 
     for name, kwargs in battle_arg_spec.items():
         battle_args.add_argument(f"--{name}", **(kwargs | {"default": None}))
 
-    for name, cls in battle_wrappers.items():
+    for name, cls in battle_styles.items():
         cls_args = battle_args.add_argument_group(name)
         for name, kwargs in cls.get_arg_spec().items():
             cls_args.add_argument(f"--{name}", **(kwargs | {"default": None}))
@@ -174,16 +174,16 @@ def parse_config(options: Namespace) -> Namespace:
     elif "battle" in config and "battle_type" in config["battle"]:
         type_str = config["battle"]["battle_type"]
         try:
-            battle_type = get_battle_wrapper(type_str)
+            battle_type = get_battle_style(type_str)
         except ValueError:
-            wrappers = ", ".join(f"'{battle_wrappers.keys()}'")
-            raise SystemExit(f"The config file contains an invalid battle type '{type_str}', choose one of {wrappers}.")
+            styles = ", ".join(f"'{battle_styles.keys()}'")
+            raise SystemExit(f"The config file contains an invalid battle type '{type_str}', choose one of {styles}.")
     else:
         raise SystemExit(f"The battle type was not specified in the command line or the config file! {help_msg}")
     battle_options.battle_type = battle_type
     battle_type = str(battle_type)
 
-    arg_specs = [("battle", battle_arg_spec), (battle_type, battle_wrappers[battle_type].get_arg_spec())]
+    arg_specs = [("battle", battle_arg_spec), (battle_type, battle_styles[battle_type].get_arg_spec())]
     for spec_name, spec in arg_specs:
         for name, kwargs in spec.items():
             if getattr(options, name) is not None:

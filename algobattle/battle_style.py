@@ -1,4 +1,4 @@
-"""Module for the abstract base class for battle types."""
+"""Module for the abstract base class for battle styles."""
 from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
@@ -10,45 +10,45 @@ from algobattle.problem import Problem
 from algobattle.team import Team, BattleMatchups, Matchup
 from algobattle.util import parse_doc_for_param
 
-logger = logging.getLogger("algobattle.battle_wrapper")
+logger = logging.getLogger("algobattle.battle_type")
 
 Instance = TypeVar("Instance")
 Solution = TypeVar("Solution")
 
 
-class BattleWrapper(ABC, Generic[Instance, Solution]):
-    """Base class for wrappers that execute a specific kind of battle.
+class BattleStyle(ABC, Generic[Instance, Solution]):
+    """Base class for battle styles that define how a battle can be structured.
 
-    All battle wrappers should inherit from this explicitly so they are integrated into the match structure properly.
-    A battle wrapper is responsible for deciding the sequence of fights that are executed and processing their results.
+    All battle styles should inherit from this class explicitly so they are integrated into the match structure properly.
+    A BattleStyle is responsible for deciding the sequence of fights that are executed and processing their results.
     It also handles further processing of match results through its associated types.
     """
 
-    _battle_wrappers: dict[str, Type[BattleWrapper]] = {}
+    _battle_styles: dict[str, Type[BattleStyle]] = {}
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         if not isabstract(cls):
-            BattleWrapper._battle_wrappers[cls.__name__.lower()] = cls
+            BattleStyle._battle_styles[cls.__name__.lower()] = cls
 
     def __init__(self, problem: Problem[Instance, Solution], fight: Fight, **kwargs: dict[str, Any]):
-        """Builds a battle wrapper object with the given option values.
+        """Builds a battle style object with the given option values.
 
         Parameters
         ----------
         problem: Problem
-            The problem this wrapper will be used for.
-        fight:
+            The problem this battle will be fought over.
+        fight: Fight
             Fight that will be executed.
         kwargs: dict[str, Any]
-            Further options that each battle wrapper can use.
+            Further options that each specific battle style can use.
         """
         self.problem = problem
         self.fight = fight
 
     @classmethod
     def get_arg_spec(cls) -> dict[str, dict[str, Any]]:
-        """Gets the info needed to make a cli interface for a battle wrapper.
+        """Gets the info needed to make a cli interface for a battle style.
 
         The argparse type argument will only be set if the type is available in the builtin or global namespace.
 
@@ -57,7 +57,7 @@ class BattleWrapper(ABC, Generic[Instance, Solution]):
         dict[str, dict[str, Any]]
             A mapping of the names of a cli argument and the **kwargs for it.
         """
-        base_params = [param for param in signature(BattleWrapper).parameters]
+        base_params = [param for param in signature(BattleStyle).parameters]
         out = {}
         doc = getdoc(cls.__init__)
         for param in signature(cls).parameters.values():
@@ -86,19 +86,19 @@ class BattleWrapper(ABC, Generic[Instance, Solution]):
         return out
 
     @abstractmethod
-    def wrapper(self, matchup: Matchup) -> Generator[Result, None, None]:
-        """The main base method for a wrapper.
+    def run(self, matchup: Matchup) -> Generator[Result, None, None]:
+        """The main base method for a battle style.
 
-        A wrapper should update the match.match_data object during its run. The callback functionality
+        A battle style should update the match.match_data object during its run. The callback functionality
         around it is executed automatically.
 
         It is assumed that the match.generating_team and match.solving_team are
-        set before calling a wrapper.
+        set before calling a battle style.
 
         Parameters
         ----------
         match: Match
-            The Match object on which the battle wrapper is to be executed on.
+            The Match object on which the battle battle style is to be executed on.
         """
         raise NotImplementedError
 
@@ -121,7 +121,7 @@ class BattleWrapper(ABC, Generic[Instance, Solution]):
                 self[matchup] = []
 
         def format(self) -> str:
-            """Format the match_data for the battle wrapper as a UTF-8 string.
+            """Format the match_data for the battle battle style as a UTF-8 string.
 
             The output should not exceed 80 characters, assuming the default
             of a battle of 5 rounds.
@@ -145,7 +145,7 @@ class BattleWrapper(ABC, Generic[Instance, Solution]):
             """Calculate the number of achieved points, given results.
 
             As awarding points completely depends on the type of battle that
-            was fought, each wrapper should implement a method that determines
+            was fought, each battle style should implement a method that determines
             how to split up the achievable points among all teams.
 
             Parameters

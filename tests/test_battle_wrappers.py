@@ -3,8 +3,8 @@ from dataclasses import dataclass
 from unittest import TestCase, main
 import logging
 
-from algobattle.battle_wrappers.averaged import Averaged
-from algobattle.battle_wrappers.iterated import Iterated
+from algobattle.battle_styles.averaged import Averaged
+from algobattle.battle_styles.iterated import Iterated
 from algobattle.team import Team, BattleMatchups, Matchup
 
 logging.disable(logging.CRITICAL)
