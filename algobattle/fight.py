@@ -1,8 +1,8 @@
+"""Module for the Fight class which is responsible for executing a fight with a given matchup."""
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Generic, TypeVar
 from logging import getLogger
-from algobattle.battle_wrapper import Instance, Solution
 from algobattle.docker import DockerConfig, DockerError
 from algobattle.problem import Problem
 from algobattle.team import Team, Matchup
@@ -14,6 +14,7 @@ Solution = TypeVar("Solution")
 
 @dataclass
 class Fight(Generic[Instance, Solution]):
+    """Class that executes a single fight with a given matchup."""
 
     problem: Problem[Instance, Solution]
     docker_config: DockerConfig
