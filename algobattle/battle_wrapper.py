@@ -128,22 +128,3 @@ class BattleWrapper(ABC, Subject):
         """Notify all subscribed Observers by calling their update() functions."""
         for observer in self._observers:
             observer.update(self)
-
-    def update_round_data(self, new_data: dict) -> bool:
-        """Update the internal round dict with new (partial) information and notify observers.
-
-        Parameters
-        ----------
-        new_data : dict
-            A dict containing information that (over-)writes data (of/)to the round_data dict.
-        """
-        self._round_data = update_nested_dict(self._round_data, new_data)
-        self.notify()
-        return True
-
-    def get_round_data(self) -> dict:
-        """Return the current match data."""
-        return self._round_data
-
-    _round_data = {'type': "Unnamed Battle Wrapper"}
-    round_data = property(get_round_data, update_round_data)  # Decorator to reduce updating overhead.

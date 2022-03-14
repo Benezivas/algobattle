@@ -54,7 +54,7 @@ class Averaged(BattleWrapper):
             logger.info('=============== Iteration: {}/{} ==============='.format(i + 1, self.round_data['approx_iters']))
             approx_ratio = fight_handler.fight(instance_size=self.round_data['approx_inst_size'])
 
-            self.round_data = {'approx_ratios': self.round_data['approx_ratios'] + [approx_ratio]}
+            update_nested_dict(self.round_data, {'approx_ratios': self.round_data['approx_ratios'] + [approx_ratio]})
 
     def calculate_valuations(self, round_data0, round_data1) -> Tuple:
         """Returns a valuation based on the average competitive ratios.

@@ -6,6 +6,7 @@ from typing import Tuple
 
 from algobattle.battle_wrapper import BattleWrapper
 from algobattle.fight_handler import FightHandler
+from algobattle.util import update_nested_dict
 
 logger = logging.getLogger('algobattle.battle_wrappers.iterated')
 
@@ -69,7 +70,7 @@ class Iterated(BattleWrapper):
         n_cap = self.round_data['iteration_cap']
         alive = True
 
-        self.round_data = {'attempting': n}
+        update_nested_dict(self.round_data, {'attempting': n})
 
         logger.info('==================== Iterative Battle, Instanze Size Cap: {} ===================='.format(n_cap))
         while alive:
@@ -103,7 +104,7 @@ class Iterated(BattleWrapper):
                     n -= base_increment ** exponent - 1
                     base_increment = 1
 
-            self.round_data = {'current_cap': n_cap, 'solved': maximum_reached_n, 'attempting': n}
+            update_nested_dict(self.round_data, {'current_cap': n_cap, 'solved': maximum_reached_n, 'attempting': n})
 
     def calculate_valuations(self, round_data0, round_data1) -> Tuple:
         """Returns the highest instance size for which each team was successful.
