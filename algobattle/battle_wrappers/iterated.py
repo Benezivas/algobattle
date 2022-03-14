@@ -13,15 +13,21 @@ from algobattle.util import format_table
 from algobattle.docker import DockerConfig
 from typing import Generator
 
-logger = logging.getLogger('algobattle.battle_wrappers.iterated')
+logger = logging.getLogger("algobattle.battle_wrappers.iterated")
 
 
 class Iterated(algobattle.battle_wrapper.BattleWrapper):
     """Class of an iterated battle Wrapper."""
 
-    def __init__(self, problem: Problem, docker_config: DockerConfig = DockerConfig(),
-                cap: int = 50000, exponent: int = 2, approximation_ratio: float = 1,
-                **options) -> None:
+    def __init__(
+        self,
+        problem: Problem,
+        docker_config: DockerConfig = DockerConfig(),
+        cap: int = 50000,
+        exponent: int = 2,
+        approximation_ratio: float = 1,
+        **options,
+    ) -> None:
         """Create a wrapper for an iterated battle.
 
         Parameters
@@ -40,9 +46,9 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
         self.exponent = exponent
         self.cap = cap
         self.approx_ratio = approximation_ratio
-        
+
         super().__init__(problem, docker_config, **options)
-    
+
     def wrapper(self, matchup: Matchup) -> Generator[Iterated.Result, None, None]:
         """Execute one iterative battle between a generating and a solving team.
 
@@ -75,21 +81,24 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
         n_cap = self.cap
         alive = True
 
-        logger.info(f'==================== Iterative Battle, Instanze Size Cap: {n_cap} ====================')
+        logger.info(f"==================== Iterative Battle, Instanze Size Cap: {n_cap} ====================")
         while alive:
-            logger.info(f'=============== Instance Size: {n}/{n_cap} ===============')
+            logger.info(f"=============== Instance Size: {n}/{n_cap} ===============")
             approx_ratio = self._one_fight(matchup, instance_size=n)
             if approx_ratio == 0.0:
                 alive = False
             elif approx_ratio > self.approx_ratio:
-                logger.info(f'Solver {matchup.solver} does not meet the required solution quality at instance size {n}. ({approx_ratio}/{self.approx_ratio})')
+                logger.info(
+                    f"Solver {matchup.solver} does not meet the required solution quality at instance size {n}. "
+                    "({approx_ratio}/{self.approx_ratio})"
+                )
                 alive = False
 
             if not alive and i > 1:
                 # The step size increase was too aggressive, take it back and reset the increment multiplier
-                logger.info(f'Setting the solution cap to {n}...')
+                logger.info(f"Setting the solution cap to {n}...")
                 n_cap = n
-                n -= i ** exponent
+                n -= i**exponent
                 i = 0
                 alive = True
             elif n > maximum_reached_n and alive:
@@ -100,15 +109,15 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
                 alive = False
             else:
                 i += 1
-                n += i ** exponent
+                n += i**exponent
 
                 if n >= n_cap:
                     # We have failed at this value of n already, reset the step size!
-                    n -= i ** exponent - 1
+                    n -= i**exponent - 1
                     i = 1
 
             yield self.Result(n_cap, maximum_reached_n, n)
-    
+
     @dataclass
     class Result(algobattle.battle_wrapper.BattleWrapper.Result):
         cap: int = 0
@@ -120,17 +129,15 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
 
         def __str__(self) -> str:
             return str(int(self))
-        
+
         def __repr__(self) -> str:
             return f"Result(cap={self.cap}, solved={self.solved}, attempting={self.attempting}"
 
-
     class MatchResult(algobattle.battle_wrapper.BattleWrapper.MatchResult[Result]):
-        
         def format(self) -> str:
             table = []
             table.append(["GEN", "SOL", *range(1, self.rounds + 1), "CAP", "AVG"])
-            
+
             for matchup, res in self.items():
                 padding = [""] * (self.rounds - len(res))
                 if len(res) == 0:
@@ -169,7 +176,6 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
             for pair in self.keys():
                 teams = teams.union(set(pair))
             team_combinations = itertools.combinations(teams, 2)
-            
 
             if len(teams) == 1:
                 return {teams.pop(): achievable_points}
@@ -189,8 +195,8 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
                     points_proportion1 = 0.5
 
                     if solved0 + solved1 > 0:
-                        points_proportion0 = (solved0 / (solved0 + solved1))
-                        points_proportion1 = (solved1 / (solved0 + solved1))
+                        points_proportion0 = solved0 / (solved0 + solved1)
+                        points_proportion1 = solved1 / (solved0 + solved1)
 
                     points[pair[0]] += round(points_per_round * points_proportion0, 1)
                     points[pair[1]] += round(points_per_round * points_proportion1, 1)
