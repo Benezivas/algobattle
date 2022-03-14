@@ -8,9 +8,9 @@ import logging
 
 import algobattle.battle_wrapper
 from algobattle.problem import Problem
+from algobattle.fight import Fight
 from algobattle.team import Matchup, Team
 from algobattle.util import format_table
-from algobattle.docker import DockerConfig
 from typing import Generator
 
 logger = logging.getLogger("algobattle.battle_wrappers.iterated")
@@ -22,7 +22,7 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
     def __init__(
         self,
         problem: Problem,
-        docker_config: DockerConfig = DockerConfig(),
+        fight: Fight,
         cap: int = 50000,
         exponent: int = 2,
         approximation_ratio: float = 1,
@@ -47,7 +47,7 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
         self.cap = cap
         self.approx_ratio = approximation_ratio
 
-        super().__init__(problem, docker_config, **options)
+        super().__init__(problem, fight, **options)
 
     def wrapper(self, matchup: Matchup) -> Generator[Iterated.Result, None, None]:
         """Execute one iterative battle between a generating and a solving team.
@@ -83,7 +83,7 @@ class Iterated(algobattle.battle_wrapper.BattleWrapper):
         logger.info(f"==================== Iterative Battle, Instanze Size Cap: {n_cap} ====================")
         while alive:
             logger.info(f"=============== Instance Size: {n}/{n_cap} ===============")
-            approx_ratio = self._one_fight(matchup, instance_size=n)
+            approx_ratio = self.fight(matchup, instance_size=n)
             if approx_ratio == 0.0:
                 alive = False
             elif approx_ratio > self.approx_ratio:

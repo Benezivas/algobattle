@@ -7,6 +7,7 @@ from typing import Any
 
 from algobattle.battle_wrapper import BattleWrapper
 from algobattle.battle_wrappers import get_battle_wrapper
+from algobattle.fight import Fight
 from algobattle.team import Team, BattleMatchups
 from algobattle.problem import Problem
 from algobattle.docker import DockerConfig, DockerError
@@ -25,6 +26,7 @@ class Match:
 
         self.problem = problem
         self.ui = ui
+        self.docker_config = docker_config
 
         self.teams: list[Team] = []
         for info in team_info:
@@ -68,14 +70,12 @@ class Match:
         BattleWrapper
             A wrapper instance containing information about the executed battle.
         """
+        fight = Fight(self.problem, self.docker_config)
         WrapperClass = get_battle_wrapper(battle_type)
         ResultClass = WrapperClass.Result
 
-        if not WrapperClass.check_compatibility(self.problem, wrapper_options):
-            logger.critical("Battle type, problem, and chosen options are incompatible!")
-            raise SystemExit
 
-        battle_wrapper = WrapperClass(self.problem, **wrapper_options)
+        battle_wrapper = WrapperClass(self.problem, fight, **wrapper_options)
 
         results = WrapperClass.MatchResult(self.battle_matchups, rounds)  # type: ignore
 

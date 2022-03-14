@@ -8,10 +8,10 @@ from collections import defaultdict
 from typing import Any, Generator
 
 import algobattle.battle_wrapper
+from algobattle.fight import Fight
 from algobattle.problem import Problem
 from algobattle.team import Team, Matchup
 from algobattle.util import format_table
-from algobattle.docker import DockerConfig
 
 
 logger = logging.getLogger("algobattle.battle_wrappers.averaged")
@@ -23,7 +23,7 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
     def __init__(
         self,
         problem: Problem,
-        docker_config: DockerConfig = DockerConfig(),
+        fight: Fight,
         instance_size: int = 10,
         iterations: int = 25,
         **options: Any,
@@ -44,7 +44,7 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
         self.instance_size = instance_size
         self.iterations = iterations
 
-        super().__init__(problem, docker_config, **options)
+        super().__init__(problem, fight, **options)
 
     def wrapper(self, matchup: Matchup) -> Generator[Averaged.Result, None, None]:
         """Execute one averaged battle between a generating and a solving team.
@@ -67,7 +67,7 @@ class Averaged(algobattle.battle_wrapper.BattleWrapper):
         )
         for i in range(self.iterations):
             logger.info(f"=============== Iteration: {i + 1}/{self.iterations} ===============")
-            approx_ratio = self._one_fight(matchup, instance_size=self.instance_size)
+            approx_ratio = self.fight(matchup, instance_size=self.instance_size)
             res.approx_ratios.append(approx_ratio)
             yield res
 
