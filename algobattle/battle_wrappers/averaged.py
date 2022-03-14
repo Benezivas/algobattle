@@ -1,9 +1,12 @@
 """Wrapper that iterates the instance size up to a point where the solving team is no longer able to solve an instance."""
 
-import itertools
+from configparser import ConfigParser
 import logging
+from typing import Tuple
 
 from algobattle.battle_wrapper import BattleWrapper
+from algobattle.fight_handler import FightHandler
+from algobattle.util import update_nested_dict
 
 logger = logging.getLogger('algobattle.battle_wrappers.averaged')
 
@@ -11,7 +14,27 @@ logger = logging.getLogger('algobattle.battle_wrappers.averaged')
 class Averaged(BattleWrapper):
     """Class of an adveraged battle Wrapper."""
 
-    def wrapper(self, match, options: dict = {}) -> None:
+    def __init__(self, config: ConfigParser) -> None:
+        if 'averaged' in config:
+            self.approximation_instance_size = int(config['averaged'].get('approximation_instance_size', 10))
+            self.approximation_iterations = int(config['averaged'].get('approximation_iterations', 10))
+        else:
+            self.approximation_instance_size = 10
+            self.approximation_iterations = 10
+        self.reset_round_data()
+
+    def __str__(self) -> str:
+        return "Averaged"
+
+    def reset_round_data(self) -> None:
+        """Resets the round_data dict to default values."""
+        self.round_data = {'type': str(self),
+                           'approx_inst_size': self.approximation_instance_size,
+                           'approx_iters': self.approximation_iterations,
+                           'approx_ratios': []}
+
+    @BattleWrapper.reset_state
+    def run_round(self, fight_handler: FightHandler) -> None:
         """Execute one averaged battle between a generating and a solving team.
 
         Execute several fights between two teams on a fixed instance size
@@ -23,140 +46,111 @@ class Averaged(BattleWrapper):
 
         Parameters
         ----------
-        match: Match
-            The Match object on which the battle wrapper is to be executed on.
-        options: dict
-            No additional options are used for this wrapper.
+        fight_handler: FightHandler
+            Fight handler that manages the execution of a concrete fight.
         """
-        approximation_ratios = []
         logger.info('==================== Averaged Battle, Instance Size: {}, Rounds: {} ===================='
-                    .format(match.match_data['approx_inst_size'], match.match_data['approx_iters']))
-        for i in range(match.match_data['approx_iters']):
-            logger.info('=============== Iteration: {}/{} ==============='.format(i + 1, match.match_data['approx_iters']))
-            approx_ratio = match._one_fight(instance_size=match.match_data['approx_inst_size'])
-            approximation_ratios.append(approx_ratio)
+                    .format(self.round_data['approx_inst_size'], self.round_data['approx_iters']))
+        for i in range(self.round_data['approx_iters']):
+            logger.info('=============== Iteration: {}/{} ==============='.format(i + 1, self.round_data['approx_iters']))
+            approx_ratio = fight_handler.fight(instance_size=self.round_data['approx_inst_size'])
 
-            curr_pair = match.match_data['curr_pair']
-            curr_round = match.match_data[curr_pair]['curr_round']
-            match.update_match_data({curr_pair: {curr_round: {'approx_ratios':
-                                    match.match_data[curr_pair][curr_round]['approx_ratios'] + [approx_ratio]}}})
+            update_nested_dict(self.round_data, {'approx_ratios': self.round_data['approx_ratios'] + [approx_ratio]})
 
-    def calculate_points(self, match_data: dict, achievable_points: int) -> dict:
-        """Calculate the number of achieved points, given results.
+    def calculate_valuations(self, round_data0, round_data1) -> Tuple:
+        """Returns a valuation based on the average competitive ratios.
 
-        The valuation of an averaged battle is calculating by summing up
+        The valuation of an averaged battle is calculated by summing up
         the reciprocals of each solved fight. This sum is then divided by
         the total number of ratios to account for unsuccessful battles.
 
-        Parameters
-        ----------
-        match_data : dict
-            dict containing the results of match.run().
-        achievable_points : int
-            Number of achievable points.
+        round_data0: dict
+            round_data in which the 0th team solved instances.
+        round_data1: dict
+            round_data in which the 1st team solved instances.
 
         Returns
         -------
-        dict
-            A mapping between team names and their achieved points.
-            The format is {(team_x_name, team_y_name): points [...]} for each
-            pair (x,y) for which there is an entry in match_data and points is a
-            float value. Returns an empty dict if no battle was fought.
+        Tuple
+            A 2-tuple with the calculated valuations for each team.
         """
-        points = dict()
+        ratios0 = round_data0['approx_ratios']
+        ratios1 = round_data1['approx_ratios']
 
-        team_pairs = [key for key in match_data.keys() if isinstance(key, tuple)]
-        team_names = set()
-        for pair in team_pairs:
-            team_names = team_names.union(set((pair[0], pair[1])))
-        team_combinations = itertools.combinations(team_names, 2)
+        valuation0 = 0
+        valuation1 = 0
+        if ratios0 and sum(ratios0) != 0:
+            valuation0 = sum(1 / x if x != 0 else 0 for x in ratios0) / len(ratios0)
+        if ratios1 and sum(ratios1) != 0:
+            valuation1 = sum(1 / x if x != 0 else 0 for x in ratios1) / len(ratios1)
 
-        if len(team_names) == 1:
-            return {team_names.pop(): achievable_points}
+        return (valuation0, valuation1)
 
-        if match_data['rounds'] <= 0:
-            return {}
-        points_per_round = round(achievable_points / match_data['rounds'], 1)
-        for pair in team_combinations:
-            for i in range(match_data['rounds']):
-                points[pair[0]] = points.get(pair[0], 0)
-                points[pair[1]] = points.get(pair[1], 0)
+    def format_round_contents(self, round_data: dict) -> str:
+        """Format the provided round_data for averaged battles.
 
-                ratios1 = match_data[pair][i]['approx_ratios']  # pair[1] was solver
-                ratios0 = match_data[(pair[1], pair[0])][i]['approx_ratios']  # pair[0] was solver
-
-                valuation0 = 0
-                valuation1 = 0
-                if ratios0 and sum(ratios0) != 0:
-                    valuation0 = sum(1 / x if x != 0 else 0 for x in ratios0) / len(ratios0)
-                if ratios1 and sum(ratios1) != 0:
-                    valuation1 = sum(1 / x if x != 0 else 0 for x in ratios1) / len(ratios1)
-
-                # Default values for proportions, assuming no team manages to solve anything
-                points_proportion0 = 0.5
-                points_proportion1 = 0.5
-
-                # Normalize valuations
-                if valuation0 + valuation1 > 0:
-                    points_proportion0 = (valuation0 / (valuation0 + valuation1))
-                    points_proportion1 = (valuation1 / (valuation0 + valuation1))
-
-                points[pair[0]] += round(points_per_round * points_proportion0, 1)
-                points[pair[1]] += round(points_per_round * points_proportion1, 1)
-
-        return points
-
-    def format_as_utf8(self, match_data: dict) -> str:
-        """Format the provided match_data for averaged battles.
+        The returned tuple is supposed to be used for formatted live outputs.
 
         Parameters
         ----------
-        match_data : dict
-            dict containing match data generated by match.run().
+        round_data : dict
+            dict containing round data.
 
         Returns
         -------
         str
-            A formatted string on the basis of the match_data.
+            A string of the current average competitive ratio.
         """
-        formatted_output_string = ""
-        formatted_output_string += 'Battle Type: Averaged Battle\n\r'
-        formatted_output_string += '╔═════════╦═════════╦' \
-                                   + ''.join(['══════╦' for i in range(match_data['rounds'])]) \
-                                   + '══════╦══════╦════════╗' + '\n\r' \
-                                   + '║   GEN   ║   SOL   ' \
-                                   + ''.join(['║{:^6s}'.format('R' + str(i + 1)) for i in range(match_data['rounds'])]) \
-                                   + '║ LAST ║ SIZE ║  ITER  ║' + '\n\r' \
-                                   + '╟─────────╫─────────╫' \
-                                   + ''.join(['──────╫' for i in range(match_data['rounds'])]) \
-                                   + '──────╫──────╫────────╢' + '\n\r'
+        avg = 0.0
 
-        for pair in match_data.keys():
-            if isinstance(pair, tuple):
+        executed_iters = len(round_data['approx_ratios'])
+        n_dead_iters = len([i for i in round_data['approx_ratios'] if i == 0.0])
 
-                avg = [0.0 for i in range(match_data['rounds'])]
+        if executed_iters - n_dead_iters > 0:
+            avg = round(sum(round_data['approx_ratios']) // (executed_iters - n_dead_iters), 1)
 
-                for i in range(match_data['rounds']):
-                    executed_iters = len(match_data[pair][i]['approx_ratios'])
-                    n_dead_iters = executed_iters - len([i for i in match_data[pair][i]['approx_ratios'] if i != 0.0])
+        return '{:6.2f}'.format(avg)
 
-                    if executed_iters - n_dead_iters > 0:
-                        avg[i] = sum(match_data[pair][i]['approx_ratios']) // (executed_iters - n_dead_iters)
+    def format_misc_headers(self) -> Tuple:
+        """Return which strings are to be used as headers a formatted output.
 
-                curr_round = match_data[pair]['curr_round']
-                curr_iter = len(match_data[pair][curr_round]['approx_ratios'])
-                latest_approx_ratio = 0.0
-                if match_data[pair][curr_round]['approx_ratios']:
-                    latest_approx_ratio = match_data[pair][curr_round]['approx_ratios'][-1]
+        Make sure that the number of elements of the returned tuple match
+        up with the number of elements returned by format_misc_contents.
 
-                formatted_output_string += '║{:>9s}║{:>9s}'.format(pair[0], pair[1]) \
-                                           + ''.join(['║{:>6.2f}'.format(avg[i]) for i in range(match_data['rounds'])]) \
-                                           + '║{:>6.2f}║{:>6d}║{:>3d}/{:>3d} ║'.format(latest_approx_ratio,
-                                                                                       match_data['approx_inst_size'],
-                                                                                       curr_iter,
-                                                                                       match_data['approx_iters']) + '\r\n'
-        formatted_output_string += '╚═════════╩═════════╩' \
-                                   + ''.join(['══════╩' for i in range(match_data['rounds'])]) \
-                                   + '══════╩══════╩════════╝' + '\n\r'
+        Returns
+        -------
+        Tuple
+            A 3-tuple of strings containing header names for:
+            - the latest achieved approximation ratio
+            - the size of the instance that is being solved
+            - (current iteration / total iterations)
+        """
+        return ('LAST', 'SIZE', 'ITER')
 
-        return formatted_output_string
+    def format_misc_contents(self, round_data: dict) -> Tuple:
+        """Format additional data that is to be displayed.
+
+        Make sure that the number of elements of the returned tuple match
+        up with the number of elements returned by format_misc_headers.
+
+        Parameters
+        ----------
+        round_data : dict
+            dict containing round data.
+
+        Returns
+        -------
+        Tuple
+            A 3-tuple of strings containing:
+            - the latest achieved approximation ratio
+            - the size of the instance that is being solved
+            - (current iteration / total iterations)
+        """
+        curr_iter = len(round_data['approx_ratios'])
+        latest_approx_ratio = 0.0
+        if round_data['approx_ratios']:
+            latest_approx_ratio = round_data['approx_ratios'][-1]
+
+        return ('{:6.2f}'.format(latest_approx_ratio),
+                '{:>9d}'.format(round_data['approx_inst_size']),
+                '{:>4d}/{:>4d}'.format(curr_iter, round_data['approx_iters']))

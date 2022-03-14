@@ -1,9 +1,9 @@
 """Subject class for an Observable pattern."""
-from abc import ABC, abstractmethod
+from abc import ABCMeta, abstractmethod
 from algobattle.observer import Observer
 
 
-class Subject(ABC):
+class Subject(metaclass=ABCMeta):
     """The Subject interface declares a set of methods for managing subscribers."""
 
     @abstractmethod

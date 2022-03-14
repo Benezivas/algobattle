@@ -1,4 +1,4 @@
-"""Base class for wrappers that execute a specific kind of battle.
+"""Abstract base class for wrappers that execute a specific kind of battle.
 
 The battle wrapper class is a base class for specific wrappers, which are
 responsible for executing specific types of battle. They share the
@@ -6,62 +6,91 @@ characteristic that they are responsible for updating some match data during
 their run, such that it contains the current state of the match.
 """
 import logging
-from abc import ABC, abstractmethod
+from abc import abstractmethod, ABC
+from typing import Callable, List, Tuple
+
+from algobattle.fight_handler import FightHandler
+from algobattle.observer import Observer
+from algobattle.subject import Subject
 
 logger = logging.getLogger('algobattle.battle_wrapper')
 
 
-class BattleWrapper(ABC):
-    """Base class for wrappers that execute a specific kind of battle."""
+class BattleWrapper(ABC, Subject):
+    """Abstract Base class for wrappers that execute a specific kind of battle."""
+
+    _observers: List[Observer] = []
 
     @abstractmethod
-    def wrapper(self, match, options: dict) -> None:
-        """The main base method for a wrapper.
+    def reset_round_data(self) -> None:
+        """Resets the round_data dict to default values."""
+        raise NotImplementedError
 
-        In order to manage the execution of a match, the wrapper needs the match object and possibly
-        some options that are specific to the individual battle wrapper.
+    @staticmethod
+    def reset_state(function: Callable) -> Callable:
+        """Wrapper that resets the state of a round."""
+        def wrapper(self, *args, **kwargs):
+            self.reset_round_data()
+            return function(self, *args, **kwargs)
+        return wrapper
 
-        A wrapper should update the match.match_data dict during its run by calling
-        the match.update_match_data method. This ensures that the callback
-        functionality around the match_data dict is properly executed.
+    @abstractmethod
+    def run_round(self, fight_handler: FightHandler) -> None:
+        """Execute a full round of fights between two teams configured in the fight_handler.
 
-        It is assumed that the match.generating_team and match.solving_team are
-        set before calling a wrapper.
+        During execution, the concrete BattleWrapper should update the round_data dict
+        to which Observers can subscribe in order to react to new intermediate results.
 
         Parameters
         ----------
-        match: Match
-            The Match object on which the battle wrapper is to be executed on.
-        options: dict
-            Additional options for the wrapper.
+        fight_handler: FightHandler
+            A FightHandler object that manages solving and generating teams as well
+            single fights between them.
         """
         raise NotImplementedError
 
     @abstractmethod
-    def calculate_points(match_data: dict, achievable_points: int) -> dict:
-        """Calculate the number of achieved points, given results.
+    def calculate_valuations(self, round_data0: dict, round_data1: dict) -> Tuple:
+        """Return a pair of valuations that help to calculate points.
 
-        As awarding points completely depends on the type of battle that
-        was fought, each wrapper should implement a method that determines
-        how to split up the achievable points among all teams, given
-        the match_data.
+        In order to evaluate how the results of two teams that
+        fought against one another can be judged, the battle wrapper
+        should give each team some score depending on their performance
+        relative to the other team. A higher score means a better performance.
 
-        Parameters
-        ----------
-        match_data : dict
-            dict containing the results of match.run().
-        achievable_points : int
-            Number of achievable points.
-
-        Returns
-        -------
-        dict
-            A mapping between team names and their achieved points.
-            The format is {(team_x_name, team_y_name): points [...]} for each
-            pair (x,y) for which there is an entry in match_data and points is a
-            float value.
+        round_data0: dict
+            round_data in which the 0th team solved instances.
+        round_data1: dict
+            round_data in which the 1st team solved instances.
         """
         raise NotImplementedError
+
+    def format_round_contents(self, round_data: dict) -> str:
+        """Format the provided round_data for a round entry in a formatted output.
+
+        The string length should not exceed 9 characters.
+        """
+        return "???"
+
+    def format_misc_contents(self, round_data: dict) -> Tuple:
+        """Format additional data that is to be displayed.
+
+        Make sure that the number of elements of the returned tuple match
+        up with the number of elements returned by format_misc_headers.
+
+        The string length should not exceed 9 characters.
+        """
+        return None
+
+    def format_misc_headers(self) -> Tuple:
+        """Return which strings are to be used as headers a formatted output.
+
+        Make sure that the number of elements of the returned tuple match
+        up with the number of elements returned by format_misc_contents.
+
+        The string length should not exceed 9 characters.
+        """
+        return None
 
     def format_as_utf8(self, match_data: dict) -> str:
         """Format the match_data for the battle wrapper as a UTF-8 string.
@@ -85,3 +114,16 @@ class BattleWrapper(ABC):
         formatted_output_string += 'Here is a dump of the match_data dict anyway:\n{}'.format(match_data)
 
         return formatted_output_string
+
+    def attach(self, observer: Observer) -> None:
+        """Subscribe a new Observer by adding them to the list of observers."""
+        self._observers.append(observer)
+
+    def detach(self, observer: Observer) -> None:
+        """Unsubscribe an Observer by removing them from the list of observers."""
+        self._observers.remove(observer)
+
+    def notify(self) -> None:
+        """Notify all subscribed Observers by calling their update() functions."""
+        for observer in self._observers:
+            observer.update(self)
