@@ -22,8 +22,7 @@ class Match(Subject, Observer):
         self.match_data = {'type': str(self.battle_wrapper),
                            'problem': str(self.fight_handler.problem),
                            'teams': [str(team) for team in self.teams],
-                           'rounds': self.rounds,
-                           'curr_pair': None}  # match_data is a property with special getters and setters
+                           'rounds': self.rounds}  # match_data is a property with special getters and setters
         for pair in self.all_battle_pairs():
             for round in range(rounds):
                 self.match_data = {pair: {'curr_round': 0, round: self.battle_wrapper.round_data}}
@@ -221,8 +220,9 @@ class Match(Subject, Observer):
         """
         if 'curr_pair' in self._match_data.keys():
             current_pair = self._match_data['curr_pair']
-            current_round = self._match_data[current_pair]['curr_round']
-            update_nested_dict(self._match_data, {current_pair: {current_round: battle_wrapper.round_data}})
+            if 'curr_round' in self._match_data[current_pair]:
+                current_round = self._match_data[current_pair]['curr_round']
+                update_nested_dict(self._match_data, {current_pair: {current_round: battle_wrapper.round_data}})
         self.notify()
 
     def _update_match_data(self, new_data: dict) -> bool:
