@@ -197,7 +197,7 @@ def parse_config(options: Namespace) -> Namespace:
     kwargs = {
         "cpus": config["run_parameters"].getint("cpus", None),
         "timeout_build": config["run_parameters"].getfloat("timeout_build", None),
-        "cache_containers": config["run_parameters"].getfloat("cache_containers", True),
+        "cache_containers": config["run_parameters"].getboolean("cache_containers", True),
     }
     for role in ("generator", "solver"):
         kwargs[f"timeout_{role}"] = config["run_parameters"].getfloat(f"timeout_{role}", None)
