@@ -17,6 +17,7 @@ class FightHandlertests(unittest.TestCase):
     """Tests for the match object."""
 
     def setUp(self) -> None:
+        """Set up a generator and a solver that always run successfully and fight handlers with two different configs."""
         Problem = importlib.import_module('algobattle.problems.testsproblem')
         self.problem = Problem.Problem()
         self.problem_path = Problem.__file__[:-12]  # remove /__init__.py

@@ -69,7 +69,8 @@ class BattleWrapper(ABC, Subject):
     def format_round_contents(self, round_data: dict) -> str:
         """Format the provided round_data for a round entry in a formatted output.
 
-        The string length should not exceed 9 characters."""
+        The string length should not exceed 9 characters.
+        """
         return "???"
 
     def format_misc_contents(self, round_data: dict) -> Tuple:

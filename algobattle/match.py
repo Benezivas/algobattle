@@ -1,3 +1,4 @@
+"""Central managing module for an algorithmic battle."""
 import logging
 from typing import List
 
@@ -11,6 +12,8 @@ logger = logging.getLogger('algobattle.match')
 
 
 class Match(Subject, Observer):
+    """Central managing class for an algorithmic battle."""
+
     _observers: List[Observer] = []
 
     def __init__(self, fight_handler: FightHandler, battle_wrapper: BattleWrapper, teams: list, rounds: int = 5) -> None:

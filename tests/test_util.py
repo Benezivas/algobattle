@@ -18,6 +18,7 @@ class Utiltests(unittest.TestCase):
     """Tests for the util functions."""
 
     def setUp(self) -> None:
+        """Set up a problem, default config, fight handler and get a file name not existing on the file system."""
         Problem = importlib.import_module('algobattle.problems.testsproblem')
         self.problem = Problem.Problem()
         config_path = os.path.join(os.path.dirname(os.path.abspath(algobattle.__file__)), 'config', 'config.ini')

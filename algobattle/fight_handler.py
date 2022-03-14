@@ -13,6 +13,7 @@ logger = logging.getLogger('algobattle.fight_handler')
 
 class FightHandler():
     """Class managing the execution of generators and solvers."""
+
     generating_team = None
     solving_team = None
 
