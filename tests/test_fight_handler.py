@@ -23,11 +23,9 @@ class FightHandlertests(unittest.TestCase):
         self.problem_path = Problem.__file__[:-12]  # remove /__init__.py
 
         util.build_docker_container(os.path.join(self.problem_path, 'generator'),
-                                    docker_tag='gen_succ',
-                                    cache_docker_container=False)
+                                    docker_tag='gen_succ')
         util.build_docker_container(os.path.join(self.problem_path, 'solver'),
-                                    docker_tag='sol_succ',
-                                    cache_docker_container=False)
+                                    docker_tag='sol_succ')
 
         self.config_base_path = os.path.join(os.path.dirname(os.path.abspath(algobattle.__file__)), 'config')
         self.config = ConfigParser()
