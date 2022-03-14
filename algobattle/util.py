@@ -10,7 +10,7 @@ from argparse import Action, SUPPRESS
 
 from algobattle.problem import Problem
 
-logger = logging.getLogger('algobattle.util')
+logger = logging.getLogger("algobattle.util")
 
 
 def import_problem_from_path(path: Path) -> Problem:
@@ -25,7 +25,7 @@ def import_problem_from_path(path: Path) -> Problem:
     -------
     Problem
         Returns an object of the problem.
-    
+
     Raises
     ------
     ValueError
@@ -37,7 +37,7 @@ def import_problem_from_path(path: Path) -> Problem:
     if not path.exists():
         logger.warning(f"Problem path '{path}' does not exist in the file system!")
         raise ValueError
-    
+
     if path.is_dir:
         if (path / "__init__.py").is_file():
             path /= "__init__.py"
@@ -46,7 +46,7 @@ def import_problem_from_path(path: Path) -> Problem:
         else:
             logger.warning(f"Problem path '{path}' points to a directory that doesn't contain a Problem.")
             raise ValueError
-    
+
     try:
         spec = importlib.util.spec_from_file_location("problem", path)
         assert spec is not None
@@ -64,7 +64,7 @@ def import_problem_from_path(path: Path) -> Problem:
         # issubclass won't work here til 3.11
         if isclass(obj) and Problem in obj.__bases__:
             potential_problems.append(obj)
-    
+
     if len(potential_problems) == 0:
         logger.warning(f"Problem path '{path}' points to a module that doesn't contain a Problem.")
         raise ValueError
@@ -72,8 +72,9 @@ def import_problem_from_path(path: Path) -> Problem:
         formatted_list = ", ".join(f"'{p.name}'" for p in potential_problems)
         logger.warning(f"Problem path '{path}' points to a module containing more than one Problem: {formatted_list}")
         raise ValueError
-    
+
     return potential_problems[0]()
+
 
 def format_table(table: list[list[Any]], column_spacing: dict[int, int] = {}) -> str:
     if len(table) == 0:
@@ -95,23 +96,24 @@ def format_table(table: list[list[Any]], column_spacing: dict[int, int] = {}) ->
 
     return res
 
+
 # this should probably be done with a library
 # (well really this should probably not be done at all but its cute)
 def parse_doc_for_param(doc: str, name: str) -> str:
     """Parses a docstring to find the documentation of a single parameter.
-    
+
     Parameters
     ----------
     doc : str
         The docstring that will be parsed.
     name
         The name of the parameter.
-    
+
     Returns
     -------
     str
         The documentation of that parameter.
-    
+
     Raises
     ------
     ValueError
@@ -124,32 +126,23 @@ def parse_doc_for_param(doc: str, name: str) -> str:
         raise ValueError
 
     param_doc = []
-    for line in lines[start+1:]:
+    for line in lines[start + 1 :]:
         if not line.startswith(" "):
             break
         param_doc.append(line.strip())
-    
+
     return " ".join(param_doc)
 
+
 class NestedHelp(Action):
-    def __init__(self,
-                option_strings,
-                dest=SUPPRESS,
-                default=SUPPRESS,
-                help=None):
-        super().__init__(
-            option_strings=option_strings,
-            dest=dest,
-            default=default,
-            nargs="?",
-            help=help)
+    def __init__(self, option_strings, dest=SUPPRESS, default=SUPPRESS, help=None):
+        super().__init__(option_strings=option_strings, dest=dest, default=default, nargs="?", help=help)
 
     def __call__(self, parser, namespace, values, option_string=None):
         formatter = parser._get_formatter()
 
         # usage
-        formatter.add_usage(parser.usage, parser._actions,
-                            parser._mutually_exclusive_groups)
+        formatter.add_usage(parser.usage, parser._actions, parser._mutually_exclusive_groups)
 
         # description
         formatter.add_text(parser.description)
@@ -169,7 +162,7 @@ class NestedHelp(Action):
                 groups = battle_group._action_groups
             elif values in arg_groups:
                 groups = [arg_groups[values]]
-            
+
             for action_group in groups:
                 formatter.start_section(action_group.title)
                 formatter.add_text(action_group.description)
