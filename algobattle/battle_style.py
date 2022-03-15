@@ -29,7 +29,7 @@ class BattleStyle(ABC, Generic[Instance, Solution]):
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         if not isabstract(cls):
-            BattleStyle._battle_styles[cls.__name__.lower()] = cls
+            BattleStyle._battle_styles[cls.name()] = cls
 
     def __init__(self, problem: Problem[Instance, Solution], fight: Fight, **kwargs: dict[str, Any]):
         """Builds a battle style object with the given option values.
@@ -46,8 +46,9 @@ class BattleStyle(ABC, Generic[Instance, Solution]):
         self.problem = problem
         self.fight = fight
 
-    def __str__(self) -> str:
-        return type(self).__name__.lower()
+    @classmethod
+    def name(cls) -> str:
+        return cls.__name__.lower()
 
     @classmethod
     def get_arg_spec(cls) -> dict[str, dict[str, Any]]:

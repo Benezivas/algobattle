@@ -180,7 +180,7 @@ def parse_config(options: Namespace) -> Namespace:
             raise SystemExit(f"The config file contains an invalid battle type '{type_str}', choose one of {styles}.")
     else:
         raise SystemExit(f"The battle type was not specified in the command line or the config file! {help_msg}")
-    battle_options.battle_type = battle_type
+    battle_options.battle_style = battle_type
     battle_type = str(battle_type)
 
     arg_specs = [("battle", battle_arg_spec), (battle_type, battle_styles[battle_type].get_arg_spec())]
