@@ -4,8 +4,8 @@ import logging
 import importlib.util
 from pathlib import Path
 from sys import modules
-from typing import Any, Callable, TypeVar
-from inspect import getmembers, isfunction, isclass
+from typing import Any, Mapping, TypeVar
+from inspect import getmembers, isclass
 from argparse import Action, SUPPRESS
 
 from algobattle.problem import Problem
@@ -102,7 +102,21 @@ def import_problem_from_path(path: Path) -> Problem:
     return potential_problems[0]()
 
 
-def format_table(table: list[list[Any]], column_spacing: dict[int, int] = {}) -> str:
+def format_table(table: list[list[Any]], column_spacing: Mapping[int, int] = {}) -> str:
+    """Formats a table of data nicely.
+
+    Parameters
+    ----------
+    table : list[list[Any]]
+        The table to format, inner lists are rows and all assumed to have equal length.
+    column_spacing : Mapping[int, int]
+        Mapping of row numbers to a minimum character width, by default {}
+
+    Returns
+    -------
+    str
+        The formatted table.
+    """
     if len(table) == 0:
         return "\n"
 
@@ -162,10 +176,13 @@ def parse_doc_for_param(doc: str, name: str) -> str:
 
 
 class NestedHelp(Action):
+    """Argparse action to generate nested help messages."""
+
     def __init__(self, option_strings, dest=SUPPRESS, default=SUPPRESS, help=None):
         super().__init__(option_strings=option_strings, dest=dest, default=default, nargs="?", help=help)
 
     def __call__(self, parser, namespace, values, option_string=None):
+        """Prints the help message to the console and then exits the parser immedietly."""
         formatter = parser._get_formatter()
 
         # usage
@@ -210,6 +227,6 @@ T = TypeVar("T")
 def inherit_docs(obj: T) -> T:
     """Decorator to mark a method as inheriting its docstring.
 
-    With 3.5+ python already does this, but pydocstyle needs a static hint.
+    Python 3.5+ already does this, but pydocstyle needs a static hint.
     """
     return obj
