@@ -115,9 +115,14 @@ class BattleStyle(ABC, Generic[Instance, Solution]):
             raise NotImplementedError
         
         def __str__(self) -> str:
-            if self.score.is_integer():
-                return f"{int(self.score): >6}"
-            elif 0 <= self.score <= 10:
-                return f"{self.score: >3.1%}"
+            return self.fmt_score(self.score)
+        
+        @staticmethod
+        def fmt_score(score: float) -> str:
+            """Formats a given score nicely."""
+            if score.is_integer():
+                return f"{int(score): >5}"
+            elif 0 <= score <= 10:
+                return f"{score: >5%}"
             else:
-                return f"{self.score: >4.2}"
+                return f"{score: >2.2}"
