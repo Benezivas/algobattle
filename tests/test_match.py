@@ -2,7 +2,7 @@
 from __future__ import annotations
 from configparser import ConfigParser
 from pathlib import Path
-from typing import Callable, cast
+from typing import Callable
 import unittest
 import logging
 
@@ -78,6 +78,7 @@ class Matchtests(unittest.TestCase):
     def test_build_error(self):
         # Build error
         team = ('0', self.tests_path / 'generator_build_error', self.tests_path / 'solver')
+
         def build_match():
             self.match = Match(self.problem, self.config_short_build_timeout, [team])
         self.assertRaises(SystemExit, build_match)

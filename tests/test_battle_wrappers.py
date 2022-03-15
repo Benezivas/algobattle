@@ -23,11 +23,14 @@ def team(name: str) -> Team:
     """Aliasing function to deal with invariance issues."""
     return TestTeam(name)
 
+
 def _iter_res(*args, **kwargs) -> BattleStyle.Result:
     return Iterated.Result(*args, **kwargs)
 
+
 def _avg_res(*args, **kwargs) -> BattleStyle.Result:
     return Averaged.Result(*args, **kwargs)
+
 
 class PointsCalculationTests(TestCase):
     """Tests for the points calculation functions."""
