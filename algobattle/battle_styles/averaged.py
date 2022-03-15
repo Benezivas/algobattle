@@ -1,24 +1,25 @@
-"""Battle style that iterates the instance size up to a point where the solving team is no longer able to solve an instance."""
+"""Battle style that repeats a battle on an instance size a number of times and averages the solution quality."""
 
 from __future__ import annotations
 from dataclasses import dataclass, field
-import itertools
 import logging
-from collections import defaultdict
 from typing import Any, Generator
 
 import algobattle.battle_style
 from algobattle.fight import Fight
 from algobattle.problem import Problem
-from algobattle.team import Team, Matchup
-from algobattle.util import format_table
+from algobattle.team import Matchup
+from algobattle.util import inherit_docs
 
 
 logger = logging.getLogger("algobattle.battle_styles.averaged")
 
 
 class Averaged(algobattle.battle_style.BattleStyle):
-    """Class of an adveraged battle style."""
+    """Class of an averaged battle.
+
+    This battle style fights on a specific instance size a number of times and then averages the solution quality.
+    """
 
     def __init__(
         self,
@@ -34,8 +35,8 @@ class Averaged(algobattle.battle_style.BattleStyle):
         ----------
         problem : Problem
             The problem that the teams will have to solve.
-        doker_config : DockerConfig
-            Docker configuration for the runs.
+        fight : Fight
+            Fight that will be used.
         instance_size : int
             The instance size on which the averaged run is to be made.
         iterations : int
@@ -52,13 +53,15 @@ class Averaged(algobattle.battle_style.BattleStyle):
         Execute several fights between two teams on a fixed instance size
         and determine the average solution quality.
 
-        During execution, this function updates the match_data of the match
-        object which is passed to it.
-
         Parameters
         ----------
-        match: Match
-            The Match object on which the battle style is to be executed on.
+        matchup: Matchup
+            The matchup of teams that participate in this battle.
+
+        Returns
+        -------
+        Generator[Result, None, None]
+            A generator of intermediate results, the last yielded is the final result.
         """
         res = self.Result()
         logger.info(
@@ -73,8 +76,11 @@ class Averaged(algobattle.battle_style.BattleStyle):
 
     @dataclass
     class Result(algobattle.battle_style.BattleStyle.Result):
+        """The result of an averaged battle."""
+
         approx_ratios: list[float] = field(default_factory=list)
 
+        @inherit_docs
         @property
         def score(self) -> float:
             if len(self.approx_ratios) == 0:
@@ -82,6 +88,7 @@ class Averaged(algobattle.battle_style.BattleStyle):
             else:
                 return sum(self.approx_ratios) / len(self.approx_ratios)
 
+        @inherit_docs
         @staticmethod
         def fmt_score(score: float) -> str:
             if 0 <= score <= 10:
