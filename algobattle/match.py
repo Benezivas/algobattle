@@ -24,7 +24,26 @@ class Match:
     def __init__(
         self, problem: Problem, docker_config: DockerConfig, team_info: list[tuple[str, Path, Path]], ui: Ui | None = None
     ) -> None:
+        """Creates a match instance.
 
+        Parameters
+        ----------
+        problem : Problem
+            The problem that the teams will have to solve.
+        docker_config : DockerConfig
+            Docker config used to build and run images.
+        team_info : list[tuple[str, Path, Path]]
+            For each team a name, path to their generator, and path to their solver.
+        ui : Ui | None
+            Ui object that the intermediate results will be displayed to, by default None.
+
+        Raises
+        ------
+        ValueError
+            If a team name is used twice.
+        SystemExit
+            If None of the teams containers built successfully.
+        """
         self.problem = problem
         self.ui = ui
         self.docker_config = docker_config
@@ -47,27 +66,23 @@ class Match:
         self.battle_matchups = BattleMatchups(self.teams)
 
     def run(self, battle_style: Type[BattleStyle], rounds: int = 5, **battle_options: dict[str, Any]) -> MatchResult:
-        """Match entry point, executes rounds fights between all teams and returns the results of the battles.
+        """Executes a match.
 
         Parameters
         ----------
-        battle_style : str
+        battle_style : Type[BattleStyle]
             Type of battle that is to be run.
         rounds : int
             Number of Battles between each pair of teams (used for averaging results).
         iterated_cap : int
             Iteration cutoff after which an iterated battle is automatically stopped, declaring the solver as the winner.
-        iterated_exponent : int
-            Exponent used for increasing the step size in an iterated battle.
-        approximation_instance_size : int
-            Instance size on which to run an averaged battle.
-        approximation_iterations : int
-            Number of iterations for an averaged battle between two teams.
+        **battle_options : dict[str, Any]
+            further options that will be passed to the battle style.
 
         Returns
         -------
-        BattleStyle
-            A battle style instance containing information about the executed battle.
+        MatchResult
+            The result of the match.
         """
         fight = Fight(self.problem, self.docker_config)
         battle = battle_style(self.problem, fight, **battle_options)
@@ -89,6 +104,7 @@ class Match:
         return results
 
     def cleanup(self) -> None:
+        """Removes all involved docker images."""
         for team in self.teams:
             team.cleanup()
 
