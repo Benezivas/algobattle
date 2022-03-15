@@ -8,6 +8,7 @@ from typing import Callable, TypeVar
 from collections import deque
 
 from algobattle import __version__ as version
+from algobattle.util import inherit_docs
 
 
 logger = logging.getLogger("algobattle.ui")
@@ -97,11 +98,14 @@ class Ui:
 
 
 class BufferHandler(MemoryHandler):
+    """Logging handler that buffers the last few messages."""
+
     def __init__(self, ui: Ui, level: int, num_records: int):
         self._buffer = deque(maxlen=num_records)
         self.ui = ui
         super().__init__(num_records)
 
+    @inherit_docs
     def emit(self, record: logging.LogRecord):
         try:
             msg = self.format(record)
