@@ -204,7 +204,10 @@ class NestedHelp(Action):
         parser.exit()
 
 
-def inherit_docs(obj: Any) -> Any:
+T = TypeVar("T")
+
+
+def inherit_docs(obj: T) -> T:
     """Decorator to mark a method as inheriting its docstring.
 
     With 3.5+ python already does this, but pydocstyle needs a static hint.
