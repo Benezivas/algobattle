@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Iterator
 from itertools import permutations
 
-from algobattle.docker import Image
+from algobattle.docker import DockerError, Image
 
 _team_names: set[str] = set()
 
@@ -27,10 +27,13 @@ class Team:
         self.name = team_name
         self.generator_path = generator_path
         self.solver_path = solver_path
-        self.generator = Image(
-            generator_path, f"generator-{self}", f"generator for team {self}", timeout=timeout_build, cache=cache_container
-        )
-        self.solver = Image(solver_path, f"solver-{self}", f"solver for team {self}", timeout_build, cache=cache_container)
+        self.generator = Image(generator_path, f"generator-{self}", f"generator for team {self}",
+                               timeout=timeout_build, cache=cache_container)
+        try:
+            self.solver = Image(solver_path, f"solver-{self}", f"solver for team {self}", timeout_build, cache=cache_container)
+        except DockerError:
+            self.generator.remove()
+            raise
         _team_names.add(team_name)
 
     def __str__(self) -> str:
