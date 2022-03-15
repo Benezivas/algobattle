@@ -9,6 +9,8 @@ logger = logging.getLogger("algobattle.problem")
 
 
 class WeightType(Enum):
+    """What kind of weighting a problem has."""
+
     unweighted = 0
     minimize = 1
     maximize = 2
@@ -138,7 +140,10 @@ class Problem(Protocol, Generic[Instance, Solution]):
     @staticmethod
     @abstractmethod
     def encode_instance(instance: Instance) -> str:
-        """Encodes an instance back into a string. Practically inverse of parse_instance.
+        """Encodes an instance back into a string to be handed to a solver.
+
+        Not necessarily an inverse of `.parse_instance()` as the generator may have to encode extra info
+        that the solver should not have access to.
 
         Parameters
         ----------
@@ -169,7 +174,7 @@ class Problem(Protocol, Generic[Instance, Solution]):
         Returns
         -------
         bool
-            Whether the solution is valid for the given instance.
+            Whether this is a valid solution of the given instance.
         """
         raise NotImplementedError
 
@@ -178,6 +183,8 @@ class Problem(Protocol, Generic[Instance, Solution]):
         """Calculates the weight of the given Solution.
 
         Typically this is its size or the sum of its elements or similar.
+        If the problem's `weight_type` is `WeightType.unweighted` this method should still exist even though
+        its return value will not be used by `approximation_ratio()`.
 
         Parameters
         ----------
@@ -205,6 +212,7 @@ class Problem(Protocol, Generic[Instance, Solution]):
         Assuming the generator found the best solution it will be a number between 0 and 1.
         An output of eg 0.5 indicates that the solver found a solution twice as big if the goal is to minimize the weight
         and half as big if the goal is to maximize.
+        Will always return 1 if the problem is unweighted.
 
         Parameters
         ----------
