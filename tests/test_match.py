@@ -21,13 +21,13 @@ def _parse_docker_config(path: Path) -> DockerConfig:
     config.read(path)
 
     kwargs = {
-        "cpus": config["run_parameters"].getint("cpus", None),
-        "timeout_build": config["run_parameters"].getfloat("timeout_build", None),
-        "cache_containers": config["run_parameters"].getboolean("cache_containers", True),
+        "cpus": config["docker_config"].getint("cpus", None),
+        "timeout_build": config["docker_config"].getfloat("timeout_build", None),
+        "cache_containers": config["docker_config"].getboolean("cache_containers", True),
     }
     for role in ("generator", "solver"):
-        kwargs[f"timeout_{role}"] = config["run_parameters"].getfloat(f"timeout_{role}", None)
-        kwargs[f"space_{role}"] = config["run_parameters"].getint(f"space_{role}", None)
+        kwargs[f"timeout_{role}"] = config["docker_config"].getfloat(f"timeout_{role}", None)
+        kwargs[f"space_{role}"] = config["docker_config"].getint(f"space_{role}", None)
 
     return DockerConfig(**kwargs)
 
