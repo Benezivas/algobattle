@@ -62,7 +62,7 @@ class Image:
         self,
         path: Path,
         image_name: str,
-        description: str | None,
+        description: str | None = None,
         timeout: float | None = None,
         cache: bool = True,
     ) -> None:
