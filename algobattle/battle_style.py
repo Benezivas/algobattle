@@ -7,7 +7,7 @@ from inspect import isabstract, signature, getdoc
 from algobattle.fight import Fight
 
 from algobattle.problem import Problem
-from algobattle.team import Team, BattleMatchups, Matchup
+from algobattle.team import Matchup
 from algobattle.util import parse_doc_for_param
 
 logger = logging.getLogger("algobattle.battle_type")
@@ -49,6 +49,7 @@ class BattleStyle(ABC, Generic[Instance, Solution]):
     @classmethod
     @property
     def name(cls) -> str:
+        """The normalized name of this battle style."""
         return cls.__name__.lower()
 
     @classmethod
