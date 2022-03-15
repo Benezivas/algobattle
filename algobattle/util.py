@@ -4,8 +4,8 @@ import logging
 import importlib.util
 from pathlib import Path
 from sys import modules
-from typing import Any
-from inspect import getmembers, isclass
+from typing import Any, Callable, TypeVar
+from inspect import getmembers, isfunction, isclass
 from argparse import Action, SUPPRESS
 
 from algobattle.problem import Problem
@@ -202,3 +202,11 @@ class NestedHelp(Action):
         # determine help from format above
         print(formatter.format_help())
         parser.exit()
+
+
+def inherit_docs(obj: Any) -> Any:
+    """Decorator to mark a method as inheriting its docstring.
+
+    With 3.5+ python already does this, but pydocstyle needs a static hint.
+    """
+    return obj
