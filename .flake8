@@ -14,5 +14,6 @@ docstring_convention = numpy
 ignore = D105, D401, E203
 exclude =
     .git,
-    __pycache__
+    __pycache__,
+    algobattle/old_problem.py
 ignore_decorators=inherit_docs
