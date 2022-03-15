@@ -108,8 +108,9 @@ def format_table(table: list[list[Any]], column_spacing: dict[int, int] = {}) ->
 
     table = [[str(element) for element in row] for row in table]
     col_sizes = [len(max((row[i] for row in table), key=len)) for i in range(len(table[0]))]
-    for (i, k) in column_spacing.items():
-        col_sizes[i] = k
+    for i, k in column_spacing.items():
+        if col_sizes[i] < k:
+            col_sizes[i] = k
 
     horizontal_sep_fmt = "{start}" + "{middle}".join("{sep}" * (width + 2) for width in col_sizes) + "{end}\n"
     top = horizontal_sep_fmt.format(start="╔", middle="╦", end="╗", sep="═")
