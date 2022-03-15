@@ -8,7 +8,7 @@ from typing import Any, Type
 
 from algobattle.battle_style import BattleStyle
 from algobattle.fight import Fight
-from algobattle.team import Team, BattleMatchups, Matchup
+from algobattle.team import Team, MatchupInfo, Matchup
 from algobattle.problem import Problem
 from algobattle.docker import DockerConfig, DockerError
 from algobattle.ui import Ui
@@ -52,7 +52,7 @@ class Match:
         for info in team_info:
             try:
                 self.teams.append(
-                    Team(*info, timeout_build=docker_config.timeout_build, cache_container=docker_config.cache_containers)
+                    Team(*info, timeout_build=docker_config.timeout_build, cache_image=docker_config.cache_containers)
                 )
             except DockerError:
                 logger.error(f"Removing team {info[0]} as their containers did not build successfully.")
@@ -63,7 +63,7 @@ class Match:
             logger.critical("None of the teams containers built successfully.")
             raise SystemExit
 
-        self.battle_matchups = BattleMatchups(self.teams)
+        self.battle_matchups = MatchupInfo(self.teams)
 
     def run(self, battle_style: Type[BattleStyle], rounds: int = 5, **battle_options: dict[str, Any]) -> MatchResult:
         """Executes a match.
@@ -115,7 +115,7 @@ class MatchResult(dict[Matchup, list[BattleStyle.Result]]):
     Primarily a mapping of matchups to a list of Results, one per round.
     """
 
-    def __init__(self, matchups: BattleMatchups, rounds: int) -> None:
+    def __init__(self, matchups: MatchupInfo, rounds: int) -> None:
         self.rounds = rounds
         self.matchups = matchups
         for matchup in matchups:

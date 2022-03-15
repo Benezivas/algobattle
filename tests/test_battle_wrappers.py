@@ -6,7 +6,7 @@ from algobattle.battle_style import BattleStyle
 
 from algobattle.battle_styles.averaged import Averaged
 from algobattle.battle_styles.iterated import Iterated
-from algobattle.team import Team, BattleMatchups, Matchup
+from algobattle.team import Team, MatchupInfo, Matchup
 from algobattle.match import MatchResult
 
 logging.disable(logging.CRITICAL)
@@ -35,7 +35,7 @@ class PointsCalculationTests(TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.teams = [team("0"), team("1")]
-        cls.matchups = BattleMatchups(cls.teams)
+        cls.matchups = MatchupInfo(cls.teams)
 
     def test_calculate_points_iterated_zero_rounds(self):
         self.assertEqual(MatchResult(self.matchups, rounds=0).calculate_points(100), {})
@@ -87,11 +87,11 @@ class MatchupsTests(TestCase):
         team0 = team("0")
         team1 = team("1")
         teams = [team0, team1]
-        self.assertEqual(list(BattleMatchups(teams)), [Matchup(team0, team1), Matchup(team1, team0)])
+        self.assertEqual(list(MatchupInfo(teams)), [Matchup(team0, team1), Matchup(team1, team0)])
 
     def test_all_battle_pairs_solo_battle(self):
         team0 = team("0")
-        self.assertEqual(list(BattleMatchups([team0])), [Matchup(team0, team0)])
+        self.assertEqual(list(MatchupInfo([team0])), [Matchup(team0, team0)])
 
 
 if __name__ == '__main__':

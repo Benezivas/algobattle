@@ -109,57 +109,57 @@ class FightTests(unittest.TestCase):
             self.team.cleanup()
 
     def test_one_fight_gen_timeout(self):
-        self.team = Team('0', self.tests_path / 'generator_timeout', self.tests_path / 'solver', cache_container=False)
+        self.team = Team('0', self.tests_path / 'generator_timeout', self.tests_path / 'solver', cache_image=False)
         matchup = Matchup(self.team, self.team)
         self.assertEqual(self.fight_run_timeout(matchup, 1), self.problem.approx_cap)
 
     def test_one_fight_gen_exec_error(self):
-        self.team = Team('0', self.tests_path / 'generator_execution_error', self.tests_path / 'solver', cache_container=False)
+        self.team = Team('0', self.tests_path / 'generator_execution_error', self.tests_path / 'solver', cache_image=False)
         matchup = Matchup(self.team, self.team)
         self.assertEqual(self.fight_normal(matchup, 1), self.problem.approx_cap)
 
     def test_one_fight_gen_wrong_instance(self):
-        self.team = Team('0', self.tests_path / 'generator_wrong_instance', self.tests_path / 'solver', cache_container=False)
+        self.team = Team('0', self.tests_path / 'generator_wrong_instance', self.tests_path / 'solver', cache_image=False)
         matchup = Matchup(self.team, self.team)
         self.assertEqual(self.fight_normal(matchup, 1), self.problem.approx_cap)
 
     def test_one_fight_gen_malformed_sol(self):
         self.team = Team('0', self.tests_path / 'generator_malformed_solution',
-                         self.tests_path / 'solver', cache_container=False)
+                         self.tests_path / 'solver', cache_image=False)
         matchup = Matchup(self.team, self.team)
         self.assertEqual(self.fight_normal(matchup, 1), self.problem.approx_cap)
 
     def test_one_fight_gen_wrong_cert(self):
         self.team = Team('0', self.tests_path / 'generator_wrong_certificate',
-                         self.tests_path / 'solver', cache_container=False)
+                         self.tests_path / 'solver', cache_image=False)
         matchup = Matchup(self.team, self.team)
         self.assertEqual(self.fight_normal(matchup, 1), self.problem.approx_cap)
 
     def test_one_fight_sol_timeout(self):
-        self.team = Team('0', self.tests_path / 'generator', self.tests_path / 'solver_timeout', cache_container=False)
+        self.team = Team('0', self.tests_path / 'generator', self.tests_path / 'solver_timeout', cache_image=False)
         matchup = Matchup(self.team, self.team)
         self.assertEqual(self.fight_run_timeout(matchup, 1), 0.0)
 
     def test_one_fight_sol_exec_error(self):
         self.team = Team('0', self.tests_path / 'generator',
-                         self.tests_path / 'solver_execution_error', cache_container=False)
+                         self.tests_path / 'solver_execution_error', cache_image=False)
         matchup = Matchup(self.team, self.team)
         self.assertEqual(self.fight_run_timeout(matchup, 1), 0.0)
 
     def test_one_fight_sol_malformed(self):
         self.team = Team('0', self.tests_path / 'generator',
-                         self.tests_path / 'solver_malformed_solution', cache_container=False)
+                         self.tests_path / 'solver_malformed_solution', cache_image=False)
         matchup = Matchup(self.team, self.team)
         self.assertEqual(self.fight_run_timeout(matchup, 1), 0.0)
 
     def test_one_fight_sol_wrong_cert(self):
         self.team = Team('0', self.tests_path / 'generator',
-                         self.tests_path / 'solver_wrong_certificate', cache_container=False)
+                         self.tests_path / 'solver_wrong_certificate', cache_image=False)
         matchup = Matchup(self.team, self.team)
         self.assertEqual(self.fight_run_timeout(matchup, 1), 0.0)
 
     def test_one_fight_successful(self):
-        self.team = Team('0', self.tests_path / 'generator', self.tests_path / 'solver', cache_container=False)
+        self.team = Team('0', self.tests_path / 'generator', self.tests_path / 'solver', cache_image=False)
         matchup = Matchup(self.team, self.team)
         self.assertEqual(self.fight_normal(matchup, 1), 1.0)
 

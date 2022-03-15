@@ -19,8 +19,28 @@ class Team:
         generator_path: Path,
         solver_path: Path,
         timeout_build: float | None = None,
-        cache_container: bool = True,
+        cache_image: bool = True,
     ) -> None:
+        """Creates a team object and builds the necessary docker containers.
+
+        Parameters
+        ----------
+        team_name : str
+            Name of the team, must be globally unique!
+        generator_path : Path
+            Path to a folder containing a Dockerfile that will be used for the generator.
+        solver_path : Path
+            Path to a folder containing a Dockerfile that will be used for the solver.
+        timeout_build : float | None
+            Timeout for building the containers, `None` means they will have unlimited time, by default None.
+        cache_container : bool, optional
+            Wether docker should cache the built images, by default True.
+
+        Raises
+        ------
+        ValueError
+            _description_
+        """
         team_name = team_name.replace(" ", "_").lower()  # Lower case needed for docker tag created from name
         if team_name in _team_names:
             raise ValueError
@@ -28,9 +48,9 @@ class Team:
         self.generator_path = generator_path
         self.solver_path = solver_path
         self.generator = Image(generator_path, f"generator-{self}", f"generator for team {self}",
-                               timeout=timeout_build, cache=cache_container)
+                               timeout=timeout_build, cache=cache_image)
         try:
-            self.solver = Image(solver_path, f"solver-{self}", f"solver for team {self}", timeout_build, cache=cache_container)
+            self.solver = Image(solver_path, f"solver-{self}", f"solver for team {self}", timeout_build, cache=cache_image)
         except DockerError:
             self.generator.remove()
             raise
@@ -49,6 +69,7 @@ class Team:
         return hash(self.name)
 
     def cleanup(self) -> None:
+        """Removes the built docker images."""
         self.generator.remove()
         self.solver.remove()
         _team_names.remove(self.name)
@@ -56,6 +77,8 @@ class Team:
 
 @dataclass(frozen=True)
 class Matchup:
+    """Represents an individual matchup of teams."""
+
     generator: Team
     solver: Team
 
@@ -65,7 +88,9 @@ class Matchup:
 
 
 # not incredibly useful atm, but a layer of abstraction over a list of teams will be nice
-class BattleMatchups:
+class MatchupInfo:
+    """All matchups that will be fought in a match and associated information."""
+
     def __init__(self, teams: list[Team]) -> None:
         self.teams = teams
         if len(self.teams) == 1:
