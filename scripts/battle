@@ -2,7 +2,6 @@
 """Main battle script. Executes all possible types of battles, see battle --help for all options."""
 from __future__ import annotations, generators
 from configparser import ConfigParser
-from genericpath import exists
 from sys import stderr
 import os
 import logging
@@ -12,7 +11,7 @@ from pathlib import Path
 
 import algobattle
 from algobattle.match import Match
-from algobattle.util import get_matching_file, import_problem_from_path, NestedHelp, get_matching_file
+from algobattle.util import get_matching_file, import_problem_from_path, NestedHelp
 from algobattle.docker import measure_runtime_overhead, DockerConfig
 from algobattle.ui import Ui
 from algobattle.battle_styles import battle_styles, get_battle_style
@@ -88,6 +87,7 @@ def _missing_path(path: Path, desc: str | None = None):
 
 
 def create_parser() -> ArgumentParser:
+    """Creates a parser with the needed arguments."""
 
     default_logging_path = Path.home() / ".algobattle_logs"
 
@@ -139,6 +139,7 @@ def create_parser() -> ArgumentParser:
 
 
 def parse_args() -> Namespace:
+    """Parse the command line arguments."""
     options = create_parser().parse_args()
 
     if not options.problem_path.exists():
@@ -165,6 +166,23 @@ def parse_args() -> Namespace:
 
 
 def parse_config(options: Namespace) -> Namespace:
+    """Gets the config file from the provided options and parses it.
+
+    Parameters
+    ----------
+    options : Namespace
+        Options namespace as generated from `parse_args()`.
+
+    Returns
+    -------
+    Namespace
+        A new, cleaned up, Namespace containing the combined options.
+
+    Raises
+    ------
+    SystemExit
+        If no battle type is chosen or an invalid choice was made.
+    """
     config = ConfigParser()
     config.read(options.config)
     battle_options = Namespace()
@@ -208,10 +226,27 @@ def parse_config(options: Namespace) -> Namespace:
 
 
 def parse_team_info(teams: list[Path]) -> list[tuple[str, Path, Path]]:     # noqa: C901
+    """Parses team info from the list of paths.
+
+    Parameters
+    ----------
+    teams : list[Path]
+        List of paths pointing to `team.ini` files, their parent folders, or folders with `generator` and `solver` subfolders.
+
+    Returns
+    -------
+    list[tuple[str, Path, Path]]
+        List of `(name, generator_path, solver_path)`
+
+    Raises
+    ------
+    SystemExit
+        If the specified paths don't exist in the file system.
+    """
     team_info: list[tuple[str, Path, Path]] = []
     for path in teams:
         try:
-            path = get_matching_file(path.resolve(), "teams.ini")
+            path = get_matching_file(path.resolve(), "team.ini")
         except RuntimeError:
             raise SystemExit(_missing_path(path, "Team info"))
         except ValueError:
