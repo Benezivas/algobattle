@@ -88,7 +88,6 @@ def _missing_path(path: Path, desc: str | None = None):
 
 def create_parser() -> ArgumentParser:
     """Creates a parser with the needed arguments."""
-
     default_logging_path = Path.home() / ".algobattle_logs"
 
     def resolved_path(path: str) -> Path:

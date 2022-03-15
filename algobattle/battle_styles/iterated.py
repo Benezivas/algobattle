@@ -122,7 +122,7 @@ class Iterated(BattleStyle):
 
     @dataclass
     class Result(BattleStyle.Result):
-        """The result of an iterated battle"""
+        """The result of an iterated battle."""
 
         cap: int = 0
         solved: int = 0
