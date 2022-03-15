@@ -8,16 +8,21 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-from subprocess import CalledProcessError, TimeoutExpired, run
+from subprocess import CREATE_NEW_PROCESS_GROUP, CalledProcessError, TimeoutExpired, run
 from timeit import default_timer
 from uuid import uuid1
 from dataclasses import dataclass
-from signal import SIGTERM
+from signal import SIGTERM, CTRL_BREAK_EVENT
 
 import algobattle.problems.delaytest as DelaytestProblem
 
 
 logger = logging.getLogger("algobattle.docker")
+
+if os.name == "posix":
+    _flag = 0
+else:
+    _flag = CREATE_NEW_PROCESS_GROUP
 
 
 class DockerError(Exception):
@@ -96,7 +101,7 @@ class Image:
 
         logger.debug(f"Building docker container with the following command: {' '.join(cmd)}")
         try:
-            result = run(cmd, capture_output=True, timeout=timeout, check=True, text=True)
+            result = run(cmd, capture_output=True, timeout=timeout, check=True, text=True, creationflags=_flag)
 
         except TimeoutExpired as e:
             logger.error(f"Build process for '{path}' ran into a timeout!")
@@ -160,7 +165,7 @@ class Image:
 
         result = None
         try:
-            result = run(cmd, input=input, capture_output=True, timeout=timeout, check=True, text=True)
+            result = run(cmd, input=input, capture_output=True, timeout=timeout, check=True, text=True, creationflags=_flag)
 
         except TimeoutExpired:
             logger.warning(f"'{self.description}' exceeded time limit!")
@@ -187,6 +192,8 @@ class Image:
                 _kill_container(self, name)
                 if os.name == "posix":
                     os.killpg(os.getpid(), SIGTERM)
+                else:
+                    os.kill(os.getpid(), CTRL_BREAK_EVENT)
 
         elapsed_time = round(default_timer() - start_time, 2)
         logger.debug(f"Approximate elapsed runtime: {elapsed_time}/{timeout} seconds.")
@@ -209,7 +216,7 @@ class Image:
         """
         cmd = ["docker", "image", "rm", "--no-prune", "-f", self.id]
         try:
-            run(cmd, capture_output=True, check=True, text=True)
+            run(cmd, capture_output=True, check=True, text=True, creationflags=_flag)
 
         except CalledProcessError as e:
             if e.stderr.find("error during connect") != -1:
