@@ -1,23 +1,23 @@
-"""Battle style that repeats a battle on an instance size a number of times and averages the competitive ratio over all runs."""
+"""Battle style that iterates the instance size up to a point where the solving team is no longer able to solve an instance."""
 
 from __future__ import annotations
-from collections import defaultdict
 from dataclasses import dataclass
-import itertools
 import logging
 
-import algobattle.battle_style
+from algobattle.battle_style import BattleStyle
 from algobattle.problem import Problem
 from algobattle.fight import Fight
-from algobattle.team import Matchup, Team
-from algobattle.util import format_table
+from algobattle.team import Matchup
 from typing import Generator
 
 logger = logging.getLogger("algobattle.battle_styles.iterated")
 
 
-class Iterated(algobattle.battle_style.BattleStyle):
-    """Class of an iterated battle style."""
+class Iterated(BattleStyle):
+    """Class of an iterated battle style.
+
+    This battle style increases the instance size up to a point where the solving team is no longer able to solve an instan
+    """
 
     def __init__(
         self,
@@ -118,7 +118,7 @@ class Iterated(algobattle.battle_style.BattleStyle):
             yield self.Result(n_cap, maximum_reached_n, n)
 
     @dataclass
-    class Result(algobattle.battle_style.BattleStyle.Result):
+    class Result(BattleStyle.Result):
         cap: int = 0
         solved: int = 0
         attempting: int = 0

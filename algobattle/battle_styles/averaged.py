@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 import logging
 from typing import Any, Generator
 
-import algobattle.battle_style
+from algobattle.battle_style import BattleStyle
 from algobattle.fight import Fight
 from algobattle.problem import Problem
 from algobattle.team import Matchup
@@ -15,7 +15,7 @@ from algobattle.util import inherit_docs
 logger = logging.getLogger("algobattle.battle_styles.averaged")
 
 
-class Averaged(algobattle.battle_style.BattleStyle):
+class Averaged(BattleStyle):
     """Class of an averaged battle.
 
     This battle style fights on a specific instance size a number of times and then averages the solution quality.
@@ -75,7 +75,7 @@ class Averaged(algobattle.battle_style.BattleStyle):
             yield res
 
     @dataclass
-    class Result(algobattle.battle_style.BattleStyle.Result):
+    class Result(BattleStyle.Result):
         """The result of an averaged battle."""
 
         approx_ratios: list[float] = field(default_factory=list)
