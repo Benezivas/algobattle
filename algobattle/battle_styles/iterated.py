@@ -126,3 +126,7 @@ class Iterated(algobattle.battle_style.BattleStyle):
         @property
         def score(self) -> float:
             return self.solved
+
+        @staticmethod
+        def fmt_score(score: float) -> str:
+            return f"{int(score): >5}"

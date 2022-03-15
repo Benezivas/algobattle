@@ -81,3 +81,10 @@ class Averaged(algobattle.battle_style.BattleStyle):
                 return 0
             else:
                 return sum(self.approx_ratios) / len(self.approx_ratios)
+
+        @staticmethod
+        def fmt_score(score: float) -> str:
+            if 0 <= score <= 10:
+                return f"{score: >5.0%}"
+            else:
+                return f"{score: >3.1}"

@@ -98,7 +98,7 @@ class BattleStyle(ABC, Generic[Instance, Solution]):
         ----------
         matchup: Matchup
             The matchup of teams that participate in this battle.
-        
+
         Returns
         -------
         Generator[Result, None, None]
@@ -114,16 +114,12 @@ class BattleStyle(ABC, Generic[Instance, Solution]):
         def score(self) -> float:
             """The score of this result."""
             raise NotImplementedError
-        
+
         def __str__(self) -> str:
             return self.fmt_score(self.score)
-        
+
         @staticmethod
+        @abstractmethod
         def fmt_score(score: float) -> str:
             """Formats a given score nicely."""
-            if score.is_integer():
-                return f"{int(score): >5}"
-            elif 0 <= score <= 10:
-                return f"{score: >5%}"
-            else:
-                return f"{score: >2.2}"
+            raise NotImplementedError
