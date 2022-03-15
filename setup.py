@@ -13,6 +13,6 @@ setup(
     version=version,
     packages=['algobattle'],
     scripts=['scripts/battle'],
-    python_requires='>=3.6',
+    python_requires='>=3.9',
     include_package_data=True
 )
