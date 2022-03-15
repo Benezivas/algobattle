@@ -203,7 +203,7 @@ def parse_config(options: Namespace) -> Namespace:      # noqa: C901
     for spec_name, spec in arg_specs:
         for name, kwargs in spec.items():
             if getattr(options, name) is not None:
-                setattr(battle_options, name, options.name)
+                setattr(battle_options, name, getattr(options, name))
             elif spec_name in config and name in config[spec_name]:
                 setattr(battle_options, name, kwargs["type"](config[spec_name][name]))
             else:
