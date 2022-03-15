@@ -10,13 +10,15 @@ from algobattle.fight import Fight
 from algobattle.team import Matchup
 from typing import Generator
 
+from algobattle.util import inherit_docs
+
 logger = logging.getLogger("algobattle.battle_styles.iterated")
 
 
 class Iterated(BattleStyle):
     """Class of an iterated battle style.
 
-    This battle style increases the instance size up to a point where the solving team is no longer able to solve an instan
+    This battle style increases the instance size up to a point where the solving team is no longer able to solve an instance
     """
 
     def __init__(
@@ -34,14 +36,14 @@ class Iterated(BattleStyle):
         ----------
         problem : Problem
             The problem that the teams will have to solve.
-        docker_config : DockerConfig
-            Docker config for the runs.
+        fight : Fight
+            Fight that will be used.
         cap : int
             The maximum instance size up to which a battle is to be fought.
         exponent : int
             The exponent used for the step size increase.
-        approximation_ratio : float, optional
-            Tolerated approximation ratio of a solution, if the problem is compatible with approximation.
+        approximation_ratio : float
+            Tolerated approximation ratio of a solution.
         """
         self.exponent = exponent
         self.cap = cap
@@ -62,16 +64,17 @@ class Iterated(BattleStyle):
         size on a second try), we cap the maximum solution size by the first
         value that an algorithm has failed on.
 
-        The battle style automatically ends the battle and declares the solver as the
-        winner once the iteration cap is reached.
-
-        During execution, this function updates the match_data of the match
-        object which is passed to it.
+        The battle style automatically ends the battle once the iteration cap is reached.
 
         Parameters
         ----------
-        match: Match
-            The Match object on which the battle style is to be executed on.
+        matchup: Matchup
+            The matchup of teams that participate in this battle.
+
+        Returns
+        -------
+        Generator[Result, None, None]
+            A generator of intermediate results, the last yielded is the final result.
         """
         n = self.problem.n_start
         maximum_reached_n = 0
@@ -119,14 +122,18 @@ class Iterated(BattleStyle):
 
     @dataclass
     class Result(BattleStyle.Result):
+        """The result of an iterated battle"""
+
         cap: int = 0
         solved: int = 0
         attempting: int = 0
 
+        @inherit_docs
         @property
         def score(self) -> float:
             return self.solved
 
+        @inherit_docs
         @staticmethod
         def fmt_score(score: float) -> str:
             return f"{int(score): >5}"
