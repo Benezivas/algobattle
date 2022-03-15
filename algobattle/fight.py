@@ -12,6 +12,7 @@ logger = getLogger("algobattle.fight")
 Instance = TypeVar("Instance")
 Solution = TypeVar("Solution")
 
+
 @dataclass
 class Fight(Generic[Instance, Solution]):
     """Class that executes a single fight with a given matchup."""
@@ -24,14 +25,16 @@ class Fight(Generic[Instance, Solution]):
 
         Parameters
         ----------
+        matchup : Matchup
+            The matchup of teams involved in this battle.
         instance_size : int
             The instance size, expected to be a positive int.
 
         Returns
         -------
         float
-            Returns the approximation ratio of the solver against
-            the generator (1 if optimal, 0 if failed, >=1 if the
+            The approximation ratio of the solver against
+            the generator (1 if optimal, 0 if failed, <=1 if the
             generator solution is optimal).
         """
         try:
@@ -57,6 +60,8 @@ class Fight(Generic[Instance, Solution]):
 
         Parameters
         ----------
+        team : Team
+            Generating team.
         instance_size : int
             The instance size, expected to be a positive int.
 
