@@ -31,6 +31,8 @@ class DockerError(Exception):
 
 @dataclass
 class DockerConfig:
+    """Specifies settings relevant for the building and execution of docker images/containers."""
+
     timeout_build: float | None = None
     timeout_generator: float | None = None
     timeout_solver: float | None = None
@@ -40,6 +42,7 @@ class DockerConfig:
     cache_containers: bool = True
 
     def add_overhead(self, overhead: float) -> None:
+        """Adds some amount of runtime overhead to the timeouts."""
         def _map(f):
             return f if f is None else f + overhead
 
@@ -51,7 +54,8 @@ class DockerConfig:
 class Image:
     """Class defining a docker image.
 
-    Constructor execution may take several seconds and should not be interrupted.
+    Instances may outlive the actual docker images in the daemon!
+    To prevent this don't use the object after calling `.remove()`.
     """
 
     def __init__(
@@ -71,7 +75,7 @@ class Image:
         image_name
             Name of the image, used both internally and for the docker image name.
         description
-            Optional description for the image, defaults to image_name
+            Optional description for the image, defaults to `image_name`
         timeout
             Build timeout in seconds, raises DockerError if exceeded.
         cache
@@ -80,7 +84,7 @@ class Image:
         Raises
         ------
         DockerError
-                On almost all common issues that might happen during the build, including timeouts, syntax errors,
+            On almost all common issues that might happen during the build, including timeouts, syntax errors,
             OS errors, and errors thrown by the docker daemon.
         """
         cmd = ["docker", "build", "-q", "--network=host"]
@@ -126,22 +130,22 @@ class Image:
         Parameters
         ----------
         input
-            The input string the container will be provided with
+            The input string the container will be provided with.
         timeout
-            Timeout in seconds. Returns an empty output if exceeded
+            Timeout in seconds. Returns an empty output if exceeded.
         memory
-            Maximum memory the container will be allocated in MB
+            Maximum memory the container will be allocated in MB.
         cpus
-            Number of cpus the container will be allocated
+            Number of cpus the container will be allocated.
 
         Returns
         -------
-        Output string of the container
+        Output string of the container.
 
         Raises
         ------
         DockerError
-                On almost all common issues that might happen during the execution, including syntax errors,
+            On almost all common issues that might happen during the execution, including syntax errors,
             OS errors, and errors thrown by the docker daemon.
 
         """
@@ -193,13 +197,13 @@ class Image:
         """Removes the image from the docker daemon.
 
         **This will not cause the python object to be deleted.** Attempting to run the image after it has been removed will
-        cause runtime errors not caught by the linter or typechecker.
+        cause runtime errors.
         Will not throw an error if the image has been removed already.
 
         Raises
         ------
         DockerError
-                On almost all common issues that might happen during the execution, including syntax errors,
+            On almost all common issues that might happen during the execution, including syntax errors,
             OS errors, and errors thrown by the docker daemon.
 
         """
@@ -230,7 +234,7 @@ def _kill_container(image: Image, name: str) -> None:
     """Kills a running container.
 
     Do not call this function if you didn't start the container,
-    it's rather unsafe and will cause many downstream errors.
+    it's rather unsafe and may cause downstream errors.
 
     Parameters
     ----------
