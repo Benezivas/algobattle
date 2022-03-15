@@ -122,7 +122,7 @@ def create_parser() -> ArgumentParser:
     parser.add_argument("--do_not_count_points", action="store_true", help="If set, points are not calculated for the run.")
 
     battle_args = parser.add_argument_group("battle arguments")
-    battle_args.add_argument("--battle_type", choices=battle_styles.keys(), type=get_battle_style,
+    battle_args.add_argument("--battle_type", choices=battle_styles.keys(),
                              help="Type of battle, has to be set in the command line or config file")
     # fmt: on
 
@@ -164,7 +164,7 @@ def parse_args() -> Namespace:
     return options
 
 
-def parse_config(options: Namespace) -> Namespace:
+def parse_config(options: Namespace) -> Namespace:      # noqa: C901
     """Gets the config file from the provided options and parses it.
 
     Parameters
@@ -187,20 +187,19 @@ def parse_config(options: Namespace) -> Namespace:
     battle_options = Namespace()
 
     if options.battle_type is not None:
-        battle_type = options.battle_type
+        type_str = options.battle_type
     elif "battle" in config and "battle_type" in config["battle"]:
         type_str = config["battle"]["battle_type"]
-        try:
-            battle_type = get_battle_style(type_str)
-        except ValueError:
-            styles = ", ".join(f"'{battle_styles.keys()}'")
-            raise SystemExit(f"The config file contains an invalid battle type '{type_str}', choose one of {styles}.")
     else:
         raise SystemExit(f"The battle type was not specified in the command line or the config file! {help_msg}")
+    try:
+        battle_type = get_battle_style(type_str)
+    except ValueError:
+        styles = ", ".join(f"'{battle_styles.keys()}'")
+        raise SystemExit(f"The config file contains an invalid battle type '{type_str}', choose one of {styles}.")
     battle_options.battle_style = battle_type
-    battle_type = battle_type.name
 
-    arg_specs = [("battle", battle_arg_spec), (battle_type, battle_styles[battle_type].get_arg_spec())]
+    arg_specs = [("battle", battle_arg_spec), (type_str, battle_styles[type_str].get_arg_spec())]
     for spec_name, spec in arg_specs:
         for name, kwargs in spec.items():
             if getattr(options, name) is not None:
