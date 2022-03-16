@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-from subprocess import CREATE_NEW_PROCESS_GROUP, CalledProcessError, TimeoutExpired, run
+from subprocess import CalledProcessError, TimeoutExpired, run
 from timeit import default_timer
 from uuid import uuid1
 from dataclasses import dataclass
@@ -22,6 +22,7 @@ logger = logging.getLogger("algobattle.docker")
 if os.name == "posix":
     _flag = 0
 else:
+    from subprocess import CREATE_NEW_PROCESS_GROUP
     _flag = CREATE_NEW_PROCESS_GROUP
 
 
