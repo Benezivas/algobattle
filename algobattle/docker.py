@@ -193,7 +193,10 @@ class Image:
             if result is None:
                 _kill_container(self, name)
                 if os.name == "posix":
-                    os.killpg(os.getpid(), SIGTERM)
+                    try:
+                        os.killpg(os.getpid(), SIGTERM)
+                    except ProcessLookupError:
+                        pass
                 else:
                     os.kill(os.getpid(), CTRL_BREAK_EVENT)
 
