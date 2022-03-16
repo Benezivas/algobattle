@@ -66,13 +66,13 @@ class PointsCalculationTests(TestCase):
 
     def test_calculate_points_averaged_draw(self):
         results = MatchResult(self.matchups, rounds=2)
-        results[self.matchups[0]] = [_avg_res([1.5, 1.5, 1.5]), _avg_res([1.5, 1.5, 1.5])]
-        results[self.matchups[1]] = [_avg_res([1.5, 1.5, 1.5]), _avg_res([1.5, 1.5, 1.5])]
+        results[self.matchups[0]] = [_avg_res([2 / 3, 2 / 3, 2 / 3]), _avg_res([2 / 3, 2 / 3, 2 / 3])]
+        results[self.matchups[1]] = [_avg_res([2 / 3, 2 / 3, 2 / 3]), _avg_res([2 / 3, 2 / 3, 2 / 3])]
         self.assertEqual(results.calculate_points(100), {self.teams[0]: 50, self.teams[1]: 50})
 
     def test_calculate_points_averaged_domination(self):
         results = MatchResult(self.matchups, rounds=2)
-        results[self.matchups[0]] = [_avg_res([1.5, 1.5, 1.5]), _avg_res([1.5, 1.5, 1.5])]
+        results[self.matchups[0]] = [_avg_res([2 / 3, 2 / 3, 2 / 3]), _avg_res([2 / 3, 2 / 3, 2 / 3])]
         results[self.matchups[1]] = [_avg_res([1.0, 1.0, 1.0]), _avg_res([1.0, 1.0, 1.0])]
         self.assertEqual(results.calculate_points(100), {self.teams[0]: 60, self.teams[1]: 40})
 
@@ -97,5 +97,5 @@ class MatchupsTests(TestCase):
         self.assertEqual(list(MatchupInfo([team0])), [Matchup(team0, team0)])
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

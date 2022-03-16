@@ -1,5 +1,6 @@
 """Match class, provides functionality for setting up and executing battles between given teams."""
 from __future__ import annotations
+from collections import defaultdict
 from itertools import combinations
 
 import logging
@@ -168,7 +169,7 @@ class MatchResult(dict[Matchup, list[BattleStyle.Result]]):
             team for which there is an entry in match_data and points is a
             float value. Returns an empty dict if no battle was fought.
         """
-        points = {}
+        points = defaultdict(lambda: 0.)
 
         teams: set[Team] = set()
         for pair in self.keys():
