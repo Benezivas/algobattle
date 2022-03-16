@@ -12,7 +12,7 @@ from subprocess import CalledProcessError, TimeoutExpired, run
 from timeit import default_timer
 from uuid import uuid1
 from dataclasses import dataclass
-from signal import SIGTERM, CTRL_BREAK_EVENT
+from signal import SIGTERM
 
 import algobattle.problems.delaytest as DelaytestProblem
 
@@ -23,6 +23,7 @@ if os.name == "posix":
     _flag = 0
 else:
     from subprocess import CREATE_NEW_PROCESS_GROUP
+    from signal import CTRL_BREAK_EVENT
     _flag = CREATE_NEW_PROCESS_GROUP
 
 
