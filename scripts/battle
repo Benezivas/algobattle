@@ -266,7 +266,7 @@ def parse_team_info(teams: list[Path]) -> list[tuple[str, Path, Path]]:     # no
         name = config.get("name", path.name)
         generator = config.get("generator", "generator")
         solver = config.get("solver", "solver")
-        team_info.append((name, (path / generator).resolve(), (path / solver).resolve()))
+        team_info.append((name, (path.parent / generator).resolve(), (path.parent / solver).resolve()))
 
     for name, gen_path, sol_path in team_info:
         for role, path in [("generator", gen_path), ("solver", sol_path)]:
