@@ -53,5 +53,5 @@ jobs:
     - name: Run short battles with different options as a sanity check
       run: |
         $HOME/.local/bin/battle algobattle/problems/testsproblem --verbose --battle_type=iterated --cap=5 --rounds=2
-        $HOME/.local/bin/battle algobattle/problems/testsproblem --verbose --battle_type=iterated --cap=5 --rounds=2 --no_overhead_calculation --teams=algobattle/problems/testsproblem/team1.ini,algobattle/problems/testsproblem/team2.ini
+        $HOME/.local/bin/battle algobattle/problems/testsproblem --verbose --battle_type=iterated --cap=5 --rounds=2 --no_overhead_calculation --teams algobattle/problems/testsproblem/team1.ini algobattle/problems/testsproblem/team2.ini
         $HOME/.local/bin/battle algobattle/problems/testsproblem --verbose --battle_type=averaged --instance_size=3 --iterations=3 --rounds=2
