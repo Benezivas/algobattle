@@ -4,10 +4,11 @@ import curses
 import logging
 from logging.handlers import MemoryHandler
 from sys import stdout
-from typing import Callable, TypeVar
-from collections import deque
+from typing import Any, Callable, TypeVar
+from collections import defaultdict, deque
 
 from algobattle import __version__ as version
+from algobattle.events import SharedObserver, Subject
 from algobattle.util import inherit_docs
 
 
@@ -29,7 +30,7 @@ def check_for_terminal(function: F) -> F:
     return wrapper  # type: ignore
 
 
-class Ui:
+class Ui(SharedObserver):
     """The UI Class declares methods to output information to STDOUT."""
 
     @check_for_terminal
@@ -39,10 +40,13 @@ class Ui:
             curses.cbreak()  # type: ignore
             curses.noecho()  # type: ignore
             self.stdscr.keypad(True)
-            self.cached_results = ""
-            self.cached_logs = ""
             handler = BufferHandler(self, logging_level, num_records)
             logger.addHandler(handler)
+            self.sections: dict[str, Any] = {
+                "match": None,
+                "battle": None,
+                "logs": None,
+            }
 
     @check_for_terminal
     def restore(self) -> None:
@@ -54,22 +58,13 @@ class Ui:
             curses.endwin()  # type: ignore
 
     @check_for_terminal
-    def update(self, results: str | None = None, logs: str | None = None) -> None:
-        """Receive updates by observing the match object and prints them out formatted.
+    def update(self, section: str, data: Any) -> None:
+        """Updates the specified section of the UI."""
+        if section not in self.sections:
+            return
 
-        Parameters
-        ----------
-        match : dict
-            The observed match object.
-        """
-        if results is None:
-            results = self.cached_results
-        else:
-            self.cached_results = results
-        if logs is None:
-            logs = self.cached_logs
-        else:
-            self.cached_logs = logs
+        self.sections[section] = data
+        results = "\n\n".join(str(d) for s, d in self.sections.items() if d is not None and s != "logs")
 
         out = "\n".join([
             r"              _    _             _           _   _   _       ",
@@ -83,7 +78,7 @@ class Ui:
             f"{results}",
             "",
             "-------------------------------------------------------------",
-            f"{logs}",
+            f"{self.sections['logs']}",
             "-------------------------------------------------------------",
         ])
         self.stdscr.clear()
@@ -97,12 +92,14 @@ class Ui:
             curses.flushinp()  # type: ignore
 
 
-class BufferHandler(MemoryHandler):
+class BufferHandler(MemoryHandler, Subject):
     """Logging handler that buffers the last few messages."""
+
+    default_event = "logs"
 
     def __init__(self, ui: Ui, level: int, num_records: int):
         self._buffer = deque(maxlen=num_records)
-        self.ui = ui
+        self.attach(ui)
         super().__init__(num_records)
 
     @inherit_docs
@@ -110,7 +107,7 @@ class BufferHandler(MemoryHandler):
         try:
             msg = self.format(record)
             self._buffer.append(msg)
-            self.ui.update(logs="\n".join(self._buffer))
+            self.notify("\n".join(self._buffer))
 
         except Exception:
             self.handleError(record)
