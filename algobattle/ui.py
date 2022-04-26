@@ -5,7 +5,7 @@ import logging
 from logging.handlers import MemoryHandler
 from sys import stdout
 from typing import Any, Callable, TypeVar
-from collections import defaultdict, deque
+from collections import deque
 
 from algobattle import __version__ as version
 from algobattle.events import SharedObserver, Subject

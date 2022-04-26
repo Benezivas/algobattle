@@ -305,7 +305,7 @@ if __name__ == "__main__":  # noqa: C901
             config.docker_config.add_overhead(runtime_overhead)
 
         team_info = parse_team_info(options.teams)
-        match = Match(problem, config.docker_config, team_info, ui)
+        match = Match(problem, config.docker_config, team_info)
         results = match.run(**vars(config))
 
         if ui is not None:
