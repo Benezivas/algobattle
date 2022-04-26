@@ -8,23 +8,23 @@ from pathlib import Path
 from typing import Any, Type
 
 from algobattle.battle_style import BattleStyle
+from algobattle.events import SharedSubject
 from algobattle.fight import Fight
 from algobattle.team import Team, MatchupInfo, Matchup
 from algobattle.problem import Problem
 from algobattle.docker import DockerConfig, DockerError
-from algobattle.ui import Ui
 from algobattle.util import format_table
 
 
 logger = logging.getLogger("algobattle.match")
 
 
-class Match:
+class Match(SharedSubject):
     """Match class, provides functionality for setting up and executing battles between given teams."""
 
-    def __init__(
-        self, problem: Problem, docker_config: DockerConfig, team_info: list[tuple[str, Path, Path]], ui: Ui | None = None
-    ) -> None:
+    default_event = "match"
+
+    def __init__(self, problem: Problem, docker_config: DockerConfig, team_info: list[tuple[str, Path, Path]]) -> None:
         """Creates a match instance.
 
         Parameters
@@ -35,8 +35,6 @@ class Match:
             Docker config used to build and run images.
         team_info : list[tuple[str, Path, Path]]
             For each team a name, path to their generator, and path to their solver.
-        ui : Ui | None
-            Ui object that the intermediate results will be displayed to, by default None.
 
         Raises
         ------
@@ -45,8 +43,8 @@ class Match:
         SystemExit
             If None of the teams containers built successfully.
         """
+        super().__init__()
         self.problem = problem
-        self.ui = ui
         self.docker_config = docker_config
 
         self.teams: list[Team] = []
@@ -89,18 +87,14 @@ class Match:
         battle = battle_style(self.problem, fight, **battle_options)
         results = MatchResult(self.battle_matchups, rounds)
 
-        if self.ui is not None:
-            self.ui.update(results.format())
+        self.notify(results.format())
 
         for matchup in self.battle_matchups:
             for i in range(rounds):
                 logger.info(f'{"#" * 20}  Running Battle {i + 1}/{rounds}  {"#" * 20}')
-                results[matchup].append(battle.Result())    # type: ignore
-
-                for result in battle.run(matchup):
-                    results[matchup][i] = result
-                    if self.ui is not None:
-                        self.ui.update(results.format())
+                result = battle.run(matchup)
+                results[matchup].append(result)
+                self.notify(results.format())
 
         return results
 

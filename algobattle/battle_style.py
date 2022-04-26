@@ -2,8 +2,9 @@
 from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Generator, Generic, Type, TypeVar
+from typing import Any, Type
 from inspect import isabstract, signature, getdoc
+from algobattle.events import SharedSubject
 from algobattle.fight import Fight
 
 from algobattle.problem import Problem
@@ -12,11 +13,8 @@ from algobattle.util import parse_doc_for_param
 
 logger = logging.getLogger("algobattle.battle_type")
 
-Instance = TypeVar("Instance")
-Solution = TypeVar("Solution")
 
-
-class BattleStyle(ABC, Generic[Instance, Solution]):
+class BattleStyle(SharedSubject, ABC):
     """Base class for battle styles that define how a battle can be structured.
 
     All battle styles should inherit from this class explicitly so they are integrated into the match structure properly.
@@ -25,13 +23,14 @@ class BattleStyle(ABC, Generic[Instance, Solution]):
     """
 
     _battle_styles: dict[str, Type[BattleStyle]] = {}
+    default_event = "battle"
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         if not isabstract(cls):
             BattleStyle._battle_styles[cls.name] = cls
 
-    def __init__(self, problem: Problem[Instance, Solution], fight: Fight, **kwargs: dict[str, Any]):
+    def __init__(self, problem: Problem, fight: Fight, **kwargs: dict[str, Any]):
         """Builds a battle style object with the given option values.
 
         Parameters
@@ -43,6 +42,7 @@ class BattleStyle(ABC, Generic[Instance, Solution]):
         kwargs: dict[str, Any]
             Further options that each specific battle style can use.
         """
+        super().__init__()
         self.problem = problem
         self.fight = fight
 
@@ -92,7 +92,7 @@ class BattleStyle(ABC, Generic[Instance, Solution]):
         return out
 
     @abstractmethod
-    def run(self, matchup: Matchup) -> Generator[Result, None, None]:
+    def run(self, matchup: Matchup) -> Result:
         """Executes a battle between the given matchup.
 
         Parameters

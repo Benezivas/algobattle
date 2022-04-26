@@ -8,8 +8,6 @@ from algobattle.battle_style import BattleStyle
 from algobattle.problem import Problem
 from algobattle.fight import Fight
 from algobattle.team import Matchup
-from typing import Generator
-
 from algobattle.util import inherit_docs
 
 logger = logging.getLogger("algobattle.battle_styles.iterated")
@@ -51,7 +49,7 @@ class Iterated(BattleStyle):
 
         super().__init__(problem, fight, **options)
 
-    def run(self, matchup: Matchup) -> Generator[Iterated.Result, None, None]:
+    def run(self, matchup: Matchup) -> Result:
         """Execute one iterative battle between a generating and a solving team.
 
         Incrementally try to search for the highest n for which the solver is
@@ -86,13 +84,14 @@ class Iterated(BattleStyle):
         logger.info(f"==================== Iterative Battle, Instanze Size Cap: {n_cap} ====================")
         while alive:
             logger.info(f"=============== Instance Size: {n}/{n_cap} ===============")
+            self.notify(f"cap: {n_cap}\nmaximum reached: {maximum_reached_n}\ncurrent size: {n}")
             approx_ratio = self.fight(matchup, instance_size=n)
             if approx_ratio == 0.0:
                 alive = False
-            elif approx_ratio > self.approx_ratio:
+            elif approx_ratio < self.approx_ratio:
                 logger.info(
                     f"Solver {matchup.solver} does not meet the required solution quality at instance size {n}. "
-                    "({approx_ratio}/{self.approx_ratio})"
+                    f"({approx_ratio}/{self.approx_ratio})"
                 )
                 alive = False
 
@@ -118,7 +117,7 @@ class Iterated(BattleStyle):
                     n -= i**exponent - 1
                     i = 1
 
-            yield self.Result(n_cap, maximum_reached_n, n)
+        return self.Result(n_cap, maximum_reached_n, n)
 
     @dataclass
     class Result(BattleStyle.Result):
