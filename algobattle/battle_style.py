@@ -2,8 +2,9 @@
 from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Generator, Generic, Type, TypeVar
+from typing import Any, Generic, Type, TypeVar
 from inspect import isabstract, signature, getdoc
+from algobattle.events import SharedSubject
 from algobattle.fight import Fight
 
 from algobattle.problem import Problem
@@ -16,7 +17,7 @@ Instance = TypeVar("Instance")
 Solution = TypeVar("Solution")
 
 
-class BattleStyle(ABC, Generic[Instance, Solution]):
+class BattleStyle(ABC, Generic[Instance, Solution], SharedSubject):
     """Base class for battle styles that define how a battle can be structured.
 
     All battle styles should inherit from this class explicitly so they are integrated into the match structure properly.
@@ -25,6 +26,7 @@ class BattleStyle(ABC, Generic[Instance, Solution]):
     """
 
     _battle_styles: dict[str, Type[BattleStyle]] = {}
+    default_event = "battle"
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -43,6 +45,7 @@ class BattleStyle(ABC, Generic[Instance, Solution]):
         kwargs: dict[str, Any]
             Further options that each specific battle style can use.
         """
+        super().__init__()
         self.problem = problem
         self.fight = fight
 

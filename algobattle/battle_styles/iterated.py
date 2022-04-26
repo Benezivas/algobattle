@@ -8,8 +8,6 @@ from algobattle.battle_style import BattleStyle
 from algobattle.problem import Problem
 from algobattle.fight import Fight
 from algobattle.team import Matchup
-from typing import Generator
-
 from algobattle.util import inherit_docs
 
 logger = logging.getLogger("algobattle.battle_styles.iterated")
@@ -84,8 +82,10 @@ class Iterated(BattleStyle):
         alive = True
 
         logger.info(f"==================== Iterative Battle, Instanze Size Cap: {n_cap} ====================")
+        self.notify(self.Result())
         while alive:
             logger.info(f"=============== Instance Size: {n}/{n_cap} ===============")
+            self.notify(self.Result(n_cap, maximum_reached_n, n))
             approx_ratio = self.fight(matchup, instance_size=n)
             if approx_ratio == 0.0:
                 alive = False

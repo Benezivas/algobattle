@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Type
 
 from algobattle.battle_style import BattleStyle
+from algobattle.events import SharedSubject
 from algobattle.fight import Fight
 from algobattle.team import Team, MatchupInfo, Matchup
 from algobattle.problem import Problem
@@ -19,8 +20,10 @@ from algobattle.util import format_table
 logger = logging.getLogger("algobattle.match")
 
 
-class Match:
+class Match(SharedSubject):
     """Match class, provides functionality for setting up and executing battles between given teams."""
+
+    default_event = "match"
 
     def __init__(
         self, problem: Problem, docker_config: DockerConfig, team_info: list[tuple[str, Path, Path]], ui: Ui | None = None
@@ -89,16 +92,14 @@ class Match:
         battle = battle_style(self.problem, fight, **battle_options)
         results = MatchResult(self.battle_matchups, rounds)
 
-        if self.ui is not None:
-            self.ui.update(results.format())
+        self.notify(results.format())
 
         for matchup in self.battle_matchups:
             for i in range(rounds):
                 logger.info(f'{"#" * 20}  Running Battle {i + 1}/{rounds}  {"#" * 20}')
                 result = battle.run(matchup)
                 results[matchup].append(result)
-                if self.ui is not None:
-                    self.ui.update(results.format())
+                self.notify(results.format())
 
         return results
 

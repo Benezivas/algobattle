@@ -3,7 +3,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 import logging
-from typing import Any, Generator
+from typing import Any
 
 from algobattle.battle_style import BattleStyle
 from algobattle.fight import Fight
@@ -70,6 +70,7 @@ class Averaged(BattleStyle):
         )
         for i in range(self.iterations):
             logger.info(f"=============== Iteration: {i + 1}/{self.iterations} ===============")
+            self.notify(res)
             approx_ratio = self.fight(matchup, instance_size=self.instance_size)
             res.approx_ratios.append(approx_ratio)
         return res
