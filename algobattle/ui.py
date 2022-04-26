@@ -35,6 +35,7 @@ class Ui(SharedObserver):
 
     @check_for_terminal
     def __init__(self, logger: logging.Logger, logging_level: int = logging.NOTSET, num_records: int = 10) -> None:
+        super().__init__()
         if stdout.isatty():
             self.stdscr = curses.initscr()  # type: ignore
             curses.cbreak()  # type: ignore
@@ -98,9 +99,10 @@ class BufferHandler(MemoryHandler, Subject):
     default_event = "logs"
 
     def __init__(self, ui: Ui, level: int, num_records: int):
+        super().__init__(num_records)
+        Subject.__init__(self)
         self._buffer = deque(maxlen=num_records)
         self.attach(ui)
-        super().__init__(num_records)
 
     @inherit_docs
     def emit(self, record: logging.LogRecord):

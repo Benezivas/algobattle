@@ -43,6 +43,7 @@ class Match(SharedSubject):
         SystemExit
             If None of the teams containers built successfully.
         """
+        super().__init__()
         self.problem = problem
         self.docker_config = docker_config
 

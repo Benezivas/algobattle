@@ -89,10 +89,10 @@ class Iterated(BattleStyle):
             approx_ratio = self.fight(matchup, instance_size=n)
             if approx_ratio == 0.0:
                 alive = False
-            elif approx_ratio > self.approx_ratio:
+            elif approx_ratio < self.approx_ratio:
                 logger.info(
                     f"Solver {matchup.solver} does not meet the required solution quality at instance size {n}. "
-                    "({approx_ratio}/{self.approx_ratio})"
+                    f"({approx_ratio}/{self.approx_ratio})"
                 )
                 alive = False
 

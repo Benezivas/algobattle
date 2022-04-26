@@ -1,10 +1,10 @@
 """basic event handling module."""
 from __future__ import annotations
-from abc import abstractmethod
-from typing import Any, ClassVar, Protocol
+from abc import ABC, abstractmethod
+from typing import Any, ClassVar
 
 
-class Observer(Protocol):
+class Observer(ABC):
     """Class that can handle updates from a `Subject`."""
 
     @abstractmethod
@@ -13,7 +13,7 @@ class Observer(Protocol):
         raise NotImplementedError
 
 
-class Subject(Protocol):
+class Subject(ABC):
     """Class that can send updates to an `Observer`."""
 
     default_event: ClassVar[str]
@@ -58,7 +58,7 @@ class _Dispatcher(Observer, Subject):
 _dispatcher = _Dispatcher()
 
 
-class SharedObserver(Observer, Protocol):
+class SharedObserver(Observer, ABC):
     """An `Observer` that will receive updates from any `SharedSubject`."""
 
     def __init__(self) -> None:
@@ -66,7 +66,7 @@ class SharedObserver(Observer, Protocol):
         _dispatcher.attach(self)
 
 
-class SharedSubject(Subject, Protocol):
+class SharedSubject(Subject, ABC):
     """A `Subject` that will update all `SharedObserver`s."""
 
     def __init__(self) -> None:
