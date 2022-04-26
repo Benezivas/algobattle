@@ -82,10 +82,9 @@ class Iterated(BattleStyle):
         alive = True
 
         logger.info(f"==================== Iterative Battle, Instanze Size Cap: {n_cap} ====================")
-        self.notify(self.Result())
         while alive:
             logger.info(f"=============== Instance Size: {n}/{n_cap} ===============")
-            self.notify(self.Result(n_cap, maximum_reached_n, n))
+            self.notify(f"cap: {n_cap}\nmaximum reached: {maximum_reached_n}\ncurrent size: {n}")
             approx_ratio = self.fight(matchup, instance_size=n)
             if approx_ratio == 0.0:
                 alive = False

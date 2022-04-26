@@ -33,6 +33,11 @@ def check_for_terminal(function: F) -> F:
 class Ui(SharedObserver):
     """The UI Class declares methods to output information to STDOUT."""
 
+    titles = {
+        "match": "",
+        "battle": "Current battle info:\n",
+    }
+
     @check_for_terminal
     def __init__(self, logger: logging.Logger, logging_level: int = logging.NOTSET, num_records: int = 10) -> None:
         super().__init__()
@@ -65,7 +70,7 @@ class Ui(SharedObserver):
             return
 
         self.sections[section] = data
-        results = "\n\n".join(str(d) for s, d in self.sections.items() if d is not None and s != "logs")
+        results = "\n\n".join(self.titles[s] + str(d) for s, d in self.sections.items() if d is not None and s != "logs")
 
         out = "\n".join([
             r"              _    _             _           _   _   _       ",
