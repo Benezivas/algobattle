@@ -92,7 +92,7 @@ class BattleStyle(ABC, Generic[Instance, Solution]):
         return out
 
     @abstractmethod
-    def run(self, matchup: Matchup) -> Generator[Result, None, None]:
+    def run(self, matchup: Matchup) -> Result:
         """Executes a battle between the given matchup.
 
         Parameters

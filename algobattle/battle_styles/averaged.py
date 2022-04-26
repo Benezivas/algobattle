@@ -47,7 +47,7 @@ class Averaged(BattleStyle):
 
         super().__init__(problem, fight, **options)
 
-    def run(self, matchup: Matchup) -> Generator[Averaged.Result, None, None]:
+    def run(self, matchup: Matchup) -> Result:
         """Execute one averaged battle between a generating and a solving team.
 
         Execute several fights between two teams on a fixed instance size
@@ -72,7 +72,7 @@ class Averaged(BattleStyle):
             logger.info(f"=============== Iteration: {i + 1}/{self.iterations} ===============")
             approx_ratio = self.fight(matchup, instance_size=self.instance_size)
             res.approx_ratios.append(approx_ratio)
-            yield res
+        return res
 
     @dataclass
     class Result(BattleStyle.Result):

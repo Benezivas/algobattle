@@ -95,12 +95,10 @@ class Match:
         for matchup in self.battle_matchups:
             for i in range(rounds):
                 logger.info(f'{"#" * 20}  Running Battle {i + 1}/{rounds}  {"#" * 20}')
-                results[matchup].append(battle.Result())    # type: ignore
-
-                for result in battle.run(matchup):
-                    results[matchup][i] = result
-                    if self.ui is not None:
-                        self.ui.update(results.format())
+                result = battle.run(matchup)
+                results[matchup].append(result)
+                if self.ui is not None:
+                    self.ui.update(results.format())
 
         return results
 
