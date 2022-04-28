@@ -324,7 +324,7 @@ if __name__ == "__main__":  # noqa: C901
             print(results.format())
 
     except KeyboardInterrupt:
-        if "logger" in locals():
+        try:
             logger.critical("Received keyboard interrupt, terminating execution.")  # type: ignore
-        else:
+        except NameError:
             raise SystemExit("Received keyboard interrupt, terminating execution.")
