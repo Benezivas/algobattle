@@ -1,5 +1,6 @@
 """Collection of utility functions."""
 from __future__ import annotations
+from itertools import dropwhile, takewhile
 import logging
 import importlib.util
 from pathlib import Path
@@ -161,18 +162,14 @@ def parse_doc_for_param(doc: str, name: str) -> str:
         If the parameter doesn't exist.
     """
     lines = doc.split("\n")
+    lines = dropwhile(lambda l: not l.startswith(name), lines)
     try:
-        start = next(i for i, line in enumerate(lines) if line.find(name) == 0)
+        next(lines)
     except StopIteration:
         raise ValueError
-
-    param_doc = []
-    for line in lines[start + 1 :]:
-        if not line.startswith(" "):
-            break
-        param_doc.append(line.strip())
-
-    return " ".join(param_doc)
+    lines = takewhile(lambda l: l.startswith(" "), lines)
+    lines = map(str.strip, lines)
+    return " ".join(lines)
 
 
 class NestedHelp(Action):
