@@ -18,7 +18,7 @@ was still able to solve an instance.
 This project has been delevoped to run on Linux and may not work on other
 platforms. Support for other platforms may be implemented in the future.
 
-`python3` in version at least `3.6` and `docker` are required.
+`python3` in version at least `3.10` and `docker` are required.
 
 We recommend installing the package as a user using `pip`
 ```
@@ -43,17 +43,11 @@ that have been posed to students in practice, have a look at the
 To start a basic run on a problem, using the `solver` and `generator` that
 are part of the problem directory, use
 ```
-battle path/to/concrecte/problem/folder
+algobattle path/to/concrecte/problem/folder
 ```
 
-The `battle` script offers several options, e.g. to give custom paths for
-solvers and generators. Run `battle --help` for all options.
+The `algobattle` script offers several options, e.g. to give custom paths for
+solvers and generators. Run `algobattle --help` for all options.
 
-On Windows you will need to either use a workaround such as [this one](https://stackoverflow.com/a/55619189)
-or invoke it with
-```
-python path\to\installed\battle\script
-```
-followed by your arguments instead of just `battle`.
 
 Check the [wiki](https://github.com/Benezivas/algobattle/wiki) for further documentation.
