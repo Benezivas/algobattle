@@ -5,6 +5,15 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [{name = "Jan Dreier"}, {name = "Henri Lotze"}]
+urls = {github = "https://github.com/Benezivas/algobattle"}
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Natural Language :: English",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Typing :: Typed",
+]
 
 [project.scripts]
 algobattle = "algobattle.battle:main"
