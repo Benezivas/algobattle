@@ -14,6 +14,10 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Typing :: Typed",
 ]
+dependencies = [
+    # on windows, we need to manually install curses bindings
+    "windows-curses; os_name == 'nt'",
+]
 
 [project.scripts]
 algobattle = "algobattle.battle:main"
