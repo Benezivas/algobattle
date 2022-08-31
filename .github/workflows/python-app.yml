@@ -5,7 +5,7 @@ name: Algorithmic Battle
 
 on:
   push:
-    branches: [ main, develop, 4.0.0-rc ]
+    branches: [ main, develop, 4.0.0-rc, cross_platform ]
   pull_request:
     branches: [ main, develop, 4.0.0-rc ]
 
@@ -26,7 +26,11 @@ jobs:
       run: flake8 .
 
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v2
     - name: Set up Python
@@ -41,7 +45,11 @@ jobs:
       run: python -m unittest --failfast
 
   execute:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v2
     - name: Set up Python
