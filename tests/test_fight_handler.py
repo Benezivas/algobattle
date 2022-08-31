@@ -28,7 +28,7 @@ class FightHandlertests(unittest.TestCase):
         cls.sol_succ = Image(cls.problem_path / "solver", "sol_succ")
 
         config = ConfigParser()
-        config.read(Path(Path(algobattle.__file__).parent, "config.ini"))
+        config.read(Path(algobattle.__file__).parent / "config.ini")
         cls.fight_handler = FightHandler(problem, config)
 
         config_short_run_timeout = ConfigParser()

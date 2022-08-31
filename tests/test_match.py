@@ -31,7 +31,7 @@ class Matchtests(unittest.TestCase):
         cls.team0 = Team('0', cls.generator, cls.solver)
         cls.team1 = Team('1', cls.generator, cls.solver)
 
-        config_path = Path(Path(algobattle.__file__).parent, 'config', 'config.ini')
+        config_path = Path(algobattle.__file__).parent / 'config.ini'
         cls.config = ConfigParser()
         cls.config.read(config_path)
 
