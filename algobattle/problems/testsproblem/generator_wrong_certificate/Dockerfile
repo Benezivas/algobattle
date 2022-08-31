@@ -2,4 +2,4 @@ FROM alpine
 
 # outputs a static string encoding an instance with an artificially wrong certificate.
 COPY output /output
-ENTRYPOINT ["true"]
+ENTRYPOINT ["echo", "1"]
