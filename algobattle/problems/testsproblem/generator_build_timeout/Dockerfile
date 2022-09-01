@@ -1,3 +1,3 @@
 FROM alpine
 
-RUN sleep 6000;
+RUN sleep 6000
