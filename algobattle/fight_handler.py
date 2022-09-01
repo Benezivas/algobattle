@@ -3,9 +3,9 @@ import logging
 from configparser import ConfigParser
 from typing import Callable, Tuple
 
-import algobattle.sighandler as sigh
 from algobattle.team import Team
 from algobattle.util import run_subprocess, docker_running
+import algobattle.util as util
 from algobattle.problem import Problem
 
 logger = logging.getLogger('algobattle.fight_handler')
@@ -115,7 +115,7 @@ class FightHandler():
 
         logger.debug('Running generator of group {}...\n'.format(self.generating_team))
 
-        sigh.latest_running_docker_image = "generator-" + str(self.generating_team)
+        util.latest_running_docker_image = "generator-" + str(self.generating_team)
         encoded_output, _ = run_subprocess(generator_run_command, str(instance_size).encode(),
                                            self.timeout_generator)
         if not encoded_output:
@@ -171,7 +171,7 @@ class FightHandler():
         solver_run_command = self.base_run_command(scaled_memory) + [self.solving_team.solver_docker_tag]
         logger.debug('Running solver of group {}...\n'.format(self.solving_team))
 
-        sigh.latest_running_docker_image = "solver-" + str(self.solving_team)
+        util.latest_running_docker_image = "solver-" + str(self.solving_team)
         encoded_output, _ = run_subprocess(solver_run_command, self.problem.parser.encode(instance),
                                            self.timeout_solver)
         if not encoded_output:

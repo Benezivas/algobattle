@@ -71,6 +71,7 @@ def initialize_wrapper(wrapper_name: str, config: ConfigParser):
         return None
 
 
+latest_running_docker_image = ""
 def measure_runtime_overhead() -> float:
     """Calculate the I/O delay for starting and stopping docker on the host machine.
 
@@ -95,7 +96,8 @@ def measure_runtime_overhead() -> float:
 
     overheads = []
     for i in range(5):
-        sigh.latest_running_docker_image = 'runtime-checker'
+        global latest_running_docker_image
+        latest_running_docker_image = 'runtime-checker'
         _, timeout = run_subprocess(fight_handler.base_run_command(fight_handler.space_generator) + ['runtime-checker'],
                                     input=str(50 * i).encode(), timeout=fight_handler.timeout_generator)
         if not timeout:
@@ -250,3 +252,10 @@ def build_docker_container(container_path: Path, docker_tag: str,
             build_successful = False
 
     return build_successful
+
+
+def kill_spawned_docker_containers():
+    """Terminate all running docker containers spawned by this program."""
+    if latest_running_docker_image:
+        subprocess.run('docker ps -a -q --filter ancestor={} | xargs -r docker kill > {} 2>&1'
+                       .format(latest_running_docker_image, '/dev/null' if os.name == 'posix' else 'nul'), shell=True)
