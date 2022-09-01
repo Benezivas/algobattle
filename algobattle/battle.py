@@ -18,69 +18,68 @@ from algobattle.util import measure_runtime_overhead, import_problem_from_path, 
 from algobattle.ui import Ui
 
 
+def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
+    """Creates and returns a parent logger.
+
+    Parameters
+    ----------
+    logging_path : Path
+        Path to folder where the logfile should be stored at.
+    verbose_logging : bool
+        Flag indicating whether to include debug messages in the output
+    silent : bool
+        Flag indicating whether not to pipe the logging output to stderr.
+
+    Returns
+    -------
+    logger:
+        The Logger object.
+    """
+    common_logging_level = logging.INFO
+
+    if verbose_logging:
+        common_logging_level = logging.DEBUG
+
+    Path(logging_path).mkdir(exist_ok=True)
+
+    t = dt.datetime.now()
+    sep = ':' if os.name == 'posix' else '-'
+    current_timestamp = f"{t.year:04d}-{t.month:02d}-{t.day:02d}_{t.hour:02d}{sep}{t.minute:02d}{sep}{t.second:02d}"
+    logging_path = Path(logging_path, current_timestamp + '.log')
+
+    logging.basicConfig(handlers=[logging.FileHandler(logging_path, 'w', 'utf-8')],
+                        level=common_logging_level,
+                        format='%(asctime)s %(levelname)s: %(message)s',
+                        datefmt='%H:%M:%S')
+    logger = logging.getLogger('algobattle')
+
+    if not silent:
+        # Pipe logging out to console
+        _consolehandler = logging.StreamHandler(stream=sys.stderr)
+        _consolehandler.setLevel(common_logging_level)
+
+        _consolehandler.setFormatter(logging.Formatter('%(message)s'))
+
+        logger.addHandler(_consolehandler)
+
+    logger.info(f"You can find the log files for this run in {logging_path}")
+    return logger
+
+
+def _exit_if_path_nonexistent(path: Path):
+    """Check if a given path can be found in the os, exit otherwise.
+
+    Parameters
+    ----------
+    path : Path
+        The path to be checked for existence.
+    """
+    if not Path(path).exists():
+        sys.exit('Path "{}" does not exist in the file system! Use "battle --help" for more information on usage and options.'.format(path))
+
+
 def main():
     """Entrypoint of `algobattle` CLI."""
-
-    def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
-        """Creates and returns a parent logger.
-
-        Parameters:
-        ----------
-        logging_path : Path
-            Path to folder where the logfile should be stored at.
-        verbose_logging : bool
-            Flag indicating whether to include debug messages in the output
-        silent : bool
-            Flag indicating whether not to pipe the logging output to stderr.
-
-        Returns:
-        ----------
-        Logger:
-            The Logger object.
-        """
-        common_logging_level = logging.INFO
-
-        if verbose_logging:
-            common_logging_level = logging.DEBUG
-
-        Path(logging_path).mkdir(exist_ok=True)
-
-        _now = dt.datetime.now()
-
-        time_seperator = ':' if os.name == 'posix' else '-'
-        current_timestamp = '{:04d}-{:02d}-{:02d}_{:02d}{}{:02d}{}{:02d}'.format(_now.year, _now.month, _now.day, _now.hour, time_seperator, _now.minute, time_seperator, _now.second)
-        logging_path = Path(logging_path, current_timestamp + '.log')
-
-        logging.basicConfig(handlers=[logging.FileHandler(logging_path, 'w', 'utf-8')],
-                            level=common_logging_level,
-                            format='%(asctime)s %(levelname)s: %(message)s',
-                            datefmt='%H:%M:%S')
-
-        logger = logging.getLogger('algobattle')
-
-        if not silent:
-            # Pipe logging out to console
-            _consolehandler = logging.StreamHandler(stream=sys.stderr)
-            _consolehandler.setLevel(common_logging_level)
-
-            _consolehandler.setFormatter(logging.Formatter('%(message)s'))
-
-            logger.addHandler(_consolehandler)
-
-        logger.info('You can find the log files for this run in {}'.format(logging_path))
-        return logger
-
-    def _exit_if_path_nonexistent(path: Path):
-        """Check if a given path can be found in the os, exit otherwise.
-
-        Parameters
-        ----------
-        path : Path
-            The path to be checked for existence.
-        """
-        if not Path(path).exists():
-            sys.exit('Path "{}" does not exist in the file system! Use "battle --help" for more information on usage and options.'.format(path))
-
     if len(sys.argv) < 2:
         sys.exit('Expecting (relative) path to the parent directory of a problem file as argument. Use "battle --help" for more information on usage and options.')
 
