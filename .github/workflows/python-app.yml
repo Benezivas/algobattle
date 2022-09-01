@@ -5,9 +5,9 @@ name: Algorithmic Battle
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, 4.0.0-rc ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main, develop, 4.0.0-rc ]
 
 jobs:
   lint:
