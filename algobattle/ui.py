@@ -1,8 +1,8 @@
 """UI class, responsible for printing nicely formatted output to STDOUT."""
 import curses
 import logging
-import sys
-from typing import Callable
+from sys import stdout
+from typing import Callable, ParamSpec, TypeVar
 from importlib.metadata import version as pkg_version
 
 from algobattle.observer import Observer
@@ -11,35 +11,40 @@ from algobattle.match import Match
 logger = logging.getLogger('algobattle.ui')
 
 
+P = ParamSpec("P")
+R = TypeVar("R")
+def check_for_terminal(function: Callable[P, R]) -> Callable[P, R | None]:
+    """Ensure that we are attached to a terminal."""
+
+    def wrapper(*args: P.args, **kwargs: P.kwargs):
+        if not stdout.isatty():
+            logger.error("Not attached to a terminal.")
+            return None
+        else:
+            return function(*args, **kwargs)
+
+    return wrapper
+
+
 class Ui(Observer):
     """The UI Class declares methods to output information to STDOUT."""
 
-    def check_for_terminal(function: Callable) -> Callable:
-        """Ensure that we are attached to a terminal."""
-        def wrapper(self, *args, **kwargs):
-            if not sys.stdout.isatty():
-                logger.error('Not attached to a terminal.')
-                return None
-            else:
-                return function(self, *args, **kwargs)
-        return wrapper
-
     @check_for_terminal
     def __init__(self) -> None:
-        if sys.stdout.isatty():
-            self.stdscr = curses.initscr()
-            curses.cbreak()
-            curses.noecho()
+        if stdout.isatty():
+            self.stdscr = curses.initscr()  # type: ignore
+            curses.cbreak()     # type: ignore
+            curses.noecho()     # type: ignore
             self.stdscr.keypad(1)
 
     @check_for_terminal
     def restore(self) -> None:
         """Restore the console. This will be later moved into a proper deconstruction method."""
-        if sys.stdout.isatty():
-            curses.nocbreak()
+        if stdout.isatty():
+            curses.nocbreak()   # type: ignore
             self.stdscr.keypad(0)
-            curses.echo()
-            curses.endwin()
+            curses.echo()       # type: ignore
+            curses.endwin()     # type: ignore
 
     @check_for_terminal
     def update(self, match: Match) -> None:
