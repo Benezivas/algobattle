@@ -57,6 +57,6 @@ jobs:
         pip install . --user
     - name: Run short battles with different options as a sanity check
       run: |
-        $HOME/.local/bin/battle algobattle/problems/testsproblem --verbose --config=algobattle/config/config_short_run_timeout.ini --rounds=2
-        $HOME/.local/bin/battle algobattle/problems/testsproblem --verbose --config=algobattle/config/config_short_run_timeout.ini --rounds=2 --no_overhead_calculation --generators=algobattle/problems/testsproblem/generator,algobattle/problems/testsproblem/generator --solvers=algobattle/problems/testsproblem/solver,algobattle/problems/testsproblem/solver --team_names=team1,team2
-        $HOME/.local/bin/battle algobattle/problems/testsproblem --verbose --config=algobattle/config/config_short_run_timeout.ini --battle_type=averaged --rounds=2
+        algobattle algobattle/problems/testsproblem --verbose --config=algobattle/config/config_short_run_timeout.ini --rounds=2
+        algobattle algobattle/problems/testsproblem --verbose --config=algobattle/config/config_short_run_timeout.ini --rounds=2 --no_overhead_calculation --generators=algobattle/problems/testsproblem/generator,algobattle/problems/testsproblem/generator --solvers=algobattle/problems/testsproblem/solver,algobattle/problems/testsproblem/solver --team_names=team1,team2
+        algobattle algobattle/problems/testsproblem --verbose --config=algobattle/config/config_short_run_timeout.ini --battle_type=averaged --rounds=2
