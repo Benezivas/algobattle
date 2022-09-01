@@ -28,7 +28,7 @@ class Utiltests(unittest.TestCase):
         self.fight_handler = FightHandler(self.problem, self.config)
         self.problem_path = Path(Problem.__file__).parent
         self.rand_file_name = random.randint(0, 2 ** 80)
-        while(Path(str(self.rand_file_name)).exists()):
+        while Path(str(self.rand_file_name)).exists():
             self.rand_file_name = random.randint(0, 2 ** 80)
 
     def test_import_problem_from_path_existing_path(self):

@@ -130,12 +130,12 @@ class Match(Subject, Observer):
         rounds_block = ''.join(['{}\n\r'.format(round_line) for round_line in round_lines])
         lower_border = self._format_delimiter_line_utf8(line_char='═', left_delim='╚', mid_delim='╩', right_delim='╝')
 
-        return('{}\n\r{}\n\r{}\n\r{}\n\r{}{}\n\r'.format(battle_type,
+        return '{}\n\r{}\n\r{}\n\r{}\n\r{}{}\n\r'.format(battle_type,
                                                          upper_border,
                                                          header,
                                                          separator,
                                                          rounds_block,
-                                                         lower_border))
+                                                         lower_border)
 
     def _format_delimiter_line_utf8(self, line_char, left_delim, mid_delim, right_delim) -> str:
         """Helper function to draw delimiter lines, such as borders and seperator lines.
