@@ -125,20 +125,20 @@ def main():
         config.read(options.config)
 
         teams = []
-        for i in range(len(generators)):
-            generator_tag = f"generator-{team_names[i]}"
-            generator_built = build_docker_container(generators[i],
+        for name, generator, solver in zip(team_names, generators, solvers):
+            generator_tag = f"generator-{name}"
+            generator_built = build_docker_container(generator,
                                                      generator_tag,
                                                      timeout_build=int(config['run_parameters']['timeout_build']))
-            solver_tag = f"solver-{team_names[i]}"
-            solver_built = build_docker_container(solvers[i],
+            solver_tag = f"solver-{name}"
+            solver_built = build_docker_container(solver,
                                                   solver_tag,
                                                   timeout_build=int(config['run_parameters']['timeout_build']))
             build_successful = generator_built & solver_built
             if build_successful:
-                teams.append(Team(team_names[i], generator_tag, solver_tag))
+                teams.append(Team(name, generator_tag, solver_tag))
             else:
-                logger.warning('Building generators and solvers for team {} failed, they will be excluded!'.format(team_names[i]))
+                logger.warning(f"Building generators and solvers for team {name} failed, they will be excluded!")
 
         runtime_overhead = 0
         if not options.no_overhead_calculation:
