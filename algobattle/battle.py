@@ -93,7 +93,7 @@ def main():
     parser.add_option('--no_overhead_calculation', dest='no_overhead_calculation', action='store_true', help='If set, the program does not benchmark the I/O of the host system to calculate the runtime overhead when started.')
     parser.add_option('--ui', dest='display_ui', action='store_true', help='If set, the program sets the --silent option and displays a small ui on STDOUT that shows the progress of the battles.')
 
-    (options, args) = parser.parse_args()
+    options, _args = parser.parse_args()
 
     display_ui = options.display_ui
     if display_ui:
@@ -101,10 +101,10 @@ def main():
 
     solvers = [Path(path) for path in options.solvers.split(',')]
     generators = [Path(path) for path in options.generators.split(',')]
-    team_names = [Path(path) for path in options.team_names.split(',')]
+    team_names = options.team_names.split(',')
 
-    if len(solvers) != len(generators) or len(solvers) != len(team_names) or len(team_names) != len(generators):
-        sys.exit('The number of provided generator paths ({}), solver paths ({}) and group numbers ({}) is not equal!'.format(len(generators), len(solvers), len(team_names)))
+    if not (len(solvers) == len(generators) == len(team_names)):
+        raise SystemExit(f"The number of provided generator paths ({len(generators)}), solver paths ({len(solvers)}) and group numbers ({len(team_names)}) is not equal!")
 
     for path in [problem_path, options.config] + solvers + generators:
         if not path.exists():
@@ -115,7 +115,7 @@ def main():
 
     problem = import_problem_from_path(problem_path)
     if not problem:
-        sys.exit(1)
+        raise SystemExit
 
     logger.debug('Options for this run: {}'.format(options))
     logger.debug('Contents of sys.argv: {}'.format(sys.argv))
@@ -125,11 +125,11 @@ def main():
 
     teams = []
     for i in range(len(generators)):
-        generator_tag = 'generator-{}'.format(team_names[i])
+        generator_tag = f"generator-{team_names[i]}"
         generator_built = build_docker_container(generators[i],
                                                  generator_tag,
                                                  timeout_build=int(config['run_parameters']['timeout_build']))
-        solver_tag = 'solver-{}'.format(team_names[i])
+        solver_tag = f"solver-{team_names[i]}"
         solver_built = build_docker_container(solvers[i],
                                               solver_tag,
                                               timeout_build=int(config['run_parameters']['timeout_build']))
@@ -154,7 +154,7 @@ def main():
         ui = Ui()
         match.attach(ui)
 
-    results = match.run()
+    match.run()
 
     if display_ui:
         match.detach(ui)
@@ -167,6 +167,7 @@ def main():
 
         for team_name in match.teams:
             logger.info('Group {} gained {:.1f} points.'.format(str(team_name), points[str(team_name)]))
+
 
 if __name__ == "__main__":
     main()
