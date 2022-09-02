@@ -33,18 +33,7 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: "3.10"
-<<<<<<< HEAD
-<<<<<<< HEAD
     - name: Install dependencies
-=======
-=======
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install . --user
->>>>>>> 9b9842c (install dependencies when running tests in CI)
-    - name: Test using unittests
->>>>>>> 1255a58 (properly install python 3.10 in CI)
       run: |
         python -m pip install --upgrade pip
         pip install . --user

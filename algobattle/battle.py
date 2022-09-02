@@ -13,7 +13,7 @@ import algobattle
 from algobattle.fight_handler import FightHandler
 from algobattle.match import Match
 from algobattle.team import Team
-from algobattle.util import measure_runtime_overhead, import_problem_from_path, initialize_wrapper, build_docker_container, kill_spawned_docker_containers
+from algobattle.util import import_problem_from_path, initialize_wrapper
 from algobattle.ui import Ui
 from algobattle.docker import DockerError
 
@@ -125,18 +125,9 @@ def main():
 
         teams: list[Team] = []
         for name, generator, solver in zip(team_names, generators, solvers):
-            generator_tag = f"generator-{name}"
-            generator_built = build_docker_container(generator,
-                                                     generator_tag,
-                                                     timeout_build=int(config['run_parameters']['timeout_build']))
-            solver_tag = f"solver-{name}"
-            solver_built = build_docker_container(solver,
-                                                  solver_tag,
-                                                  timeout_build=int(config['run_parameters']['timeout_build']))
-            build_successful = generator_built & solver_built
-            if build_successful:
-                teams.append(Team(name, generator_tag, solver_tag))
-            else:
+            try:
+                teams.append(Team(name, generator, solver, float(config["run_parameters"]["timeout_build"])))
+            except (ValueError, DockerError):
                 logger.warning(f"Building generators and solvers for team {name} failed, they will be excluded!")
 
         fight_handler = FightHandler(problem, config)
