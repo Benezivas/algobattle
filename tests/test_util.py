@@ -1,4 +1,5 @@
 """Tests for all util functions."""
+from typing import cast
 import unittest
 import logging
 import importlib
@@ -27,10 +28,10 @@ class Utiltests(unittest.TestCase):
         self.config = ConfigParser()
         self.config.read(config_path)
         self.fight_handler = FightHandler(self.problem, self.config)
-        self.problem_path = Path(Problem.__file__).parent
-        self.rand_file_name = random.randint(0, 2 ** 80)
-        while Path(str(self.rand_file_name)).exists():
-            self.rand_file_name = random.randint(0, 2 ** 80)
+        self.problem_path = Path(cast(str, Problem.__file__)).parent
+        self.rand_file_name = str(random.randint(0, 2 ** 80))
+        while Path(self.rand_file_name).exists():
+            self.rand_file_name = str(random.randint(0, 2 ** 80))
 
     def test_import_problem_from_path_existing_path(self):
         """Importing works when importing a Problem from an existing path."""
@@ -38,7 +39,7 @@ class Utiltests(unittest.TestCase):
 
     def test_import_problem_from_path_nonexistant_path(self):
         """An import fails if importing from a nonexistant path."""
-        self.assertIsNone(util.import_problem_from_path(self.rand_file_name))
+        self.assertIsNone(util.import_problem_from_path(Path(self.rand_file_name)))
 
     def test_initialize_wrapper_existing_path(self):
         """Initializing an existing wrapper works as expected."""
