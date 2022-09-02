@@ -3,7 +3,6 @@ from __future__ import annotations
 from io import BytesIO
 import logging
 from pathlib import Path
-from subprocess import CalledProcessError, run
 import tarfile
 from time import sleep
 from timeit import default_timer
@@ -240,30 +239,13 @@ class Image:
         Raises
         ------
         DockerError
-            On almost all common issues that might happen during the execution, including syntax errors,
-            OS errors, and errors thrown by the docker daemon.
-
+            When removing the image fails
         """
-        cmd = ["docker", "image", "rm", "--no-prune", "-f", self.id]
         try:
-            run(cmd, capture_output=True, check=True, text=True)
+            client().images.remove(image=self.id[7:], force=True)
 
-        except CalledProcessError as e:
-            if e.stderr.find("error during connect") != -1:
-                logger.error("Could not connect to the docker daemon. Is docker running?")
-                raise SystemExit("Exited algobattle: Could not connect to the docker daemon. Is docker running?")
-
-            if e.stderr.find("No such image") == -1:
-                logger.warning(f"Removing '{self.description}' did not complete successfully:\n{e.stderr}")
-
-            raise DockerError from e
-
-        except OSError as e:
-            logger.warning(f"OSError thrown while trying to remove '{self.description}':\n{e}")
-            raise DockerError from e
-
-        except ValueError as e:
-            logger.warning(f"Trying to remove '{self.description}' with invalid arguments:\n{e}")
+        except APIError as e:
+            logger.warning(f"Docker APIError thrown while removing '{self.name}'")
             raise DockerError from e
 
 
