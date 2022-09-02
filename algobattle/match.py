@@ -3,7 +3,7 @@ import logging
 from typing import List
 
 from algobattle.battle_wrapper import BattleWrapper
-from algobattle.team import Matchup
+from algobattle.team import Matchup, Team
 from algobattle.util import update_nested_dict
 from algobattle.subject import Subject
 from algobattle.observer import Observer
@@ -17,7 +17,7 @@ class Match(Subject, Observer):
 
     _observers: List[Observer] = []
 
-    def __init__(self, fight_handler: FightHandler, battle_wrapper: BattleWrapper, teams: list, rounds: int = 5) -> None:
+    def __init__(self, fight_handler: FightHandler, battle_wrapper: BattleWrapper, teams: list[Team], rounds: int = 5) -> None:
         self.fight_handler = fight_handler
         self.battle_wrapper = battle_wrapper
         self.battle_wrapper.attach(self)

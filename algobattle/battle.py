@@ -124,7 +124,7 @@ def main():
         config = ConfigParser()
         config.read(options.config)
 
-        teams = []
+        teams: list[Team] = []
         for name, generator, solver in zip(team_names, generators, solvers):
             generator_tag = f"generator-{name}"
             generator_built = build_docker_container(generator,
