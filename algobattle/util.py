@@ -98,8 +98,7 @@ def archive(input: str, filename: str) -> bytes:
             info.size = len(encoded)
             tar.addfile(info, source)
         fh.seek(0)
-        data = fh.getvalue()
-    return data
+        return fh.getvalue()
 
 
 def extract(archive: bytes, filename: str) -> str:
@@ -108,5 +107,4 @@ def extract(archive: bytes, filename: str) -> str:
         file = tar.extractfile(filename)
         assert file is not None
         with file as f:
-            output = f.read().decode()
-    return output
+            return f.read().decode()
