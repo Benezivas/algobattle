@@ -16,9 +16,10 @@ logging.disable(logging.CRITICAL)
 class DockerTests(unittest.TestCase):
     """Tests for the util functions."""
 
-    def setUpClass(self) -> None:
+    @classmethod
+    def setUpClass(cls) -> None:
         """Set up the path to the docker containers."""
-        self.problem_path = Path(cast(str, algobattle.__file__)) / "problems" / "testsproblem"
+        cls.problem_path = Path(cast(str, algobattle.__file__)).parent / "problems" / "testsproblem"
 
     def test_build_docker_container_timeout(self):
         """Raises an error if building a container runs into a timeout."""
@@ -36,7 +37,6 @@ class DockerTests(unittest.TestCase):
         """Runs successfully if a docker container builds successfully."""
         image = Image(self.problem_path / "generator", "gen_succ", cache=False)
         image.remove()
-        self.assertTrue(True)
 
     def test_build_docker_container_nonexistant_path(self):
         """Raises an error if the path to the container does not exist in the file system."""
