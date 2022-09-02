@@ -11,6 +11,7 @@ import algobattle
 from algobattle.battle_wrappers.iterated import Iterated
 import algobattle.util as util
 from algobattle.fight_handler import FightHandler
+from algobattle.docker import measure_runtime_overhead
 
 logging.disable(logging.CRITICAL)
 
@@ -49,7 +50,7 @@ class Utiltests(unittest.TestCase):
 
     def test_measure_runtime_overhead(self):
         """The overhead calculation returns some float greater than zero on normal execution."""
-        self.assertGreater(util.measure_runtime_overhead(), 0)
+        self.assertGreater(measure_runtime_overhead(), 0)
 
     def test_build_docker_container_timeout(self):
         """False is returned if building a container runs into a timeout."""
