@@ -14,11 +14,13 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Typing :: Typed",
 ]
-# we need to use a fixed version of the docker lib for windows
-dependencies = ["docker @ git+https://github.com/ImogenBits/docker-py.git"]
+dependencies = [
+    # we need to use a fixed version of the docker lib for windows
+    "docker @ git+https://github.com/ImogenBits/docker-py.git",
+
+    # on windows, we need to manually install curses bindings
+    "windows-curses; os_name == 'nt'",
+]
 
 [project.scripts]
 algobattle = "algobattle.battle:main"
-
-[project.optional-dependencies]
-windows = ["windows-curses"]
