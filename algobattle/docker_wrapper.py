@@ -4,17 +4,39 @@ import logging
 from pathlib import Path
 from subprocess import CalledProcessError, TimeoutExpired, run
 from timeit import default_timer
-from typing import Any, Iterator, cast
+from typing import Any, Callable, Iterator, ParamSpec, TypeVar, cast
 from uuid import uuid1
 from dataclasses import dataclass
 import docker
 from docker.models.images import Image as DockerImage
+from docker.errors import APIError, BuildError, DockerException
 
 import algobattle.problems.delaytest as DelaytestProblem
 
 
 logger = logging.getLogger("algobattle.docker")
-client = docker.from_env()
+try:
+    client = docker.from_env()
+except DockerException:
+    err = "Could not connect to the docker daemon. Is docker running?"
+    logger.error(err)
+    raise SystemExit(f"Exited algobattle: {err}")
+P = ParamSpec("P")
+R = TypeVar("R")
+
+
+def docker_running(func: Callable[P, R]) -> Callable[P, R]:
+    """ensures the docker daemon is running, terminating execution if not"""
+    def wrapper(*args: P.args, **kwargs: P.kwargs):
+        try:
+            client.ping()
+        except APIError:
+            err = "Could not connect to the docker daemon. Is docker running?"
+            logger.error(err)
+            raise SystemExit(f"Exited algobattle: {err}")
+        return func(*args, **kwargs)
+    
+    return wrapper
 
 
 class DockerError(Exception):
@@ -56,6 +78,7 @@ class Image:
     To prevent this don't use the object after calling `.remove()`.
     """
 
+    @docker_running
     def __init__(
         self,
         path: Path,
@@ -95,24 +118,17 @@ class Image:
                 ),
             )
 
+        #! currently not handeled properly
         except TimeoutExpired as e:
             logger.error(f"Build process for '{path}' ran into a timeout!")
             raise DockerError from e
 
-        except CalledProcessError as e:
-            if e.stderr.find("error during connect") != -1:
-                logger.error("Could not connect to the docker daemon. Is docker running?")
-                raise SystemExit("Exited algobattle: Could not connect to the docker daemon. Is docker running?")
-
-            logger.warning(f"Building '{path}' did not complete successfully:\n{e.stderr}")
+        except BuildError as e:
+            logger.warning(f"Building '{path}' did not complete successfully:\n{e.msg}")
             raise DockerError from e
 
-        except OSError as e:
-            logger.warning(f"OSError thrown while building '{path}':\n{e}")
-            raise DockerError from e
-
-        except ValueError as e:
-            logger.warning(f"Build process for '{path}' created with invalid arguments:\n{e}")
+        except APIError as e:
+            logger.warning(f"Docker APIError thrown while building '{path}':\n{e}")
             raise DockerError from e
 
         self.name = image_name
