@@ -1,20 +1,13 @@
 """Collection of utility functions."""
-import os
 import logging
-import timeit
-import subprocess
 import importlib.util
 import sys
 import collections
 
 from configparser import ConfigParser
 from pathlib import Path
-from typing import Callable, Tuple
 
 from algobattle.problem import Problem
-import algobattle
-import algobattle.problems.delaytest as DelaytestProblem
-import algobattle.sighandler as sigh
 
 logger = logging.getLogger('algobattle.util')
 
