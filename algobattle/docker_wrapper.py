@@ -5,40 +5,33 @@ import os
 from pathlib import Path
 from subprocess import CalledProcessError, TimeoutExpired, run
 from timeit import default_timer
-from typing import Any, Callable, Iterator, ParamSpec, TypeVar, cast
+from typing import Any, Iterator, cast
 from uuid import uuid1
 from dataclasses import dataclass
-import docker
 from docker.models.images import Image as DockerImage
 from docker.errors import APIError, BuildError, DockerException
+from docker import DockerClient
 from requests import Timeout
 
 import algobattle.problems.delaytest as DelaytestProblem
 
 
 logger = logging.getLogger("algobattle.docker")
-try:
-    client = docker.from_env()
-except DockerException:
-    err = "Could not connect to the docker daemon. Is docker running?"
-    logger.error(err)
-    raise SystemExit(f"Exited algobattle: {err}")
-P = ParamSpec("P")
-R = TypeVar("R")
 
-
-def docker_running(func: Callable[P, R]) -> Callable[P, R]:
-    """ensures the docker daemon is running, terminating execution if not"""
-    def wrapper(*args: P.args, **kwargs: P.kwargs):
-        try:
-            client.ping()
-        except APIError:
-            err = "Could not connect to the docker daemon. Is docker running?"
-            logger.error(err)
-            raise SystemExit(f"Exited algobattle: {err}")
-        return func(*args, **kwargs)
-    
-    return wrapper
+_client_var: DockerClient | None = None
+def client() -> DockerClient:
+    """returns the docker api client, checking that it's still responsive"""
+    global _client_var
+    try:
+        if _client_var is None:
+            _client_var = DockerClient.from_env()
+        else:
+            _client_var.ping()
+    except (DockerException, APIError):
+        err = "Could not connect to the docker daemon. Is docker running?"
+        logger.error(err)
+        raise SystemExit(f"Exited algobattle: {err}")
+    return _client_var
 
 
 class DockerError(Exception):
@@ -81,7 +74,6 @@ class Image:
     """
 
     @staticmethod
-    @docker_running
     def _build(path: Path, image_name: str, timeout: float | None, cache: bool) -> str:
         """the docker api does not honour timeouts on windows, so we need to circumvent it here"""
         if os.name == "nta":
@@ -92,6 +84,7 @@ class Image:
                 cmd.append("--no-cache")
             cmd.append(str(path))
 
+            client()    # check if docker daemon is still running
             try:
                 result = run(cmd, capture_output=True, timeout=timeout, check=True, text=True)
             except TimeoutExpired as e:
@@ -105,7 +98,7 @@ class Image:
         else:
             image, _logs = cast(
                 tuple[DockerImage, Iterator[Any]],
-                client.images.build(
+                client().images.build(
                     path=str(path), tag=image_name, nocache=not cache, quiet=True, network_mode="host", timeout=timeout
                 ),
             )
