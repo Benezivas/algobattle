@@ -79,7 +79,8 @@ class Iterated(BattleWrapper):
 
             approx_ratio = fight_handler.fight(matchup, n)
             if approx_ratio == 0.0 or approx_ratio > self.approximation_ratio:
-                logger.info(f"Solver {matchup.solver} does not meet the required solution quality at instance size {n}. ({approx_ratio}/{self.approximation_ratio})")
+                logger.info(f"Solver {matchup.solver} does not meet the required solution quality at instance size {n}."
+                            f" ({approx_ratio}/{self.approximation_ratio})")
                 alive = False
 
             if not alive and base_increment > 1:

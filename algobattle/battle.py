@@ -165,7 +165,6 @@ def main():
             for team_name in match.teams:
                 logger.info('Group {} gained {:.1f} points.'.format(str(team_name), points[str(team_name)]))
     except KeyboardInterrupt:
-        kill_spawned_docker_containers()
         try:
             logger.critical("Received keyboard interrupt, terminating execution.")  # type: ignore
         except NameError:
