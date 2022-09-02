@@ -8,7 +8,7 @@ import random
 from pathlib import Path
 
 import algobattle
-from algobattle.docker_wrapper import DockerError, Image, measure_runtime_overhead
+from algobattle.docker_wrapper import DockerError, Image
 
 logging.disable(logging.CRITICAL)
 
@@ -62,10 +62,6 @@ class DockerTests(unittest.TestCase):
             finally:
                 image.remove()
                 raise
-
-    def test_measure_runtime_overhead(self):
-        """The overhead calculation returns some float greater than zero on normal execution."""
-        self.assertGreater(measure_runtime_overhead(), 0)
 
 
 if __name__ == '__main__':

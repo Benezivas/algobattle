@@ -15,8 +15,6 @@ from docker import DockerClient
 from docker.models.containers import Container as DockerContainer
 from requests import Timeout
 
-import algobattle.problems.delaytest as DelaytestProblem
-
 
 logger = logging.getLogger("algobattle.docker")
 
@@ -58,16 +56,6 @@ class DockerConfig:
     space_solver: int | None = None
     cpus: int | None = None
     cache_containers: bool = True
-
-    def add_overhead(self, overhead: float) -> None:
-        """Adds some amount of runtime overhead to the timeouts."""
-
-        def _map(f):
-            return f if f is None else f + overhead
-
-        self.timeout_build = _map(self.timeout_build)
-        self.timeout_generator = _map(self.timeout_generator)
-        self.timeout_solver = _map(self.timeout_solver)
 
 
 class Image:
@@ -241,29 +229,3 @@ class Image:
 
         except APIError as e:
             raise DockerError(f"Docker APIError thrown while removing '{self.name}'") from e
-
-
-def measure_runtime_overhead() -> float:
-    """Calculate the I/O delay for starting and stopping docker on the host machine.
-
-    Returns
-    -------
-    float
-        I/O overhead in seconds, rounded to two decimal places.
-    """
-    delaytest_path = Path(DelaytestProblem.__file__).parent / "generator"
-    try:
-        image = Image(delaytest_path, "delaytest_generator", "delaytest generator", timeout=300)
-    except DockerError:
-        return 0
-
-    overheads = []
-    for i in range(5):
-        try:
-            start_time = default_timer()
-            image.run(str(50 * i), timeout=300)
-            overheads.append(default_timer() - start_time)
-        except DockerError:
-            overheads.append(300)
-    image.remove()
-    return round(max(overheads), 2)

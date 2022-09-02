@@ -13,9 +13,9 @@ logger = logging.getLogger("algobattle.fight_handler")
 class FightHandler:
     """Class managing the execution of generators and solvers."""
 
-    def __init__(self, problem: Problem, config: ConfigParser, runtime_overhead: float = 0) -> None:
-        self.timeout_generator = int(config["run_parameters"]["timeout_generator"]) + runtime_overhead
-        self.timeout_solver = int(config["run_parameters"]["timeout_solver"]) + runtime_overhead
+    def __init__(self, problem: Problem, config: ConfigParser) -> None:
+        self.timeout_generator = int(config["run_parameters"]["timeout_generator"])
+        self.timeout_solver = int(config["run_parameters"]["timeout_solver"])
         self.space_generator = int(config["run_parameters"]["space_generator"])
         self.space_solver = int(config["run_parameters"]["space_solver"])
         self.cpus = int(config["run_parameters"]["cpus"])
