@@ -193,7 +193,8 @@ class Image:
             while container.reload() or container.status == "running":
                 if timeout is not None and default_timer() - start_time > timeout:
                     logger.warning(f"'{self.description}' exceeded time limit!")
-                    raise DockerError
+                    container.kill()
+                    break
                 sleep(0.01)
             elapsed_time = round(default_timer() - start_time, 2)
 
@@ -242,7 +243,7 @@ class Image:
             When removing the image fails
         """
         try:
-            client().images.remove(image=self.id[7:], force=True)
+            client().images.remove(image=self.id, force=True)
 
         except APIError as e:
             logger.warning(f"Docker APIError thrown while removing '{self.name}'")
