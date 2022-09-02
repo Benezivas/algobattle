@@ -6,6 +6,7 @@ from typing import Tuple
 
 from algobattle.battle_wrapper import BattleWrapper
 from algobattle.fight_handler import FightHandler
+from algobattle.team import Matchup
 from algobattle.util import update_nested_dict
 
 logger = logging.getLogger('algobattle.battle_wrappers.iterated')
@@ -39,7 +40,7 @@ class Iterated(BattleWrapper):
                            'approximation_ratio': self.approximation_ratio}
 
     @BattleWrapper.reset_state
-    def run_round(self, fight_handler: FightHandler) -> None:
+    def run_round(self, fight_handler: FightHandler, matchup: Matchup) -> None:
         """Execute one iterative battle between a generating and a solving team.
 
         Incrementally try to search for the highest n for which the solver is
@@ -76,10 +77,9 @@ class Iterated(BattleWrapper):
         while alive:
             logger.info('=============== Instance Size: {}/{} ==============='.format(n, n_cap))
 
-            approx_ratio = fight_handler.fight(instance_size=n)
+            approx_ratio = fight_handler.fight(matchup, n)
             if approx_ratio == 0.0 or approx_ratio > self.approximation_ratio:
-                logger.info('Solver {} does not meet the required solution quality at instance size {}. ({}/{})'
-                            .format(fight_handler.solving_team, n, approx_ratio, self.approximation_ratio))
+                logger.info(f"Solver {matchup.solver} does not meet the required solution quality at instance size {n}. ({approx_ratio}/{self.approximation_ratio})")
                 alive = False
 
             if not alive and base_increment > 1:

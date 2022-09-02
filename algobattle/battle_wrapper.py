@@ -12,6 +12,7 @@ from typing import Callable, List, Tuple
 from algobattle.fight_handler import FightHandler
 from algobattle.observer import Observer
 from algobattle.subject import Subject
+from algobattle.team import Matchup
 
 logger = logging.getLogger('algobattle.battle_wrapper')
 
@@ -35,7 +36,7 @@ class BattleWrapper(ABC, Subject):
         return wrapper
 
     @abstractmethod
-    def run_round(self, fight_handler: FightHandler) -> None:
+    def run_round(self, fight_handler: FightHandler, matchup: Matchup) -> None:
         """Execute a full round of fights between two teams configured in the fight_handler.
 
         During execution, the concrete BattleWrapper should update the round_data dict

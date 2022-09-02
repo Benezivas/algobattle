@@ -3,6 +3,7 @@ import logging
 from typing import List
 
 from algobattle.battle_wrapper import BattleWrapper
+from algobattle.team import Matchup
 from algobattle.util import update_nested_dict
 from algobattle.subject import Subject
 from algobattle.observer import Observer
@@ -34,7 +35,7 @@ class Match(Subject, Observer):
         """Match entry point, executes fights between all teams."""
         for pair in self.all_battle_pairs(as_team_objects=True):
             update_nested_dict(self.match_data, {'curr_pair': (str(pair[0]), str(pair[1]))})
-            self.fight_handler.set_roles(generating=pair[0], solving=pair[1])
+            matchup = Matchup(pair[0], pair[1])
 
             for i in range(self.rounds):
                 logger.info('{}  Running Battle {}/{}  {}'.format('#' * 20, i + 1, self.rounds, '#' * 20))
