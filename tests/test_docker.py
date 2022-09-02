@@ -4,11 +4,10 @@ from typing import cast
 import unittest
 import logging
 import random
-
 from pathlib import Path
 
 import algobattle
-from algobattle.docker_wrapper import DockerError, Image
+from algobattle.docker import DockerError, Image
 
 logging.disable(logging.CRITICAL)
 

@@ -2,8 +2,8 @@
 import logging
 from configparser import ConfigParser
 from typing import Any, Tuple
-from algobattle.docker_wrapper import DockerError
 
+from algobattle.docker import DockerError
 from algobattle.team import Matchup, Team
 from algobattle.problem import Problem
 

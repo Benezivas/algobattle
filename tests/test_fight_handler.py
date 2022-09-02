@@ -4,7 +4,6 @@ from typing import cast
 import unittest
 import logging
 import importlib
-
 from configparser import ConfigParser
 from pathlib import Path
 from uuid import uuid4
@@ -12,7 +11,7 @@ from uuid import uuid4
 import algobattle
 from algobattle.fight_handler import FightHandler
 from algobattle.team import Matchup, Team
-from algobattle.docker_wrapper import Image
+from algobattle.docker import Image
 
 logging.disable(logging.CRITICAL)
 

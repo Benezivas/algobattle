@@ -7,9 +7,9 @@ from timeit import default_timer
 from typing import Any, Iterator, cast
 from uuid import uuid1
 from dataclasses import dataclass
-from docker.models.images import Image as DockerImage
-from docker.errors import APIError, BuildError, DockerException, ImageNotFound
 from docker import DockerClient
+from docker.errors import APIError, BuildError, DockerException, ImageNotFound
+from docker.models.images import Image as DockerImage
 from docker.models.containers import Container as DockerContainer
 from requests import Timeout
 
