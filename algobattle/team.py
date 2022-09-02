@@ -16,8 +16,8 @@ class Team:
     def __init__(
         self,
         team_name: str,
-        generator_path: Path,
-        solver_path: Path,
+        generator: Path | Image,
+        solver: Path | Image,
         timeout_build: float | None = None,
         cache_image: bool = True,
     ) -> None:
@@ -27,10 +27,10 @@ class Team:
         ----------
         team_name : str
             Name of the team, must be globally unique!
-        generator_path : Path
-            Path to a folder containing a Dockerfile that will be used for the generator.
-        solver_path : Path
-            Path to a folder containing a Dockerfile that will be used for the solver.
+        generator_path : Path | Image
+            Path to a folder containing a Dockerfile that will be used for the generator, or already built image.
+        solver_path : Path | Image
+            Path to a folder containing a Dockerfile that will be used for the solver, or already built image.
         timeout_build : float | None
             Timeout for building the containers, `None` means they will have unlimited time, by default None.
         cache_container : bool, optional
@@ -45,14 +45,23 @@ class Team:
         if team_name in _team_names:
             raise ValueError
         self.name = team_name
-        self.generator_path = generator_path
-        self.solver_path = solver_path
-        self.generator = Image(generator_path, f"generator-{self}", f"generator for team {self}",
-                               timeout=timeout_build, cache=cache_image)
+        built_generator = None
         try:
-            self.solver = Image(solver_path, f"solver-{self}", f"solver for team {self}", timeout_build, cache=cache_image)
+            self._built_generator = isinstance(generator, Path)
+            if isinstance(generator, Path):
+                self.generator = Image(generator, f"generator-{self}", f"generator for team {self}",
+                                       timeout=timeout_build, cache=cache_image)
+                built_generator = self.generator
+            else:
+                self.generator = generator
+            self._built_solver = isinstance(solver, Path)
+            if isinstance(solver, Path):
+                self.solver = Image(solver, f"solver-{self}", f"solver for team {self}", timeout_build, cache=cache_image)
+            else:
+                self.solver = solver
         except DockerError:
-            self.generator.remove()
+            if built_generator is not None:
+                built_generator.remove()
             raise
         _team_names.add(team_name)
 
@@ -70,8 +79,10 @@ class Team:
 
     def cleanup(self) -> None:
         """Removes the built docker images."""
-        self.generator.remove()
-        self.solver.remove()
+        if self._built_generator:
+            self.generator.remove()
+        if self._built_solver:
+            self.solver.remove()
         _team_names.remove(self.name)
 
 
