@@ -147,7 +147,7 @@ class FightHandler:
 
         if not encoded_output:
             logger.warning(f"No output was generated when running the solver of group {team}!")
-            raise ValueError
+            raise RuntimeError
 
         raw_solver_solution = self.problem.parser.decode(encoded_output)
 
