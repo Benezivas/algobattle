@@ -24,6 +24,10 @@ We recommend installing the package as a user using `pip`
 ```
 pip install . --user
 ```
+When installing the package on windows, specify the `windows` optional dependencies
+```
+pip install .[windows] --user
+```
 
 Adjust the parameters set in the `algobattle/configs/config.ini` file to set
 which hardware resources you want to assign. You can pass alternative

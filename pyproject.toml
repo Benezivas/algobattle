@@ -21,3 +21,6 @@ dependencies = [
 
 [project.scripts]
 algobattle = "algobattle.battle:main"
+
+[project.optional-dependencies]
+windows = ["windows-curses"]
