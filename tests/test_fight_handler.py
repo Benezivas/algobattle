@@ -7,10 +7,11 @@ import importlib
 
 from configparser import ConfigParser
 from pathlib import Path
+from uuid import uuid4
 
 import algobattle
 from algobattle.fight_handler import FightHandler
-from algobattle.team import Team
+from algobattle.team import Matchup, Team
 from algobattle.docker import Image
 
 logging.disable(logging.CRITICAL)
@@ -61,9 +62,9 @@ class FightHandlertests(unittest.TestCase):
         if handler is None:
             handler = self.fight_handler
 
-        team = Team("test", generator, solver)
-        self.fight_handler_short_to.set_roles(generating=team, solving=team)
-        result = handler.fight(1)
+        team = Team(uuid4().hex[:8], generator, solver)
+        matchup = Matchup(team, team)
+        result = handler.fight(matchup, 1)
         team.cleanup()
         return result
 

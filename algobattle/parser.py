@@ -93,7 +93,7 @@ class Parser(ABC):
         return instance
 
     @abstractmethod
-    def encode(self, input: Any) -> bytes:
+    def encode(self, input: Any) -> str:
         """Encode an input and return it.
 
         This method is responsible for turning the output of parse_instance back
@@ -109,10 +109,10 @@ class Parser(ABC):
         bytes
             Returns the input as a byte object.
         """
-        return "\n".join(str(" ".join(str(element) for element in line)) for line in input).encode()
+        return "\n".join(str(" ".join(str(element) for element in line)) for line in input)
 
     @abstractmethod
-    def decode(self, raw_input: bytes) -> Any:
+    def decode(self, raw_input: str) -> Any:
         """Decode an input and return it.
 
         This method is responsible for taking the output of a generator or
@@ -129,4 +129,4 @@ class Parser(ABC):
         Any
             Returns the decoded input.
         """
-        return [tuple(line.split()) for line in raw_input.decode().splitlines() if line.split()]
+        return [tuple(line.split()) for line in raw_input.splitlines() if line.split()]
