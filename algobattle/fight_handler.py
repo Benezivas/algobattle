@@ -5,7 +5,6 @@ from typing import Callable, Tuple
 from algobattle.docker import DockerError
 
 from algobattle.team import Team
-from algobattle.util import docker_running
 from algobattle.problem import Problem
 
 logger = logging.getLogger('algobattle.fight_handler')
@@ -59,7 +58,6 @@ class FightHandler():
                 return function(self, *args, **kwargs)
         return wrapper
 
-    @docker_running
     @team_roles_set
     def fight(self, instance_size: int) -> float:
         """Execute a single fight of a battle between a given generator and solver for a given instance size.
@@ -92,7 +90,6 @@ class FightHandler():
                     .format(self.solving_team, approximation_ratio))
         return approximation_ratio
 
-    @docker_running
     @team_roles_set
     def _run_generator(self, instance_size: int) -> Tuple[any, any]:
         """Execute the generator of match.generating_team and check the validity of the generated output.
@@ -148,7 +145,6 @@ class FightHandler():
 
         return instance, generator_solution
 
-    @docker_running
     @team_roles_set
     def _run_solver(self, instance_size: int, instance: any) -> any:
         """Execute the solver of match.solving_team and check the validity of the generated output.
