@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Main battle script. Executes all possible types of battles, see battle --help for all options."""
 import sys
 import os
