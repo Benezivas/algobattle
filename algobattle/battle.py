@@ -99,6 +99,8 @@ def main():
         if display_ui:
             options.silent = True
 
+        problem_path = Path(problem_path)
+        options.config = Path(options.config)
         solvers = [Path(path) for path in options.solvers.split(',')]
         generators = [Path(path) for path in options.generators.split(',')]
         team_names = options.team_names.split(',')
