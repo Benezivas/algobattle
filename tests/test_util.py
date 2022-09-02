@@ -12,7 +12,6 @@ import algobattle
 from algobattle.battle_wrappers.iterated import Iterated
 import algobattle.util as util
 from algobattle.fight_handler import FightHandler
-from algobattle.docker import measure_runtime_overhead
 
 logging.disable(logging.CRITICAL)
 
@@ -48,10 +47,6 @@ class Utiltests(unittest.TestCase):
     def test_initialize_wrapper_nonexistent_path(self):
         """Initializing a nonexistent wrapper returns None."""
         self.assertEqual(util.initialize_wrapper(self.rand_file_name, self.config), None)
-
-    def test_measure_runtime_overhead(self):
-        """The overhead calculation returns some float greater than zero on normal execution."""
-        self.assertGreater(measure_runtime_overhead(), 0)
 
     def test_update_nested_dict(self):
         """A nested dict should be updated with information from another nested dict as expected."""

@@ -47,17 +47,14 @@ class FightHandlertests(unittest.TestCase):
     def _build_and_run(
         self, handler: FightHandler | None = None, generator: str | Image | None = None, solver: str | Image | None = None
     ) -> float:
-        built_images: set[Image] = set()
 
         if isinstance(generator, str):
             generator = Image(self.problem_path / generator, f"test_generator_{generator}", cache=False)
-            built_images.add(generator)
         elif generator is None:
             generator = self.gen_succ
 
         if isinstance(solver, str):
             solver = Image(self.problem_path / solver, f"test_generator_{solver}", cache=False)
-            built_images.add(solver)
         elif solver is None:
             solver = self.sol_succ
 
@@ -67,8 +64,7 @@ class FightHandlertests(unittest.TestCase):
         team = Team("test", generator, solver)
         self.fight_handler_short_to.set_roles(generating=team, solving=team)
         result = handler.fight(1)
-        for image in built_images:
-            image.remove()
+        team.cleanup()
         return result
 
     def test_one_fight_gen_timeout(self):
