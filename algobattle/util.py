@@ -1,11 +1,13 @@
 """Collection of utility functions."""
+from __future__ import annotations
+from io import BytesIO
 import logging
 import importlib.util
 import sys
 import collections
-
 from configparser import ConfigParser
 from pathlib import Path
+import tarfile
 
 from algobattle.problem import Problem
 
@@ -85,3 +87,26 @@ def update_nested_dict(current_dict: dict, updates: dict) -> dict:
         else:
             current_dict[key] = value
     return current_dict
+
+
+def archive(input: str, filename: str) -> bytes:
+    """Compresses a string into a tar archive."""
+    encoded = input.encode()
+    with BytesIO() as fh:
+        with BytesIO(initial_bytes=encoded) as source, tarfile.open(fileobj=fh, mode="w") as tar:
+            info = tarfile.TarInfo(filename)
+            info.size = len(encoded)
+            tar.addfile(info, source)
+        fh.seek(0)
+        data = fh.getvalue()
+    return data
+
+
+def extract(archive: bytes, filename: str) -> str:
+    """Retrieves the contents of a file from a tar archive."""
+    with BytesIO(initial_bytes=archive) as fh, tarfile.open(fileobj=fh, mode="r") as tar:
+        file = tar.extractfile(filename)
+        assert file is not None
+        with file as f:
+            output = f.read().decode()
+    return output
