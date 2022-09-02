@@ -1,6 +1,7 @@
 """Leightweight wrapper around docker functionality."""
 from __future__ import annotations
 import logging
+import os
 from pathlib import Path
 from subprocess import CalledProcessError, TimeoutExpired, run
 from timeit import default_timer
@@ -10,6 +11,7 @@ from dataclasses import dataclass
 import docker
 from docker.models.images import Image as DockerImage
 from docker.errors import APIError, BuildError, DockerException
+from requests import Timeout
 
 import algobattle.problems.delaytest as DelaytestProblem
 
@@ -78,7 +80,37 @@ class Image:
     To prevent this don't use the object after calling `.remove()`.
     """
 
+    @staticmethod
     @docker_running
+    def _build(path: Path, image_name: str, timeout: float | None, cache: bool) -> str:
+        """the docker api does not honour timeouts on windows, so we need to circumvent it here"""
+        if os.name == "nta":
+            cmd = ["docker", "build", "-q", "--network=host"]
+            if image_name is not None:
+                cmd += ["-t", image_name]
+            if not cache:
+                cmd.append("--no-cache")
+            cmd.append(str(path))
+
+            try:
+                result = run(cmd, capture_output=True, timeout=timeout, check=True, text=True)
+            except TimeoutExpired as e:
+                raise Timeout from e
+            except CalledProcessError as e:
+                raise BuildError(e, e.stderr) from e
+            except (OSError, ValueError) as e:
+                raise APIError(e) from e
+            
+            return result.stdout.strip()[7:]
+        else:
+            image, _logs = cast(
+                tuple[DockerImage, Iterator[Any]],
+                client.images.build(
+                    path=str(path), tag=image_name, nocache=not cache, quiet=True, network_mode="host", timeout=timeout
+                ),
+            )
+            return cast(str, image.id)
+
     def __init__(
         self,
         path: Path,
@@ -111,15 +143,9 @@ class Image:
 
         logger.debug(f"Building docker container with options: {path = !s}, {image_name = }, {cache = }, {timeout = :.2f}")
         try:
-            image, _logs = cast(
-                tuple[DockerImage, Iterator[Any]],
-                client.images.build(
-                    path=str(path), tag=image_name, nocache=not cache, timeout=timeout, quiet=True, network_mode="host"
-                ),
-            )
+            id = self._build(path, image_name, timeout, cache)
 
-        #! currently not handeled properly
-        except TimeoutExpired as e:
+        except Timeout as e:
             logger.error(f"Build process for '{path}' ran into a timeout!")
             raise DockerError from e
 
@@ -132,7 +158,7 @@ class Image:
             raise DockerError from e
 
         self.name = image_name
-        self.id = cast(str, image.id)
+        self.id = id
         self.description = description if description is not None else image_name
 
     def run(
