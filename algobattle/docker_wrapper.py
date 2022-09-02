@@ -110,7 +110,7 @@ class Image:
             image, _logs = cast(
                 tuple[DockerImage, Iterator[Any]],
                 client().images.build(
-                    path=str(path), tag=image_name, nocache=not cache, quiet=True, network_mode="host", timeout=timeout
+                    path=str(path), rm=True, forcerm=True, tag=image_name, nocache=not cache, quiet=True, network_mode="host", timeout=timeout
                 ),
             )
 
