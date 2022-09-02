@@ -1,21 +1,20 @@
-"""Leightweight wrapper around docker functionality.
-
-We are not using the Python Docker SDK lib since it does not provide needed
-functionality like timeouts and windows support requires annoying workarounds atm.
-"""
-
+"""Leightweight wrapper around docker functionality."""
 from __future__ import annotations
 import logging
 from pathlib import Path
 from subprocess import CalledProcessError, TimeoutExpired, run
 from timeit import default_timer
+from typing import Any, Iterator, cast
 from uuid import uuid1
 from dataclasses import dataclass
+import docker
+from docker.models.images import Image as DockerImage
 
 import algobattle.problems.delaytest as DelaytestProblem
 
 
 logger = logging.getLogger("algobattle.docker")
+client = docker.from_env()
 
 
 class DockerError(Exception):
@@ -41,6 +40,7 @@ class DockerConfig:
 
     def add_overhead(self, overhead: float) -> None:
         """Adds some amount of runtime overhead to the timeouts."""
+
         def _map(f):
             return f if f is None else f + overhead
 
@@ -85,16 +85,15 @@ class Image:
             On almost all common issues that might happen during the build, including timeouts, syntax errors,
             OS errors, and errors thrown by the docker daemon.
         """
-        cmd = ["docker", "build", "-q", "--network=host"]
-        if image_name is not None:
-            cmd += ["-t", image_name]
-        if not cache:
-            cmd.append("--no-cache")
-        cmd.append(str(path))
 
-        logger.debug(f"Building docker container with the following command: {' '.join(cmd)}")
+        logger.debug(f"Building docker container with options: {path = !s}, {image_name = }, {cache = }, {timeout = :.2f}")
         try:
-            result = run(cmd, capture_output=True, timeout=timeout, check=True, text=True)
+            image, _logs = cast(
+                tuple[DockerImage, Iterator[Any]],
+                client.images.build(
+                    path=str(path), tag=image_name, nocache=not cache, timeout=timeout, quiet=True, network_mode="host"
+                ),
+            )
 
         except TimeoutExpired as e:
             logger.error(f"Build process for '{path}' ran into a timeout!")
@@ -117,7 +116,7 @@ class Image:
             raise DockerError from e
 
         self.name = image_name
-        self.id = result.stdout.strip()[7:]
+        self.id = cast(str, image.id)
         self.description = description if description is not None else image_name
 
     def run(
