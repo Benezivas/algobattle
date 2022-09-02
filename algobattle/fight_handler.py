@@ -2,10 +2,10 @@
 import logging
 from configparser import ConfigParser
 from typing import Callable, Tuple
+from algobattle.docker import DockerError
 
 from algobattle.team import Team
-from algobattle.util import run_subprocess, docker_running
-import algobattle.util as util
+from algobattle.util import docker_running
 from algobattle.problem import Problem
 
 logger = logging.getLogger('algobattle.fight_handler')
@@ -17,7 +17,7 @@ class FightHandler():
     generating_team = None
     solving_team = None
 
-    def __init__(self, problem: Problem, config: ConfigParser, runtime_overhead=0) -> None:
+    def __init__(self, problem: Problem, config: ConfigParser, runtime_overhead: float = 0) -> None:
         self.timeout_generator = int(config['run_parameters']['timeout_generator']) + runtime_overhead
         self.timeout_solver    = int(config['run_parameters']['timeout_solver']) + runtime_overhead
         self.space_generator   = int(config['run_parameters']['space_generator'])
@@ -111,15 +111,14 @@ class FightHandler():
             format that is specified, else (None, None).
         """
         scaled_memory = self.problem.generator_memory_scaler(self.space_generator, instance_size)
-        generator_run_command = self.base_run_command(scaled_memory) + [self.generating_team.generator_docker_tag]
 
         logger.debug('Running generator of group {}...\n'.format(self.generating_team))
 
-        util.latest_running_docker_image = "generator-" + str(self.generating_team)
-        encoded_output, _ = run_subprocess(generator_run_command, str(instance_size).encode(),
-                                           self.timeout_generator)
-        if not encoded_output:
-            logger.warning('No output was generated when running the generator group {}!'.format(self.generating_team))
+        try:
+            assert(self.generating_team is not None)
+            encoded_output = self.generating_team.generator.run(str(instance_size), self.timeout_generator, scaled_memory, self.cpus)
+        except DockerError:
+            logger.warning(f"No output was generated when running the generator group {self.generating_team}!")
             return None, None
 
         raw_instance_with_solution = self.problem.parser.decode(encoded_output)
@@ -168,14 +167,11 @@ class FightHandler():
             format that is specified, else None.
         """
         scaled_memory = self.problem.solver_memory_scaler(self.space_solver, instance_size)
-        solver_run_command = self.base_run_command(scaled_memory) + [self.solving_team.solver_docker_tag]
-        logger.debug('Running solver of group {}...\n'.format(self.solving_team))
-
-        util.latest_running_docker_image = "solver-" + str(self.solving_team)
-        encoded_output, _ = run_subprocess(solver_run_command, self.problem.parser.encode(instance),
-                                           self.timeout_solver)
-        if not encoded_output:
-            logger.warning('No output was generated when running the solver of group {}!'.format(self.solving_team))
+        try:
+            assert(self.solving_team is not None)
+            encoded_output = self.solving_team.solver.run(self.problem.parser.encode(instance), self.timeout_solver, scaled_memory, self.cpus)
+        except DockerError:
+            logger.warning(f"No output was generated when running the solver of group {self.solving_team}!")
             return None
 
         raw_solver_solution = self.problem.parser.decode(encoded_output)
