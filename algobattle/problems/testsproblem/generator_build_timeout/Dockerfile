@@ -1,3 +1,3 @@
-FROM python:3
+FROM alpine
 
 RUN sleep 6000;

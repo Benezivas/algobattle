@@ -1,3 +1,3 @@
-FROM python:3
+FROM scratch
 
 BUILD AN ERROR

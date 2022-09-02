@@ -1,6 +1,4 @@
-FROM python:3
+FROM alpine
 
-COPY main.sh /
-COPY main.py /
-
-CMD ["./main.sh"]
+# outputs a static instance and certificate
+CMD ["printf", "i 1\ns 1 1 1\n"]

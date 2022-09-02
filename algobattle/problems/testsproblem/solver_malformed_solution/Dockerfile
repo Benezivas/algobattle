@@ -1,6 +1,4 @@
-FROM python:3
+FROM alpine
 
-COPY main.sh /
-COPY main.py /
-
-CMD ["./main.sh"]
+# outputs a static, semantically wrong solution.
+CMD ["printf", "s 0 1 1\n"]
