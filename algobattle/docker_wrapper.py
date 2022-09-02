@@ -105,7 +105,10 @@ class Image:
             OS errors, and errors thrown by the docker daemon.
         """
 
-        logger.debug(f"Building docker container with options: {path = !s}, {image_name = }, {cache = }, {timeout = :.2f}")
+        if not path.exists():
+            logger.error(f"Error when building {image_name}: '{path}' does not exist on the file system.")
+            raise DockerError
+        logger.debug(f"Building docker container with options: {path = !s}, {image_name = }, {cache = }" + (", {timeout = :.2f}" if timeout is not None else ""))
         try:
             image, _logs = cast(
                 tuple[DockerImage, Iterator[Any]],

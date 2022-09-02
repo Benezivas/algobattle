@@ -48,14 +48,10 @@ class DockerTests(unittest.TestCase):
             image.remove()
 
     def test_run_subprocess_timeout(self):
-        """`Image.run()` raises an error when the container times out."""
-        with self.assertRaises(DockerError):
-            image = Image(self.problem_path / "generator_timeout", "gen_to", cache=False)
-            try:
-                image.run(timeout=2.0)
-            finally:
-                image.remove()
-                raise
+        """`Image.run()` normally terminates when the container times out."""
+        image = Image(self.problem_path / "generator_timeout", "gen_to", cache=False)
+        image.run(timeout=1.0)
+        image.remove()
 
     def test_run_subprocess_execution_error(self):
         """run_subprocess returns None if an exception is thrown during execution of the subprocess."""
