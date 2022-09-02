@@ -1,9 +1,7 @@
 """Leightweight wrapper around docker functionality."""
 from __future__ import annotations
-from io import BytesIO
 import logging
 from pathlib import Path
-import tarfile
 from time import sleep
 from timeit import default_timer
 from typing import Any, Iterator, cast
@@ -15,12 +13,15 @@ from docker import DockerClient
 from docker.models.containers import Container as DockerContainer
 from requests import Timeout
 
+from algobattle.util import archive, extract
+
 
 logger = logging.getLogger("algobattle.docker")
 
+
 _client_var: DockerClient | None = None
 def client() -> DockerClient:
-    """returns the docker api client, checking that it's still responsive"""
+    """Returns the docker api client, checking that it's still responsive."""
     global _client_var
     try:
         if _client_var is None:
@@ -94,15 +95,21 @@ class Image:
             On almost all common issues that might happen during the build, including timeouts, syntax errors,
             OS errors, and errors thrown by the docker daemon.
         """
-
         if not path.exists():
             raise DockerError(f"Error when building {image_name}: '{path}' does not exist on the file system.")
-        logger.debug(f"Building docker container with options: {path = !s}, {image_name = }, {cache = }" + (f", {timeout = :.2f}" if timeout is not None else ""))
+        logger.debug(f"Building docker container with options: {path = !s}, {image_name = }, {cache = }, {timeout = }")
         try:
             image, _logs = cast(
                 tuple[DockerImage, Iterator[Any]],
                 client().images.build(
-                    path=str(path), rm=True, forcerm=True, tag=image_name, nocache=not cache, quiet=True, network_mode="host", timeout=timeout
+                    path=str(path),
+                    tag=image_name,
+                    nocache=not cache,
+                    timeout=timeout,
+                    rm=True,
+                    forcerm=True,
+                    quiet=True,
+                    network_mode="host",
                 ),
             )
 
@@ -153,62 +160,43 @@ class Image:
         container: DockerContainer | None = None
         try:
             container = cast(DockerContainer, client().containers.create(
-                stdin_open=True,
-                detach=True,
-                network_mode="none",
                 image=self.id,
                 name=name,
                 mem_limit=memory,
-                nano_cpus=cpus
+                nano_cpus=cpus,
+                detach=True,
+                network_mode="none",
             ))
-            encoded = input.encode()
-            with BytesIO() as fh:
-                with BytesIO(initial_bytes=encoded) as source, tarfile.open(fileobj=fh, mode="w") as tar:
-                    info = tarfile.TarInfo("input")
-                    info.size = len(encoded)
-                    tar.addfile(info, source)
-                fh.seek(0)
-                data = fh.getvalue()
-                ok = container.put_archive("/", data)
-                if not ok:
-                    raise DockerError(f"Copying input into container {self.name} failed")
+            ok = container.put_archive("/", archive(input, "input"))
+            if not ok:
+                raise DockerError(f"Copying input into container {self.name} failed")
 
             container.start()
             start_time = default_timer()
             while container.reload() or container.status == "running":
                 if timeout is not None and default_timer() - start_time > timeout:
-                    logger.warning(f"'{self.description}' exceeded time limit!")
+                    logger.warning(f"{self.description} exceeded time limit!")
                     container.kill()
                     break
                 sleep(0.01)
             elapsed_time = round(default_timer() - start_time, 2)
 
-            try:
-                source, _stat = container.get_archive("output")
-            except APIError as e:
-                if cast(str, e.explanation).startswith("Could not find the file output in container"):
-                    return ""
-                else:
-                    raise
-            with BytesIO() as fh:
-                for chunk in source:
-                    fh.write(chunk)
-                fh.seek(0)
-                with tarfile.open(fileobj=fh, mode="r") as tar:
-                    with tar.extractfile("output") as f:    # type: ignore
-                        output = f.read().decode()
+            output_iter, _stat = container.get_archive("output")
+            output = extract(b"".join(output_iter), "output")
 
         except ImageNotFound as e:
             raise DockerError(f"Image {self.name} (id={self.id}) does not exist") from e
         except APIError as e:
-            raise DockerError(f"Docker APIError thrown while running '{self.name}'") from e
+            if cast(str, e.explanation).startswith("Could not find the file output in container"):
+                return ""
+            raise DockerError(f"Docker API Error thrown while running {self.name}") from e
         finally:
             if container is not None:
                 try:
                     container.remove(force=True)
                 except APIError as e:
-                    raise DockerError from e
-        
+                    raise DockerError(f"Couldn't remove {name}") from e
+
         logger.debug(f"Approximate elapsed runtime: {elapsed_time}/{timeout} seconds.")
         return output
 
