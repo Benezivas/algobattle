@@ -1,4 +1,5 @@
 """Tests for the Match class."""
+from typing import cast
 import unittest
 import logging
 import importlib
@@ -9,10 +10,10 @@ from pathlib import Path
 import algobattle
 from algobattle.battle_wrappers.iterated import Iterated
 from algobattle.battle_wrappers.averaged import Averaged
+from algobattle.docker import Image
 from algobattle.fight_handler import FightHandler
 from algobattle.match import Match
 from algobattle.team import Team
-import algobattle.util as util
 
 logging.disable(logging.CRITICAL)
 
@@ -20,29 +21,33 @@ logging.disable(logging.CRITICAL)
 class Matchtests(unittest.TestCase):
     """Tests for the match object."""
 
-    def setUp(self) -> None:
+    @classmethod
+    def setUpClass(cls) -> None:
         """Set up a match object."""
         Problem = importlib.import_module('algobattle.problems.testsproblem')
-        self.problem = Problem.Problem()
-        self.problem_path = Problem.__file__[:-12]  # remove /__init__.py
+        cls.problem = Problem.Problem()
+        cls.problem_path = Path(cast(str, Problem.__file__)).parent
 
-        util.build_docker_container(Path(self.problem_path, 'generator'),
-                                    docker_tag='gen')
-        util.build_docker_container(Path(self.problem_path, 'solver'),
-                                    docker_tag='sol')
-        self.team0 = Team('0', 'gen', 'sol')
-        self.team1 = Team('1', 'gen', 'sol')
+        cls.generator = Image(cls.problem_path / "generator", "generator")
+        cls.solver = Image(cls.problem_path / "solver", "solver")
+        cls.team0 = Team('0', cls.generator, cls.solver)
+        cls.team1 = Team('1', cls.generator, cls.solver)
 
         config_path = Path(Path(algobattle.__file__).parent, 'config', 'config.ini')
-        self.config = ConfigParser()
-        self.config.read(config_path)
+        cls.config = ConfigParser()
+        cls.config.read(config_path)
 
-        self.fight_handler = FightHandler(self.problem, self.config)
+        cls.fight_handler = FightHandler(cls.problem, cls.config)
 
-        self.wrapper_iter = Iterated(self.config)
-        self.wrapper_avg = Averaged(self.config)
-        self.match_iter = Match(self.fight_handler, self.wrapper_iter, [self.team0, self.team1])
-        self.match_avg = Match(self.fight_handler, self.wrapper_avg, [self.team0, self.team1])
+        cls.wrapper_iter = Iterated(cls.config)
+        cls.wrapper_avg = Averaged(cls.config)
+        cls.match_iter = Match(cls.fight_handler, cls.wrapper_iter, [cls.team0, cls.team1])
+        cls.match_avg = Match(cls.fight_handler, cls.wrapper_avg, [cls.team0, cls.team1])
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.generator.remove()
+        cls.solver.remove()
 
     def test_all_battle_pairs_two_teams(self):
         """Two teams both generate and solve one time each."""
