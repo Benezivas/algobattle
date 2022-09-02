@@ -1,4 +1,6 @@
 """Tests for the Fight Handler class."""
+from __future__ import annotations
+from typing import cast
 import unittest
 import logging
 import importlib
@@ -7,9 +9,9 @@ from configparser import ConfigParser
 from pathlib import Path
 
 import algobattle
-import algobattle.util as util
 from algobattle.fight_handler import FightHandler
 from algobattle.team import Team
+from algobattle.docker import Image
 
 logging.disable(logging.CRITICAL)
 
@@ -17,117 +19,111 @@ logging.disable(logging.CRITICAL)
 class FightHandlertests(unittest.TestCase):
     """Tests for the match object."""
 
-    def setUp(self) -> None:
+    @classmethod
+    def setUpClass(cls) -> None:
         """Set up a generator and a solver that always run successfully and fight handlers with two different configs."""
-        Problem = importlib.import_module('algobattle.problems.testsproblem')
-        self.problem = Problem.Problem()
-        self.problem_path = Path(Problem.__file__).parent
+        Problem = importlib.import_module("algobattle.problems.testsproblem")
+        cls.problem = Problem.Problem()
+        cls.problem_path = Path(cast(str, Problem.__file__)).parent
 
-        util.build_docker_container(Path(self.problem_path, 'generator'),
-                                    docker_tag='gen_succ')
-        util.build_docker_container(Path(self.problem_path, 'solver'),
-                                    docker_tag='sol_succ')
+        cls.gen_succ = Image(cls.problem_path / "generator", "gen_succ")
+        cls.sol_succ = Image(cls.problem_path / "solver", "sol_succ")
 
-        self.config_base_path = Path(Path(algobattle.__file__).parent, 'config')
-        self.config = ConfigParser()
-        self.config.read(Path(self.config_base_path, 'config.ini'))
+        cls.config_base_path = Path(Path(algobattle.__file__).parent, "config")
+        cls.config = ConfigParser()
+        cls.config.read(Path(cls.config_base_path, "config.ini"))
 
-        self.config_short_run_timeout = ConfigParser()
-        self.config_short_run_timeout.read(Path(self.config_base_path, 'config_short_run_timeout.ini'))
+        cls.config_short_run_timeout = ConfigParser()
+        cls.config_short_run_timeout.read(Path(cls.config_base_path, "config_short_run_timeout.ini"))
 
-        self.fight_handler = FightHandler(self.problem, self.config)
-        self.fight_handler_short_to = FightHandler(self.problem, self.config_short_run_timeout)
+        cls.fight_handler = FightHandler(cls.problem, cls.config)
+        cls.fight_handler_short_to = FightHandler(cls.problem, cls.config_short_run_timeout)
+
+    @classmethod
+    def tearDown(cls) -> None:
+        cls.gen_succ.remove()
+        cls.sol_succ.remove()
+
+    def _build_and_run(
+        self, handler: FightHandler | None = None, generator: str | Image | None = None, solver: str | Image | None = None
+    ) -> float:
+        built_images: set[Image] = set()
+
+        if isinstance(generator, str):
+            generator = Image(self.problem_path / generator, f"test_generator_{generator}", cache=False)
+            built_images.add(generator)
+        elif generator is None:
+            generator = self.gen_succ
+
+        if isinstance(solver, str):
+            solver = Image(self.problem_path / solver, f"test_generator_{solver}", cache=False)
+            built_images.add(solver)
+        elif solver is None:
+            solver = self.sol_succ
+
+        if handler is None:
+            handler = self.fight_handler
+
+        team = Team("test", generator, solver)
+        self.fight_handler_short_to.set_roles(generating=team, solving=team)
+        result = handler.fight(1)
+        for image in built_images:
+            image.remove()
+        return result
 
     def test_one_fight_gen_timeout(self):
         """An approximation of 1.0 is returned if the generator times out."""
-        util.build_docker_container(Path(self.problem_path, 'generator_timeout'),
-                                    docker_tag='gen_to',
-                                    cache_docker_container=False)
-        team = Team('0', 'gen_to', 'sol_succ')
-        self.fight_handler_short_to.set_roles(generating=team, solving=team)
-        self.assertEqual(self.fight_handler_short_to.fight(1), 1.0)
+        result = self._build_and_run(handler=self.fight_handler_short_to, generator="generator_timeout")
+        self.assertEqual(result, 1.0)
 
     def test_one_fight_gen_exec_error(self):
         """An approximation of 1.0 is returned if the generator fails on execution."""
-        util.build_docker_container(Path(self.problem_path, 'generator_execution_error'),
-                                    docker_tag='gen_exerr',
-                                    cache_docker_container=False)
-        team = Team('0', 'gen_exerr', 'sol_succ')
-        self.fight_handler.set_roles(generating=team, solving=team)
-        self.assertEqual(self.fight_handler.fight(1), 1.0)
+        result = self._build_and_run(generator="generator_execution_error")
+        self.assertEqual(result, 1.0)
 
     def test_one_fight_gen_wrong_instance(self):
         """An approximation of 1.0 is returned if the generator returns a bad instance."""
-        util.build_docker_container(Path(self.problem_path, 'generator_wrong_instance'),
-                                    docker_tag='gen_bad_inst',
-                                    cache_docker_container=False)
-        team = Team('0', 'gen_bad_inst', 'sol_succ')
-        self.fight_handler.set_roles(generating=team, solving=team)
-        self.assertEqual(self.fight_handler.fight(1), 1.0)
+        result = self._build_and_run(generator="generator_wrong_instance")
+        self.assertEqual(result, 1.0)
 
     def test_one_fight_gen_malformed_sol(self):
         """An approximation of 1.0 is returned if the generator returns a malformed certificate."""
-        util.build_docker_container(Path(self.problem_path, 'generator_malformed_solution'),
-                                    docker_tag='gen_mal_cert',
-                                    cache_docker_container=False)
-        team = Team('0', 'gen_mal_cert', 'sol_succ')
-        self.fight_handler.set_roles(generating=team, solving=team)
-        self.assertEqual(self.fight_handler.fight(1), 1.0)
+        result = self._build_and_run(generator="generator_malformed_solution")
+        self.assertEqual(result, 1.0)
 
     def test_one_fight_gen_wrong_cert(self):
         """An approximation of 1.0 is returned if the generator returns a bad certificate."""
-        util.build_docker_container(Path(self.problem_path, 'generator_wrong_certificate'),
-                                    docker_tag='gen_bad_cert',
-                                    cache_docker_container=False)
-        team = Team('0', 'gen_bad_cert', 'sol_succ')
-        self.fight_handler.set_roles(generating=team, solving=team)
-        self.assertEqual(self.fight_handler.fight(1), 1.0)
+        result = self._build_and_run(generator="generator_wrong_certificate")
+        self.assertEqual(result, 1.0)
 
     def test_one_fight_sol_timeout(self):
         """An approximation ratio of 0.0 is returned if the solver times out."""
-        util.build_docker_container(Path(self.problem_path, 'solver_timeout'),
-                                    docker_tag='sol_to',
-                                    cache_docker_container=False)
-        team = Team('0', 'gen_succ', 'sol_to')
-        self.fight_handler_short_to.set_roles(generating=team, solving=team)
-        self.assertEqual(self.fight_handler_short_to.fight(1), 0.0)
+        result = self._build_and_run(handler=self.fight_handler_short_to, solver="solver_timeout")
+        self.assertEqual(result, 0.0)
 
     def test_one_fight_sol_exec_error(self):
         """An approximation ratio of 0.0 is returned if the solver fails on execution."""
-        util.build_docker_container(Path(self.problem_path, 'solver_execution_error'),
-                                    docker_tag='sol_exerr',
-                                    cache_docker_container=False)
-        team = Team('0', 'gen_succ', 'sol_exerr')
-        self.fight_handler.set_roles(generating=team, solving=team)
-        self.assertEqual(self.fight_handler.fight(1), 0.0)
+        result = self._build_and_run(solver="solver_execution_error")
+        self.assertEqual(result, 0.0)
 
     def test_one_fight_sol_malformed(self):
         """An approximation ratio of 0.0 is returned if the solver returns a malformed certificate."""
-        util.build_docker_container(Path(self.problem_path, 'solver_malformed_solution'),
-                                    docker_tag='sol_mal_cert',
-                                    cache_docker_container=False)
-        team = Team('0', 'gen_succ', 'sol_mal_cert')
-        self.fight_handler.set_roles(generating=team, solving=team)
-        self.assertEqual(self.fight_handler.fight(1), 0.0)
+        result = self._build_and_run(solver="solver_malformed_solution")
+        self.assertEqual(result, 0.0)
 
     def test_one_fight_sol_wrong_cert(self):
         """An approximation ratio of 0.0 is returned if the solver returns a bad certificate."""
-        util.build_docker_container(Path(self.problem_path, 'solver_wrong_certificate'),
-                                    docker_tag='sol_bad_cert',
-                                    cache_docker_container=False)
-        team = Team('0', 'gen_succ', 'sol_bad_cert')
-        self.fight_handler.set_roles(generating=team, solving=team)
-        self.assertEqual(self.fight_handler.fight(1), 0.0)
+        result = self._build_and_run(solver="solver_wrong_certificate")
+        self.assertEqual(result, 0.0)
 
     def test_one_fight_successful(self):
         """An approximation ratio of 1.0 is returned if a solver correctly and optimally solves an instance."""
-        team = Team('0', 'gen_succ', 'sol_succ')
-        self.fight_handler.set_roles(generating=team, solving=team)
-        self.assertEqual(self.fight_handler.fight(1), 1.0)
+        result = self._build_and_run()
+        self.assertEqual(result, 1.0)
 
     # TODO: Test approximation ratios != 1.0
     # TODO: Split up further into _run_generator and _run_solver?
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
