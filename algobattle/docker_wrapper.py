@@ -130,7 +130,7 @@ class Image:
         self.description = description if description is not None else image_name
 
     def run(
-        self, input: str | None = None, timeout: float | None = None, memory: int | None = None, cpus: int | None = None
+        self, input: str = "", timeout: float | None = None, memory: int | None = None, cpus: int | None = None
     ) -> str:
         """Runs a docker image with the provided input and returns its output.
 
@@ -173,19 +173,17 @@ class Image:
                 mem_limit=memory,
                 nano_cpus=cpus
             ))
-            #print(default_timer() - start_time)
-            if input is not None:
-                encoded = input.encode()
-                with BytesIO() as fh:
-                    with BytesIO(initial_bytes=encoded) as source, tarfile.open(fileobj=fh, mode="w") as tar:
-                        info = tarfile.TarInfo("input")
-                        info.size = len(encoded)
-                        tar.addfile(info, source)
-                    fh.seek(0)
-                    data = fh.getvalue()
-                    ok = container.put_archive("/", data)
-                    if not ok:
-                        raise DockerError(f"Copying input into container {self.name} failed")
+            encoded = input.encode()
+            with BytesIO() as fh:
+                with BytesIO(initial_bytes=encoded) as source, tarfile.open(fileobj=fh, mode="w") as tar:
+                    info = tarfile.TarInfo("input")
+                    info.size = len(encoded)
+                    tar.addfile(info, source)
+                fh.seek(0)
+                data = fh.getvalue()
+                ok = container.put_archive("/", data)
+                if not ok:
+                    raise DockerError(f"Copying input into container {self.name} failed")
 
             container.start()
             start_time = default_timer()
@@ -211,7 +209,6 @@ class Image:
                 with tarfile.open(fileobj=fh, mode="r") as tar:
                     with tar.extractfile("output") as f:    # type: ignore
                         output = f.read().decode()
-                
 
         except ImageNotFound as e:
             raise DockerError(f"Image {self.name} (id={self.id}) does not exist") from e
