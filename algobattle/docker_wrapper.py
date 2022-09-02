@@ -42,7 +42,9 @@ class DockerError(Exception):
     The only error raised by any function in the docker module.
     """
 
-    pass
+    def __init__(self, message: str = "", level: int = logging.WARNING, *args: object) -> None:
+        logger.log(level=level, msg=message)
+        super().__init__(message, *args)
 
 
 @dataclass
@@ -106,8 +108,7 @@ class Image:
         """
 
         if not path.exists():
-            logger.error(f"Error when building {image_name}: '{path}' does not exist on the file system.")
-            raise DockerError
+            raise DockerError(f"Error when building {image_name}: '{path}' does not exist on the file system.")
         logger.debug(f"Building docker container with options: {path = !s}, {image_name = }, {cache = }" + (", {timeout = :.2f}" if timeout is not None else ""))
         try:
             image, _logs = cast(
@@ -118,16 +119,11 @@ class Image:
             )
 
         except Timeout as e:
-            logger.error(f"Build process for '{path}' ran into a timeout!")
-            raise DockerError from e
-
+            raise DockerError(f"Build process for '{path}' ran into a timeout!") from e
         except BuildError as e:
-            logger.warning(f"Building '{path}' did not complete successfully:\n{e.msg}")
-            raise DockerError from e
-
+            raise DockerError(f"Building '{path}' did not complete successfully:\n{e.msg}") from e
         except APIError as e:
-            logger.warning(f"Docker APIError thrown while building '{path}':\n{e}")
-            raise DockerError from e
+            raise DockerError(f"Docker APIError thrown while building '{path}':\n{e}") from e
 
         self.name = image_name
         self.id = cast(str, image.id)
@@ -218,11 +214,9 @@ class Image:
                 
 
         except ImageNotFound as e:
-            logger.warning(f"Image {self.name} (id={self.id}) does not exist")
-            raise DockerError from e
+            raise DockerError(f"Image {self.name} (id={self.id}) does not exist") from e
         except APIError as e:
-            logger.warning(f"Docker APIError thrown while running '{self.name}'")
-            raise DockerError from e
+            raise DockerError(f"Docker APIError thrown while running '{self.name}'") from e
         finally:
             if container is not None:
                 try:
@@ -249,8 +243,7 @@ class Image:
             client().images.remove(image=self.id, force=True)
 
         except APIError as e:
-            logger.warning(f"Docker APIError thrown while removing '{self.name}'")
-            raise DockerError from e
+            raise DockerError(f"Docker APIError thrown while removing '{self.name}'") from e
 
 
 def measure_runtime_overhead() -> float:
