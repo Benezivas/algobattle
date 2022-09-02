@@ -1,16 +1,19 @@
 """Leightweight wrapper around docker functionality."""
 from __future__ import annotations
+from io import BytesIO
 import logging
 from pathlib import Path
 from subprocess import CalledProcessError, run
+import tarfile
 from time import sleep
 from timeit import default_timer
 from typing import Any, Iterator, cast
 from uuid import uuid1
 from dataclasses import dataclass
 from docker.models.images import Image as DockerImage
-from docker.errors import APIError, BuildError, DockerException
+from docker.errors import APIError, BuildError, DockerException, ImageNotFound
 from docker import DockerClient
+from docker.models.containers import Container as DockerContainer
 from requests import Timeout
 
 import algobattle.problems.delaytest as DelaytestProblem
@@ -138,7 +141,7 @@ class Image:
         input
             The input string the container will be provided with.
         timeout
-            Timeout in seconds. Returns an empty output if exceeded.
+            Timeout in seconds.
         memory
             Maximum memory the container will be allocated in MB.
         cpus
@@ -155,47 +158,77 @@ class Image:
             OS errors, and errors thrown by the docker daemon.
 
         """
-        start_time = default_timer()
         name = f"algobattle_{uuid1().hex[:8]}"
-        cmd = ["docker", "run", "--rm", "--network", "none", "-i", "--sig-proxy=true", "--name", name]
         if memory is not None:
-            cmd.append(f"-m={memory}mb")
+            memory = int(memory * 1000000)
         if cpus is not None:
-            cmd.append(f"--cpus={cpus}")
-        cmd.append(self.id)
+            cpus = int(cpus * 1000000000)
 
-        result = None
+        container: DockerContainer | None = None
         try:
-            result = run(cmd, input=input, capture_output=True, timeout=timeout, check=True, text=True)
+            container = cast(DockerContainer, client().containers.create(
+                stdin_open=True,
+                detach=True,
+                network_mode="none",
+                image=self.id,
+                name=name,
+                mem_limit=memory,
+                nano_cpus=cpus
+            ))
+            #print(default_timer() - start_time)
+            if input is not None:
+                encoded = input.encode()
+                with BytesIO() as fh:
+                    with BytesIO(initial_bytes=encoded) as source, tarfile.open(fileobj=fh, mode="w") as tar:
+                        info = tarfile.TarInfo("input")
+                        info.size = len(encoded)
+                        tar.addfile(info, source)
+                    fh.seek(0)
+                    data = fh.getvalue()
+                    ok = container.put_archive("/", data)
+                    if not ok:
+                        raise DockerError(f"Copying input into container {self.name} failed")
 
-        except TimeoutExpired:
-            logger.warning(f"'{self.description}' exceeded time limit!")
-            raise DockerError
+            container.start()
+            start_time = default_timer()
+            while container.reload() or container.status == "running":
+                if timeout is not None and default_timer() - start_time > timeout:
+                    logger.warning(f"'{self.description}' exceeded time limit!")
+                    raise DockerError
+                sleep(0.01)
+            elapsed_time = round(default_timer() - start_time, 2)
 
-        except CalledProcessError as e:
-            if e.stderr.find("error during connect") != -1:
-                logger.error("Could not connect to the docker daemon. Is docker running?")
-                raise SystemExit("Exited algobattle: Could not connect to the docker daemon. Is docker running?")
+            try:
+                source, _stat = container.get_archive("output")
+            except APIError as e:
+                if cast(str, e.explanation).startswith("Could not find the file output in container"):
+                    return ""
+                else:
+                    raise
+            with BytesIO() as fh:
+                for chunk in source:
+                    fh.write(chunk)
+                fh.seek(0)
+                with tarfile.open(fileobj=fh, mode="r") as tar:
+                    with tar.extractfile("output") as f:    # type: ignore
+                        output = f.read().decode()
+                
 
-            logger.warning(f"Running '{self.description}' did not complete successfully:\n{e.stderr}")
+        except ImageNotFound as e:
+            logger.warning(f"Image {self.name} (id={self.id}) does not exist")
             raise DockerError from e
-
-        except OSError as e:
-            logger.warning(f"OSError thrown while running '{self.description}':\n{e}")
+        except APIError as e:
+            logger.warning(f"Docker APIError thrown while running '{self.name}'")
             raise DockerError from e
-
-        except ValueError as e:
-            logger.warning(f"Process '{self.description}' created with invalid arguments:\n{e}")
-            raise DockerError from e
-
         finally:
-            if result is None:
-                _kill_container(self, name)
-
-        elapsed_time = round(default_timer() - start_time, 2)
+            if container is not None:
+                try:
+                    container.remove(force=True)
+                except APIError as e:
+                    raise DockerError from e
+        
         logger.debug(f"Approximate elapsed runtime: {elapsed_time}/{timeout} seconds.")
-
-        return result.stdout  # type: ignore
+        return output
 
     def remove(self) -> None:
         """Removes the image from the docker daemon.
@@ -232,31 +265,6 @@ class Image:
         except ValueError as e:
             logger.warning(f"Trying to remove '{self.description}' with invalid arguments:\n{e}")
             raise DockerError from e
-
-
-def _kill_container(image: Image, name: str) -> None:
-    """Kills a running container.
-
-    Do not call this function if you didn't start the container,
-    it's rather unsafe and may cause downstream errors.
-
-    Parameters
-    ----------
-    image
-        Image that the container was built from.
-    name
-        Name of the container, not of the image.
-    """
-    try:
-        run(["docker", "kill", name], capture_output=True, check=True, text=True)
-
-    except CalledProcessError as e:
-        if e.stderr.find("error during connect") != -1:
-            logger.error("Could not connect to the docker daemon. Is docker running?")
-            raise SystemExit("Exited algobattle: Could not connect to the docker daemon. Is docker running?")
-
-        if e.stderr.find(f"No such container: {name}") == -1 and e.stderr.find("is not running") == -1:
-            logger.warning(f"Could not kill container '{image.description}':\n{e.stderr}")
 
 
 def measure_runtime_overhead() -> float:
