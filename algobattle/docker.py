@@ -171,7 +171,7 @@ class Image:
 
         except TimeoutExpired:
             logger.warning(f"'{self.description}' exceeded time limit!")
-            return ""
+            raise DockerError
 
         except CalledProcessError as e:
             if e.stderr.find("error during connect") != -1:
