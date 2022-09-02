@@ -10,7 +10,7 @@ from pathlib import Path
 import algobattle
 from algobattle.battle_wrappers.iterated import Iterated
 from algobattle.battle_wrappers.averaged import Averaged
-from algobattle.docker import Image
+from algobattle.docker_wrapper import Image
 from algobattle.fight_handler import FightHandler
 from algobattle.match import Match
 from algobattle.team import Team

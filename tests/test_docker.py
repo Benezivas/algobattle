@@ -8,7 +8,7 @@ import random
 from pathlib import Path
 
 import algobattle
-from algobattle.docker import DockerError, Image, measure_runtime_overhead
+from algobattle.docker_wrapper import DockerError, Image, measure_runtime_overhead
 
 logging.disable(logging.CRITICAL)
 

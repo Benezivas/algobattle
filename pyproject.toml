@@ -14,10 +14,14 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Typing :: Typed",
 ]
+<<<<<<< HEAD
 dependencies = [
     # on windows, we need to manually install curses bindings
     "windows-curses; os_name == 'nt'",
 ]
+=======
+dependencies = ["docker"]
+>>>>>>> 8e96be6 (add docker to dependencies)
 
 [project.scripts]
 algobattle = "algobattle.battle:main"

@@ -15,6 +15,10 @@ from algobattle.match import Match
 from algobattle.team import Team
 from algobattle.util import measure_runtime_overhead, import_problem_from_path, initialize_wrapper, build_docker_container, kill_spawned_docker_containers
 from algobattle.ui import Ui
+<<<<<<< HEAD
+=======
+from algobattle.docker_wrapper import DockerError, measure_runtime_overhead
+>>>>>>> 8e96be6 (add docker to dependencies)
 
 
 def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):

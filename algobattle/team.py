@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Iterator
 from itertools import permutations
 
-from algobattle.docker import DockerError, Image
+from algobattle.docker_wrapper import DockerError, Image
 
 _team_names: set[str] = set()
 
