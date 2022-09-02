@@ -41,7 +41,7 @@ class FightHandlertests(unittest.TestCase):
         cls.fight_handler_short_to = FightHandler(cls.problem, cls.config_short_run_timeout)
 
     @classmethod
-    def tearDown(cls) -> None:
+    def tearDownClass(cls) -> None:
         cls.gen_succ.remove()
         cls.sol_succ.remove()
 
@@ -50,12 +50,12 @@ class FightHandlertests(unittest.TestCase):
     ) -> float:
 
         if isinstance(generator, str):
-            generator = Image(self.problem_path / generator, f"test_generator_{generator}", cache=False)
+            generator = Image(self.problem_path / generator, f"test_{generator}", cache=False)
         elif generator is None:
             generator = self.gen_succ
 
         if isinstance(solver, str):
-            solver = Image(self.problem_path / solver, f"test_generator_{solver}", cache=False)
+            solver = Image(self.problem_path / solver, f"test_{solver}", cache=False)
         elif solver is None:
             solver = self.sol_succ
 
