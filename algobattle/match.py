@@ -40,7 +40,7 @@ class Match(Subject, Observer):
             for i in range(self.rounds):
                 logger.info('{}  Running Battle {}/{}  {}'.format('#' * 20, i + 1, self.rounds, '#' * 20))
                 update_nested_dict(self.match_data, {str(pair): {'curr_round': i}})
-                self.battle_wrapper.run_round(self.fight_handler)
+                self.battle_wrapper.run_round(self.fight_handler, matchup)
 
     def calculate_points(self, achievable_points: int) -> dict:
         """Calculate the number of points achieved through the match.
