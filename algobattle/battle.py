@@ -32,7 +32,7 @@ def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
 
     Returns
     -------
-    logger:
+    logger : Logger
         The Logger object.
     """
     common_logging_level = logging.INFO
