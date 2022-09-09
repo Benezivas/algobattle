@@ -11,7 +11,7 @@ from uuid import uuid4
 import algobattle
 from algobattle.fight_handler import FightHandler
 from algobattle.team import Matchup, Team
-from algobattle.docker import Image
+from algobattle.docker_util import Image
 
 logging.disable(logging.CRITICAL)
 

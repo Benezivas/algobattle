@@ -7,7 +7,7 @@ import random
 from pathlib import Path
 
 import algobattle
-from algobattle.docker import DockerError, Image
+from algobattle.docker_util import DockerError, Image
 
 logging.disable(logging.CRITICAL)
 

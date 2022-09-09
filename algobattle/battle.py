@@ -15,7 +15,7 @@ from algobattle.match import Match
 from algobattle.team import Team
 from algobattle.util import import_problem_from_path, initialize_wrapper
 from algobattle.ui import Ui
-from algobattle.docker import DockerError
+from algobattle.docker_util import DockerError
 
 
 def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
