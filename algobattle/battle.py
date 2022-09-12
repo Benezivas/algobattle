@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Main battle script. Executes all possible types of battles, see battle --help for all options."""
 import sys
 import os
@@ -14,8 +13,9 @@ import algobattle
 from algobattle.fight_handler import FightHandler
 from algobattle.match import Match
 from algobattle.team import Team
-from algobattle.util import measure_runtime_overhead, import_problem_from_path, initialize_wrapper, build_docker_container, kill_spawned_docker_containers
+from algobattle.util import import_problem_from_path, initialize_wrapper
 from algobattle.ui import Ui
+from algobattle.docker_util import DockerError
 
 
 def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
@@ -91,7 +91,6 @@ def main():
         parser.add_option('--points', dest='points', type=int, default='100', help='Number of points that are to be fought for. Default: 100')
         parser.add_option('--do_not_count_points', dest='do_not_count_points', action='store_true', help='If set, points are not calculated for the run.')
         parser.add_option('--silent', dest='silent', action='store_true', help='Disable forking the logging output to stderr.')
-        parser.add_option('--no_overhead_calculation', dest='no_overhead_calculation', action='store_true', help='If set, the program does not benchmark the I/O of the host system to calculate the runtime overhead when started.')
         parser.add_option('--ui', dest='display_ui', action='store_true', help='If set, the program sets the --silent option and displays a small ui on STDOUT that shows the progress of the battles.')
 
         options, _args = parser.parse_args()
@@ -100,6 +99,8 @@ def main():
         if display_ui:
             options.silent = True
 
+        problem_path = Path(problem_path)
+        options.config = Path(options.config)
         solvers = [Path(path) for path in options.solvers.split(',')]
         generators = [Path(path) for path in options.generators.split(',')]
         team_names = options.team_names.split(',')
@@ -124,29 +125,14 @@ def main():
         config = ConfigParser()
         config.read(options.config)
 
-        teams = []
+        teams: list[Team] = []
         for name, generator, solver in zip(team_names, generators, solvers):
-            generator_tag = f"generator-{name}"
-            generator_built = build_docker_container(generator,
-                                                     generator_tag,
-                                                     timeout_build=int(config['run_parameters']['timeout_build']))
-            solver_tag = f"solver-{name}"
-            solver_built = build_docker_container(solver,
-                                                  solver_tag,
-                                                  timeout_build=int(config['run_parameters']['timeout_build']))
-            build_successful = generator_built & solver_built
-            if build_successful:
-                teams.append(Team(name, generator_tag, solver_tag))
-            else:
+            try:
+                teams.append(Team(name, generator, solver, float(config["run_parameters"]["timeout_build"])))
+            except (ValueError, DockerError):
                 logger.warning(f"Building generators and solvers for team {name} failed, they will be excluded!")
 
-        runtime_overhead = 0
-        if not options.no_overhead_calculation:
-            logger.info('Running a benchmark to determine your machines I/O overhead to start and stop docker containers...')
-            runtime_overhead = measure_runtime_overhead()
-            logger.info('Maximal measured runtime overhead is at {} seconds. Adding this amount to the configured runtime.'.format(runtime_overhead))
-
-        fight_handler = FightHandler(problem, config, runtime_overhead=runtime_overhead)
+        fight_handler = FightHandler(problem, config)
         battle_wrapper = initialize_wrapper(options.battle_type, config)
         match = Match(fight_handler, battle_wrapper, teams, rounds=options.battle_rounds)
 
@@ -169,7 +155,6 @@ def main():
             for team_name in match.teams:
                 logger.info('Group {} gained {:.1f} points.'.format(str(team_name), points[str(team_name)]))
     except KeyboardInterrupt:
-        kill_spawned_docker_containers()
         try:
             logger.critical("Received keyboard interrupt, terminating execution.")  # type: ignore
         except NameError:

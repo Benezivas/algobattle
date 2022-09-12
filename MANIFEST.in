@@ -1,5 +1,4 @@
 include README.md
 include algobattle/config/*
-recursive-include algobattle/problems/delaytest **
 recursive-include algobattle/problems/testsproblem **
 recursive-include algobattle/battle_wrappers **

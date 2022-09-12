@@ -1,6 +1,5 @@
-FROM python:3
+FROM scratch
 
-COPY main.sh /
-COPY main.py /
-
-CMD ["./main.sh"]
+# causes an error on container execution
+# the actual command here is irrelevant since scratch doesn't include a shell so it will always throw an error
+CMD ["exit", "1"]

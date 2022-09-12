@@ -6,6 +6,7 @@ from typing import Tuple
 
 from algobattle.battle_wrapper import BattleWrapper
 from algobattle.fight_handler import FightHandler
+from algobattle.team import Matchup
 from algobattle.util import update_nested_dict
 
 logger = logging.getLogger('algobattle.battle_wrappers.averaged')
@@ -34,7 +35,7 @@ class Averaged(BattleWrapper):
                            'approx_ratios': []}
 
     @BattleWrapper.reset_state
-    def run_round(self, fight_handler: FightHandler) -> None:
+    def run_round(self, fight_handler: FightHandler, matchup: Matchup) -> None:
         """Execute one averaged battle between a generating and a solving team.
 
         Execute several fights between two teams on a fixed instance size
@@ -53,7 +54,7 @@ class Averaged(BattleWrapper):
                     .format(self.round_data['approx_inst_size'], self.round_data['approx_iters']))
         for i in range(self.round_data['approx_iters']):
             logger.info('=============== Iteration: {}/{} ==============='.format(i + 1, self.round_data['approx_iters']))
-            approx_ratio = fight_handler.fight(instance_size=self.round_data['approx_inst_size'])
+            approx_ratio = fight_handler.fight(matchup, self.round_data['approx_inst_size'])
 
             update_nested_dict(self.round_data, {'approx_ratios': self.round_data['approx_ratios'] + [approx_ratio]})
 

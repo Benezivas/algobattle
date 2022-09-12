@@ -1,6 +1,5 @@
-FROM python:3
+FROM alpine
 
-COPY main.sh /
-COPY main.py /
-
-CMD ["./main.sh"]
+# outputs a static string encoding an instance with an artificially wrong certificate.
+COPY output /output
+ENTRYPOINT ["true"]

@@ -15,6 +15,9 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
+    # we need to use a fixed version of the docker lib for windows
+    "docker @ git+https://github.com/ImogenBits/docker-py.git",
+
     # on windows, we need to manually install curses bindings
     "windows-curses; os_name == 'nt'",
 ]
