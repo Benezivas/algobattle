@@ -23,7 +23,10 @@ logger = logging.getLogger('algobattle.battle_wrapper')
 class BattleWrapper(ABC, Subject):
     """Abstract Base class for wrappers that execute a specific kind of battle."""
 
-    _observers: List[Observer] = []
+    def __init__(self) -> None:
+        super().__init__()
+        self._observers: List[Observer] = []
+        self.round_data: dict = {}
 
     @staticmethod
     def initialize(wrapper_name: str, config: ConfigParser) -> BattleWrapper:

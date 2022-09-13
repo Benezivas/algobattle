@@ -23,10 +23,10 @@ class Match(Subject, Observer):
         self.battle_wrapper.attach(self)
         self.teams = teams
         self.rounds = rounds
-        self.match_data = {'type': str(self.battle_wrapper),
-                           'problem': str(self.fight_handler.problem),
-                           'teams': [str(team) for team in self.teams],
-                           'rounds': self.rounds}
+        self.match_data: dict = {'type': str(self.battle_wrapper),
+                                 'problem': str(self.fight_handler.problem),
+                                 'teams': [str(team) for team in self.teams],
+                                 'rounds': self.rounds}
         for pair in self.all_battle_pairs():
             for round in range(rounds):
                 update_nested_dict(self.match_data, {pair: {'curr_round': 0, round: self.battle_wrapper.round_data}})
