@@ -26,17 +26,26 @@ def import_problem_from_path(problem_path: Path) -> Problem:
     -------
     Problem
         Returns an object of the problem.
+
+    Raises
+    ------
+    ValueError
+        If the path doesn't point to a file containing a valid problem.
     """
+    if not (problem_path / "__init__.py").is_file():
+        raise ValueError
+
     try:
-        spec = importlib.util.spec_from_file_location("problem", Path(problem_path, "__init__.py"))
+        spec = importlib.util.spec_from_file_location("problem", problem_path / "__init__.py")
+        assert spec is not None
+        assert spec.loader is not None
         Problem = importlib.util.module_from_spec(spec)
         sys.modules[spec.name] = Problem
         spec.loader.exec_module(Problem)
-
         return Problem.Problem()
     except Exception as e:
-        logger.critical('Importing the given problem failed with the following exception: "{}"'.format(e))
-        return None
+        logger.critical(f"Importing the given problem failed with the following exception: {e}")
+        raise ValueError from e
 
 
 def initialize_wrapper(wrapper_name: str, config: ConfigParser):
