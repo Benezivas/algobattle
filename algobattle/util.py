@@ -4,7 +4,6 @@ from io import BytesIO
 import logging
 import importlib.util
 import sys
-import collections
 from pathlib import Path
 import tarfile
 
@@ -63,7 +62,7 @@ def update_nested_dict(current_dict: dict, updates: dict) -> dict:
         The updated dict.
     """
     for key, value in updates.items():
-        if isinstance(value, collections.abc.Mapping):
+        if isinstance(value, dict):
             current_dict[key] = update_nested_dict(current_dict.get(key, {}), value)
         else:
             current_dict[key] = value
