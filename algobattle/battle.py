@@ -144,7 +144,7 @@ def main():
 
         match.run()
 
-        if display_ui:
+        if ui is not None:
             match.detach(ui)
             ui.restore()
 
