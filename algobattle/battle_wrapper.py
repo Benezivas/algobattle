@@ -109,7 +109,7 @@ class BattleWrapper(ABC, Subject):
 
         The string length should not exceed 9 characters.
         """
-        return "???"
+        raise NotImplementedError
 
     def format_misc_contents(self, round_data: dict) -> Tuple:
         """Format additional data that is to be displayed.
@@ -119,7 +119,7 @@ class BattleWrapper(ABC, Subject):
 
         The string length should not exceed 9 characters.
         """
-        return None
+        raise NotImplementedError
 
     def format_misc_headers(self) -> Tuple:
         """Return which strings are to be used as headers a formatted output.
@@ -129,7 +129,7 @@ class BattleWrapper(ABC, Subject):
 
         The string length should not exceed 9 characters.
         """
-        return None
+        raise NotImplementedError
 
     def format_as_utf8(self, match_data: dict) -> str:
         """Format the match_data for the battle wrapper as a UTF-8 string.
