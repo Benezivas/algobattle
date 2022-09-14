@@ -87,7 +87,7 @@ class Image:
         timeout
             Build timeout in seconds, raises DockerError if exceeded.
         cache
-            Unset to instruct docker to not cache the image build.
+            Unset to instruct docker to not use the cache when building the image.
 
         Raises
         ------
@@ -123,6 +123,12 @@ class Image:
         self.name = image_name
         self.id = cast(str, image.id)
         self.description = description if description is not None else image_name
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, _type, _value_, _traceback):
+        self.remove()
 
     def run(
         self, input: str = "", timeout: float | None = None, memory: int | None = None, cpus: int | None = None
