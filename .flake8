@@ -15,5 +15,5 @@ ignore = D105, D401, E203, E302
 exclude =
     .git,
     __pycache__,
-    algobattle/problems/*
+    tests/testsproblem/*,
 ignore_decorators=inherit_docs
