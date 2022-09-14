@@ -117,7 +117,9 @@ class Image:
                 ),
             )
             if old_image is not None:
-                old_image.remove(force=True)
+                old_image.reload()
+                if len(old_image.tags) == 0:
+                    old_image.remove(force=True)
 
         except Timeout as e:
             raise DockerError(f"Build process for '{path}' ran into a timeout!") from e
