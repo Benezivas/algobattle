@@ -95,6 +95,13 @@ class Image:
             On almost all common issues that might happen during the build, including timeouts, syntax errors,
             OS errors, and errors thrown by the docker daemon.
         """
+        try:
+            old_image = cast(DockerImage, client().images.get(image_name))
+        except ImageNotFound:
+            old_image = None
+        except APIError as e:
+            raise DockerError(f"Docker APIError thrown while building '{path}':\n{e}") from e
+
         if not path.exists():
             raise DockerError(f"Error when building {image_name}: '{path}' does not exist on the file system.")
         logger.debug(f"Building docker container with options: {path = !s}, {image_name = }, {cache = }, {timeout = }")
@@ -119,6 +126,12 @@ class Image:
             raise DockerError(f"Building '{path}' did not complete successfully:\n{e.msg}") from e
         except APIError as e:
             raise DockerError(f"Docker APIError thrown while building '{path}':\n{e}") from e
+
+        if old_image is not None:
+            try:
+                old_image.remove(force=True)
+            except APIError as e:
+                raise DockerError(f"Docker APIError thrown while building '{path}':\n{e}") from e
 
         self.name = image_name
         self.id = cast(str, image.id)
