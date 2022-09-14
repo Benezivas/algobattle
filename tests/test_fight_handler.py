@@ -49,12 +49,12 @@ class FightHandlertests(unittest.TestCase):
     ) -> float:
 
         if isinstance(generator, str):
-            generator = Image(self.problem_path / generator, f"test_{generator}", cache=False)
+            generator = Image(self.problem_path / generator, f"test_{generator}")
         elif generator is None:
             generator = self.gen_succ
 
         if isinstance(solver, str):
-            solver = Image(self.problem_path / solver, f"test_{solver}", cache=False)
+            solver = Image(self.problem_path / solver, f"test_{solver}")
         elif solver is None:
             solver = self.sol_succ
 

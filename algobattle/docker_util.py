@@ -56,7 +56,6 @@ class DockerConfig:
     space_generator: int | None = None
     space_solver: int | None = None
     cpus: int | None = None
-    cache_containers: bool = True
 
 
 class Image:
@@ -72,7 +71,6 @@ class Image:
         image_name: str,
         description: str | None = None,
         timeout: float | None = None,
-        cache: bool = True,
     ) -> None:
         """Constructs the python Image object and uses the docker daemon to build the image.
 
@@ -86,8 +84,6 @@ class Image:
             Optional description for the image, defaults to `image_name`
         timeout
             Build timeout in seconds, raises DockerError if exceeded.
-        cache
-            Unset to instruct docker to not use the cache when building the image.
 
         Raises
         ------
@@ -97,7 +93,7 @@ class Image:
         """
         if not path.exists():
             raise DockerError(f"Error when building {image_name}: '{path}' does not exist on the file system.")
-        logger.debug(f"Building docker container with options: {path = !s}, {image_name = }, {cache = }, {timeout = }")
+        logger.debug(f"Building docker container with options: {path = !s}, {image_name = }, {timeout = }")
         try:
             try:
                 old_image = cast(DockerImage, client().images.get(image_name))
@@ -108,7 +104,6 @@ class Image:
                 client().images.build(
                     path=str(path),
                     tag=image_name,
-                    nocache=not cache,
                     timeout=timeout,
                     rm=True,
                     forcerm=True,

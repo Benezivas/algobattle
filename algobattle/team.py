@@ -19,7 +19,6 @@ class Team:
         generator: Path | Image,
         solver: Path | Image,
         timeout_build: float | None = None,
-        cache_image: bool = True,
     ) -> None:
         """Creates a team object and builds the necessary docker containers.
 
@@ -33,8 +32,6 @@ class Team:
             Path to a folder containing a Dockerfile that will be used for the solver, or already built image.
         timeout_build : float | None
             Timeout for building the containers, `None` means they will have unlimited time, by default None.
-        cache_container : bool, optional
-            Wether docker should cache the built images, by default True.
 
         Raises
         ------
@@ -50,13 +47,13 @@ class Team:
             self._built_generator = isinstance(generator, Path)
             if isinstance(generator, Path):
                 self.generator = Image(generator, f"generator-{self}", f"generator for team {self}",
-                                       timeout=timeout_build, cache=cache_image)
+                                       timeout=timeout_build)
                 built_generator = self.generator
             else:
                 self.generator = generator
             self._built_solver = isinstance(solver, Path)
             if isinstance(solver, Path):
-                self.solver = Image(solver, f"solver-{self}", f"solver for team {self}", timeout_build, cache=cache_image)
+                self.solver = Image(solver, f"solver-{self}", f"solver for team {self}", timeout_build)
             else:
                 self.solver = solver
         except DockerError:
