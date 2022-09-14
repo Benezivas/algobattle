@@ -65,6 +65,10 @@ class FightHandlertests(unittest.TestCase):
         matchup = Matchup(team, team)
         result = handler.fight(matchup, 1)
         team.cleanup()
+        if generator != self.gen_succ:
+            generator.remove()
+        if solver != self.sol_succ:
+            solver.remove()
         return result
 
     def test_one_fight_gen_timeout(self):
