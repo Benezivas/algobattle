@@ -134,13 +134,14 @@ def main():
 
         fight_handler = FightHandler(problem, config)
         battle_wrapper = BattleWrapper.initialize(options.battle_type, config)
-        match = Match(fight_handler, battle_wrapper, teams, rounds=options.battle_rounds)
+        observers = ObserverGroup()
+        match = Match(fight_handler, battle_wrapper, teams, rounds=options.battle_rounds, observer=observers)
 
-        with ObserverGroup() as observers:
+        with observers:
             if display_ui:
                 observers.add(Ui())
 
-            result = match.run(observers)
+            result = match.run()
 
         logger.info('#' * 78)
         logger.info('\n{}'.format(match.format_match_data_as_utf8()))

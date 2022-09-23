@@ -1,24 +1,26 @@
 """Central managing module for an algorithmic battle."""
 from __future__ import annotations
+from dataclasses import dataclass, field
 from itertools import combinations
 import logging
 
 from algobattle.battle_wrapper import BattleWrapper, BattleResult
 from algobattle.team import Matchup, Team
 from algobattle.fight_handler import FightHandler
-from algobattle.observer import Observer
+from algobattle.observer import Observer, ObserverGroup
 
 logger = logging.getLogger('algobattle.match')
 
 
+@dataclass
 class Match:
     """Central managing class for an algorithmic battle."""
 
-    def __init__(self, fight_handler: FightHandler, battle_wrapper: BattleWrapper, teams: list[Team], rounds: int = 5) -> None:
-        self.fight_handler = fight_handler
-        self.battle_wrapper = battle_wrapper
-        self.teams = teams
-        self.rounds = rounds
+    fight_handler: FightHandler
+    battle_wrapper: BattleWrapper
+    teams: list[Team]
+    rounds: int = 5
+    observer: Observer = field(default_factory=ObserverGroup)
 
     @property
     def grouped_matchups(self) -> list[tuple[Matchup, Matchup]]:
@@ -33,7 +35,7 @@ class Match:
         """All 'Matchups` that will be fought."""
         return [m for pair in self.grouped_matchups for m in pair]
 
-    def run(self, observer: Observer) -> MatchResult:
+    def run(self) -> MatchResult:
         """Match entry point, executes fights between all teams."""
         result = MatchResult(self)
         for matchup in self.matchups:
@@ -41,7 +43,7 @@ class Match:
                 logger.info("#" * 20 + f"  Running Round {i+1}/{self.rounds}  " + "#" * 20)
                 battle_result = self.battle_wrapper.run_round(self.fight_handler, matchup)
                 result[matchup].append(battle_result)
-                observer.update("match_result", result)
+                self.observer.update("match_result", result)
         return result
 
     def format_match_data_as_utf8(self) -> str:

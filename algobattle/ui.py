@@ -40,19 +40,13 @@ class Ui(Observer):
             self.stdscr.keypad(True)
 
     @check_for_terminal
-    def restore(self) -> None:
+    def cleanup(self) -> None:
         """Restore the console."""
         if stdout.isatty():
             curses.nocbreak()
             self.stdscr.keypad(False)
             curses.echo()
             curses.endwin()
-
-    def __enter__(self) -> Ui:
-        return self
-
-    def __exit__(self, _type, _value_, _traceback):
-        self.restore()
 
     @check_for_terminal
     def update(self, event: str, data: Any):
