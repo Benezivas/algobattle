@@ -6,6 +6,7 @@ import logging
 from algobattle.battle_wrapper import BattleWrapper, BattleResult
 from algobattle.team import Matchup, Team
 from algobattle.fight_handler import FightHandler
+from algobattle.observer import Observer
 
 logger = logging.getLogger('algobattle.match')
 
@@ -32,7 +33,7 @@ class Match:
         """All 'Matchups` that will be fought."""
         return [m for pair in self.grouped_matchups for m in pair]
 
-    def run(self) -> MatchResult:
+    def run(self, observer: Observer) -> MatchResult:
         """Match entry point, executes fights between all teams."""
         result = MatchResult(self)
         for matchup in self.matchups:
@@ -40,6 +41,7 @@ class Match:
                 logger.info("#" * 20 + f"  Running Round {i+1}/{self.rounds}  " + "#" * 20)
                 battle_result = self.battle_wrapper.run_round(self.fight_handler, matchup)
                 result[matchup].append(battle_result)
+                observer.update("match_result", result)
         return result
 
     def format_match_data_as_utf8(self) -> str:

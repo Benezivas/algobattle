@@ -16,6 +16,7 @@ from algobattle.util import import_problem_from_path
 from algobattle.battle_wrapper import BattleWrapper
 from algobattle.ui import Ui
 from algobattle.docker_util import DockerError
+from algobattle.observer import ObserverGroup
 
 
 def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
@@ -135,24 +136,19 @@ def main():
         battle_wrapper = BattleWrapper.initialize(options.battle_type, config)
         match = Match(fight_handler, battle_wrapper, teams, rounds=options.battle_rounds)
 
-        ui = None
-        if display_ui:
-            ui = Ui()
-            match.attach(ui)
+        with ObserverGroup() as observers:
+            if display_ui:
+                observers.add(Ui())
 
-        match.run()
-
-        if ui is not None:
-            match.detach(ui)
-            ui.restore()
+            result = match.run(observers)
 
         logger.info('#' * 78)
         logger.info('\n{}'.format(match.format_match_data_as_utf8()))
         if not options.do_not_count_points:
-            points = match.calculate_points(options.points)
+            points = result.calculate_points(options.points)
 
-            for team_name in match.teams:
-                logger.info('Group {} gained {:.1f} points.'.format(str(team_name), points[str(team_name)]))
+            for team in match.teams:
+                logger.info(f"Group {team} gained {points[team]:.1f} points.")
     except KeyboardInterrupt:
         try:
             logger.critical("Received keyboard interrupt, terminating execution.")  # type: ignore

@@ -14,13 +14,12 @@ from configparser import ConfigParser
 
 from algobattle.fight_handler import FightHandler
 from algobattle.observer import Observer
-from algobattle.subject import Subject
 from algobattle.team import Matchup
 
 logger = logging.getLogger('algobattle.battle_wrapper')
 
 
-class BattleWrapper(ABC, Subject):
+class BattleWrapper(ABC):
     """Abstract Base class for wrappers that execute a specific kind of battle."""
 
     def __init__(self) -> None:
@@ -153,19 +152,6 @@ class BattleWrapper(ABC, Subject):
         formatted_output_string += 'Here is a dump of the match_data dict anyway:\n{}'.format(match_data)
 
         return formatted_output_string
-
-    def attach(self, observer: Observer) -> None:
-        """Subscribe a new Observer by adding them to the list of observers."""
-        self._observers.append(observer)
-
-    def detach(self, observer: Observer) -> None:
-        """Unsubscribe an Observer by removing them from the list of observers."""
-        self._observers.remove(observer)
-
-    def notify(self) -> None:
-        """Notify all subscribed Observers by calling their update() functions."""
-        for observer in self._observers:
-            observer.update(self)
 
 class BattleResult:
     """Result of a single battle."""

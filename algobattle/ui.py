@@ -1,4 +1,5 @@
 """UI class, responsible for printing nicely formatted output to STDOUT."""
+from __future__ import annotations
 import curses
 import logging
 from sys import stdout
@@ -31,6 +32,7 @@ class Ui(Observer):
 
     @check_for_terminal
     def __init__(self) -> None:
+        super().__init__()
         if stdout.isatty():
             self.stdscr = curses.initscr()
             curses.cbreak()
