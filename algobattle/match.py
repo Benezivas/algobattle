@@ -2,9 +2,8 @@
 from __future__ import annotations
 from itertools import combinations
 import logging
-from typing import Any
 
-from algobattle.battle_wrapper import BattleWrapper
+from algobattle.battle_wrapper import BattleWrapper, BattleResult
 from algobattle.team import Matchup, Team
 from algobattle.fight_handler import FightHandler
 
@@ -33,7 +32,7 @@ class Match:
         """All 'Matchups` that will be fought."""
         return [m for pair in self.grouped_matchups for m in pair]
 
-    def run(self) -> None:
+    def run(self) -> MatchResult:
         """Match entry point, executes fights between all teams."""
         result = MatchResult(self)
         for matchup in self.matchups:
@@ -41,6 +40,7 @@ class Match:
                 logger.info("#" * 20 + f"  Running Round {i+1}/{self.rounds}  " + "#" * 20)
                 battle_result = self.battle_wrapper.run_round(self.fight_handler, matchup)
                 result[matchup].append(battle_result)
+        return result
 
     def format_match_data_as_utf8(self) -> str:
         """Format the current match data in utf8 that can be output e.g. to STDOUT.
@@ -144,7 +144,7 @@ class Match:
 
         return round_lines
 
-class MatchResult(dict[Matchup, list[Any]]):
+class MatchResult(dict[Matchup, list[BattleResult]]):
     """The Result of a `Match`."""
 
     def __init__(self, match: Match):
@@ -166,17 +166,18 @@ class MatchResult(dict[Matchup, list[Any]]):
         points = {team: 0. for team in self.match.teams}
         points_per_round = round(achievable_points / self.match.rounds, 1)
 
-        for matchup_home, matchup_away in self.match.grouped_matchups:
-            for home, away in zip(self[matchup_home], self[matchup_away]):
-                if home.score == away.score == 0:
+        for home_matchup, away_matchup in self.match.grouped_matchups:
+            for home_res, away_res in zip(self[home_matchup], self[away_matchup]):
+                total_score = home_res.score + away_res.score
+                if total_score == 0:
                     # Default values for proportions, assuming no team manages to solve anything
-                    home_points = 0.5
-                    away_points = 0.5
+                    home_ratio = 0.5
+                    away_ratio = 0.5
                 else:
-                    home_points = home / (home + away)
-                    away_points = away / (home + away)
+                    home_ratio = home_res.score / total_score
+                    away_ratio = away_res.score / total_score
 
-                points[home.solver] += round(points_per_round * home_points, 1)
-                points[away.solver] += round(points_per_round * away_points, 1)
+                points[home_matchup.solver] += round(points_per_round * home_ratio, 1)
+                points[away_matchup.solver] += round(points_per_round * away_ratio, 1)
 
         return points

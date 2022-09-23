@@ -74,7 +74,7 @@ class BattleWrapper(ABC, Subject):
         return wrapper
 
     @abstractmethod
-    def run_round(self, fight_handler: FightHandler, matchup: Matchup) -> None:
+    def run_round(self, fight_handler: FightHandler, matchup: Matchup) -> BattleResult:
         """Execute a full round of fights between two teams configured in the fight_handler.
 
         During execution, the concrete BattleWrapper should update the round_data dict
@@ -166,3 +166,12 @@ class BattleWrapper(ABC, Subject):
         """Notify all subscribed Observers by calling their update() functions."""
         for observer in self._observers:
             observer.update(self)
+
+class BattleResult:
+    """Result of a single battle."""
+
+    @property
+    @abstractmethod
+    def score(self) -> float:
+        """The score achieved by the solver of this battle."""
+        raise NotImplementedError
