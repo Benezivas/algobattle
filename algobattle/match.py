@@ -1,6 +1,9 @@
 """Central managing module for an algorithmic battle."""
+from __future__ import annotations
+from dataclasses import dataclass
+from itertools import combinations
 import logging
-from typing import List
+from typing import Any
 
 from algobattle.battle_wrapper import BattleWrapper
 from algobattle.team import Matchup, Team
@@ -15,7 +18,7 @@ logger = logging.getLogger('algobattle.match')
 class Match(Subject, Observer):
     """Central managing class for an algorithmic battle."""
 
-    _observers: List[Observer] = []
+    _observers: list[Observer] = []
 
     def __init__(self, fight_handler: FightHandler, battle_wrapper: BattleWrapper, teams: list[Team], rounds: int = 5) -> None:
         self.fight_handler = fight_handler
@@ -31,6 +34,14 @@ class Match(Subject, Observer):
             for round in range(rounds):
                 update_nested_dict(self.match_data, {pair: {'curr_round': 0, round: self.battle_wrapper.round_data}})
 
+    @property
+    def matchups(self) -> list[tuple[Matchup, Matchup]]:
+        """All `Matchup`s, grouped by the involved teams.
+
+        Each tuple's first matchup has the first team in the group generating, the second has it solving.
+        """
+        return [(Matchup(*g), Matchup(*g[::-1])) for g in combinations(self.teams, 2)]
+
     def run(self) -> None:
         """Match entry point, executes fights between all teams."""
         for pair in self.all_battle_pairs(as_team_objects=True):
@@ -41,59 +52,6 @@ class Match(Subject, Observer):
                 logger.info('{}  Running Battle {}/{}  {}'.format('#' * 20, i + 1, self.rounds, '#' * 20))
                 update_nested_dict(self.match_data, {str(pair): {'curr_round': i}})
                 self.battle_wrapper.run_round(self.fight_handler, matchup)
-
-    def calculate_points(self, achievable_points: int) -> dict:
-        """Calculate the number of points achieved through the match.
-
-        Call only _after_ the run() method has finished.
-
-        Each pair of teams fights for the achievable points among one another.
-        These achievable points are split over all rounds.
-        Points are derived from pairings of teams, it is thus expected that
-        for each pairing of teams (x,y) there is also a pairing (y,x).
-
-        Parameters
-        ----------
-        achievable_points : int
-            Number of achievable points.
-
-        Returns
-        -------
-        dict
-            A mapping between team names and their achieved points.
-            The format is {str(team)): points [...]}.
-        """
-        if self.rounds <= 0:
-            return {}
-
-        if len(self.teams) == 1:  # Special case for single player
-            return {str(self.teams[0]): achievable_points}
-
-        points = dict()
-        points_per_iteration = round(achievable_points / self.rounds, 1)
-
-        for pair in self.all_battle_pairs():
-            points[pair[0]] = points.get(pair[0], 0)
-            points[pair[1]] = points.get(pair[1], 0)
-
-            for i in range(self.rounds):
-                round_data0 = self.match_data[(pair[1], pair[0])][i]  # pair[0] was solver
-                round_data1 = self.match_data[pair][i]  # pair[1] was solver
-
-                valuation0, valuation1 = self.battle_wrapper.calculate_valuations(round_data0, round_data1)
-
-                # Default values for proportions, assuming no team manages to solve anything
-                points_proportion0 = 0.5
-                points_proportion1 = 0.5
-
-                if valuation0 + valuation1 > 0:
-                    points_proportion0 = (valuation0 / (valuation0 + valuation1))
-                    points_proportion1 = (valuation1 / (valuation0 + valuation1))
-
-                points[pair[0]] += round(points_per_iteration * points_proportion0, 1) / 2
-                points[pair[1]] += round(points_per_iteration * points_proportion1, 1) / 2
-
-        return points
 
     def all_battle_pairs(self, as_team_objects=False) -> list:
         """Generate and return a list of all team pairings for battles."""
@@ -239,3 +197,40 @@ class Match(Subject, Observer):
         """Notify all subscribed Observers by calling their update() functions."""
         for observer in self._observers:
             observer.update(self)
+
+class MatchResult(dict[Matchup, list[Any]]):
+    """The Result of a `Match`."""
+
+    def __init__(self, match: Match):
+        self.match = match
+        super().__init__({m: [] for group in match.matchups for m in group})
+
+    def calculate_points(self, achievable_points: int) -> dict[Team, float]:
+        """Calculate the number of points each team scored.
+
+        Each pair of teams fights for the achievable points among one another.
+        These achievable points are split over all rounds.
+        """
+        if len(self.match.teams) == 1:
+            return {self.match.teams[0]: achievable_points}
+
+        if any(not 0 <= len(results) <= self.match.rounds for results in self.values()):
+            raise ValueError
+
+        points = {team: 0. for team in self.match.teams}
+        points_per_round = round(achievable_points / self.match.rounds, 1)
+
+        for matchup_home, matchup_away in self.match.matchups:
+            for home, away in zip(self[matchup_home], self[matchup_away]):
+                if home.score == away.score == 0:
+                    # Default values for proportions, assuming no team manages to solve anything
+                    home_points = 0.5
+                    away_points = 0.5
+                else:
+                    home_points = home / (home + away)
+                    away_points = away / (home + away)
+
+                points[home.solver] += round(points_per_round * home_points, 1)
+                points[away.solver] += round(points_per_round * away_points, 1)
+
+        return points

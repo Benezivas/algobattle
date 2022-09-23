@@ -3,7 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Iterator
-from itertools import permutations
 
 from algobattle.docker_util import DockerError, Image
 
@@ -93,21 +92,3 @@ class Matchup:
     def __iter__(self) -> Iterator[Team]:
         yield self.generator
         yield self.solver
-
-
-# not incredibly useful atm, but a layer of abstraction over a list of teams will be nice
-class MatchupInfo:
-    """All matchups that will be fought in a match and associated information."""
-
-    def __init__(self, teams: list[Team]) -> None:
-        self.teams = teams
-        if len(self.teams) == 1:
-            self._list = [Matchup(self.teams[0], self.teams[0])]
-        else:
-            self._list = [Matchup(*x) for x in permutations(self.teams, 2)]
-
-    def __iter__(self) -> Iterator[Matchup]:
-        return iter(self._list)
-
-    def __getitem__(self, i: int) -> Matchup:
-        return self._list[i]
