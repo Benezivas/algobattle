@@ -1,27 +1,29 @@
 """Central managing module for an algorithmic battle."""
 from __future__ import annotations
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from itertools import combinations
 import logging
 from prettytable import PrettyTable, DOUBLE_BORDER
 
-from algobattle.battle_wrapper import BattleWrapper, BattleResult
+from algobattle.battle_wrapper import BattleWrapper
 from algobattle.team import Matchup, Team
 from algobattle.fight_handler import FightHandler
-from algobattle.observer import Observer, ObserverGroup
+from algobattle.observer import Passthrough
 
 logger = logging.getLogger('algobattle.match')
 
 
 @dataclass
-class Match:
+class Match(Passthrough):
     """Central managing class for an algorithmic battle."""
 
     fight_handler: FightHandler
     battle_wrapper: BattleWrapper
     teams: list[Team]
     rounds: int = 5
-    observer: Observer = field(default_factory=ObserverGroup)
+
+    def __post_init__(self):
+        self.battle_wrapper.attach(self)
 
     @property
     def grouped_matchups(self) -> list[tuple[Matchup, Matchup]]:
@@ -44,11 +46,11 @@ class Match:
                 logger.info("#" * 20 + f"  Running Round {i+1}/{self.rounds}  " + "#" * 20)
                 battle_result = self.battle_wrapper.run_round(self.fight_handler, matchup)
                 result[matchup].append(battle_result)
-                self.observer.update("match_result", result)
+                self.notify("match_result", result)
         return result
 
 
-class MatchResult(dict[Matchup, list[BattleResult]]):
+class MatchResult(dict[Matchup, list[BattleWrapper.Result]]):
     """The Result of a `Match`."""
 
     def __init__(self, match: Match):

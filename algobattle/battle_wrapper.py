@@ -8,17 +8,17 @@ their run, such that it contains the current state of the match.
 from __future__ import annotations
 import logging
 from abc import abstractmethod, ABC
-from typing import Callable
 from importlib import import_module
 from configparser import ConfigParser
 
 from algobattle.fight_handler import FightHandler
 from algobattle.team import Matchup
+from algobattle.observer import Subject
 
 logger = logging.getLogger('algobattle.battle_wrapper')
 
 
-class BattleWrapper(ABC):
+class BattleWrapper(Subject, ABC):
     """Abstract Base class for wrappers that execute a specific kind of battle."""
 
     @staticmethod
@@ -54,7 +54,7 @@ class BattleWrapper(ABC):
             raise ValueError from e
 
     @abstractmethod
-    def run_round(self, fight_handler: FightHandler, matchup: Matchup) -> BattleResult:
+    def run_round(self, fight_handler: FightHandler, matchup: Matchup) -> BattleWrapper.Result:
         """Execute a full round of fights between two teams configured in the fight_handler.
 
         During execution, the concrete BattleWrapper should update the round_data dict
@@ -68,21 +68,24 @@ class BattleWrapper(ABC):
         """
         raise NotImplementedError
 
+    @classmethod
+    def __str__(cls) -> str:
+        return cls.__name__
 
-class BattleResult:
-    """Result of a single battle."""
+    class Result:
+        """Result of a single battle."""
 
-    @property
-    @abstractmethod
-    def score(self) -> float:
-        """The score achieved by the solver of this battle."""
-        raise NotImplementedError
+        @property
+        @abstractmethod
+        def score(self) -> float:
+            """The score achieved by the solver of this battle."""
+            raise NotImplementedError
 
-    @staticmethod
-    @abstractmethod
-    def format_score(score: float) -> str:
-        """Formats a score nicely."""
-        raise NotImplementedError
+        @staticmethod
+        @abstractmethod
+        def format_score(score: float) -> str:
+            """Formats a score nicely."""
+            raise NotImplementedError
 
-    def __str__(self) -> str:
-        return self.format_score(self.score)
+        def __str__(self) -> str:
+            return self.format_score(self.score)

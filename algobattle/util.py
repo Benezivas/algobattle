@@ -6,6 +6,7 @@ import importlib.util
 import sys
 from pathlib import Path
 import tarfile
+from typing import TypeVar
 
 from algobattle.problem import Problem
 
@@ -88,3 +89,12 @@ def extract(archive: bytes, filename: str) -> str:
         assert file is not None
         with file as f:
             return f.read().decode()
+
+
+T = TypeVar("T")
+def inherit_docs(obj: T) -> T:
+    """Decorator to mark a method as inheriting its docstring.
+
+    Python 3.5+ already does this, but pydocstyle needs a static hint.
+    """
+    return obj

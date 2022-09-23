@@ -16,7 +16,6 @@ from algobattle.util import import_problem_from_path
 from algobattle.battle_wrapper import BattleWrapper
 from algobattle.ui import Ui
 from algobattle.docker_util import DockerError
-from algobattle.observer import ObserverGroup
 
 
 def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
@@ -134,12 +133,10 @@ def main():
 
         fight_handler = FightHandler(problem, config)
         battle_wrapper = BattleWrapper.initialize(options.battle_type, config)
-        observers = ObserverGroup()
-        match = Match(fight_handler, battle_wrapper, teams, rounds=options.battle_rounds, observer=observers)
 
-        with observers:
+        with Match(fight_handler, battle_wrapper, teams, rounds=options.battle_rounds) as match:
             if display_ui:
-                observers.add(Ui())
+                match.attach(Ui())
 
             result = match.run()
 
