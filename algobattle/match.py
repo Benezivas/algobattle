@@ -1,72 +1,46 @@
 """Central managing module for an algorithmic battle."""
 from __future__ import annotations
-from dataclasses import dataclass
 from itertools import combinations
 import logging
 from typing import Any
 
 from algobattle.battle_wrapper import BattleWrapper
 from algobattle.team import Matchup, Team
-from algobattle.util import update_nested_dict
-from algobattle.subject import Subject
-from algobattle.observer import Observer
 from algobattle.fight_handler import FightHandler
 
 logger = logging.getLogger('algobattle.match')
 
 
-class Match(Subject, Observer):
+class Match:
     """Central managing class for an algorithmic battle."""
-
-    _observers: list[Observer] = []
 
     def __init__(self, fight_handler: FightHandler, battle_wrapper: BattleWrapper, teams: list[Team], rounds: int = 5) -> None:
         self.fight_handler = fight_handler
         self.battle_wrapper = battle_wrapper
-        self.battle_wrapper.attach(self)
         self.teams = teams
         self.rounds = rounds
-        self.match_data: dict = {'type': str(self.battle_wrapper),
-                                 'problem': str(self.fight_handler.problem),
-                                 'teams': [str(team) for team in self.teams],
-                                 'rounds': self.rounds}
-        for pair in self.all_battle_pairs():
-            for round in range(rounds):
-                update_nested_dict(self.match_data, {pair: {'curr_round': 0, round: self.battle_wrapper.round_data}})
 
     @property
-    def matchups(self) -> list[tuple[Matchup, Matchup]]:
+    def grouped_matchups(self) -> list[tuple[Matchup, Matchup]]:
         """All `Matchup`s, grouped by the involved teams.
 
         Each tuple's first matchup has the first team in the group generating, the second has it solving.
         """
         return [(Matchup(*g), Matchup(*g[::-1])) for g in combinations(self.teams, 2)]
 
+    @property
+    def matchups(self) -> list[Matchup]:
+        """All 'Matchups` that will be fought."""
+        return [m for pair in self.grouped_matchups for m in pair]
+
     def run(self) -> None:
         """Match entry point, executes fights between all teams."""
-        for pair in self.all_battle_pairs(as_team_objects=True):
-            update_nested_dict(self.match_data, {'curr_pair': (str(pair[0]), str(pair[1]))})
-            matchup = Matchup(pair[0], pair[1])
-
+        result = MatchResult(self)
+        for matchup in self.matchups:
             for i in range(self.rounds):
-                logger.info('{}  Running Battle {}/{}  {}'.format('#' * 20, i + 1, self.rounds, '#' * 20))
-                update_nested_dict(self.match_data, {str(pair): {'curr_round': i}})
-                self.battle_wrapper.run_round(self.fight_handler, matchup)
-
-    def all_battle_pairs(self, as_team_objects=False) -> list:
-        """Generate and return a list of all team pairings for battles."""
-        battle_pairs = []
-        for i in range(len(self.teams)):
-            for j in range(len(self.teams)):
-                if as_team_objects:
-                    battle_pairs.append((self.teams[i], self.teams[j]))
-                else:
-                    battle_pairs.append((str(self.teams[i]), str(self.teams[j])))
-
-        if not len(self.teams) == 1:
-            battle_pairs = [pair for pair in battle_pairs if pair[0] != pair[1]]
-
-        return battle_pairs
+                logger.info("#" * 20 + f"  Running Round {i+1}/{self.rounds}  " + "#" * 20)
+                battle_result = self.battle_wrapper.run_round(self.fight_handler, matchup)
+                result[matchup].append(battle_result)
 
     def format_match_data_as_utf8(self) -> str:
         """Format the current match data in utf8 that can be output e.g. to STDOUT.
@@ -170,40 +144,12 @@ class Match(Subject, Observer):
 
         return round_lines
 
-    def update(self, battle_wrapper: BattleWrapper) -> None:
-        """Receive updates by observing the battle_wrapper object and integrate them into match_data.
-
-        Parameters
-        ----------
-        battle_wrapper : BattleWrapper
-            The observed battle_wrapper object.
-        """
-        if 'curr_pair' in self.match_data.keys():
-            current_pair = self.match_data['curr_pair']
-            if 'curr_round' in self.match_data[current_pair]:
-                current_round = self.match_data[current_pair]['curr_round']
-                update_nested_dict(self.match_data, {current_pair: {current_round: battle_wrapper.round_data}})
-        self.notify()
-
-    def attach(self, observer: Observer) -> None:
-        """Subscribe a new Observer by adding them to the list of observers."""
-        self._observers.append(observer)
-
-    def detach(self, observer: Observer) -> None:
-        """Unsubscribe an Observer by removing them from the list of observers."""
-        self._observers.remove(observer)
-
-    def notify(self) -> None:
-        """Notify all subscribed Observers by calling their update() functions."""
-        for observer in self._observers:
-            observer.update(self)
-
 class MatchResult(dict[Matchup, list[Any]]):
     """The Result of a `Match`."""
 
     def __init__(self, match: Match):
         self.match = match
-        super().__init__({m: [] for group in match.matchups for m in group})
+        super().__init__({m: [] for group in match.grouped_matchups for m in group})
 
     def calculate_points(self, achievable_points: int) -> dict[Team, float]:
         """Calculate the number of points each team scored.
@@ -220,7 +166,7 @@ class MatchResult(dict[Matchup, list[Any]]):
         points = {team: 0. for team in self.match.teams}
         points_per_round = round(achievable_points / self.match.rounds, 1)
 
-        for matchup_home, matchup_away in self.match.matchups:
+        for matchup_home, matchup_away in self.match.grouped_matchups:
             for home, away in zip(self[matchup_home], self[matchup_away]):
                 if home.score == away.score == 0:
                     # Default values for proportions, assuming no team manages to solve anything
