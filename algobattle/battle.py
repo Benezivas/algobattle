@@ -144,7 +144,7 @@ def main():
             result = match.run()
 
         logger.info('#' * 78)
-        logger.info('\n{}'.format(match.format_match_data_as_utf8()))
+        logger.info(str(result))
         if not options.do_not_count_points:
             points = result.calculate_points(options.points)
 

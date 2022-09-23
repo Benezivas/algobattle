@@ -20,6 +20,8 @@ dependencies = [
 
     # on windows, we need to manually install curses bindings
     "windows-curses; os_name == 'nt'",
+
+    "prettytable",
 ]
 
 [project.scripts]
