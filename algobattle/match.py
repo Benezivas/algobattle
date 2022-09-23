@@ -99,7 +99,7 @@ class MatchResult(dict[Matchup, list[BattleResult]]):
             if not 0 <= len(results) <= self.match.rounds:
                 raise RuntimeError
             padding = [""] * (self.match.rounds - len(results))
-            average = "" if len(results) == 0 else sum(r.score for r in results) / len(results)
+            average = "" if len(results) == 0 else results[1].format_score(sum(r.score for r in results) / len(results))
             table.add_row([matchup.generator, matchup.solver, *results, *padding, average])
 
         return f"Battle Type: {self.match.battle_wrapper}\n{table}"
