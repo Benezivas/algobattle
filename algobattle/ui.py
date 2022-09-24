@@ -42,8 +42,14 @@ class Ui(Observer):
         curses.noecho()
         self.stdscr.keypad(True)
 
+    def __enter__(self) -> Ui:
+        return self
+
+    def __exit__(self, _type, _value, _traceback):
+        self.close()
+
     @check_for_terminal
-    def cleanup(self) -> None:
+    def close(self) -> None:
         """Restore the console."""
         curses.nocbreak()
         self.stdscr.keypad(False)

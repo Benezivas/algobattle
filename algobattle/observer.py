@@ -8,19 +8,9 @@ from algobattle.util import inherit_docs
 class Observer(ABC):
     """The Observer interface declares the methods to receive updates from running matches."""
 
-    def cleanup(self):
-        """Frees any resources allocated during the observer's construction."""
-        pass
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, _type, _value_, _traceback):
-        self.cleanup()
-
     @abstractmethod
     def update(self, event: str, data: Any):
-        """Notify an update of `event` with `data`."""
+        """Receive an update regarding `event` with `data`."""
         raise NotImplementedError
 
 
@@ -45,14 +35,6 @@ class Subject(ABC):
         for observer in self.observers:
             observer.update(event, data)
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, _type, _value_, _traceback):
-        for observer in self.observers.copy():
-            self.detach(observer)
-            observer.cleanup()
-
 
 class Passthrough(Subject, Observer, ABC):
     """A class that is an observer and a subject and just passes notifications through."""
@@ -60,8 +42,3 @@ class Passthrough(Subject, Observer, ABC):
     @inherit_docs
     def update(self, event: str, data: Any):
         self.notify(event, data)
-
-    @inherit_docs
-    def cleanup(self):
-        for observer in self.observers:
-            observer.cleanup()
