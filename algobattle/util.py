@@ -47,29 +47,6 @@ def import_problem_from_path(problem_path: Path) -> Problem:
         raise ValueError from e
 
 
-def update_nested_dict(current_dict: dict, updates: dict) -> dict:
-    """Update a nested dictionary with new data recursively.
-
-    Parameters
-    ----------
-    current_dict : dict
-        The dict to be updated.
-    updates : dict
-        The dict containing the updates
-
-    Returns
-    -------
-    dict
-        The updated dict.
-    """
-    for key, value in updates.items():
-        if isinstance(value, dict):
-            current_dict[key] = update_nested_dict(current_dict.get(key, {}), value)
-        else:
-            current_dict[key] = value
-    return current_dict
-
-
 def archive(input: str, filename: str) -> bytes:
     """Compresses a string into a tar archive."""
     encoded = input.encode()
