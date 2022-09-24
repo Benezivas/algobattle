@@ -75,6 +75,8 @@ class MatchResult(dict[Matchup, list[BattleWrapper.Result]]):
             raise ValueError
 
         points = {team: 0. for team in self.match.teams}
+        if self.match.rounds == 0:
+            return points
         points_per_round = round(achievable_points / self.match.rounds, 1)
 
         for home_matchup, away_matchup in self.match.grouped_matchups:
