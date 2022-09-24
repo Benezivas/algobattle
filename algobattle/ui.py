@@ -7,7 +7,7 @@ from typing import Any, Callable, Mapping, ParamSpec, TypeVar
 from importlib.metadata import version as pkg_version
 
 from algobattle.observer import Observer
-from algobattle.match import MatchResult
+from algobattle.match import Match
 
 logger = logging.getLogger("algobattle.ui")
 
@@ -35,7 +35,7 @@ class Ui(Observer):
     @check_for_terminal
     def __init__(self) -> None:
         super().__init__()
-        self.match_result: MatchResult | None = None
+        self.match_result: Match.Result | None = None
         self.battle_info: dict[str, Any] = {}
         self.stdscr = curses.initscr()
         curses.cbreak()
@@ -55,13 +55,15 @@ class Ui(Observer):
         """Receive updates to the match data and displays them."""
         match event:
             case "match_result":
-                if not isinstance(data, MatchResult | None):
+                if not isinstance(data, Match.Result | None):
                     raise TypeError
                 self.match_result = data
             case "battle_info":
                 if not isinstance(data, Mapping):
                     raise TypeError
                 self.battle_info |= data
+            case _other:
+                return
 
         out = [
             r"              _    _             _           _   _   _       ",

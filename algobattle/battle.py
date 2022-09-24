@@ -1,4 +1,5 @@
 """Main battle script. Executes all possible types of battles, see battle --help for all options."""
+from contextlib import ExitStack
 import sys
 import logging
 import datetime as dt
@@ -133,20 +134,23 @@ def main():
 
         fight_handler = FightHandler(problem, config)
         battle_wrapper = BattleWrapper.initialize(options.battle_type, config)
+        match = Match(fight_handler, battle_wrapper, teams, rounds=options.battle_rounds)
 
-        with Match(fight_handler, battle_wrapper, teams, rounds=options.battle_rounds) as match:
+        with ExitStack() as stack:
             if display_ui:
-                match.attach(Ui())
+                ui = Ui()
+                stack.enter_context(ui)
+                match.attach(ui)
 
             result = match.run()
 
-        logger.info('#' * 78)
-        logger.info(str(result))
-        if not options.do_not_count_points:
-            points = result.calculate_points(options.points)
+            logger.info('#' * 78)
+            logger.info(str(result))
+            if not options.do_not_count_points:
+                points = result.calculate_points(options.points)
+                for team, pts in points.items():
+                    logger.info(f"Group {team} gained {pts:.1f} points.")
 
-            for team in match.teams:
-                logger.info(f"Group {team} gained {points[team]:.1f} points.")
     except KeyboardInterrupt:
         try:
             logger.critical("Received keyboard interrupt, terminating execution.")  # type: ignore
