@@ -57,9 +57,9 @@ class Iterated(BattleWrapper):
         n_cap = self.iteration_cap
         alive = True
 
-        logger.info('==================== Iterative Battle, Instanze Size Cap: {} ===================='.format(n_cap))
+        logger.info(f"==================== Iterative Battle, Instanze Size Cap: {n_cap} ====================")
         while alive:
-            logger.info('=============== Instance Size: {}/{} ==============='.format(n, n_cap))
+            logger.info(f"=============== Instance Size: {n}/{n_cap} ===============")
 
             approx_ratio = fight_handler.fight(matchup, n)
             if approx_ratio == 0.0 or approx_ratio > self.approximation_ratio:
@@ -69,7 +69,7 @@ class Iterated(BattleWrapper):
 
             if not alive and base_increment > 1:
                 # The step size increase was too aggressive, take it back and reset the base_increment
-                logger.info('Setting the solution cap to {}...'.format(n))
+                logger.info(f"Setting the solution cap to {n}...")
                 n_cap = n
                 n -= base_increment ** exponent
                 base_increment = 0

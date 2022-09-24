@@ -33,20 +33,18 @@ class Ui(Observer):
     @check_for_terminal
     def __init__(self) -> None:
         super().__init__()
-        if stdout.isatty():
-            self.stdscr = curses.initscr()
-            curses.cbreak()
-            curses.noecho()
-            self.stdscr.keypad(True)
+        self.stdscr = curses.initscr()
+        curses.cbreak()
+        curses.noecho()
+        self.stdscr.keypad(True)
 
     @check_for_terminal
     def cleanup(self) -> None:
         """Restore the console."""
-        if stdout.isatty():
-            curses.nocbreak()
-            self.stdscr.keypad(False)
-            curses.echo()
-            curses.endwin()
+        curses.nocbreak()
+        self.stdscr.keypad(False)
+        curses.echo()
+        curses.endwin()
 
     @check_for_terminal
     def update(self, event: str, data: Any):
