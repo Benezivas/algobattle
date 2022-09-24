@@ -29,15 +29,16 @@ class Subject(ABC):
 
     def __init__(self) -> None:
         super().__init__()
-        self.observers: set[Observer] = set()
+        self.observers: list[Observer] = []
 
     def attach(self, observer: Observer):
         """Subscribes an observer to the updates of this subject."""
-        self.observers.add(observer)
+        self.observers.append(observer)
 
     def detach(self, observer: Observer):
         """Unsubscribes an observer from the updates of this object."""
-        self.observers.discard(observer)
+        if observer in self.observers:
+            self.observers.remove(observer)
 
     def notify(self, event: str, data: Any):
         """Updates all subscribed observers."""
@@ -47,7 +48,7 @@ class Subject(ABC):
     def __enter__(self):
         return self
 
-    def __exit__(self):
+    def __exit__(self, _type, _value_, _traceback):
         for observer in self.observers.copy():
             self.detach(observer)
             observer.cleanup()

@@ -54,8 +54,8 @@ class Ui(Observer):
     def update(self, event: str, data: Any):
         """Receive updates to the match data and displays them."""
         match event:
-            case "match_data":
-                if not isinstance(data, MatchResult):
+            case "match_result":
+                if not isinstance(data, MatchResult | None):
                     raise TypeError
                 self.match_result = data
             case "battle_info":
@@ -63,8 +63,6 @@ class Ui(Observer):
                     raise TypeError
                 self.battle_info |= data
 
-        self.stdscr.refresh()
-        self.stdscr.clear()
         out = [
             r"              _    _             _           _   _   _       ",
             r"             / \  | | __ _  ___ | |__   __ _| |_| |_| | ___  ",
@@ -78,4 +76,15 @@ class Ui(Observer):
         ]
         out.extend(f"{k}: {v}" for k, v in self.battle_info.items())
 
-        print(out)
+        self.stdscr.clear()
+        self.stdscr.addstr(0, 0, "\n".join(out))
+        self.stdscr.refresh()
+        self.stdscr.nodelay(True)
+
+        # on windows curses swallows the ctrl+C event, we need to manually check for the control sequence
+        # ideally we'd be doing this from inside the docker image run wait loop too
+        c = self.stdscr.getch()
+        if c == 3:
+            raise KeyboardInterrupt
+        else:
+            curses.flushinp()

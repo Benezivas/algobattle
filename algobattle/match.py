@@ -23,6 +23,7 @@ class Match(Passthrough):
     rounds: int = 5
 
     def __post_init__(self):
+        super().__init__()
         self.battle_wrapper.attach(self)
 
     @property
@@ -36,11 +37,15 @@ class Match(Passthrough):
     @property
     def matchups(self) -> list[Matchup]:
         """All 'Matchups` that will be fought."""
-        return [m for pair in self.grouped_matchups for m in pair]
+        if len(self.teams) == 1:
+            return [Matchup(self.teams[0], self.teams[0])]
+        else:
+            return [m for pair in self.grouped_matchups for m in pair]
 
     def run(self) -> MatchResult:
         """Match entry point, executes fights between all teams."""
         result = MatchResult(self)
+        self.notify("match_result", result)
         for matchup in self.matchups:
             for i in range(self.rounds):
                 logger.info("#" * 20 + f"  Running Round {i+1}/{self.rounds}  " + "#" * 20)
@@ -89,13 +94,11 @@ class MatchResult(dict[Matchup, list[BattleWrapper.Result]]):
         return points
 
     def __str__(self) -> str:
-        table = PrettyTable(field_names=["GEN", "SOL", *range(self.match.rounds), "AVG"])
+        table = PrettyTable(field_names=["GEN", "SOL", *range(self.match.rounds), "AVG"], min_width=5)
         table.set_style(DOUBLE_BORDER)
-        table.min_width = 9
-        table.max_width = 9
         table.align["AVG"] = "r"
         for i in range(self.match.rounds):
-            table.align[i] = "r"
+            table.align[str(i)] = "r"
 
         for matchup, results in self.items():
             if not 0 <= len(results) <= self.match.rounds:
