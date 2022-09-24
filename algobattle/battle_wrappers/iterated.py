@@ -88,7 +88,7 @@ class Iterated(BattleWrapper):
                     # We have failed at this value of n already, reset the step size!
                     n -= base_increment ** exponent - 1
                     base_increment = 1
-            self.notify("battle_info", {"current_cap": n_cap, "solved": maximum_reached_n, "attempting": n})
+            self.notify("battle_info", {"current cap": n_cap, "solved": maximum_reached_n, "attempting": n})
 
         return self.Result(maximum_reached_n)
 
