@@ -28,7 +28,7 @@ class Match(Passthrough):
 
     @property
     def grouped_matchups(self) -> list[tuple[Matchup, Matchup]]:
-        """All `Matchup`s, grouped by the involved teams.
+        """All matchups, grouped by the involved teams.
 
         Each tuple's first matchup has the first team in the group generating, the second has it solving.
         """
@@ -36,7 +36,7 @@ class Match(Passthrough):
 
     @property
     def matchups(self) -> list[Matchup]:
-        """All 'Matchups` that will be fought."""
+        """All matchups that will be fought."""
         if len(self.teams) == 1:
             return [Matchup(self.teams[0], self.teams[0])]
         else:

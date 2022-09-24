@@ -47,13 +47,6 @@ class Utiltests(unittest.TestCase):
         """Initializing a nonexistent wrapper raises an error."""
         self.assertRaises(ValueError, lambda: BattleWrapper.initialize(self.rand_file_name, self.config))
 
-    def test_update_nested_dict(self):
-        """A nested dict should be updated with information from another nested dict as expected."""
-        dict_to_be_expanded = {0: 1, 1: {0: 0, 1: 0}, 2: 2}
-        dict_expanding = {1: {1: 1}, 2: 1}
-        self.assertEqual(util.update_nested_dict(dict_to_be_expanded, dict_expanding),
-                         {0: 1, 1: {0: 0, 1: 1}, 2: 1})
-
 
 if __name__ == '__main__':
     unittest.main()
