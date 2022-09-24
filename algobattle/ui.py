@@ -3,7 +3,7 @@ from __future__ import annotations
 import curses
 import logging
 from sys import stdout
-from typing import Any, Callable, ParamSpec, TypeVar
+from typing import Any, Callable, Mapping, ParamSpec, TypeVar
 from importlib.metadata import version as pkg_version
 
 from algobattle.observer import Observer
@@ -33,6 +33,8 @@ class Ui(Observer):
     @check_for_terminal
     def __init__(self) -> None:
         super().__init__()
+        self.match_result: MatchResult | None = None
+        self.battle_info: dict[str, Any] = {}
         self.stdscr = curses.initscr()
         curses.cbreak()
         curses.noecho()
@@ -48,26 +50,28 @@ class Ui(Observer):
 
     @check_for_terminal
     def update(self, event: str, data: Any):
-        """Receive updates by observing the match object and prints them out formatted.
-
-        Parameters
-        ----------
-        match : dict
-            The observed match object.
-        """
-        if event != "match_data" or not isinstance(data, MatchResult):
-            return
+        """Receive updates to the match data and displays them."""
+        match event:
+            case "match_data":
+                if not isinstance(data, MatchResult):
+                    raise TypeError
+                self.match_result = data
+            case "battle_info":
+                if not isinstance(data, Mapping):
+                    raise TypeError
+                self.battle_info |= data
 
         self.stdscr.refresh()
         self.stdscr.clear()
-        out = r'              _    _             _           _   _   _       ' + '\n\r' \
-              + r'             / \  | | __ _  ___ | |__   __ _| |_| |_| | ___  ' + '\n\r' \
-              + r'            / _ \ | |/ _` |/ _ \| |_ \ / _` | __| __| |/ _ \ ' + '\n\r' \
-              + r'           / ___ \| | (_| | (_) | |_) | (_| | |_| |_| |  __/ ' + '\n\r' \
-              + r'          /_/   \_\_|\__, |\___/|_.__/ \__,_|\__|\__|_|\___| ' + '\n\r' \
-              + r'                      |___/                                  ' + '\n\r'
-
-        out += '\nAlgobattle version {}\n\r'.format(pkg_version(__package__))
-        out += format(data)
+        out = r'              _    _             _           _   _   _       ' + '\n' \
+              + r'             / \  | | __ _  ___ | |__   __ _| |_| |_| | ___  ' + '\n' \
+              + r'            / _ \ | |/ _` |/ _ \| |_ \ / _` | __| __| |/ _ \ ' + '\n' \
+              + r'           / ___ \| | (_| | (_) | |_) | (_| | |_| |_| |  __/ ' + '\n' \
+              + r'          /_/   \_\_|\__, |\___/|_.__/ \__,_|\__|\__|_|\___| ' + '\n' \
+              + r'                      |___/                                  ' + '\n'
+        out += f"\nAlgobattle version {pkg_version(__package__)}\n"
+        out += format(self.match_result) if self.match_result is not None else ""
+        out += "\n\n"
+        out += "\n".join(f"{k}: {v}" for k, v in self.battle_info.items())
 
         print(out)
