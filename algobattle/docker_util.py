@@ -91,6 +91,7 @@ class Image:
             On almost all common issues that might happen during the build, including timeouts, syntax errors,
             OS errors, and errors thrown by the docker daemon.
         """
+        super().__init__()
         if not path.exists():
             raise DockerError(f"Error when building {image_name}: '{path}' does not exist on the file system.")
         logger.debug(f"Building docker container with options: {path = !s}, {image_name = }, {timeout = }")
@@ -190,7 +191,7 @@ class Image:
                 sleep(0.01)
             elapsed_time = round(default_timer() - start_time, 2)
 
-            if exit_code := cast(dict, container.attrs)["State"]["ExitCode"] != 0:
+            if exit_code := cast(dict[str, Any], container.attrs)["State"]["ExitCode"] != 0:
                 raise DockerError(f"{self.description} exited with error code: {exit_code}")
             output_iter, _stat = container.get_archive("output")
             output = extract(b"".join(output_iter), "output")

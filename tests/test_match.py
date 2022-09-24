@@ -1,4 +1,5 @@
 """Tests for the Match class."""
+# pyright: reportMissingSuperCall=false
 import unittest
 import logging
 

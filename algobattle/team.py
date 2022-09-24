@@ -37,6 +37,7 @@ class Team:
         ValueError
             _description_
         """
+        super().__init__()
         team_name = team_name.replace(" ", "_").lower()  # Lower case needed for docker tag created from name
         if team_name in _team_names:
             raise ValueError

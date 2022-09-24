@@ -68,9 +68,8 @@ class BattleWrapper(Subject, ABC):
         """
         raise NotImplementedError
 
-    @classmethod
-    def __str__(cls) -> str:
-        return cls.__name__
+    def __str__(self) -> str:
+        return self.__class__.__name__
 
     class Result:
         """Result of a single battle."""
