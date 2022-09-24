@@ -9,11 +9,13 @@ from importlib.metadata import version as pkg_version
 from algobattle.observer import Observer
 from algobattle.match import MatchResult
 
-logger = logging.getLogger('algobattle.ui')
+logger = logging.getLogger("algobattle.ui")
 
 
 P = ParamSpec("P")
 R = TypeVar("R")
+
+
 def check_for_terminal(function: Callable[P, R]) -> Callable[P, R | None]:
     """Ensure that we are attached to a terminal."""
 
@@ -63,15 +65,17 @@ class Ui(Observer):
 
         self.stdscr.refresh()
         self.stdscr.clear()
-        out = r'              _    _             _           _   _   _       ' + '\n' \
-              + r'             / \  | | __ _  ___ | |__   __ _| |_| |_| | ___  ' + '\n' \
-              + r'            / _ \ | |/ _` |/ _ \| |_ \ / _` | __| __| |/ _ \ ' + '\n' \
-              + r'           / ___ \| | (_| | (_) | |_) | (_| | |_| |_| |  __/ ' + '\n' \
-              + r'          /_/   \_\_|\__, |\___/|_.__/ \__,_|\__|\__|_|\___| ' + '\n' \
-              + r'                      |___/                                  ' + '\n'
-        out += f"\nAlgobattle version {pkg_version(__package__)}\n"
-        out += format(self.match_result) if self.match_result is not None else ""
-        out += "\n\n"
-        out += "\n".join(f"{k}: {v}" for k, v in self.battle_info.items())
+        out = [
+            r"              _    _             _           _   _   _       ",
+            r"             / \  | | __ _  ___ | |__   __ _| |_| |_| | ___  ",
+            r"            / _ \ | |/ _` |/ _ \| |_ \ / _` | __| __| |/ _ \ ",
+            r"           / ___ \| | (_| | (_) | |_) | (_| | |_| |_| |  __/ ",
+            r"          /_/   \_\_|\__, |\___/|_.__/ \__,_|\__|\__|_|\___| ",
+            r"                      |___/                                  ",
+            f"Algobattle version {pkg_version(__package__)}",
+            format(self.match_result) if self.match_result is not None else "",
+            ""
+        ]
+        out.extend(f"{k}: {v}" for k, v in self.battle_info.items())
 
         print(out)
