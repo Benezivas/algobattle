@@ -69,6 +69,7 @@ class BattleWrapper(ABC):
 
     @property
     def type(self) -> str:
+        """Name of the type of this battle wrapper."""
         return self.__class__.__name__
 
     class Result(Subject):
@@ -88,7 +89,7 @@ class BattleWrapper(ABC):
 
         def __str__(self) -> str:
             return self.format_score(self.score)
-        
+
         @abstractmethod
         def display(self) -> str:
             """Nicely formats the object."""

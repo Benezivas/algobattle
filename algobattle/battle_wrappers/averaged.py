@@ -10,7 +10,7 @@ from algobattle.observer import Observer
 from algobattle.team import Matchup
 from algobattle.util import inherit_docs
 
-logger = logging.getLogger('algobattle.battle_wrappers.averaged')
+logger = logging.getLogger("algobattle.battle_wrappers.averaged")
 
 
 class Averaged(BattleWrapper):
@@ -18,9 +18,9 @@ class Averaged(BattleWrapper):
 
     def __init__(self, fight_handler: FightHandler, config: ConfigParser, observer: Observer | None = None) -> None:
         super().__init__(fight_handler, observer)
-        if 'averaged' in config:
-            self.instance_size = int(config['averaged'].get('approximation_instance_size', "10"))
-            self.iterations = int(config['averaged'].get('approximation_iterations', "10"))
+        if "averaged" in config:
+            self.instance_size = int(config["averaged"].get("approximation_instance_size", "10"))
+            self.iterations = int(config["averaged"].get("approximation_iterations", "10"))
         else:
             self.instance_size = 10
             self.iterations = 10
@@ -61,5 +61,8 @@ class Averaged(BattleWrapper):
         def format_score(score: float) -> str:
             return format(score, ".0%")
 
+        @inherit_docs
         def display(self) -> str:
-            return f"size: {self.size}\niteration: {self.curr_iter}/{self.num_iter}\napproximation ratios: {self.approx_ratios}"
+            return (
+                f"size: {self.size}\niteration: {self.curr_iter}/{self.num_iter}\napproximation ratios: {self.approx_ratios}"
+            )

@@ -10,7 +10,7 @@ from algobattle.observer import Observer
 from algobattle.team import Matchup
 from algobattle.util import inherit_docs
 
-logger = logging.getLogger('algobattle.battle_wrappers.iterated')
+logger = logging.getLogger("algobattle.battle_wrappers.iterated")
 
 
 class Iterated(BattleWrapper):
@@ -18,10 +18,10 @@ class Iterated(BattleWrapper):
 
     def __init__(self, fight_handler: FightHandler, config: ConfigParser, observer: Observer | None = None) -> None:
         super().__init__(fight_handler, observer)
-        if 'iterated' in config:
-            self.iteration_cap = int(config['iterated'].get('iteration_cap', "50000"))
-            self.exponent = int(config['iterated'].get('exponent', "2"))
-            self.approximation_ratio = float(config['iterated'].get('approximation_ratio', "1.0"))
+        if "iterated" in config:
+            self.iteration_cap = int(config["iterated"].get("iteration_cap", "50000"))
+            self.exponent = int(config["iterated"].get("exponent", "2"))
+            self.approximation_ratio = float(config["iterated"].get("approximation_ratio", "1.0"))
         else:
             self.iteration_cap = 50000
             self.exponent = 2
@@ -62,15 +62,15 @@ class Iterated(BattleWrapper):
 
             approx_ratio = self.fight_handler.fight(matchup, result.current)
             if approx_ratio == 0.0 or approx_ratio > self.approximation_ratio:
-                logger.info(f"Solver {matchup.solver} does not meet the required solution quality at instance size {result.current}."
-                            f" ({approx_ratio}/{self.approximation_ratio})")
+                logger.info(f"Solver {matchup.solver} does not meet the required solution quality at instance size "
+                            f"{result.current}. ({approx_ratio}/{self.approximation_ratio})")
                 alive = False
 
             if not alive and base_increment > 1:
                 # The step size increase was too aggressive, take it back and reset the base_increment
                 logger.info(f"Setting the solution cap to {result.current}...")
                 result.n_cap = result.current
-                result.current -= base_increment ** exponent
+                result.current -= base_increment**exponent
                 base_increment = 0
                 alive = True
             elif result.current > result.reached and alive:
@@ -81,11 +81,11 @@ class Iterated(BattleWrapper):
                 alive = False
             else:
                 base_increment += 1
-                result.current += base_increment ** exponent
+                result.current += base_increment**exponent
 
                 if result.current >= result.n_cap:
                     # We have failed at this value of n already, reset the step size!
-                    result.current -= base_increment ** exponent - 1
+                    result.current -= base_increment**exponent - 1
                     base_increment = 1
 
         return result
@@ -106,6 +106,7 @@ class Iterated(BattleWrapper):
         @staticmethod
         def format_score(score: float) -> str:
             return str(int(score))
-        
+
+        @inherit_docs
         def display(self) -> str:
             return f"current cap: {self.n_cap}\nsolved: {self.reached}\nattempting: {self.current}"
