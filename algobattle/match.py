@@ -104,4 +104,4 @@ class MatchResult(Subject, dict[Matchup, list[BattleWrapper.Result]]):
             average = "" if len(results) == 0 else results[1].format_score(sum(r.score for r in results) / len(results))
             table.add_row([matchup.generator, matchup.solver, *results, *padding, average])
 
-        return f"Battle Type: {self.match.battle_wrapper}\n{table}"
+        return f"Battle Type: {self.match.battle_wrapper.type}\n{table}"

@@ -68,7 +68,8 @@ class BattleWrapper(Subject, ABC):
         """
         raise NotImplementedError
 
-    def __str__(self) -> str:
+    @property
+    def type(self) -> str:
         return self.__class__.__name__
 
     class Result:
