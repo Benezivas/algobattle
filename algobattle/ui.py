@@ -3,11 +3,12 @@ from __future__ import annotations
 import curses
 import logging
 from sys import stdout
-from typing import Any, Callable, Mapping, ParamSpec, TypeVar
+from typing import Callable, ParamSpec, TypeVar
 from importlib.metadata import version as pkg_version
+from algobattle.battle_wrapper import BattleWrapper
 
-from algobattle.observer import Observer
-from algobattle.match import Match
+from algobattle.observer import Observer, Subject
+from algobattle.match import MatchResult
 
 logger = logging.getLogger("algobattle.ui")
 
@@ -35,8 +36,8 @@ class Ui(Observer):
     @check_for_terminal
     def __init__(self) -> None:
         super().__init__()
-        self.match_result: Match.Result | None = None
-        self.battle_info: dict[str, Any] = {}
+        self.match_result: MatchResult | None = None
+        self.battle_info: BattleWrapper.Result | None = None
         self.stdscr = curses.initscr()
         curses.cbreak()
         curses.noecho()
@@ -57,19 +58,14 @@ class Ui(Observer):
         curses.endwin()
 
     @check_for_terminal
-    def update(self, event: str, data: Any):
+    def update(self, subject: Subject, event: str) -> None:
         """Receive updates to the match data and displays them."""
-        match event:
-            case "match_result":
-                if not isinstance(data, Match.Result | None):
-                    raise TypeError
-                self.match_result = data
-            case "battle_info":
-                if not isinstance(data, Mapping):
-                    raise TypeError
-                self.battle_info |= data
-            case _other:
-                return
+        if isinstance(subject, MatchResult):
+            self.match_result = subject
+        elif isinstance(subject, BattleWrapper.Result):
+            self.battle_info = subject
+        else:
+            return
 
         out = [
             r"              _    _             _           _   _   _       ",
@@ -80,9 +76,9 @@ class Ui(Observer):
             r"                      |___/                                  ",
             f"Algobattle version {pkg_version(__package__)}",
             format(self.match_result) if self.match_result is not None else "",
-            ""
+            "",
+            format(self.battle_info) if self.battle_info is not None else "",
         ]
-        out.extend(f"{k}: {v}" for k, v in self.battle_info.items())
 
         self.stdscr.clear()
         self.stdscr.addstr(0, 0, "\n".join(out))

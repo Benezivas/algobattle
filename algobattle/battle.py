@@ -11,7 +11,7 @@ from importlib.metadata import version as pkg_version
 
 import algobattle
 from algobattle.fight_handler import FightHandler
-from algobattle.match import Match
+from algobattle.match import MatchInfo
 from algobattle.team import Team
 from algobattle.util import import_problem_from_path
 from algobattle.battle_wrapper import BattleWrapper
@@ -115,6 +115,10 @@ def main():
 
         logger = setup_logging(options.logging_path, options.verbose_logging, options.silent)
 
+    except KeyboardInterrupt:
+        raise SystemExit("Received keyboard interrupt, terminating execution.")
+
+    try:
         problem = import_problem_from_path(problem_path)
         if not problem:
             raise SystemExit
@@ -134,15 +138,16 @@ def main():
 
         fight_handler = FightHandler(problem, config)
         battle_wrapper = BattleWrapper.initialize(options.battle_type, config)
-        match = Match(fight_handler, battle_wrapper, teams, rounds=options.battle_rounds)
+        match_info = MatchInfo(fight_handler, battle_wrapper, teams, rounds=options.battle_rounds)
 
         with ExitStack() as stack:
             if display_ui:
                 ui = Ui()
                 stack.enter_context(ui)
-                match.attach(ui)
+            else:
+                ui = None
 
-            result = match.run()
+            result = match_info.run_match(ui)
 
             logger.info('#' * 78)
             logger.info(str(result))
@@ -152,10 +157,7 @@ def main():
                     logger.info(f"Group {team} gained {pts:.1f} points.")
 
     except KeyboardInterrupt:
-        try:
-            logger.critical("Received keyboard interrupt, terminating execution.")  # type: ignore
-        except NameError:
-            raise SystemExit("Received keyboard interrupt, terminating execution.")
+        logger.critical("Received keyboard interrupt, terminating execution.")
 
 
 if __name__ == "__main__":

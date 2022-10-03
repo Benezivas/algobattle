@@ -38,7 +38,7 @@ class MatchInfo:
         else:
             return [m for pair in self.grouped_matchups for m in pair]
 
-    def run_match(self, observer: Observer | None) -> MatchResult:
+    def run_match(self, observer: Observer | None = None) -> MatchResult:
         """Executes the match with the specified parameters."""
         result = MatchResult(self, observer)
         for matchup in self.matchups:
