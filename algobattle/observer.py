@@ -8,7 +8,7 @@ class Observer(ABC):
     """The Observer interface declares the methods to receive updates from running matches."""
 
     @abstractmethod
-    def update(self, subject: Subject, update: str):
+    def update(self, subject: Subject, event: str):
         """Processes an update in the info of the subject."""
         raise NotImplementedError
 
@@ -25,16 +25,17 @@ class Subject(ABC):
     def attach(self, observer: Observer):
         """Subscribes an observer to the updates of this subject."""
         self.observers.append(observer)
+        observer.update(self, "__attach__")
 
     def detach(self, observer: Observer):
         """Unsubscribes an observer from the updates of this object."""
         if observer in self.observers:
             self.observers.remove(observer)
 
-    def notify(self, update: str = ""):
+    def notify(self, event: str = ""):
         """Updates all subscribed observers."""
         for observer in self.observers:
-            observer.update(self, update)
+            observer.update(self, event)
 
 
 T = TypeVar("T")
