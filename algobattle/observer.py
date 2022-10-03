@@ -40,3 +40,7 @@ class Subject(ABC):
     def __setattr__(self, name: str, value: Any) -> None:
         super().__setattr__(name, value)
         self.notify(name)
+
+    def display(self) -> str:
+        """Nicely formats the object."""
+        return str(self)

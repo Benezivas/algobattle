@@ -44,7 +44,7 @@ class MatchInfo:
         for matchup in self.matchups:
             for i in range(self.rounds):
                 logger.info("#" * 20 + f"  Running Round {i+1}/{self.rounds}  " + "#" * 20)
-                battle_result = self.battle_wrapper.run_round(self.fight_handler, matchup)
+                battle_result = self.battle_wrapper.run_round(matchup)
                 result[matchup].append(battle_result)
                 result.notify()
         return result

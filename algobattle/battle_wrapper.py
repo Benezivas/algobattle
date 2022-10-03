@@ -13,12 +13,12 @@ from configparser import ConfigParser
 
 from algobattle.fight_handler import FightHandler
 from algobattle.team import Matchup
-from algobattle.observer import Subject
+from algobattle.observer import Observer, Subject
 
 logger = logging.getLogger('algobattle.battle_wrapper')
 
 
-class BattleWrapper(Subject, ABC):
+class BattleWrapper(ABC):
     """Abstract Base class for wrappers that execute a specific kind of battle."""
 
     @staticmethod
@@ -53,18 +53,17 @@ class BattleWrapper(Subject, ABC):
             logger.critical(f"Importing a wrapper from the given path failed with the following exception: {e}")
             raise ValueError from e
 
+    def __init__(self, fight_handler: FightHandler, observer: Observer | None = None) -> None:
+        super().__init__()
+        self.fight_handler = fight_handler
+        self.observer = observer
+
     @abstractmethod
-    def run_round(self, fight_handler: FightHandler, matchup: Matchup) -> BattleWrapper.Result:
+    def run_round(self, matchup: Matchup) -> BattleWrapper.Result:
         """Execute a full round of fights between two teams configured in the fight_handler.
 
         During execution, the concrete BattleWrapper should update the round_data dict
         to which Observers can subscribe in order to react to new intermediate results.
-
-        Parameters
-        ----------
-        fight_handler: FightHandler
-            A FightHandler object that manages solving and generating teams as well
-            single fights between them.
         """
         raise NotImplementedError
 
@@ -72,7 +71,7 @@ class BattleWrapper(Subject, ABC):
     def type(self) -> str:
         return self.__class__.__name__
 
-    class Result:
+    class Result(Subject):
         """Result of a single battle."""
 
         @property
@@ -89,3 +88,8 @@ class BattleWrapper(Subject, ABC):
 
         def __str__(self) -> str:
             return self.format_score(self.score)
+        
+        @abstractmethod
+        def display(self) -> str:
+            """Nicely formats the object."""
+            raise NotImplementedError
