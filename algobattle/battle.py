@@ -1,6 +1,5 @@
 """Main battle script. Executes all possible types of battles, see battle --help for all options."""
 import sys
-import os
 import logging
 import datetime as dt
 
@@ -43,8 +42,7 @@ def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
     Path(logging_path).mkdir(exist_ok=True)
 
     t = dt.datetime.now()
-    sep = ':' if os.name == 'posix' else '-'
-    current_timestamp = f"{t.year:04d}-{t.month:02d}-{t.day:02d}_{t.hour:02d}{sep}{t.minute:02d}{sep}{t.second:02d}"
+    current_timestamp = f"{t.year:04d}-{t.month:02d}-{t.day:02d}_{t.hour:02d}-{t.minute:02d}-{t.second:02d}"
     logging_path = Path(logging_path, current_timestamp + '.log')
 
     logging.basicConfig(handlers=[logging.FileHandler(logging_path, 'w', 'utf-8')],

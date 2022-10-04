@@ -15,8 +15,8 @@ Points are distributed relative to the biggest instance size for which a group
 was still able to solve an instance.
 
 # Installation
-This project has been delevoped to run on Linux and may not work on other
-platforms. Support for other platforms may be implemented in the future.
+This project is being developed and tested on both Windows and Linux, MacOS support
+is being worked on but still is tentative.
 
 `python3` in version at least `3.10` and `docker` are required.
 

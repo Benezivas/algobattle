@@ -59,7 +59,6 @@ class DockerTests(unittest.TestCase):
                 image.run(timeout=10.0)
             finally:
                 image.remove()
-                raise
 
 
 if __name__ == '__main__':
