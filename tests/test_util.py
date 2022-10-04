@@ -10,6 +10,7 @@ import algobattle
 from algobattle.battle_wrappers.iterated import Iterated
 import algobattle.util as util
 from algobattle.fight_handler import FightHandler
+from algobattle.battle_wrapper import BattleWrapper
 from . import testsproblem
 
 logging.disable(logging.CRITICAL)
@@ -36,15 +37,15 @@ class Utiltests(unittest.TestCase):
 
     def test_import_problem_from_path_nonexistant_path(self):
         """An import fails if importing from a nonexistant path."""
-        self.assertIsNone(util.import_problem_from_path(Path(self.rand_file_name)))
+        self.assertRaises(ValueError, lambda: util.import_problem_from_path(Path(self.rand_file_name)))
 
     def test_initialize_wrapper_existing_path(self):
         """Initializing an existing wrapper works as expected."""
-        self.assertEqual(type(util.initialize_wrapper('iterated', self.config)), type(Iterated(self.config)))
+        self.assertIsInstance(BattleWrapper.initialize('iterated', self.config), Iterated)
 
     def test_initialize_wrapper_nonexistent_path(self):
-        """Initializing a nonexistent wrapper returns None."""
-        self.assertEqual(util.initialize_wrapper(self.rand_file_name, self.config), None)
+        """Initializing a nonexistent wrapper raises an error."""
+        self.assertRaises(ValueError, lambda: BattleWrapper.initialize(self.rand_file_name, self.config))
 
     def test_update_nested_dict(self):
         """A nested dict should be updated with information from another nested dict as expected."""

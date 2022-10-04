@@ -1,8 +1,11 @@
 """Abstract base class for problem classes used in concrete problem implementations."""
-from abc import ABCMeta, abstractmethod
+from typing import Protocol
+
+from algobattle.parser import Parser
+from algobattle.verifier import Verifier
 
 
-class Problem(metaclass=ABCMeta):
+class Problem(Protocol):
     """Problem Class, bundling together the verifier and parser of a problem.
 
     Enforces the necessary attribute n_start which is the smallest iteration
@@ -10,35 +13,15 @@ class Problem(metaclass=ABCMeta):
     usable in an approximation setting.
     """
 
-    @property
-    @abstractmethod
-    def name(self):
-        """Name of a Problem."""
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def n_start(self):
-        """Lowest value on which a battle should be executed."""
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def parser(self):
-        """Parser object for the corresponding problem."""
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def verifier(self):
-        """Verifier object for the corresponding problem."""
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def approximable(self):
-        """Boolean flag indicating whether a problem can have an approximate solution."""
-        raise NotImplementedError
+    name: str
+    n_start: int
+    """Lowest value on which a battle should be executed."""
+    parser: Parser
+    """Parser object for the corresponding problem."""
+    verifier: Verifier
+    """Verifier object for the corresponding problem."""
+    approximable: bool
+    """Boolean flag indicating whether a problem can have an approximate solution."""
 
     def generator_memory_scaler(self, memory, instance_size):
         """Method that scales the amount of memory of the generator in relation to the given instance size."""
