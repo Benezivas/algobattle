@@ -75,9 +75,9 @@ class Ui(Observer):
             r"          /_/   \_\_|\__, |\___/|_.__/ \__,_|\__|\__|_|\___| ",
             r"                      |___/                                  ",
             f"Algobattle version {pkg_version(__package__)}",
-            format(self.match_result) if self.match_result is not None else "",
+            self.match_result.display() if self.match_result is not None else "",
             "",
-            format(self.battle_info) if self.battle_info is not None else "",
+            self.battle_info.display() if self.battle_info is not None else "",
         ]
 
         self.stdscr.clear()

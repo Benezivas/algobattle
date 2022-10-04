@@ -1,7 +1,7 @@
 """Wrapper that repeats a battle on an instance size a number of times and averages the competitive ratio over all runs."""
 from __future__ import annotations
 from configparser import ConfigParser
-from dataclasses import dataclass
+from dataclasses import InitVar, dataclass
 import logging
 
 from algobattle.battle_wrapper import BattleWrapper
@@ -16,8 +16,8 @@ logger = logging.getLogger("algobattle.battle_wrappers.iterated")
 class Iterated(BattleWrapper):
     """Class of an iterated battle Wrapper."""
 
-    def __init__(self, fight_handler: FightHandler, config: ConfigParser, observer: Observer | None = None) -> None:
-        super().__init__(fight_handler, observer)
+    def __init__(self, fight_handler: FightHandler, config: ConfigParser) -> None:
+        super().__init__(fight_handler)
         if "iterated" in config:
             self.iteration_cap = int(config["iterated"].get("iteration_cap", "50000"))
             self.exponent = int(config["iterated"].get("exponent", "2"))
@@ -27,7 +27,7 @@ class Iterated(BattleWrapper):
             self.exponent = 2
             self.approximation_ratio = 1.0
 
-    def run_round(self, matchup: Matchup) -> Iterated.Result:
+    def run_round(self, matchup: Matchup, observer: Observer | None = None) -> Iterated.Result:
         """Execute one iterative battle between a generating and a solving team.
 
         Incrementally try to search for the highest n for which the solver is
@@ -53,7 +53,8 @@ class Iterated(BattleWrapper):
         """
         base_increment = 0
         exponent = self.exponent
-        result = self.Result(0, self.iteration_cap, self.fight_handler.problem.n_start)
+        result = self.Result(0, self.iteration_cap, self.fight_handler.problem.n_start, observer)
+        result.notify()
         alive = True
 
         logger.info(f"==================== Iterative Battle, Instanze Size Cap: {result.n_cap} ====================")
@@ -96,6 +97,7 @@ class Iterated(BattleWrapper):
         reached: int
         n_cap: int
         current: int
+        observer: InitVar[Observer | None] = None
 
         @inherit_docs
         @property

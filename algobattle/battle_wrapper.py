@@ -22,7 +22,7 @@ class BattleWrapper(ABC):
     """Abstract Base class for wrappers that execute a specific kind of battle."""
 
     @staticmethod
-    def initialize(wrapper_name: str, config: ConfigParser) -> BattleWrapper:
+    def initialize(wrapper_name: str, fight_handler: FightHandler, config: ConfigParser) -> BattleWrapper:
         """Try to import and initialize a Battle Wrapper from a given name.
 
         For this to work, a BattleWrapper module with the same name as the argument
@@ -48,18 +48,17 @@ class BattleWrapper(ABC):
         """
         try:
             wrapper_module = import_module("algobattle.battle_wrappers." + wrapper_name)
-            return getattr(wrapper_module, wrapper_name.capitalize())(config)
+            return getattr(wrapper_module, wrapper_name.capitalize())(fight_handler, config)
         except ImportError as e:
             logger.critical(f"Importing a wrapper from the given path failed with the following exception: {e}")
             raise ValueError from e
 
-    def __init__(self, fight_handler: FightHandler, observer: Observer | None = None) -> None:
+    def __init__(self, fight_handler: FightHandler) -> None:
         super().__init__()
         self.fight_handler = fight_handler
-        self.observer = observer
 
     @abstractmethod
-    def run_round(self, matchup: Matchup) -> BattleWrapper.Result:
+    def run_round(self, matchup: Matchup, observer: Observer | None = None) -> BattleWrapper.Result:
         """Execute a full round of fights between two teams configured in the fight_handler.
 
         During execution, the concrete BattleWrapper should update the round_data dict

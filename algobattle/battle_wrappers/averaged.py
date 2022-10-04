@@ -1,7 +1,7 @@
 """Wrapper that iterates the instance size up to a point where the solving team is no longer able to solve an instance."""
 from __future__ import annotations
 from configparser import ConfigParser
-from dataclasses import dataclass, field
+from dataclasses import InitVar, dataclass, field
 import logging
 
 from algobattle.battle_wrapper import BattleWrapper
@@ -16,8 +16,8 @@ logger = logging.getLogger("algobattle.battle_wrappers.averaged")
 class Averaged(BattleWrapper):
     """Class of an adveraged battle Wrapper."""
 
-    def __init__(self, fight_handler: FightHandler, config: ConfigParser, observer: Observer | None = None) -> None:
-        super().__init__(fight_handler, observer)
+    def __init__(self, fight_handler: FightHandler, config: ConfigParser) -> None:
+        super().__init__(fight_handler)
         if "averaged" in config:
             self.instance_size = int(config["averaged"].get("approximation_instance_size", "10"))
             self.iterations = int(config["averaged"].get("approximation_iterations", "10"))
@@ -25,14 +25,14 @@ class Averaged(BattleWrapper):
             self.instance_size = 10
             self.iterations = 10
 
-    def run_round(self, matchup: Matchup) -> Averaged.Result:
+    def run_round(self, matchup: Matchup, observer: Observer | None = None) -> Averaged.Result:
         """Execute one averaged battle between a generating and a solving team.
 
         Execute several fights between two teams on a fixed instance size
         and determine the average solution quality.
         """
         logger.info("=" * 20 + f"Averaged Battle, Instance Size: {self.instance_size}, Rounds: {self.iterations} " + "=" * 20)
-        result = self.Result(self.instance_size, self.iterations)
+        result = self.Result(self.instance_size, self.iterations, observer=observer)
         for i in range(self.iterations):
             logger.info(f"=============== Iteration: {i + 1}/{self.iterations} ===============")
             result.curr_iter = i + 1
@@ -47,6 +47,7 @@ class Averaged(BattleWrapper):
         num_iter: int
         curr_iter: int = 0
         approx_ratios: list[float] = field(default_factory=list)
+        observer: InitVar[Observer | None] = None
 
         @inherit_docs
         @property

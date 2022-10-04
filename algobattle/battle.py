@@ -137,7 +137,7 @@ def main():
                 logger.warning(f"Building generators and solvers for team {name} failed, they will be excluded!")
 
         fight_handler = FightHandler(problem, config)
-        battle_wrapper = BattleWrapper.initialize(options.battle_type, config)
+        battle_wrapper = BattleWrapper.initialize(options.battle_type, fight_handler, config)
         match_info = MatchInfo(fight_handler, battle_wrapper, teams, rounds=options.battle_rounds)
 
         with ExitStack() as stack:

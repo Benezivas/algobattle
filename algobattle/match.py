@@ -44,7 +44,7 @@ class MatchInfo:
         for matchup in self.matchups:
             for i in range(self.rounds):
                 logger.info("#" * 20 + f"  Running Round {i+1}/{self.rounds}  " + "#" * 20)
-                battle_result = self.battle_wrapper.run_round(matchup)
+                battle_result = self.battle_wrapper.run_round(matchup, observer)
                 result[matchup].append(battle_result)
                 result.notify()
         return result
@@ -53,9 +53,10 @@ class MatchResult(Subject, dict[Matchup, list[BattleWrapper.Result]]):
     """The Result of a whole Match."""
 
     def __init__(self, match: MatchInfo, observer: Observer | None = None):
-        self.match = match
-        dict.__init__(self, {m: [] for m in match.matchups})
         Subject.__init__(self, observer)
+        dict.__init__(self, {m: [] for m in match.matchups})
+        self.match = match
+        self.notify_vars = True
 
     def calculate_points(self, achievable_points: int) -> dict[Team, float]:
         """Calculate the number of points each team scored.
@@ -101,7 +102,7 @@ class MatchResult(Subject, dict[Matchup, list[BattleWrapper.Result]]):
             if not 0 <= len(results) <= self.match.rounds:
                 raise RuntimeError
             padding = [""] * (self.match.rounds - len(results))
-            average = "" if len(results) == 0 else results[1].format_score(sum(r.score for r in results) / len(results))
+            average = "" if len(results) == 0 else results[0].format_score(sum(r.score for r in results) / len(results))
             table.add_row([matchup.generator, matchup.solver, *results, *padding, average])
 
         return f"Battle Type: {self.match.battle_wrapper.type}\n{table}"
