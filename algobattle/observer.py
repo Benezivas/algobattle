@@ -18,7 +18,7 @@ class Subject(ABC):
 
     notify_vars = False
     """If True, the subject will automatically notify if an attribute gets changed.
-    
+
     Gets set automatically if the subject is a dataclass."""
 
     def __init__(self, observer: Observer | None = None) -> None:
