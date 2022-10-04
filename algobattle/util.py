@@ -4,8 +4,6 @@ from io import BytesIO
 import logging
 import importlib.util
 import sys
-import collections
-from configparser import ConfigParser
 from pathlib import Path
 import tarfile
 
@@ -26,44 +24,26 @@ def import_problem_from_path(problem_path: Path) -> Problem:
     -------
     Problem
         Returns an object of the problem.
+
+    Raises
+    ------
+    ValueError
+        If the path doesn't point to a file containing a valid problem.
     """
+    if not (problem_path / "__init__.py").is_file():
+        raise ValueError
+
     try:
-        spec = importlib.util.spec_from_file_location("problem", Path(problem_path, "__init__.py"))
+        spec = importlib.util.spec_from_file_location("problem", problem_path / "__init__.py")
+        assert spec is not None
+        assert spec.loader is not None
         Problem = importlib.util.module_from_spec(spec)
         sys.modules[spec.name] = Problem
         spec.loader.exec_module(Problem)
-
         return Problem.Problem()
-    except Exception as e:
-        logger.critical('Importing the given problem failed with the following exception: "{}"'.format(e))
-        return None
-
-
-def initialize_wrapper(wrapper_name: str, config: ConfigParser):
-    """Try to import and initialize a Battle Wrapper from a given name.
-
-    For this to work, a BattleWrapper module with the same name as the argument
-    needs to be present in the algobattle/battle_wrappers folder.
-
-    Parameters
-    ----------
-    wrapper : str
-        Name of a battle wrapper module in algobattle/battle_wrappers.
-
-    config : ConfigParser
-        A ConfigParser object containing possible additional arguments for the battle_wrapper.
-
-    Returns
-    -------
-    BattleWrapper
-        A BattleWrapper object of the given wrapper_name.
-    """
-    try:
-        wrapper_module = importlib.import_module("algobattle.battle_wrappers." + str(wrapper_name))
-        return getattr(wrapper_module, wrapper_name.capitalize())(config)
-    except Exception as e:
-        logger.critical('Importing a wrapper from the given path failed with the following exception: "{}"'.format(e))
-        return None
+    except ImportError as e:
+        logger.critical(f"Importing the given problem failed with the following exception: {e}")
+        raise ValueError from e
 
 
 def update_nested_dict(current_dict: dict, updates: dict) -> dict:
@@ -82,7 +62,7 @@ def update_nested_dict(current_dict: dict, updates: dict) -> dict:
         The updated dict.
     """
     for key, value in updates.items():
-        if isinstance(value, collections.abc.Mapping):
+        if isinstance(value, dict):
             current_dict[key] = update_nested_dict(current_dict.get(key, {}), value)
         else:
             current_dict[key] = value

@@ -1,6 +1,8 @@
 """Abstract base class for verifiers used in concrete problem implementations."""
+from __future__ import annotations
 from abc import ABC, abstractmethod
 import logging
+from typing import Any
 
 logger = logging.getLogger('algobattle.verifier')
 
@@ -13,7 +15,7 @@ class Verifier(ABC):
     usually refers to the solution size.
     """
 
-    def verify_semantics_of_instance(self, instance: any, instance_size: int) -> bool:
+    def verify_semantics_of_instance(self, instance: Any, instance_size: int) -> bool:
         """Check the semantical correctness of an instance.
 
         For most problems, this function does not need to be overwritten.
@@ -23,7 +25,7 @@ class Verifier(ABC):
 
         Parameters
         ----------
-        instance : any
+        instance : Any
             The syntactically checked instance.
         instance_size : int
             The maximum instance size.
@@ -38,16 +40,16 @@ class Verifier(ABC):
             return False
         return True
 
-    def verify_semantics_of_solution(self, solution: any, instance_size: int, solution_type: bool) -> bool:
+    def verify_semantics_of_solution(self, solution: Any, instance_size: int, solution_type: bool) -> bool:
         """Check whether a given solution is semantically correct.
 
         For most problems, this function does not need to be overwritten.
 
         Parameters
         ----------
-        instance : any
+        instance : Any
             The syntactically checked instance.
-        solution : any
+        solution : Any
             The syntactically checked solution.
         instance_size : int
             The maximum instance size.
@@ -65,14 +67,14 @@ class Verifier(ABC):
         return True
 
     @abstractmethod
-    def verify_solution_against_instance(self, instance: any, solution: any, instance_size: int, solution_type: bool) -> bool:
+    def verify_solution_against_instance(self, instance: Any, solution: Any, instance_size: int, solution_type: bool) -> bool:
         """Check the validity of a solution against an instance.
 
         Parameters
         ----------
-        instance : any
+        instance : Any
             The syntactically checked instance.
-        solution : any
+        solution : Any
             The syntactically checked solution.
         instance_size : int
             The maximum instance size.
@@ -87,8 +89,8 @@ class Verifier(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def calculate_approximation_ratio(self, instance: any, instance_size: int,
-                                      generator_solution: any, solver_solution: any) -> float:
+    def calculate_approximation_ratio(self, instance: Any, instance_size: int,
+                                      generator_solution: Any, solver_solution: Any) -> float:
         """Calculate how good a solvers solution is compared to a generators solution.
 
         Assuming an approximation problem, this method returns the approximation
@@ -96,13 +98,13 @@ class Verifier(ABC):
 
         Parameters
         ----------
-        instance : any
+        instance : Any
             The syntactically checked instance.
         instance_size : int
             The current iteration size.
-        generator_solution : any
+        generator_solution : Any
             The syntactically checked generator solution.
-        solver_solution : any
+        solver_solution : Any
             The syntactically checked solver solution.
 
         Returns

@@ -16,10 +16,11 @@ class Iterated(BattleWrapper):
     """Class of an iterated battle Wrapper."""
 
     def __init__(self, config: ConfigParser) -> None:
+        super().__init__()
         if 'iterated' in config:
-            self.iteration_cap = int(config['iterated'].get('iteration_cap', 50000))
-            self.exponent = int(config['iterated'].get('exponent', 2))
-            self.approximation_ratio = float(config['iterated'].get('approximation_ratio', 1.0))
+            self.iteration_cap = int(config['iterated'].get('iteration_cap', "50000"))
+            self.exponent = int(config['iterated'].get('exponent', "2"))
+            self.approximation_ratio = float(config['iterated'].get('approximation_ratio', "1.0"))
         else:
             self.iteration_cap = 50000
             self.exponent = 2

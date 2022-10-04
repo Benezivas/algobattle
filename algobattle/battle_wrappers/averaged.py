@@ -16,9 +16,10 @@ class Averaged(BattleWrapper):
     """Class of an adveraged battle Wrapper."""
 
     def __init__(self, config: ConfigParser) -> None:
+        super().__init__()
         if 'averaged' in config:
-            self.approximation_instance_size = int(config['averaged'].get('approximation_instance_size', 10))
-            self.approximation_iterations = int(config['averaged'].get('approximation_iterations', 10))
+            self.approximation_instance_size = int(config['averaged'].get('approximation_instance_size', "10"))
+            self.approximation_iterations = int(config['averaged'].get('approximation_iterations', "10"))
         else:
             self.approximation_instance_size = 10
             self.approximation_iterations = 10

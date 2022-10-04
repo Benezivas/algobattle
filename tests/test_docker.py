@@ -5,8 +5,8 @@ import logging
 import random
 from pathlib import Path
 
-import algobattle
 from algobattle.docker_util import DockerError, Image
+from . import testsproblem
 
 logging.disable(logging.CRITICAL)
 
@@ -17,7 +17,7 @@ class DockerTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         """Set up the path to the docker containers."""
-        cls.problem_path = Path(algobattle.__file__).parent / "problems" / "testsproblem"
+        cls.problem_path = Path(testsproblem.__file__).parent
 
     def test_build_timeout(self):
         """Raises an error if building a container runs into a timeout."""

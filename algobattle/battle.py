@@ -12,7 +12,8 @@ import algobattle
 from algobattle.fight_handler import FightHandler
 from algobattle.match import Match
 from algobattle.team import Team
-from algobattle.util import import_problem_from_path, initialize_wrapper
+from algobattle.util import import_problem_from_path
+from algobattle.battle_wrapper import BattleWrapper
 from algobattle.ui import Ui
 from algobattle.docker_util import DockerError
 
@@ -73,7 +74,7 @@ def main():
         problem_path = Path(sys.argv[1]).resolve()
 
         default_logging_path = Path.home() / '.algobattle_logs'
-        default_config_file = Path(algobattle.__file__).parent / 'config' / 'config.ini'
+        default_config_file = Path(algobattle.__file__).parent / 'config.ini'
 
         # Option parser to process arguments from the console.
         usage = 'usage: %prog FILE [options]\nExpecting (relative) path to the directory of the problem as first argument.\nIf you provide generators, solvers and group numbers for multiple teams, make sure that the order is the same for all three arguments.'
@@ -131,7 +132,7 @@ def main():
                 logger.warning(f"Building generators and solvers for team {name} failed, they will be excluded!")
 
         fight_handler = FightHandler(problem, config)
-        battle_wrapper = initialize_wrapper(options.battle_type, config)
+        battle_wrapper = BattleWrapper.initialize(options.battle_type, config)
         match = Match(fight_handler, battle_wrapper, teams, rounds=options.battle_rounds)
 
         ui = None
@@ -141,7 +142,7 @@ def main():
 
         match.run()
 
-        if display_ui:
+        if ui is not None:
             match.detach(ui)
             ui.restore()
 

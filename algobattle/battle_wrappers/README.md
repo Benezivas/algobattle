@@ -8,7 +8,7 @@ the iteration cap is reached or one of the teams fails on some instance size.
 
 If you want to add your own wrapper, include it in this directory. You can then
 use it by providing the name of the module to the
-`match_data.initialize_wrapper` method or by simply using the modules name for
+`BattleWrapper.initialize` method or by simply using the modules name for
 the `--battle_type` option of the `battle` script (you may have to add its name
 to the *choices* list of this option).
 

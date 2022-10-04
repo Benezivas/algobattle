@@ -1,9 +1,8 @@
 """Tests for the Fight Handler class."""
 from __future__ import annotations
-from typing import cast
 import unittest
 import logging
-import importlib
+
 from configparser import ConfigParser
 from pathlib import Path
 from uuid import uuid4
@@ -12,6 +11,7 @@ import algobattle
 from algobattle.fight_handler import FightHandler
 from algobattle.team import Matchup, Team
 from algobattle.docker_util import Image
+from . import testsproblem
 
 logging.disable(logging.CRITICAL)
 
@@ -22,22 +22,18 @@ class FightHandlertests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         """Set up a generator and a solver that always run successfully and fight handlers with two different configs."""
-        Problem = importlib.import_module("algobattle.problems.testsproblem")
-        cls.problem = Problem.Problem()
-        cls.problem_path = Path(cast(str, Problem.__file__)).parent
-
+        problem = testsproblem.Problem()
+        cls.problem_path = Path(testsproblem.__file__).parent
         cls.gen_succ = Image(cls.problem_path / "generator", "gen_succ")
         cls.sol_succ = Image(cls.problem_path / "solver", "sol_succ")
 
-        cls.config_base_path = Path(Path(algobattle.__file__).parent, "config")
-        cls.config = ConfigParser()
-        cls.config.read(Path(cls.config_base_path, "config.ini"))
+        config = ConfigParser()
+        config.read(Path(algobattle.__file__).parent / "config.ini")
+        cls.fight_handler = FightHandler(problem, config)
 
-        cls.config_short_run_timeout = ConfigParser()
-        cls.config_short_run_timeout.read(Path(cls.config_base_path, "config_short_run_timeout.ini"))
-
-        cls.fight_handler = FightHandler(cls.problem, cls.config)
-        cls.fight_handler_short_to = FightHandler(cls.problem, cls.config_short_run_timeout)
+        config_short_run_timeout = ConfigParser()
+        config_short_run_timeout.read(cls.problem_path / "config_short_run_timeout.ini")
+        cls.fight_handler_short_to = FightHandler(problem, config_short_run_timeout)
 
     @classmethod
     def tearDownClass(cls) -> None:
