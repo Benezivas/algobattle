@@ -56,7 +56,6 @@ class DockerConfig:
     space_generator: int | None = None
     space_solver: int | None = None
     cpus: int | None = None
-    cache_containers: bool = True
 
 
 class Image:
@@ -72,7 +71,6 @@ class Image:
         image_name: str,
         description: str | None = None,
         timeout: float | None = None,
-        cache: bool = True,
     ) -> None:
         """Constructs the python Image object and uses the docker daemon to build the image.
 
@@ -86,8 +84,6 @@ class Image:
             Optional description for the image, defaults to `image_name`
         timeout
             Build timeout in seconds, raises DockerError if exceeded.
-        cache
-            Unset to instruct docker to not cache the image build.
 
         Raises
         ------
@@ -97,14 +93,17 @@ class Image:
         """
         if not path.exists():
             raise DockerError(f"Error when building {image_name}: '{path}' does not exist on the file system.")
-        logger.debug(f"Building docker container with options: {path = !s}, {image_name = }, {cache = }, {timeout = }")
+        logger.debug(f"Building docker container with options: {path = !s}, {image_name = }, {timeout = }")
         try:
+            try:
+                old_image = cast(DockerImage, client().images.get(image_name))
+            except ImageNotFound:
+                old_image = None
             image, _logs = cast(
                 tuple[DockerImage, Iterator[Any]],
                 client().images.build(
                     path=str(path),
                     tag=image_name,
-                    nocache=not cache,
                     timeout=timeout,
                     rm=True,
                     forcerm=True,
@@ -112,6 +111,10 @@ class Image:
                     network_mode="host",
                 ),
             )
+            if old_image is not None:
+                old_image.reload()
+                if len(old_image.tags) == 0:
+                    old_image.remove(force=True)
 
         except Timeout as e:
             raise DockerError(f"Build process for '{path}' ran into a timeout!") from e
@@ -123,6 +126,12 @@ class Image:
         self.name = image_name
         self.id = cast(str, image.id)
         self.description = description if description is not None else image_name
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, _type, _value_, _traceback):
+        self.remove()
 
     def run(
         self, input: str = "", timeout: float | None = None, memory: int | None = None, cpus: int | None = None
