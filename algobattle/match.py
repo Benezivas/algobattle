@@ -92,10 +92,10 @@ class MatchResult(Subject, dict[Matchup, list[BattleWrapper.Result]]):
         return points
 
     def __str__(self) -> str:
-        table = PrettyTable(field_names=["GEN", "SOL", *range(self.match.rounds), "AVG"], min_width=5)
+        table = PrettyTable(field_names=["GEN", "SOL", *range(1, self.match.rounds + 1), "AVG"], min_width=5)
         table.set_style(DOUBLE_BORDER)
         table.align["AVG"] = "r"
-        for i in range(self.match.rounds):
+        for i in range(1, self.match.rounds + 1):
             table.align[str(i)] = "r"
 
         for matchup, results in self.items():
@@ -103,6 +103,7 @@ class MatchResult(Subject, dict[Matchup, list[BattleWrapper.Result]]):
                 raise RuntimeError
             padding = [""] * (self.match.rounds - len(results))
             average = "" if len(results) == 0 else results[0].format_score(sum(r.score for r in results) / len(results))
-            table.add_row([matchup.generator, matchup.solver, *results, *padding, average])
+            results = [str(r) for r in results]
+            table.add_row([str(matchup.generator), str(matchup.solver), *results, *padding, average])
 
         return f"Battle Type: {self.match.battle_wrapper.type}\n{table}"
