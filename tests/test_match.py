@@ -1,8 +1,6 @@
 """Tests for the Match class."""
-from typing import cast
 import unittest
 import logging
-import importlib
 
 from configparser import ConfigParser
 from pathlib import Path
@@ -14,6 +12,7 @@ from algobattle.docker_util import Image
 from algobattle.fight_handler import FightHandler
 from algobattle.match import Match
 from algobattle.team import Team
+from . import testsproblem
 
 logging.disable(logging.CRITICAL)
 
@@ -24,16 +23,15 @@ class Matchtests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         """Set up a match object."""
-        Problem = importlib.import_module('algobattle.problems.testsproblem')
-        cls.problem = Problem.Problem()
-        cls.problem_path = Path(cast(str, Problem.__file__)).parent
+        cls.problem = testsproblem.Problem()
+        cls.problem_path = Path(testsproblem.__file__).parent
 
         cls.generator = Image(cls.problem_path / "generator", "generator")
         cls.solver = Image(cls.problem_path / "solver", "solver")
         cls.team0 = Team('0', cls.generator, cls.solver)
         cls.team1 = Team('1', cls.generator, cls.solver)
 
-        config_path = Path(Path(algobattle.__file__).parent, 'config', 'config.ini')
+        config_path = Path(algobattle.__file__).parent / 'config.ini'
         cls.config = ConfigParser()
         cls.config.read(config_path)
 

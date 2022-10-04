@@ -15,8 +15,8 @@ Points are distributed relative to the biggest instance size for which a group
 was still able to solve an instance.
 
 # Installation
-This project has been delevoped to run on Linux and may not work on other
-platforms. Support for other platforms may be implemented in the future.
+This project is being developed and tested on both Windows and Linux, MacOS support
+is being worked on but still is tentative.
 
 `python3` in version at least `3.10` and `docker` are required.
 
@@ -25,7 +25,7 @@ We recommend installing the package as a user using `pip`
 pip install . --user
 ```
 
-Adjust the parameters set in the `algobattle/configs/config.ini` file to set
+Adjust the parameters set in the `algobattle/config.ini` file to set
 which hardware resources you want to assign. You can pass alternative
 configuration files to the script using the `--config_file` option.
 

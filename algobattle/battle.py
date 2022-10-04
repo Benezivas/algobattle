@@ -1,6 +1,5 @@
 """Main battle script. Executes all possible types of battles, see battle --help for all options."""
 import sys
-import os
 import logging
 import datetime as dt
 
@@ -44,8 +43,7 @@ def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
     Path(logging_path).mkdir(exist_ok=True)
 
     t = dt.datetime.now()
-    sep = ':' if os.name == 'posix' else '-'
-    current_timestamp = f"{t.year:04d}-{t.month:02d}-{t.day:02d}_{t.hour:02d}{sep}{t.minute:02d}{sep}{t.second:02d}"
+    current_timestamp = f"{t.year:04d}-{t.month:02d}-{t.day:02d}_{t.hour:02d}-{t.minute:02d}-{t.second:02d}"
     logging_path = Path(logging_path, current_timestamp + '.log')
 
     logging.basicConfig(handlers=[logging.FileHandler(logging_path, 'w', 'utf-8')],
@@ -76,7 +74,7 @@ def main():
         problem_path = Path(sys.argv[1]).resolve()
 
         default_logging_path = Path.home() / '.algobattle_logs'
-        default_config_file = Path(algobattle.__file__).parent / 'config' / 'config.ini'
+        default_config_file = Path(algobattle.__file__).parent / 'config.ini'
 
         # Option parser to process arguments from the console.
         usage = 'usage: %prog FILE [options]\nExpecting (relative) path to the directory of the problem as first argument.\nIf you provide generators, solvers and group numbers for multiple teams, make sure that the order is the same for all three arguments.'

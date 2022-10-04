@@ -1,4 +1,2 @@
-include README.md
-include algobattle/config/*
-recursive-include algobattle/problems/testsproblem **
-recursive-include algobattle/battle_wrappers **
+include algobattle/config.ini
+graft algobattle/battle_wrappers
