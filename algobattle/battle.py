@@ -73,7 +73,7 @@ def main():
         problem_path = Path(sys.argv[1]).resolve()
 
         default_logging_path = Path.home() / '.algobattle_logs'
-        default_config_file = Path(algobattle.__file__).parent / 'config' / 'config.ini'
+        default_config_file = Path(algobattle.__file__).parent / 'config.ini'
 
         # Option parser to process arguments from the console.
         usage = 'usage: %prog FILE [options]\nExpecting (relative) path to the directory of the problem as first argument.\nIf you provide generators, solvers and group numbers for multiple teams, make sure that the order is the same for all three arguments.'
