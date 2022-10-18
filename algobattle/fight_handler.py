@@ -14,6 +14,7 @@ class FightHandler:
     """Class managing the execution of generators and solvers."""
 
     def __init__(self, problem: Problem, config: ConfigParser) -> None:
+        super().__init__()
         self.timeout_generator = int(config["run_parameters"]["timeout_generator"])
         self.timeout_solver = int(config["run_parameters"]["timeout_solver"])
         self.space_generator = int(config["run_parameters"]["space_generator"])

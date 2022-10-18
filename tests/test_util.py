@@ -41,18 +41,11 @@ class Utiltests(unittest.TestCase):
 
     def test_initialize_wrapper_existing_path(self):
         """Initializing an existing wrapper works as expected."""
-        self.assertIsInstance(BattleWrapper.initialize('iterated', self.config), Iterated)
+        self.assertIsInstance(BattleWrapper.initialize('iterated', self.fight_handler, self.config), Iterated)
 
     def test_initialize_wrapper_nonexistent_path(self):
         """Initializing a nonexistent wrapper raises an error."""
-        self.assertRaises(ValueError, lambda: BattleWrapper.initialize(self.rand_file_name, self.config))
-
-    def test_update_nested_dict(self):
-        """A nested dict should be updated with information from another nested dict as expected."""
-        dict_to_be_expanded = {0: 1, 1: {0: 0, 1: 0}, 2: 2}
-        dict_expanding = {1: {1: 1}, 2: 1}
-        self.assertEqual(util.update_nested_dict(dict_to_be_expanded, dict_expanding),
-                         {0: 1, 1: {0: 0, 1: 1}, 2: 1})
+        self.assertRaises(ValueError, lambda: BattleWrapper.initialize(self.rand_file_name, self.fight_handler, self.config))
 
 
 if __name__ == '__main__':

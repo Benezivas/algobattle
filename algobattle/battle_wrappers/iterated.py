@@ -1,47 +1,33 @@
 """Wrapper that repeats a battle on an instance size a number of times and averages the competitive ratio over all runs."""
-
+from __future__ import annotations
 from configparser import ConfigParser
+from dataclasses import InitVar, dataclass
 import logging
-from typing import Tuple
 
 from algobattle.battle_wrapper import BattleWrapper
 from algobattle.fight_handler import FightHandler
+from algobattle.observer import Observer
 from algobattle.team import Matchup
-from algobattle.util import update_nested_dict
+from algobattle.util import inherit_docs
 
-logger = logging.getLogger('algobattle.battle_wrappers.iterated')
+logger = logging.getLogger("algobattle.battle_wrappers.iterated")
 
 
 class Iterated(BattleWrapper):
     """Class of an iterated battle Wrapper."""
 
-    def __init__(self, config: ConfigParser) -> None:
-        super().__init__()
-        if 'iterated' in config:
-            self.iteration_cap = int(config['iterated'].get('iteration_cap', "50000"))
-            self.exponent = int(config['iterated'].get('exponent', "2"))
-            self.approximation_ratio = float(config['iterated'].get('approximation_ratio', "1.0"))
+    def __init__(self, fight_handler: FightHandler, config: ConfigParser) -> None:
+        super().__init__(fight_handler)
+        if "iterated" in config:
+            self.iteration_cap = int(config["iterated"].get("iteration_cap", "50000"))
+            self.exponent = int(config["iterated"].get("exponent", "2"))
+            self.approximation_ratio = float(config["iterated"].get("approximation_ratio", "1.0"))
         else:
             self.iteration_cap = 50000
             self.exponent = 2
             self.approximation_ratio = 1.0
-        self.reset_round_data()
 
-    def __str__(self) -> str:
-        return "Iterated"
-
-    def reset_round_data(self) -> None:
-        """Resets the round_data dict to default values."""
-        self.round_data = {'type': str(self),
-                           'iteration_cap': self.iteration_cap,
-                           'current_cap': self.iteration_cap,
-                           'solved': 0,
-                           'attempting': 0,
-                           'exponent': self.exponent,
-                           'approximation_ratio': self.approximation_ratio}
-
-    @BattleWrapper.reset_state
-    def run_round(self, fight_handler: FightHandler, matchup: Matchup) -> None:
+    def run_round(self, matchup: Matchup, observer: Observer | None = None) -> Iterated.Result:
         """Execute one iterative battle between a generating and a solving team.
 
         Incrementally try to search for the highest n for which the solver is
@@ -65,113 +51,64 @@ class Iterated(BattleWrapper):
         fight_handler: FightHandler
             Fight handler that manages the execution of a concrete fight.
         """
-        n = fight_handler.problem.n_start
-        maximum_reached_n = 0
         base_increment = 0
-        exponent = self.round_data['exponent']
-        n_cap = self.round_data['iteration_cap']
+        exponent = self.exponent
+        result = self.Result(0, self.iteration_cap, self.fight_handler.problem.n_start, observer)
+        result.notify()
         alive = True
 
-        update_nested_dict(self.round_data, {'attempting': n})
-
-        logger.info('==================== Iterative Battle, Instanze Size Cap: {} ===================='.format(n_cap))
+        logger.info(f"==================== Iterative Battle, Instanze Size Cap: {result.n_cap} ====================")
         while alive:
-            logger.info('=============== Instance Size: {}/{} ==============='.format(n, n_cap))
+            logger.info(f"=============== Instance Size: {result.current}/{result.n_cap} ===============")
 
-            approx_ratio = fight_handler.fight(matchup, n)
+            approx_ratio = self.fight_handler.fight(matchup, result.current)
             if approx_ratio == 0.0 or approx_ratio > self.approximation_ratio:
-                logger.info(f"Solver {matchup.solver} does not meet the required solution quality at instance size {n}."
-                            f" ({approx_ratio}/{self.approximation_ratio})")
+                logger.info(f"Solver {matchup.solver} does not meet the required solution quality at instance size "
+                            f"{result.current}. ({approx_ratio}/{self.approximation_ratio})")
                 alive = False
 
             if not alive and base_increment > 1:
                 # The step size increase was too aggressive, take it back and reset the base_increment
-                logger.info('Setting the solution cap to {}...'.format(n))
-                n_cap = n
-                n -= base_increment ** exponent
+                logger.info(f"Setting the solution cap to {result.current}...")
+                result.n_cap = result.current
+                result.current -= base_increment**exponent
                 base_increment = 0
                 alive = True
-            elif n > maximum_reached_n and alive:
+            elif result.current > result.reached and alive:
                 # We solved an instance of bigger size than before
-                maximum_reached_n = n
+                result.reached = result.current
 
-            if n + 1 > n_cap:
+            if result.current + 1 > result.n_cap:
                 alive = False
             else:
                 base_increment += 1
-                n += base_increment ** exponent
+                result.current += base_increment**exponent
 
-                if n >= n_cap:
+                if result.current >= result.n_cap:
                     # We have failed at this value of n already, reset the step size!
-                    n -= base_increment ** exponent - 1
+                    result.current -= base_increment**exponent - 1
                     base_increment = 1
 
-            update_nested_dict(self.round_data, {'current_cap': n_cap, 'solved': maximum_reached_n, 'attempting': n})
+        return result
 
-    def calculate_valuations(self, round_data0, round_data1) -> Tuple:
-        """Returns the highest instance size for which each team was successful.
+    @inherit_docs
+    @dataclass
+    class Result(BattleWrapper.Result):
+        reached: int
+        n_cap: int
+        current: int
+        observer: InitVar[Observer | None] = None
 
-        round_data0: dict
-            round_data in which the 0th team solved instances.
-        round_data1: dict
-            round_data in which the 1st team solved instances.
+        @inherit_docs
+        @property
+        def score(self) -> float:
+            return self.reached
 
-        Returns
-        -------
-        Tuple
-            A 2-tuple with the calculated valuations for each team.
-        """
-        return (round_data0['solved'], round_data1['solved'])
+        @inherit_docs
+        @staticmethod
+        def format_score(score: float) -> str:
+            return str(int(score))
 
-    def format_round_contents(self, round_data: dict) -> str:
-        """Format the provided round_data for iterated battles.
-
-        The returned tuple is supposed to be used for formatted live outputs.
-
-        Parameters
-        ----------
-        round_data : dict
-            dict containing round data.
-
-        Returns
-        -------
-        str
-            A string of the size of the currently highest solved instance.
-        """
-        return str(round_data['solved'])
-
-    def format_misc_headers(self) -> Tuple:
-        """Return which strings are to be used as headers a formatted output.
-
-        Make sure that the number of elements of the returned tuple match
-        up with the number of elements returned by format_misc_contents.
-
-        Returns
-        -------
-        Tuple
-            A 2-tuple of strings containing header names for:
-            - the current upper bound for instance sizes
-            - The average instance size solved over all rounds
-        """
-        return ('CAP', 'AVG')
-
-    def format_misc_contents(self, round_data: dict) -> Tuple:
-        """Format additional data that is to be displayed.
-
-        Make sure that the number of elements of the returned tuple match
-        up with the number of elements returned by format_misc_headers.
-
-        Parameters
-        ----------
-        round_data : dict
-            dict containing round data.
-
-        Returns
-        -------
-        Tuple
-            A 2-tuple of strings containing header names for:
-            - the current upper bound for instance sizes
-            - The average instance size solved over all rounds
-        """
-        # TODO: We cannot calculate the average as we only have access to a single round.
-        return (str(round_data['current_cap']), 'TODO')
+        @inherit_docs
+        def display(self) -> str:
+            return f"current cap: {self.n_cap}\nsolved: {self.reached}\nattempting: {self.current}"

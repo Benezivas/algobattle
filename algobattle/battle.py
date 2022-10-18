@@ -1,4 +1,5 @@
 """Main battle script. Executes all possible types of battles, see battle --help for all options."""
+from contextlib import ExitStack
 import sys
 import logging
 import datetime as dt
@@ -10,7 +11,7 @@ from importlib.metadata import version as pkg_version
 
 import algobattle
 from algobattle.fight_handler import FightHandler
-from algobattle.match import Match
+from algobattle.match import MatchInfo
 from algobattle.team import Team
 from algobattle.util import import_problem_from_path
 from algobattle.battle_wrapper import BattleWrapper
@@ -114,6 +115,10 @@ def main():
 
         logger = setup_logging(options.logging_path, options.verbose_logging, options.silent)
 
+    except KeyboardInterrupt:
+        raise SystemExit("Received keyboard interrupt, terminating execution.")
+
+    try:
         problem = import_problem_from_path(problem_path)
         if not problem:
             raise SystemExit
@@ -132,32 +137,27 @@ def main():
                 logger.warning(f"Building generators and solvers for team {name} failed, they will be excluded!")
 
         fight_handler = FightHandler(problem, config)
-        battle_wrapper = BattleWrapper.initialize(options.battle_type, config)
-        match = Match(fight_handler, battle_wrapper, teams, rounds=options.battle_rounds)
+        battle_wrapper = BattleWrapper.initialize(options.battle_type, fight_handler, config)
+        match_info = MatchInfo(fight_handler, battle_wrapper, teams, rounds=options.battle_rounds)
 
-        ui = None
-        if display_ui:
-            ui = Ui()
-            match.attach(ui)
+        with ExitStack() as stack:
+            if display_ui:
+                ui = Ui()
+                stack.enter_context(ui)
+            else:
+                ui = None
 
-        match.run()
+            result = match_info.run_match(ui)
 
-        if ui is not None:
-            match.detach(ui)
-            ui.restore()
+            logger.info('#' * 78)
+            logger.info(str(result))
+            if not options.do_not_count_points:
+                points = result.calculate_points(options.points)
+                for team, pts in points.items():
+                    logger.info(f"Group {team} gained {pts:.1f} points.")
 
-        logger.info('#' * 78)
-        logger.info('\n{}'.format(match.format_match_data_as_utf8()))
-        if not options.do_not_count_points:
-            points = match.calculate_points(options.points)
-
-            for team_name in match.teams:
-                logger.info('Group {} gained {:.1f} points.'.format(str(team_name), points[str(team_name)]))
     except KeyboardInterrupt:
-        try:
-            logger.critical("Received keyboard interrupt, terminating execution.")  # type: ignore
-        except NameError:
-            raise SystemExit("Received keyboard interrupt, terminating execution.")
+        logger.critical("Received keyboard interrupt, terminating execution.")
 
 
 if __name__ == "__main__":

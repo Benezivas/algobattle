@@ -1,241 +1,109 @@
 """Central managing module for an algorithmic battle."""
+from __future__ import annotations
+from dataclasses import dataclass
+from itertools import combinations
 import logging
-from typing import List
+from prettytable import PrettyTable, DOUBLE_BORDER
 
 from algobattle.battle_wrapper import BattleWrapper
+from algobattle.observer import Observer, Subject
 from algobattle.team import Matchup, Team
-from algobattle.util import update_nested_dict
-from algobattle.subject import Subject
-from algobattle.observer import Observer
 from algobattle.fight_handler import FightHandler
 
 logger = logging.getLogger('algobattle.match')
 
 
-class Match(Subject, Observer):
-    """Central managing class for an algorithmic battle."""
+@dataclass
+class MatchInfo:
+    """Class specifying all the parameters to run a match."""
 
-    _observers: List[Observer] = []
+    fight_handler: FightHandler
+    battle_wrapper: BattleWrapper
+    teams: list[Team]
+    rounds: int = 5
 
-    def __init__(self, fight_handler: FightHandler, battle_wrapper: BattleWrapper, teams: list[Team], rounds: int = 5) -> None:
-        self.fight_handler = fight_handler
-        self.battle_wrapper = battle_wrapper
-        self.battle_wrapper.attach(self)
-        self.teams = teams
-        self.rounds = rounds
-        self.match_data: dict = {'type': str(self.battle_wrapper),
-                                 'problem': str(self.fight_handler.problem),
-                                 'teams': [str(team) for team in self.teams],
-                                 'rounds': self.rounds}
-        for pair in self.all_battle_pairs():
-            for round in range(rounds):
-                update_nested_dict(self.match_data, {pair: {'curr_round': 0, round: self.battle_wrapper.round_data}})
+    @property
+    def grouped_matchups(self) -> list[tuple[Matchup, Matchup]]:
+        """All matchups, grouped by the involved teams.
 
-    def run(self) -> None:
-        """Match entry point, executes fights between all teams."""
-        for pair in self.all_battle_pairs(as_team_objects=True):
-            update_nested_dict(self.match_data, {'curr_pair': (str(pair[0]), str(pair[1]))})
-            matchup = Matchup(pair[0], pair[1])
+        Each tuple's first matchup has the first team in the group generating, the second has it solving.
+        """
+        return [(Matchup(*g), Matchup(*g[::-1])) for g in combinations(self.teams, 2)]
 
+    @property
+    def matchups(self) -> list[Matchup]:
+        """All matchups that will be fought."""
+        if len(self.teams) == 1:
+            return [Matchup(self.teams[0], self.teams[0])]
+        else:
+            return [m for pair in self.grouped_matchups for m in pair]
+
+    def run_match(self, observer: Observer | None = None) -> MatchResult:
+        """Executes the match with the specified parameters."""
+        result = MatchResult(self, observer)
+        for matchup in self.matchups:
             for i in range(self.rounds):
-                logger.info('{}  Running Battle {}/{}  {}'.format('#' * 20, i + 1, self.rounds, '#' * 20))
-                update_nested_dict(self.match_data, {str(pair): {'curr_round': i}})
-                self.battle_wrapper.run_round(self.fight_handler, matchup)
+                logger.info("#" * 20 + f"  Running Round {i+1}/{self.rounds}  " + "#" * 20)
+                battle_result = self.battle_wrapper.run_round(matchup, observer)
+                result[matchup].append(battle_result)
+                result.notify()
+        return result
 
-    def calculate_points(self, achievable_points: int) -> dict:
-        """Calculate the number of points achieved through the match.
+class MatchResult(Subject, dict[Matchup, list[BattleWrapper.Result]]):
+    """The Result of a whole Match."""
 
-        Call only _after_ the run() method has finished.
+    def __init__(self, match: MatchInfo, observer: Observer | None = None):
+        Subject.__init__(self, observer)
+        dict.__init__(self, {m: [] for m in match.matchups})
+        self.match = match
+        self.notify_vars = True
+
+    def calculate_points(self, achievable_points: int) -> dict[Team, float]:
+        """Calculate the number of points each team scored.
 
         Each pair of teams fights for the achievable points among one another.
         These achievable points are split over all rounds.
-        Points are derived from pairings of teams, it is thus expected that
-        for each pairing of teams (x,y) there is also a pairing (y,x).
-
-        Parameters
-        ----------
-        achievable_points : int
-            Number of achievable points.
-
-        Returns
-        -------
-        dict
-            A mapping between team names and their achieved points.
-            The format is {str(team)): points [...]}.
         """
-        if self.rounds <= 0:
-            return {}
+        if len(self.match.teams) == 1:
+            return {self.match.teams[0]: achievable_points}
 
-        if len(self.teams) == 1:  # Special case for single player
-            return {str(self.teams[0]): achievable_points}
+        if any(not 0 <= len(results) <= self.match.rounds for results in self.values()):
+            raise ValueError
 
-        points = dict()
-        points_per_iteration = round(achievable_points / self.rounds, 1)
+        points = {team: 0. for team in self.match.teams}
+        if self.match.rounds == 0:
+            return points
+        points_per_round = round(achievable_points / self.match.rounds, 1)
 
-        for pair in self.all_battle_pairs():
-            points[pair[0]] = points.get(pair[0], 0)
-            points[pair[1]] = points.get(pair[1], 0)
+        for home_matchup, away_matchup in self.match.grouped_matchups:
+            for home_res, away_res in zip(self[home_matchup], self[away_matchup]):
+                total_score = home_res.score + away_res.score
+                if total_score == 0:
+                    # Default values for proportions, assuming no team manages to solve anything
+                    home_ratio = 0.5
+                    away_ratio = 0.5
+                else:
+                    home_ratio = home_res.score / total_score
+                    away_ratio = away_res.score / total_score
 
-            for i in range(self.rounds):
-                round_data0 = self.match_data[(pair[1], pair[0])][i]  # pair[0] was solver
-                round_data1 = self.match_data[pair][i]  # pair[1] was solver
-
-                valuation0, valuation1 = self.battle_wrapper.calculate_valuations(round_data0, round_data1)
-
-                # Default values for proportions, assuming no team manages to solve anything
-                points_proportion0 = 0.5
-                points_proportion1 = 0.5
-
-                if valuation0 + valuation1 > 0:
-                    points_proportion0 = (valuation0 / (valuation0 + valuation1))
-                    points_proportion1 = (valuation1 / (valuation0 + valuation1))
-
-                points[pair[0]] += round(points_per_iteration * points_proportion0, 1) / 2
-                points[pair[1]] += round(points_per_iteration * points_proportion1, 1) / 2
+                points[home_matchup.solver] += round(points_per_round * home_ratio, 1)
+                points[away_matchup.solver] += round(points_per_round * away_ratio, 1)
 
         return points
 
-    def all_battle_pairs(self, as_team_objects=False) -> list:
-        """Generate and return a list of all team pairings for battles."""
-        battle_pairs = []
-        for i in range(len(self.teams)):
-            for j in range(len(self.teams)):
-                if as_team_objects:
-                    battle_pairs.append((self.teams[i], self.teams[j]))
-                else:
-                    battle_pairs.append((str(self.teams[i]), str(self.teams[j])))
+    def __str__(self) -> str:
+        table = PrettyTable(field_names=["GEN", "SOL", *range(1, self.match.rounds + 1), "AVG"], min_width=5)
+        table.set_style(DOUBLE_BORDER)
+        table.align["AVG"] = "r"
+        for i in range(1, self.match.rounds + 1):
+            table.align[str(i)] = "r"
 
-        if not len(self.teams) == 1:
-            battle_pairs = [pair for pair in battle_pairs if pair[0] != pair[1]]
+        for matchup, results in self.items():
+            if not 0 <= len(results) <= self.match.rounds:
+                raise RuntimeError
+            padding = [""] * (self.match.rounds - len(results))
+            average = "" if len(results) == 0 else results[0].format_score(sum(r.score for r in results) / len(results))
+            results = [str(r) for r in results]
+            table.add_row([str(matchup.generator), str(matchup.solver), *results, *padding, average])
 
-        return battle_pairs
-
-    def format_match_data_as_utf8(self) -> str:
-        """Format the current match data in utf8 that can be output e.g. to STDOUT.
-
-        Parameters
-        ----------
-        match_data : dict
-            dict containing match data generated by match.run().
-
-        Returns
-        -------
-        str
-            A formatted string on the basis of the match_data.
-        """
-        battle_type = 'Battle Type: {}'.format(str(self.battle_wrapper))
-        upper_border = self._format_delimiter_line_utf8(line_char='═', left_delim='╔', mid_delim='╦', right_delim='╗')
-        header = self._format_header_line_utf8()
-        separator = self._format_delimiter_line_utf8(line_char='─', left_delim='╟', mid_delim='╫', right_delim='╢')
-        round_lines = self._format_round_lines_utf8()
-        rounds_block = ''.join(['{}\n\r'.format(round_line) for round_line in round_lines])
-        lower_border = self._format_delimiter_line_utf8(line_char='═', left_delim='╚', mid_delim='╩', right_delim='╝')
-
-        return '{}\n\r{}\n\r{}\n\r{}\n\r{}{}\n\r'.format(battle_type,
-                                                         upper_border,
-                                                         header,
-                                                         separator,
-                                                         rounds_block,
-                                                         lower_border)
-
-    def _format_delimiter_line_utf8(self, line_char, left_delim, mid_delim, right_delim) -> str:
-        """Helper function to draw delimiter lines, such as borders and seperator lines.
-
-        Parameters
-        ----------
-        line_char : str
-            Basic line character.
-        left_delim : str
-            Left delimiting character.
-        mid_delim : str
-            Middle delimiting character.
-        right_delim : str
-            Right delimiting character.
-
-        Returns
-        -------
-        str
-            A formatted delimiter string.
-        """
-        nheaders = len(self.battle_wrapper.format_misc_headers())
-        rounds = self.rounds
-
-        delimiter_start = '{}{}{}{}{}'.format(left_delim, 9 * line_char, mid_delim, 9 * line_char, mid_delim)
-        additional_round_chunks = ('{}{}'.format(line_char * 9, mid_delim)) * rounds
-        additional_misc_chunks = ('{}{}'.format(line_char * 9, mid_delim)) * (nheaders - 1)
-        delimiter_end = '{}{}'.format(9 * line_char, right_delim)
-
-        return delimiter_start + additional_round_chunks + additional_misc_chunks + delimiter_end
-
-    def _format_header_line_utf8(self) -> str:
-        """Helper function to format general and battle wrapper specific header strings.
-
-        Returns
-        -------
-        str
-            A formatted header string.
-        """
-        headers = self.battle_wrapper.format_misc_headers()
-        rounds = self.rounds
-
-        default_header = '║   GEN   ║   SOL   '
-        additional_round_headers = ''.join(['║{:^9s}'.format('R' + str(i + 1)) for i in range(rounds)])
-        additional_misc_headers = ''.join(['║{:>9s}'.format(headers[i]) for i in range(len(headers))])
-        closing_header = '║'
-
-        return default_header + additional_round_headers + additional_misc_headers + closing_header
-
-    def _format_round_lines_utf8(self) -> list:
-        """Helper function to format the round_data of each pairing of teams.
-
-        Returns
-        -------
-        str
-            A list of formatted round strings
-        """
-        round_lines = []
-        for pair in self.all_battle_pairs():
-            default_contents = '║{:>9s}║{:>9s}'.format(pair[0], pair[1])
-            additional_round_contents = ''
-            for round in range(self.rounds):
-                round_data = self.match_data[pair][round]
-                additional_round_contents += '║{:>9s}'.format(self.battle_wrapper.format_round_contents(round_data))
-
-            latest_round = self.match_data[pair]['curr_round']
-            latest_round_data = self.match_data[pair][latest_round]
-
-            misc_contents = self.battle_wrapper.format_misc_contents(latest_round_data)
-            additional_misc_contents = ''.join(['║{:>9s}'.format(misc_contents[i]) for i in range(len(misc_contents))])
-            closing_contents = '║'
-
-            round_lines.append(default_contents + additional_round_contents + additional_misc_contents + closing_contents)
-
-        return round_lines
-
-    def update(self, battle_wrapper: BattleWrapper) -> None:
-        """Receive updates by observing the battle_wrapper object and integrate them into match_data.
-
-        Parameters
-        ----------
-        battle_wrapper : BattleWrapper
-            The observed battle_wrapper object.
-        """
-        if 'curr_pair' in self.match_data.keys():
-            current_pair = self.match_data['curr_pair']
-            if 'curr_round' in self.match_data[current_pair]:
-                current_round = self.match_data[current_pair]['curr_round']
-                update_nested_dict(self.match_data, {current_pair: {current_round: battle_wrapper.round_data}})
-        self.notify()
-
-    def attach(self, observer: Observer) -> None:
-        """Subscribe a new Observer by adding them to the list of observers."""
-        self._observers.append(observer)
-
-    def detach(self, observer: Observer) -> None:
-        """Unsubscribe an Observer by removing them from the list of observers."""
-        self._observers.remove(observer)
-
-    def notify(self) -> None:
-        """Notify all subscribed Observers by calling their update() functions."""
-        for observer in self._observers:
-            observer.update(self)
+        return f"Battle Type: {self.match.battle_wrapper.type}\n{table}"
