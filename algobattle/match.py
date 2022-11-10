@@ -1,4 +1,5 @@
 """Match class, provides functionality for setting up and executing battles between given teams."""
+from pathlib import Path
 import subprocess
 import os
 
@@ -169,6 +170,7 @@ class Match(Subject):
 
         self.single_player = (len(teams) == 1)
 
+        image_archives: list[Path] = []
         for team in teams:
             build_commands = []
             build_commands.append(base_build_command + ["solver-" + str(team.name), team.solver_path])
@@ -195,10 +197,20 @@ class Match(Subject):
                         process.wait()
                         logger.error('Build process for {} failed!'.format(command[5]))
                         build_successful = False
-            if not build_successful:
-                logger.error("Removing team {} as their containers did not build successfully.".format(team.name))
-                self.team_names.remove(team.name)
+                if not build_successful:
+                    logger.error("Removing team {} as their containers did not build successfully.".format(team.name))
+                    self.team_names.remove(team.name)
+                    if command[-2].startswith("generator"):
+                        image_archives.pop().unlink()
+                    break
+                else:
+                    path = command[-1].parent / f"{command[-2]}-archive.tar"
+                    subprocess.Popen(["docker", "save", command[-2], "-o", path], stdout=subprocess.PIPE)
+                    image_archives.append(path)
+                    subprocess.Popen(["docker", "image", "rm", "-f", command[-2]])
 
+        for path in image_archives:
+            subprocess.Popen(["docker", "load", "-q", "-i", str(path)])
         return len(self.team_names) > 0
 
     @build_successful
