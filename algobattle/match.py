@@ -211,6 +211,7 @@ class Match(Subject):
 
         for path in image_archives:
             subprocess.Popen(["docker", "load", "-q", "-i", str(path)])
+            path.unlink()
         return len(self.team_names) > 0
 
     @build_successful
@@ -308,6 +309,9 @@ class Match(Subject):
                 self.solving_team = pair[1]
                 self.battle_wrapper.wrapper(self, options)
 
+        for team in self.team_names:
+            for role in ("generator", "solver"):
+                    subprocess.Popen(["docker", "image", "rm", "-f", f"{role}-{team}"])
         return self.match_data
 
     @docker_running
