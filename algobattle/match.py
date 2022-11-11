@@ -5,6 +5,7 @@ import os
 
 import logging
 import configparser
+from time import sleep
 from typing import Callable, List, Tuple
 
 import algobattle.sighandler as sigh
@@ -204,13 +205,13 @@ class Match(Subject):
                         image_archives.pop().unlink()
                     break
                 else:
-                    path = command[-1].parent / f"{command[-2]}-archive.tar"
-                    subprocess.Popen(["docker", "save", command[-2], "-o", path], stdout=subprocess.PIPE)
+                    path = Path(command[-1]) / f"{command[-2]}-archive.tar"
+                    subprocess.run(["docker", "save", command[-2], "-o", str(path)], stdout=subprocess.PIPE)
                     image_archives.append(path)
-                    subprocess.Popen(["docker", "image", "rm", "-f", command[-2]])
+                    subprocess.run(["docker", "image", "rm", "-f", command[-2]], stdout=subprocess.PIPE)
 
         for path in image_archives:
-            subprocess.Popen(["docker", "load", "-q", "-i", str(path)])
+            subprocess.run(["docker", "load", "-q", "-i", str(path)], stdout=subprocess.PIPE)
             path.unlink()
         return len(self.team_names) > 0
 
@@ -311,7 +312,7 @@ class Match(Subject):
 
         for team in self.team_names:
             for role in ("generator", "solver"):
-                    subprocess.Popen(["docker", "image", "rm", "-f", f"{role}-{team}"])
+                    subprocess.run(["docker", "image", "rm", "-f", f"{role}-{team}"], stdout=subprocess.PIPE)
         return self.match_data
 
     @docker_running
