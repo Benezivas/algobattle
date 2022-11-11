@@ -109,7 +109,7 @@ class Parser(ABC):
         bytes
             Returns the input as a byte object.
         """
-        return "\n".join(str(" ".join(str(element) for element in line)) for line in input).encode()
+        return "\n".join(str(" ".join(str(element) for element in line)) for line in input).encode(errors="ignore")
 
     @abstractmethod
     def decode(self, raw_input: bytes) -> any:
@@ -129,4 +129,4 @@ class Parser(ABC):
         any
             Returns the decoded input.
         """
-        return [tuple(line.split()) for line in raw_input.decode().splitlines() if line.split()]
+        return [tuple(line.split()) for line in raw_input.decode(errors="ignore").splitlines() if line.split()]

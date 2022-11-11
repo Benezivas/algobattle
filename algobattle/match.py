@@ -184,7 +184,7 @@ class Match(Subject):
                                       stderr=subprocess.PIPE, creationflags=creationflags) as process:
                     try:
                         output, _ = process.communicate(timeout=self.timeout_build)
-                        logger.debug(output.decode())
+                        logger.debug(output.decode(errors="ignore"))
                     except subprocess.TimeoutExpired:
                         process.kill()
                         process.wait()
