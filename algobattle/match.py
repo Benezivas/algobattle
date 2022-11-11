@@ -5,7 +5,6 @@ import os
 
 import logging
 import configparser
-from time import sleep
 from typing import Callable, List, Tuple
 
 import algobattle.sighandler as sigh
