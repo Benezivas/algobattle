@@ -29,7 +29,7 @@ class Match(Subject):
     battle_wrapper = None
 
     def __init__(self, problem: Problem, config_path: str, teams: list,
-                 runtime_overhead=0, approximation_ratio=1.0, cache_docker_containers=True) -> None:
+                 runtime_overhead=0, approximation_ratio=1.0, cache_docker_containers=True, unsafe_build: bool = False) -> None:
 
         config = configparser.ConfigParser()
         logger.debug('Using additional configuration options from file "%s".', config_path)
@@ -45,7 +45,7 @@ class Match(Subject):
         self.config = config
         self.approximation_ratio = approximation_ratio
 
-        self.build_successful = self._build(teams, cache_docker_containers)
+        self.build_successful = self._build(teams, cache_docker_containers, unsafe_build)
 
         if approximation_ratio != 1.0 and not problem.approximable:
             logger.error('The given problem is not approximable and can only be run with an approximation ratio of 1.0!')
@@ -134,7 +134,7 @@ class Match(Subject):
         return True
 
     @docker_running
-    def _build(self, teams: list, cache_docker_containers=True) -> bool:
+    def _build(self, teams: list, cache_docker_containers=True, unsafe_build: bool = False) -> bool:
         """Build docker containers for the given generators and solvers of each team.
 
         Any team for which either the generator or solver does not build successfully
@@ -201,10 +201,10 @@ class Match(Subject):
                 if not build_successful:
                     logger.error("Removing team {} as their containers did not build successfully.".format(team.name))
                     self.team_names.remove(team.name)
-                    if command[-2].startswith("generator"):
+                    if command[-2].startswith("generator") and not unsafe_build:
                         image_archives.pop().unlink()
                     break
-                else:
+                elif not unsafe_build:
                     path = Path(command[-1]) / f"{command[-2]}-archive.tar"
                     subprocess.run(["docker", "save", command[-2], "-o", str(path)], stdout=subprocess.PIPE)
                     image_archives.append(path)

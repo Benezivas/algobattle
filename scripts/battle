@@ -95,6 +95,7 @@ if __name__ == "__main__":
     parser.add_option('--silent', dest='silent', action='store_true', help='Disable forking the logging output to stderr.')
     parser.add_option('--no_overhead_calculation', dest='no_overhead_calculation', action='store_true', help='If set, the program does not benchmark the I/O of the host system to calculate the runtime overhead when started.')
     parser.add_option('--ui', dest='display_ui', action='store_true', help='If set, the program sets the --silent option and displays a small ui on STDOUT that shows the progress of the battles.')
+    parser.add_option('--unsafe_build', dest='unsafe_build', action='store_true', help='If set, the build processes of the docker containers will not be isolated from each other.')
 
     (options, args) = parser.parse_args()
 
@@ -140,7 +141,7 @@ if __name__ == "__main__":
         runtime_overhead = measure_runtime_overhead()
         logger.info('Maximal measured runtime overhead is at {} seconds. Adding this amount to the configured runtime.'.format(runtime_overhead))
 
-    match = Match(problem, options.config, teams, runtime_overhead=runtime_overhead, approximation_ratio=options.approximation_ratio)
+    match = Match(problem, options.config, teams, runtime_overhead=runtime_overhead, approximation_ratio=options.approximation_ratio, unsafe_build=options.unsafe_build)
 
     if not match.build_successful:
         logger.critical('Building the match object failed, exiting!')
