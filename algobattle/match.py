@@ -10,7 +10,7 @@ from typing import Callable, List, Tuple
 import algobattle.sighandler as sigh
 from algobattle.team import Team
 from algobattle.problem import Problem
-from algobattle.util import run_subprocess, update_nested_dict
+from algobattle.util import build_image, run_subprocess, update_nested_dict
 from algobattle.subject import Subject
 from algobattle.observer import Observer
 from algobattle.battle_wrappers.averaged import Averaged
@@ -179,38 +179,24 @@ class Match(Subject):
         image_archives: list[Path] = []
         for team in teams:
             build_commands = []
-            build_commands.append(base_build_command + ["solver-" + str(team.name), team.solver_path])
-            build_commands.append(base_build_command + ["generator-" + str(team.name), team.generator_path])
+            build_commands.append(("solver-" + str(team.name), team.solver_path))
+            build_commands.append(("generator-" + str(team.name), team.generator_path))
 
             build_successful = True
-            for command in build_commands:
-                logger.debug('Building docker container with the following command: {}'.format(command))
-                with subprocess.Popen(command, stdout=subprocess.PIPE,
-                                      stderr=subprocess.PIPE, creationflags=self.creationflags) as process:
-                    try:
-                        output, _ = process.communicate(timeout=self.timeout_build)
-                        logger.debug(output.decode())
-                    except subprocess.TimeoutExpired:
-                        process.kill()
-                        process.wait()
-                        logger.error('Build process for {} ran into a timeout!'.format(command[5]))
-                        build_successful = False
-                    if process.returncode != 0:
-                        process.kill()
-                        process.wait()
-                        logger.error('Build process for {} failed!'.format(command[5]))
-                        build_successful = False
+            for name, path in build_commands:
+                logger.debug(f"Building docker container with the following command: {base_build_command} {name} {path}")
+                build_successful = build_image(base_build_command, name, path, timeout=self.timeout_build, unsafe=unsafe_build)
                 if not build_successful:
                     logger.error("Removing team {} as their containers did not build successfully.".format(team.name))
                     self.team_names.remove(team.name)
-                    if command[-2].startswith("generator") and not unsafe_build:
+                    if name.startswith("generator") and not unsafe_build:
                         image_archives.pop().unlink()
                     break
                 elif not unsafe_build:
-                    path = Path(command[-1]) / f"{command[-2]}-archive.tar"
-                    subprocess.run(["docker", "save", command[-2], "-o", str(path)], stdout=subprocess.PIPE)
+                    path = Path(path) / f"{name}-archive.tar"
+                    subprocess.run(["docker", "save", name, "-o", str(path)], stdout=subprocess.PIPE)
                     image_archives.append(path)
-                    subprocess.run(["docker", "image", "rm", "-f", command[-2]], stdout=subprocess.PIPE)
+                    subprocess.run(["docker", "image", "rm", "-f", name], stdout=subprocess.PIPE)
 
         for path in image_archives:
             subprocess.run(["docker", "load", "-q", "-i", str(path)], stdout=subprocess.PIPE)
