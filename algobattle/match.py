@@ -26,9 +26,14 @@ class Match(Subject):
     generating_team = None
     solving_team = None
     battle_wrapper = None
+    creation_flags = 0
 
     def __init__(self, problem: Problem, config_path: str, teams: list,
-                 runtime_overhead=0, approximation_ratio=1.0, cache_docker_containers=True, unsafe_build: bool = False) -> None:
+                 runtime_overhead=0, approximation_ratio=1.0,
+                 cache_docker_containers=True, unsafe_build: bool = False) -> None:
+
+        if os.name != 'posix':
+            self.creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
 
         config = configparser.ConfigParser()
         logger.debug('Using additional configuration options from file "%s".', config_path)
@@ -93,11 +98,8 @@ class Match(Subject):
     def docker_running(function: Callable) -> Callable:
         """Ensure that internal methods are only callable if docker is running."""
         def wrapper(self, *args, **kwargs):
-            creationflags = 0
-            if os.name != 'posix':
-                creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
             docker_running = subprocess.Popen(['docker', 'info'], stdout=subprocess.PIPE,
-                                              stderr=subprocess.PIPE, creationflags=creationflags)
+                                              stderr=subprocess.PIPE, creationflags=self.creationflags)
             _ = docker_running.communicate()
             if docker_running.returncode:
                 logger.error('Could not connect to the docker daemon. Is docker running?')
@@ -145,6 +147,8 @@ class Match(Subject):
             List of Team objects.
         cache_docker_containers : bool
             Flag indicating whether to cache built docker containers.
+        unsafe_build: bool
+            If set, images are not removed after building, risking exposure to build process of other teams.
 
         Returns
         -------
@@ -179,11 +183,8 @@ class Match(Subject):
             build_successful = True
             for command in build_commands:
                 logger.debug('Building docker container with the following command: {}'.format(command))
-                creationflags = 0
-                if os.name != 'posix':
-                    creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
                 with subprocess.Popen(command, stdout=subprocess.PIPE,
-                                      stderr=subprocess.PIPE, creationflags=creationflags) as process:
+                                      stderr=subprocess.PIPE, creationflags=self.creationflags) as process:
                     try:
                         output, _ = process.communicate(timeout=self.timeout_build)
                         logger.debug(output.decode())
@@ -311,7 +312,7 @@ class Match(Subject):
 
         for team in self.team_names:
             for role in ("generator", "solver"):
-                    subprocess.run(["docker", "image", "rm", "-f", f"{role}-{team}"], stdout=subprocess.PIPE)
+                subprocess.run(["docker", "image", "rm", "-f", f"{role}-{team}"], stdout=subprocess.PIPE)
         return self.match_data
 
     @docker_running
