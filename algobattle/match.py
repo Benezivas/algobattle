@@ -34,6 +34,8 @@ class Match(Subject):
 
         if os.name != 'posix':
             self.creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
+        else:
+            self.creation_flags = 0
 
         config = configparser.ConfigParser()
         logger.debug('Using additional configuration options from file "%s".', config_path)
