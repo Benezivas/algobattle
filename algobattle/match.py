@@ -33,7 +33,7 @@ class Match(Subject):
                  cache_docker_containers=True, unsafe_build: bool = False) -> None:
 
         if os.name != 'posix':
-            self.creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
+            self.creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP
         else:
             self.creation_flags = 0
 
@@ -101,7 +101,7 @@ class Match(Subject):
         """Ensure that internal methods are only callable if docker is running."""
         def wrapper(self, *args, **kwargs):
             docker_running = subprocess.Popen(['docker', 'info'], stdout=subprocess.PIPE,
-                                              stderr=subprocess.PIPE, creationflags=self.creationflags)
+                                              stderr=subprocess.PIPE, creationflags=self.creation_flags)
             _ = docker_running.communicate()
             if docker_running.returncode:
                 logger.error('Could not connect to the docker daemon. Is docker running?')
@@ -185,7 +185,7 @@ class Match(Subject):
             build_successful = True
             for name, path in build_commands:
                 logger.debug(f"Building docker container with the following command: {base_build_command} {name} {path}")
-                build_successful = build_image(base_build_command, name, path, timeout=self.timeout_build, unsafe=unsafe_build)
+                build_successful = build_image(base_build_command, name, path, timeout=self.timeout_build)
                 if not build_successful:
                     logger.error("Removing team {} as their containers did not build successfully.".format(team.name))
                     self.team_names.remove(team.name)
