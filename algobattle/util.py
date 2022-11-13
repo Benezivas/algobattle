@@ -135,7 +135,7 @@ def run_subprocess(run_command: list, input: bytes, timeout: float, suppress_out
     return raw_output, elapsed_time
 
 
-def build_image(base_cmd: list[str], name: str, path: Path | str, timeout: float | None) -> bool:
+def build_image(base_cmd: list, name: str, path: Path | str, timeout: float | None) -> bool:
     """Builds a docker image of the given name using the base_command.
 
     Parameters

@@ -176,7 +176,7 @@ class Match(Subject):
 
         self.single_player = (len(teams) == 1)
 
-        image_archives: list[Path] = []
+        image_archives: list = []
         for team in teams:
             build_commands = []
             build_commands.append(("solver-" + str(team.name), team.solver_path))
