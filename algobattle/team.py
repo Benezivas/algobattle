@@ -1,7 +1,7 @@
 """Team class, stores necessary information about a Team, such as their associated solver and generator."""
 from __future__ import annotations
 from pathlib import Path
-from dataclasses import InitVar, dataclass
+from dataclasses import dataclass
 from typing import Iterator
 
 from algobattle.docker_util import DockerError, Image

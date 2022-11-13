@@ -12,7 +12,7 @@ from importlib.metadata import version as pkg_version
 import algobattle
 from algobattle.fight_handler import FightHandler
 from algobattle.match import MatchInfo
-from algobattle.team import Team
+from algobattle.team import Team, TeamInfo
 from algobattle.util import import_problem_from_path
 from algobattle.battle_wrapper import BattleWrapper
 from algobattle.ui import Ui
@@ -128,11 +128,12 @@ def main():
         logger.debug('Using additional configuration options from file "%s".', options.config)
         config = ConfigParser()
         config.read(options.config)
+        build_timeout = float(config["run_parameters"]["timeout_build"])
 
         teams: list[Team] = []
         for name, generator, solver in zip(team_names, generators, solvers):
             try:
-                teams.append(Team(name, generator, solver, float(config["run_parameters"]["timeout_build"])))
+                teams.append(TeamInfo(name, generator, solver).build(build_timeout))
             except (ValueError, DockerError):
                 logger.warning(f"Building generators and solvers for team {name} failed, they will be excluded!")
 
