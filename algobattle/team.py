@@ -38,7 +38,7 @@ class TeamInfo:
             generator.remove()
             raise
         _team_names.add(name)
-        return Team(name, generator, solver)
+        return Team(name, generator, solver, _cleanup_generator=True, _cleanup_solver=True)
 
 
 @dataclass
