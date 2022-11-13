@@ -1,4 +1,5 @@
 """Match class, provides functionality for setting up and executing battles between given teams."""
+from pathlib import Path
 import subprocess
 import os
 
@@ -9,7 +10,7 @@ from typing import Callable, List, Tuple
 import algobattle.sighandler as sigh
 from algobattle.team import Team
 from algobattle.problem import Problem
-from algobattle.util import run_subprocess, update_nested_dict
+from algobattle.util import build_image, run_subprocess, update_nested_dict
 from algobattle.subject import Subject
 from algobattle.observer import Observer
 from algobattle.battle_wrappers.averaged import Averaged
@@ -25,9 +26,16 @@ class Match(Subject):
     generating_team = None
     solving_team = None
     battle_wrapper = None
+    creationflags = 0
 
     def __init__(self, problem: Problem, config_path: str, teams: list,
-                 runtime_overhead=0, approximation_ratio=1.0, cache_docker_containers=True) -> None:
+                 runtime_overhead=0, approximation_ratio=1.0,
+                 cache_docker_containers=True, unsafe_build: bool = False) -> None:
+
+        if os.name != 'posix':
+            self.creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
+        else:
+            self.creationflags = 0
 
         config = configparser.ConfigParser()
         logger.debug('Using additional configuration options from file "%s".', config_path)
@@ -43,7 +51,7 @@ class Match(Subject):
         self.config = config
         self.approximation_ratio = approximation_ratio
 
-        self.build_successful = self._build(teams, cache_docker_containers)
+        self.build_successful = self._build(teams, cache_docker_containers, unsafe_build)
 
         if approximation_ratio != 1.0 and not problem.approximable:
             logger.error('The given problem is not approximable and can only be run with an approximation ratio of 1.0!')
@@ -92,11 +100,8 @@ class Match(Subject):
     def docker_running(function: Callable) -> Callable:
         """Ensure that internal methods are only callable if docker is running."""
         def wrapper(self, *args, **kwargs):
-            creationflags = 0
-            if os.name != 'posix':
-                creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
             docker_running = subprocess.Popen(['docker', 'info'], stdout=subprocess.PIPE,
-                                              stderr=subprocess.PIPE, creationflags=creationflags)
+                                              stderr=subprocess.PIPE, creationflags=self.creationflags)
             _ = docker_running.communicate()
             if docker_running.returncode:
                 logger.error('Could not connect to the docker daemon. Is docker running?')
@@ -132,7 +137,7 @@ class Match(Subject):
         return True
 
     @docker_running
-    def _build(self, teams: list, cache_docker_containers=True) -> bool:
+    def _build(self, teams: list, cache_docker_containers=True, unsafe_build: bool = False) -> bool:
         """Build docker containers for the given generators and solvers of each team.
 
         Any team for which either the generator or solver does not build successfully
@@ -144,6 +149,8 @@ class Match(Subject):
             List of Team objects.
         cache_docker_containers : bool
             Flag indicating whether to cache built docker containers.
+        unsafe_build: bool
+            If set, images are not removed after building, risking exposure to build process of other teams.
 
         Returns
         -------
@@ -169,36 +176,31 @@ class Match(Subject):
 
         self.single_player = (len(teams) == 1)
 
+        image_archives: list = []
         for team in teams:
             build_commands = []
-            build_commands.append(base_build_command + ["solver-" + str(team.name), team.solver_path])
-            build_commands.append(base_build_command + ["generator-" + str(team.name), team.generator_path])
+            build_commands.append(("solver-" + str(team.name), team.solver_path))
+            build_commands.append(("generator-" + str(team.name), team.generator_path))
 
             build_successful = True
-            for command in build_commands:
-                logger.debug('Building docker container with the following command: {}'.format(command))
-                creationflags = 0
-                if os.name != 'posix':
-                    creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
-                with subprocess.Popen(command, stdout=subprocess.PIPE,
-                                      stderr=subprocess.PIPE, creationflags=creationflags) as process:
-                    try:
-                        output, _ = process.communicate(timeout=self.timeout_build)
-                        logger.debug(output.decode(errors="ignore"))
-                    except subprocess.TimeoutExpired:
-                        process.kill()
-                        process.wait()
-                        logger.error('Build process for {} ran into a timeout!'.format(command[5]))
-                        build_successful = False
-                    if process.returncode != 0:
-                        process.kill()
-                        process.wait()
-                        logger.error('Build process for {} failed!'.format(command[5]))
-                        build_successful = False
-            if not build_successful:
-                logger.error("Removing team {} as their containers did not build successfully.".format(team.name))
-                self.team_names.remove(team.name)
+            for name, path in build_commands:
+                logger.debug(f"Building docker container with the following command: {base_build_command} {name} {path}")
+                build_successful = build_image(base_build_command, name, path, timeout=self.timeout_build)
+                if not build_successful:
+                    logger.error("Removing team {} as their containers did not build successfully.".format(team.name))
+                    self.team_names.remove(team.name)
+                    if name.startswith("generator") and not unsafe_build:
+                        image_archives.pop().unlink()
+                    break
+                elif not unsafe_build:
+                    path = Path(path) / f"{name}-archive.tar"
+                    subprocess.run(["docker", "save", name, "-o", str(path)], stdout=subprocess.PIPE)
+                    image_archives.append(path)
+                    subprocess.run(["docker", "image", "rm", "-f", name], stdout=subprocess.PIPE)
 
+        for path in image_archives:
+            subprocess.run(["docker", "load", "-q", "-i", str(path)], stdout=subprocess.PIPE)
+            path.unlink()
         return len(self.team_names) > 0
 
     @build_successful
@@ -296,6 +298,9 @@ class Match(Subject):
                 self.solving_team = pair[1]
                 self.battle_wrapper.wrapper(self, options)
 
+        for team in self.team_names:
+            for role in ("generator", "solver"):
+                subprocess.run(["docker", "image", "rm", "-f", f"{role}-{team}"], stdout=subprocess.PIPE)
         return self.match_data
 
     @docker_running

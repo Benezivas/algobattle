@@ -1,6 +1,7 @@
 """Collection of utility functions."""
 import os
 import logging
+from pathlib import Path
 import timeit
 import subprocess
 import importlib.util
@@ -13,7 +14,12 @@ import algobattle.sighandler as sigh
 from algobattle.problem import Problem
 
 
-logger = logging.getLogger('algobattle.util')
+logger = logging.getLogger("algobattle.util")
+
+
+creationflags = 0
+if os.name != "posix":
+    creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
 
 
 def import_problem_from_path(problem_path: str) -> Problem:
@@ -50,21 +56,24 @@ def measure_runtime_overhead() -> float:
         I/O overhead in seconds, rounded to two decimal places.
     """
     problem = DelaytestProblem.Problem()
-    config_path = os.path.join(os.path.dirname(os.path.abspath(algobattle.__file__)), 'config', 'config_delaytest.ini')
+    config_path = os.path.join(os.path.dirname(os.path.abspath(algobattle.__file__)), "config", "config_delaytest.ini")
     delaytest_path = DelaytestProblem.__file__[:-12]  # remove /__init__.py
-    delaytest_team = algobattle.team.Team(0, delaytest_path + '/generator', delaytest_path + '/solver')
+    delaytest_team = algobattle.team.Team(0, delaytest_path + "/generator", delaytest_path + "/solver")
 
     match = algobattle.match.Match(problem, config_path, [delaytest_team])
 
     if not match.build_successful:
-        logger.warning('Building a match for the time tolerance calculation failed!')
+        logger.warning("Building a match for the time tolerance calculation failed!")
         return 0
 
     overheads = []
     for i in range(5):
         sigh.latest_running_docker_image = "generator0"
-        _, timeout = run_subprocess(match.generator_base_run_command(match.space_generator) + ["generator0"],
-                                    input=str(50 * i).encode(), timeout=match.timeout_generator)
+        _, timeout = run_subprocess(
+            match.generator_base_run_command(match.space_generator) + ["generator0"],
+            input=str(50 * i).encode(),
+            timeout=match.timeout_generator,
+        )
         if not timeout:
             timeout = match.timeout_generator
         overheads.append(float(timeout))
@@ -124,6 +133,46 @@ def run_subprocess(run_command: list, input: bytes, timeout: float, suppress_out
     logger.debug('Approximate elapsed runtime: {}/{} seconds.'.format(elapsed_time, timeout))
 
     return raw_output, elapsed_time
+
+
+def build_image(base_cmd: list, name: str, path: Path, timeout: float) -> bool:
+    """Builds a docker image of the given name using the base_command.
+
+    Parameters
+    ----------
+    base_cmd : list
+        A list containing a shared prefix of a command.
+    name : str
+        The intended name (tag) of the image.
+    path: Path
+        Path to the image.
+    timeout: float
+        Timeout after which the build process is terminated preemptively.
+
+    Returns
+    -------
+    bool
+        Determines whether an image with the given tag is now built and thus accessible.
+    """
+    path = Path(path)
+    build_successful = True
+    with subprocess.Popen(
+        base_cmd + [name, str(path)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=creationflags
+    ) as process:
+        try:
+            output, _ = process.communicate(timeout=timeout)
+            logger.debug(output.decode())
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait()
+            logger.error(f"Build process for {name} ran into a timeout!")
+            build_successful = False
+        if process.returncode != 0:
+            process.kill()
+            process.wait()
+            logger.error(f"Build process for {name} failed!")
+            build_successful = False
+    return build_successful
 
 
 def update_nested_dict(current_dict, updates):
