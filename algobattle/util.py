@@ -135,8 +135,25 @@ def run_subprocess(run_command: list, input: bytes, timeout: float, suppress_out
     return raw_output, elapsed_time
 
 
-def build_image(base_cmd: list[str], name: str, path: Path | str, timeout: float | None, unsafe: bool = False) -> bool:
-    """Builds a docker image of the given name using the base_command."""
+def build_image(base_cmd: list[str], name: str, path: Path | str, timeout: float | None) -> bool:
+    """Builds a docker image of the given name using the base_command.
+
+    Parameters
+    ----------
+    base_cmd : list
+        A list containing a shared prefix of a command.
+    name : str
+        The intended name (tag) of the image.
+    path: Path
+        Path to the image.
+    timeout: float
+        Timeout after which the build process is terminated preemptively.
+
+    Returns
+    -------
+    bool
+        Determines whether an image with the given tag is now built and thus accessible.
+    """
     path = Path(path)
     build_successful = True
     with subprocess.Popen(
