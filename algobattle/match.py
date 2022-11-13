@@ -26,16 +26,16 @@ class Match(Subject):
     generating_team = None
     solving_team = None
     battle_wrapper = None
-    creation_flags = 0
+    creationflags = 0
 
     def __init__(self, problem: Problem, config_path: str, teams: list,
                  runtime_overhead=0, approximation_ratio=1.0,
                  cache_docker_containers=True, unsafe_build: bool = False) -> None:
 
         if os.name != 'posix':
-            self.creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP
+            self.creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
         else:
-            self.creation_flags = 0
+            self.creationflags = 0
 
         config = configparser.ConfigParser()
         logger.debug('Using additional configuration options from file "%s".', config_path)
@@ -101,7 +101,7 @@ class Match(Subject):
         """Ensure that internal methods are only callable if docker is running."""
         def wrapper(self, *args, **kwargs):
             docker_running = subprocess.Popen(['docker', 'info'], stdout=subprocess.PIPE,
-                                              stderr=subprocess.PIPE, creationflags=self.creation_flags)
+                                              stderr=subprocess.PIPE, creationflags=self.creationflags)
             _ = docker_running.communicate()
             if docker_running.returncode:
                 logger.error('Could not connect to the docker daemon. Is docker running?')
