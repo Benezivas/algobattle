@@ -9,6 +9,15 @@ from algobattle.docker_util import DockerError, Image
 _team_names: set[str] = set()
 
 
+@dataclass
+class TeamInfo:
+    """Object containing all the info needed to build a team."""
+
+    name: str
+    generator: Path
+    solver: Path
+
+
 class Team:
     """Team class responsible for holding basic information of a specific team."""
 
