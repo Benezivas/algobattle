@@ -17,6 +17,30 @@ class TeamInfo:
     generator: Path
     solver: Path
 
+    def build(self, timeout: float | None = None) -> Team:
+        """Builds the specified docker files into images and return the corresponding team.
+
+        Raises
+        ------
+        ValueError
+            If the team name is already in use.
+        DockerError
+            If the docker build fails for some reason
+        """
+
+        name = self.name.replace(" ", "_").lower()  # Lower case needed for docker tag created from name
+        if name in _team_names:
+            raise
+        generator = Image(self.generator, f"generator-{self}", f"generator for team {self}", timeout=timeout)
+        try:
+            solver = Image(self.solver, f"solver-{self}", f"solver for team {self}", timeout)
+        except DockerError:
+            generator.remove()
+            raise
+        _team_names.add(name)
+        return Team(name, generator, solver)
+
+
 
 class Team:
     """Team class responsible for holding basic information of a specific team."""
