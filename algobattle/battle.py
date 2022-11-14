@@ -129,13 +129,14 @@ def main():
         config = ConfigParser()
         config.read(options.config)
         build_timeout = float(config["run_parameters"]["timeout_build"])
+        team_infos = [TeamInfo(*info) for info in zip(team_names, generators, solvers)]
 
         teams: list[Team] = []
-        for name, generator, solver in zip(team_names, generators, solvers):
+        for info in team_infos:
             try:
-                teams.append(TeamInfo(name, generator, solver).build(build_timeout))
+                teams.append(info.build(build_timeout))
             except (ValueError, DockerError):
-                logger.warning(f"Building generators and solvers for team {name} failed, they will be excluded!")
+                logger.warning(f"Building generators and solvers for team {info.name} failed, they will be excluded!")
 
         fight_handler = FightHandler(problem, config)
         battle_wrapper = BattleWrapper.initialize(options.battle_type, fight_handler, config)
