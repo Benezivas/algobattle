@@ -64,6 +64,7 @@ class Team:
         self.name = self.name.replace(" ", "_").lower()  # Lower case needed for docker tag created from name
         if self.name in _team_names:
             raise ValueError
+        _team_names.add(self.name)
 
     def __str__(self) -> str:
         return self.name
@@ -114,6 +115,7 @@ class ArchivedTeam:
         self.name = self.name.replace(" ", "_").lower()  # Lower case needed for docker tag created from name
         if self.name in _team_names:
             raise ValueError
+        _team_names.add(self.name)
 
     def restore(self) -> Team:
         gen = self.generator.restore()
