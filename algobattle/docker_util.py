@@ -58,6 +58,16 @@ class DockerConfig:
     cpus: int | None = None
 
 
+@dataclass
+class ArchivedImage:
+    """Defines an archived docker image."""
+
+    path: Path
+    name: str
+    id: str
+    description: str
+
+
 class Image:
     """Class defining a docker image.
 
