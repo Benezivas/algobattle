@@ -78,6 +78,12 @@ class Team:
     def __hash__(self) -> int:
         return hash(self.name)
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, _type, _value_, _traceback):
+        self.cleanup()
+
     def cleanup(self) -> None:
         """Removes the built docker images."""
         if self._cleanup_generator:

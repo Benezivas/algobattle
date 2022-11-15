@@ -159,6 +159,9 @@ def main():
                 stack.enter_context(ui)
             else:
                 ui = None
+            if safe_build:
+                for team in restored_teams:
+                    stack.enter_context(team)
 
             result = match_info.run_match(ui)
 
