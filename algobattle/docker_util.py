@@ -68,6 +68,7 @@ class ArchivedImage:
     description: str
 
 
+@dataclass
 class Image:
     """Class defining a docker image.
 
@@ -75,13 +76,18 @@ class Image:
     To prevent this don't use the object after calling `.remove()`.
     """
 
-    def __init__(
-        self,
+    name: str
+    id: str
+    description: str
+
+    @classmethod
+    def build(
+        cls,
         path: Path,
         image_name: str,
         description: str | None = None,
         timeout: float | None = None,
-    ) -> None:
+    ) -> Image:
         """Constructs the python Image object and uses the docker daemon to build the image.
 
         Parameters
@@ -101,7 +107,6 @@ class Image:
             On almost all common issues that might happen during the build, including timeouts, syntax errors,
             OS errors, and errors thrown by the docker daemon.
         """
-        super().__init__()
         if not path.exists():
             raise DockerError(f"Error when building {image_name}: '{path}' does not exist on the file system.")
         logger.debug(f"Building docker container with options: {path = !s}, {image_name = }, {timeout = }")
@@ -134,9 +139,7 @@ class Image:
         except APIError as e:
             raise DockerError(f"Docker APIError thrown while building '{path}':\n{e}") from e
 
-        self.name = image_name
-        self.id = cast(str, image.id)
-        self.description = description if description is not None else image_name
+        return cls(image_name, cast(str, image.id), description if description is not None else image_name)
 
     def __enter__(self):
         return self

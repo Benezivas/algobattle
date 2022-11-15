@@ -24,8 +24,8 @@ class FightHandlertests(unittest.TestCase):
         """Set up a generator and a solver that always run successfully and fight handlers with two different configs."""
         problem = testsproblem.Problem()
         cls.problem_path = Path(testsproblem.__file__).parent
-        cls.gen_succ = Image(cls.problem_path / "generator", "gen_succ")
-        cls.sol_succ = Image(cls.problem_path / "solver", "sol_succ")
+        cls.gen_succ = Image.build(cls.problem_path / "generator", "gen_succ")
+        cls.sol_succ = Image.build(cls.problem_path / "solver", "sol_succ")
 
         config = ConfigParser()
         config.read(Path(algobattle.__file__).parent / "config.ini")
@@ -45,12 +45,12 @@ class FightHandlertests(unittest.TestCase):
     ) -> float:
 
         if isinstance(generator, str):
-            generator = Image(self.problem_path / generator, f"test_{generator}")
+            generator = Image.build(self.problem_path / generator, f"test_{generator}")
         elif generator is None:
             generator = self.gen_succ
 
         if isinstance(solver, str):
-            solver = Image(self.problem_path / solver, f"test_{solver}")
+            solver = Image.build(self.problem_path / solver, f"test_{solver}")
         elif solver is None:
             solver = self.sol_succ
 
