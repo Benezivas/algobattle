@@ -265,7 +265,7 @@ class Image:
         try:
             image = cast(DockerImage, client().images.get(self.name))
             with open(path, "wb") as file:
-                for chunk in image.save(named=self.name):
+                for chunk in image.save(named=True):
                     file.write(chunk)
             image.remove(force=True)
         except:

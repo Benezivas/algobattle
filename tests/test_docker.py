@@ -1,11 +1,12 @@
 """Tests for all docker functions."""
 from __future__ import annotations
+from typing import cast
 import unittest
 import logging
 import random
 from pathlib import Path
 
-from algobattle.docker_util import DockerError, Image
+from algobattle.docker_util import DockerError, Image, client, DockerImage
 from . import testsproblem
 
 logging.disable(logging.CRITICAL)
@@ -53,6 +54,16 @@ class DockerTests(unittest.TestCase):
         with self.assertRaises(DockerError), Image.build(self.problem_path / "generator_execution_error", "gen_err") as image:
             image.run(timeout=10.0)
 
+    def test_archive(self):
+        """Raises an error if the image can't be archived and restored properly."""
+        with Image.build(self.problem_path / "generator", "gen_arch") as image:
+            original_tag = cast(DockerImage, client().images.get(image.id)).tags[0]
+            archived = image.archive()
+            assert (self.problem_path / "generator" / "gen_arch-archive.tar").is_file()
+            restored = archived.restore()
+            docker_image = cast(DockerImage, client().images.get(restored.id))
+            assert docker_image.id == image.id
+            assert docker_image.tags == [original_tag]
 
 if __name__ == '__main__':
     unittest.main()
