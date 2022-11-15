@@ -77,7 +77,7 @@ class ArchivedImage:
                 raise KeyError
         except:
             raise DockerError(f"Docker APIError thrown while restoring '{self.name}'")
-        return Image(self.name, self.id, self.description)
+        return Image(self.name, self.id, self.description, path=self.path)
 
 @dataclass
 class Image:
@@ -90,6 +90,7 @@ class Image:
     name: str
     id: str
     description: str
+    path: Path
 
     @classmethod
     def build(
@@ -150,7 +151,7 @@ class Image:
         except APIError as e:
             raise DockerError(f"Docker APIError thrown while building '{path}':\n{e}") from e
 
-        return cls(image_name, cast(str, image.id), description if description is not None else image_name)
+        return cls(image_name, cast(str, image.id), description if description is not None else image_name, path=path)
 
     def __enter__(self):
         return self
@@ -254,9 +255,13 @@ class Image:
         except APIError as e:
             raise DockerError(f"Docker APIError thrown while removing '{self.name}'") from e
 
-    def archive(self, dir: Path) -> ArchivedImage:
+    def archive(self) -> ArchivedImage:
         """Archives the image into a .tar file at the targeted directory."""
-        path = dir / f"{self.name}-archive.tar"
+        if self.path.is_dir():
+            path = self.path
+        else:
+            path = self.path.parent
+        path = path / f"{self.name}-archive.tar"
         try:
             image = cast(DockerImage, client().images.get(self.name))
             with open(path, "wb") as file:

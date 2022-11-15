@@ -1,10 +1,11 @@
 """Team class, stores necessary information about a Team, such as their associated solver and generator."""
 from __future__ import annotations
-from pathlib import Path
+
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Iterator
 
-from algobattle.docker_util import DockerError, Image
+from algobattle.docker_util import DockerError, Image, ArchivedImage
 
 _team_names: set[str] = set()
 
@@ -83,6 +84,42 @@ class Team:
         if self._cleanup_solver:
             self.solver.remove()
         _team_names.remove(self.name)
+
+    def archive(self) -> ArchivedTeam:
+        """Archives the images this team uses."""
+        gen = self.generator.archive()
+        sol = self.solver.archive()
+        _team_names.discard(self.name)
+        return ArchivedTeam(self.name, gen, sol, _cleanup_generator=self._cleanup_generator, _cleanup_solver=self._cleanup_solver)
+
+
+@dataclass
+class ArchivedTeam:
+    """A team whose images have been archived."""
+    name: str
+    generator: ArchivedImage
+    solver: ArchivedImage
+    _cleanup_generator: bool = False
+    _cleanup_solver: bool = False
+
+    def __post_init__(self) -> None:
+        """Creates a team object.
+
+        Raises
+        ------
+        ValueError
+            If the team name is already in use.
+        """
+        super().__init__()
+        self.name = self.name.replace(" ", "_").lower()  # Lower case needed for docker tag created from name
+        if self.name in _team_names:
+            raise ValueError
+
+    def restore(self) -> Team:
+        gen = self.generator.restore()
+        sol = self.generator.restore()
+        _team_names.discard(self.name)
+        return Team(self.name, gen, sol, _cleanup_generator=self._cleanup_generator, _cleanup_solver=self._cleanup_solver)
 
 
 @dataclass(frozen=True)
