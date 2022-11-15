@@ -76,8 +76,8 @@ class ArchivedImage:
             if self.id not in (i.id for i in images):
                 raise KeyError
             self.path.unlink()
-        except:
-            raise DockerError(f"Docker APIError thrown while restoring '{self.name}'")
+        except APIError as e:
+            raise DockerError(f"Docker APIError thrown while restoring '{self.name}'") from e
         return Image(self.name, self.id, self.description, path=self.path)
 
 @dataclass
@@ -269,6 +269,6 @@ class Image:
                 for chunk in image.save(named=True):
                     file.write(chunk)
             image.remove(force=True)
-        except:
-            raise DockerError(f"Docker APIError thrown while archiving '{self.name}'")
+        except APIError as e:
+            raise DockerError(f"Docker APIError thrown while archiving '{self.name}'") from e
         return ArchivedImage(path, self.name, self.id, self.description)
