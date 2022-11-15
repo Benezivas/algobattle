@@ -67,6 +67,17 @@ class ArchivedImage:
     id: str
     description: str
 
+    def restore(self) -> Image:
+        """Restores a docker image from an archive."""
+        try:
+            with open(self.path, "rb") as file:
+                data = file.read()
+            images = cast(list[DockerImage], client().images.load(data))
+            if self.id not in (i.id for i in images):
+                raise KeyError
+        except:
+            raise DockerError(f"Docker APIError thrown while restoring '{self.name}'")
+        return Image(self.name, self.id, self.description)
 
 @dataclass
 class Image:
@@ -242,3 +253,16 @@ class Image:
 
         except APIError as e:
             raise DockerError(f"Docker APIError thrown while removing '{self.name}'") from e
+
+    def archive(self, dir: Path) -> ArchivedImage:
+        """Archives the image into a .tar file at the targeted directory."""
+        path = dir / f"{self.name}-archive.tar"
+        try:
+            image = cast(DockerImage, client().images.get(self.name))
+            with open(path, "wb") as file:
+                for chunk in image.save(named=self.name):
+                    file.write(chunk)
+            image.remove(force=True)
+        except:
+            raise DockerError(f"Docker APIError thrown while archiving '{self.name}'")
+        return ArchivedImage(path, self.name, self.id, self.description)
