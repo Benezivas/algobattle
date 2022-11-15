@@ -75,6 +75,7 @@ class ArchivedImage:
             images = cast(list[DockerImage], client().images.load(data))
             if self.id not in (i.id for i in images):
                 raise KeyError
+            self.path.unlink()
         except:
             raise DockerError(f"Docker APIError thrown while restoring '{self.name}'")
         return Image(self.name, self.id, self.description, path=self.path)
