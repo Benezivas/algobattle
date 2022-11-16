@@ -31,13 +31,12 @@ class TeamInfo:
         name = self.name.replace(" ", "_").lower()  # Lower case needed for docker tag created from name
         if name in _team_names:
             raise
-        generator = Image.build(self.generator, f"generator-{self}", f"generator for team {self}", timeout=timeout)
+        generator = Image.build(self.generator, f"generator-{name}", f"generator for team {self}", timeout=timeout)
         try:
-            solver = Image.build(self.solver, f"solver-{self}", f"solver for team {self}", timeout)
+            solver = Image.build(self.solver, f"solver-{name}", f"solver for team {self}", timeout)
         except DockerError:
             generator.remove()
             raise
-        _team_names.add(name)
         return Team(name, generator, solver, _cleanup_generator=True, _cleanup_solver=True)
 
 

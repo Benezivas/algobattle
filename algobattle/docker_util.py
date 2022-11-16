@@ -122,7 +122,7 @@ class Image:
         """
         if not path.exists():
             raise DockerError(f"Error when building {image_name}: '{path}' does not exist on the file system.")
-        logger.debug(f"Building docker container with options: {path = !s}, {image_name = }, {timeout = }")
+        logger.debug(f"Building docker image with options: {path = !s}, {image_name = }, {timeout = }")
         try:
             try:
                 old_image = cast(DockerImage, client().images.get(image_name))
