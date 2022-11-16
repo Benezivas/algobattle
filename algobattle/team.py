@@ -97,7 +97,8 @@ class Team:
         gen = self.generator.archive()
         sol = self.solver.archive()
         _team_names.discard(self.name)
-        return ArchivedTeam(self.name, gen, sol, _cleanup_generator=self._cleanup_generator, _cleanup_solver=self._cleanup_solver)
+        return ArchivedTeam(self.name, gen, sol, _cleanup_generator=self._cleanup_generator,
+                            _cleanup_solver=self._cleanup_solver)
 
 
 @dataclass

@@ -143,7 +143,7 @@ def main():
                 teams.append(team)
             except (ValueError, DockerError):
                 logger.warning(f"Building generators and solvers for team {info.name} failed, they will be excluded!")
-        
+
         if safe_build:
             restored_teams = [team.restore() for team in teams if isinstance(team, ArchivedTeam)]
         else:

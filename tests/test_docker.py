@@ -22,7 +22,8 @@ class DockerTests(unittest.TestCase):
 
     def test_build_timeout(self):
         """Raises an error if building a container runs into a timeout."""
-        with self.assertRaises(DockerError), Image.build(self.problem_path / "generator_build_timeout", "gen_built_to", timeout=0.5):
+        with self.assertRaises(DockerError), Image.build(self.problem_path / "generator_build_timeout",
+                                                         "gen_built_to", timeout=0.5):
             pass
 
     def test_build_failed(self):
@@ -64,6 +65,7 @@ class DockerTests(unittest.TestCase):
             docker_image = cast(DockerImage, client().images.get(restored.id))
             assert docker_image.id == image.id
             assert docker_image.tags == [original_tag]
+
 
 if __name__ == '__main__':
     unittest.main()
