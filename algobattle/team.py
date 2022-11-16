@@ -28,7 +28,6 @@ class TeamInfo:
         DockerError
             If the docker build fails for some reason
         """
-
         name = self.name.replace(" ", "_").lower()  # Lower case needed for docker tag created from name
         if name in _team_names:
             raise
@@ -104,6 +103,7 @@ class Team:
 @dataclass
 class ArchivedTeam:
     """A team whose images have been archived."""
+
     name: str
     generator: ArchivedImage
     solver: ArchivedImage
@@ -125,6 +125,7 @@ class ArchivedTeam:
         _team_names.add(self.name)
 
     def restore(self) -> Team:
+        """Restores the archived docker images."""
         gen = self.generator.restore()
         sol = self.generator.restore()
         _team_names.discard(self.name)
