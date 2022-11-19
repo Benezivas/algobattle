@@ -27,7 +27,14 @@ class MatchInfo:
 
     @classmethod
     def build(
-        cls, *, problem_path: Path, config_path: Path, team_infos: list[TeamInfo], rounds: int = 5, battle_type: str, safe_build: bool = True
+        cls,
+        *,
+        problem_path: Path,
+        config_path: Path,
+        team_infos: list[TeamInfo],
+        rounds: int = 5,
+        battle_type: str,
+        safe_build: bool = True,
     ) -> MatchInfo:
         """Builds a :cls:`MatchInfo` object from the provided data, including building the docker images."""
         problem = import_problem_from_path(problem_path)
