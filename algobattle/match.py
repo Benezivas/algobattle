@@ -44,7 +44,7 @@ class MatchInfo:
                 teams.append(team)
             except (ValueError, DockerError):
                 logger.warning(f"Building generators and solvers for team {info.name} failed, they will be excluded!")
-        restored_teams = [team.restore() for team in teams if isinstance(team, ArchivedTeam)]
+        restored_teams = [team.restore() if isinstance(team, ArchivedTeam) else team for team in teams]
 
         fight_handler = FightHandler(problem, config)
         battle_wrapper = BattleWrapper.initialize(battle_type, fight_handler, config)
