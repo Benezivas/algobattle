@@ -58,6 +58,29 @@ class DockerConfig:
     cpus: int | None = None
 
 
+@dataclass
+class ArchivedImage:
+    """Defines an archived docker image."""
+
+    path: Path
+    name: str
+    id: str
+    description: str
+
+    def restore(self) -> Image:
+        """Restores a docker image from an archive."""
+        try:
+            with open(self.path, "rb") as file:
+                data = file.read()
+            images = cast(list[DockerImage], client().images.load(data))
+            if self.id not in (i.id for i in images):
+                raise KeyError
+            self.path.unlink()
+        except APIError as e:
+            raise DockerError(f"Docker APIError thrown while restoring '{self.name}'") from e
+        return Image(self.name, self.id, self.description, path=self.path)
+
+@dataclass
 class Image:
     """Class defining a docker image.
 
@@ -65,13 +88,19 @@ class Image:
     To prevent this don't use the object after calling `.remove()`.
     """
 
-    def __init__(
-        self,
+    name: str
+    id: str
+    description: str
+    path: Path
+
+    @classmethod
+    def build(
+        cls,
         path: Path,
         image_name: str,
         description: str | None = None,
         timeout: float | None = None,
-    ) -> None:
+    ) -> Image:
         """Constructs the python Image object and uses the docker daemon to build the image.
 
         Parameters
@@ -91,10 +120,9 @@ class Image:
             On almost all common issues that might happen during the build, including timeouts, syntax errors,
             OS errors, and errors thrown by the docker daemon.
         """
-        super().__init__()
         if not path.exists():
             raise DockerError(f"Error when building {image_name}: '{path}' does not exist on the file system.")
-        logger.debug(f"Building docker container with options: {path = !s}, {image_name = }, {timeout = }")
+        logger.debug(f"Building docker image with options: {path = !s}, {image_name = }, {timeout = }")
         try:
             try:
                 old_image = cast(DockerImage, client().images.get(image_name))
@@ -124,9 +152,7 @@ class Image:
         except APIError as e:
             raise DockerError(f"Docker APIError thrown while building '{path}':\n{e}") from e
 
-        self.name = image_name
-        self.id = cast(str, image.id)
-        self.description = description if description is not None else image_name
+        return cls(image_name, cast(str, image.id), description if description is not None else image_name, path=path)
 
     def __enter__(self):
         return self
@@ -229,3 +255,20 @@ class Image:
 
         except APIError as e:
             raise DockerError(f"Docker APIError thrown while removing '{self.name}'") from e
+
+    def archive(self) -> ArchivedImage:
+        """Archives the image into a .tar file at the targeted directory."""
+        if self.path.is_dir():
+            path = self.path
+        else:
+            path = self.path.parent
+        path = path / f"{self.name}-archive.tar"
+        try:
+            image = cast(DockerImage, client().images.get(self.name))
+            with open(path, "wb") as file:
+                for chunk in image.save(named=True):
+                    file.write(chunk)
+            image.remove(force=True)
+        except APIError as e:
+            raise DockerError(f"Docker APIError thrown while archiving '{self.name}'") from e
+        return ArchivedImage(path, self.name, self.id, self.description)
