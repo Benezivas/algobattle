@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from itertools import combinations
 import logging
 from pathlib import Path
-from typing import cast
 from prettytable import PrettyTable, DOUBLE_BORDER
 
 from algobattle.battle_wrapper import BattleWrapper
