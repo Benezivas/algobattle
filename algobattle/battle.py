@@ -151,7 +151,7 @@ def main():
 
         fight_handler = FightHandler(problem, config)
         battle_wrapper = BattleWrapper.initialize(options.battle_type, fight_handler, config)
-        match_info = MatchInfo(fight_handler, battle_wrapper, restored_teams, rounds=options.battle_rounds)
+        match_info = MatchInfo(battle_wrapper, restored_teams, rounds=options.battle_rounds)
 
         with ExitStack() as stack:
             if display_ui:

@@ -8,7 +8,6 @@ from prettytable import PrettyTable, DOUBLE_BORDER
 from algobattle.battle_wrapper import BattleWrapper
 from algobattle.observer import Observer, Subject
 from algobattle.team import Matchup, Team
-from algobattle.fight_handler import FightHandler
 
 logger = logging.getLogger('algobattle.match')
 
@@ -17,7 +16,6 @@ logger = logging.getLogger('algobattle.match')
 class MatchInfo:
     """Class specifying all the parameters to run a match."""
 
-    fight_handler: FightHandler
     battle_wrapper: BattleWrapper
     teams: list[Team]
     rounds: int = 5
