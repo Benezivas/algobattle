@@ -35,7 +35,7 @@ def client() -> DockerClient:
     return _client_var
 
 
-def get_os_type() -> Literal["linux"] | Literal["windows"]:
+def get_os_type() -> Literal["linux", "windows"]:
     """OS running inside docker containers."""
     return client().info()["OSType"]
 
