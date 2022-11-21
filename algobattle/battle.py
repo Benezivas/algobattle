@@ -87,7 +87,7 @@ def main():
         parser.add_option('--do_not_count_points', dest='do_not_count_points', action='store_true', help='If set, points are not calculated for the run.')
         parser.add_option('--silent', dest='silent', action='store_true', help='Disable forking the logging output to stderr.')
         parser.add_option('--ui', dest='display_ui', action='store_true', help='If set, the program sets the --silent option and displays a small ui on STDOUT that shows the progress of the battles.')
-        parser.add_option("--unsafe_build", dest="safe_build", action="store_false", help="If set, the docker image builds will not be isolated from each other, speeding up execution but leaving open an attack surface. Only recommende for local development.")
+        parser.add_option("--unsafe_build", dest="safe_build", action="store_false", default=True, help="If set, the docker image builds will not be isolated from each other, speeding up execution but leaving open an attack surface. Only recommende for local development.")
 
         options, _args = parser.parse_args()
 
