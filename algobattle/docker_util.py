@@ -105,6 +105,8 @@ class Image:
         image_name: str,
         description: str | None = None,
         timeout: float | None = None,
+        *,
+        dockerfile: str | None = None,
     ) -> Image:
         """Constructs the python Image object and uses the docker daemon to build the image.
 
@@ -127,6 +129,12 @@ class Image:
         """
         if not path.exists():
             raise DockerError(f"Error when building {image_name}: '{path}' does not exist on the file system.")
+        if dockerfile is not None:
+            if not (path / dockerfile).is_file():
+                raise DockerError(f"Error when building {image_name}: '{path / dockerfile}' does not exist on the file system.")
+            dockerfile_obj = open(path / dockerfile)
+        else:
+            dockerfile_obj = None
         logger.debug(f"Building docker image with options: {path = !s}, {image_name = }, {timeout = }")
         try:
             try:
@@ -143,6 +151,7 @@ class Image:
                     forcerm=True,
                     quiet=True,
                     network_mode="host",
+                    fileobj=dockerfile_obj,
                 ),
             )
             if old_image is not None:
@@ -156,6 +165,9 @@ class Image:
             raise DockerError(f"Building '{path}' did not complete successfully:\n{e.msg}") from e
         except APIError as e:
             raise DockerError(f"Docker APIError thrown while building '{path}':\n{e}") from e
+        finally:
+            if dockerfile_obj is not None:
+                dockerfile_obj.close()
 
         return cls(image_name, cast(str, image.id), description if description is not None else image_name, path=path)
 
