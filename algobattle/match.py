@@ -45,7 +45,7 @@ class MatchInfo:
         teams: list[Team | ArchivedTeam] = []
         for info in team_infos:
             try:
-                team = info.build(build_timeout)
+                team = info.build(build_timeout, auto_cleanup=safe_build)
                 if safe_build:
                     team = team.archive()
                 teams.append(team)
