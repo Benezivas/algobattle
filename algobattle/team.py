@@ -126,7 +126,7 @@ class ArchivedTeam:
     def restore(self) -> Team:
         """Restores the archived docker images."""
         gen = self.generator.restore()
-        sol = self.generator.restore()
+        sol = self.solver.restore()
         _team_names.discard(self.name)
         return Team(self.name, gen, sol, _cleanup_generator=self._cleanup_generator, _cleanup_solver=self._cleanup_solver)
 
