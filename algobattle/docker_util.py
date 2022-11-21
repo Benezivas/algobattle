@@ -252,7 +252,8 @@ class Image:
         """
         try:
             client().images.remove(image=self.id, force=True)
-
+        except ImageNotFound as e:
+            pass
         except APIError as e:
             raise DockerError(f"Docker APIError thrown while removing '{self.name}'") from e
 
