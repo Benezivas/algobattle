@@ -218,7 +218,8 @@ class Image:
             elapsed_time = round(default_timer() - start_time, 2)
 
             if (exit_code := cast(dict[str, Any], container.attrs)["State"]["ExitCode"]) != 0:
-                raise DockerError(f"{self.description} exited with error code: {exit_code}")
+                raise DockerError(f"{self.description} exited with error code {exit_code} "
+                                  f"and error message '{container.logs().decode()}'")
             output_iter, _stat = container.get_archive("output")
             output = extract(b"".join(output_iter), "output")
 
