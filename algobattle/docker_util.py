@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 from time import sleep
 from timeit import default_timer
-from typing import Any, Iterator, cast
+from typing import Any, Iterator, Literal, cast
 from uuid import uuid1
 from dataclasses import dataclass
 from docker import DockerClient
@@ -33,6 +33,11 @@ def client() -> DockerClient:
         logger.error(err)
         raise SystemExit(f"Exited algobattle: {err}")
     return _client_var
+
+
+def get_os_type() -> Literal["linux"] | Literal["windows"]:
+    """OS running inside docker containers."""
+    return client().info()["OSType"]
 
 
 class DockerError(Exception):
