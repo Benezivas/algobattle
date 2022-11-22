@@ -26,13 +26,16 @@ class DockerTests(unittest.TestCase):
 
     def test_build_timeout(self):
         """Raises an error if building a container runs into a timeout."""
-        with self.assertRaises(DockerError), Image.build(self.problem_path / "generator_build_timeout",
-                                                         "gen_built_to", timeout=0.5, dockerfile=self.dockerfile):
+        with self.assertRaises(DockerError), Image.build(
+            self.problem_path / "generator_build_timeout", "gen_built_to", timeout=0.5, dockerfile=self.dockerfile
+        ):
             pass
 
     def test_build_failed(self):
         """Raises an error if building a docker container fails for any reason other than a timeout."""
-        with self.assertRaises(DockerError), Image.build(self.problem_path / "generator_build_error", "gen_build_error", dockerfile=self.dockerfile):
+        with self.assertRaises(DockerError), Image.build(
+            self.problem_path / "generator_build_error", "gen_build_error", dockerfile=self.dockerfile
+        ):
             pass
 
     def test_build_successful(self):
@@ -45,7 +48,7 @@ class DockerTests(unittest.TestCase):
         with self.assertRaises(DockerError):
             nonexistent_file = None
             while nonexistent_file is None or nonexistent_file.exists():
-                nonexistent_file = Path(str(random.randint(0, 2 ** 80)))
+                nonexistent_file = Path(str(random.randint(0, 2**80)))
             with Image.build(nonexistent_file, "foo_bar", dockerfile=self.dockerfile):
                 pass
 
@@ -56,7 +59,9 @@ class DockerTests(unittest.TestCase):
 
     def test_run_error(self):
         """Raises an error if the container doesn't run successfully."""
-        with self.assertRaises(DockerError), Image.build(self.problem_path / "generator_execution_error", "gen_err", dockerfile=self.dockerfile) as image:
+        with self.assertRaises(DockerError), Image.build(
+            self.problem_path / "generator_execution_error", "gen_err", dockerfile=self.dockerfile
+        ) as image:
             image.run(timeout=10.0)
 
     def test_archive(self):
@@ -71,5 +76,5 @@ class DockerTests(unittest.TestCase):
             assert docker_image.tags == [original_tag]
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
