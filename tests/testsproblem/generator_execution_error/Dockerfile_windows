@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/windows/servercore:20H2
+FROM windows-base
 
 # causes an error on container execution
 ENTRYPOINT thisisnotavalidcommand
