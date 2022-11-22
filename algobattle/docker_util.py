@@ -20,6 +20,8 @@ logger = logging.getLogger("algobattle.docker")
 
 
 _client_var: DockerClient | None = None
+
+
 def client() -> DockerClient:
     """Returns the docker api client, checking that it's still responsive."""
     global _client_var
@@ -85,6 +87,7 @@ class ArchivedImage:
             raise DockerError(f"Docker APIError thrown while restoring '{self.name}'") from e
         return Image(self.name, self.id, self.description, path=self.path)
 
+
 @dataclass
 class Image:
     """Class defining a docker image.
@@ -131,7 +134,9 @@ class Image:
             raise DockerError(f"Error when building {image_name}: '{path}' does not exist on the file system.")
         if path.is_file():
             if dockerfile is not None:
-                raise DockerError(f"Error when building {image_name}: '{path}' refers to a file and 'dockerfile' is specified.")
+                raise DockerError(
+                    f"Error when building {image_name}: '{path}' refers to a file and 'dockerfile' is specified."
+                )
             dockerfile = path.name
             path = path.parent
         logger.debug(f"Building docker image with options: {path = !s}, {image_name = }, {timeout = }")
@@ -173,9 +178,7 @@ class Image:
     def __exit__(self, _type, _value_, _traceback):
         self.remove()
 
-    def run(
-        self, input: str = "", timeout: float | None = None, memory: int | None = None, cpus: int | None = None
-    ) -> str:
+    def run(self, input: str = "", timeout: float | None = None, memory: int | None = None, cpus: int | None = None) -> str:
         """Runs a docker image with the provided input and returns its output.
 
         Parameters
@@ -208,14 +211,17 @@ class Image:
 
         container: DockerContainer | None = None
         try:
-            container = cast(DockerContainer, client().containers.create(
-                image=self.id,
-                name=name,
-                mem_limit=memory,
-                nano_cpus=cpus,
-                detach=True,
-                network_mode="none",
-            ))
+            container = cast(
+                DockerContainer,
+                client().containers.create(
+                    image=self.id,
+                    name=name,
+                    mem_limit=memory,
+                    nano_cpus=cpus,
+                    detach=True,
+                    network_mode="none",
+                ),
+            )
             ok = container.put_archive("/", archive(input, "input"))
             if not ok:
                 raise DockerError(f"Copying input into container {self.name} failed")
@@ -231,8 +237,10 @@ class Image:
             elapsed_time = round(default_timer() - start_time, 2)
 
             if (exit_code := cast(dict[str, Any], container.attrs)["State"]["ExitCode"]) != 0:
-                raise DockerError(f"{self.description} exited with error code {exit_code} "
-                                  f"and error message '{container.logs().decode()}'")
+                raise DockerError(
+                    f"{self.description} exited with error code {exit_code} "
+                    f"and error message '{container.logs().decode()}'"
+                )
             output_iter, _stat = container.get_archive("output")
             output = extract(b"".join(output_iter), "output")
 
