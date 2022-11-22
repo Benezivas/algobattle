@@ -61,8 +61,8 @@ class Matchtests(unittest.TestCase):
 
         cls.wrapper_iter = Iterated(cls.fight_handler, cls.config)
         cls.wrapper_avg = Averaged(cls.fight_handler, cls.config)
-        cls.match_iter = MatchInfo(cls.fight_handler, cls.wrapper_iter, [cls.team0, cls.team1])
-        cls.match_avg = MatchInfo(cls.fight_handler, cls.wrapper_avg, [cls.team0, cls.team1])
+        cls.match_iter = MatchInfo(cls.wrapper_iter, [cls.team0, cls.team1])
+        cls.match_avg = MatchInfo(cls.wrapper_avg, [cls.team0, cls.team1])
 
     def test_all_battle_pairs_two_teams(self):
         """Two teams both generate and solve one time each."""
@@ -70,7 +70,7 @@ class Matchtests(unittest.TestCase):
 
     def test_all_battle_pairs_single_player(self):
         """A team playing against itself is the only battle pair in single player."""
-        match = MatchInfo(self.fight_handler, self.wrapper_iter, [self.team0])
+        match = MatchInfo(self.wrapper_iter, [self.team0])
         self.assertEqual(match.matchups, [Matchup(self.team0, self.team0)])
 
     def test_calculate_points_zero_rounds(self):

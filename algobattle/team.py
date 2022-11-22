@@ -18,7 +18,7 @@ class TeamInfo:
     generator: Path
     solver: Path
 
-    def build(self, timeout: float | None = None) -> Team:
+    def build(self, timeout: float | None = None, *, auto_cleanup=True) -> Team:
         """Builds the specified docker files into images and return the corresponding team.
 
         Raises
@@ -37,7 +37,7 @@ class TeamInfo:
         except DockerError:
             generator.remove()
             raise
-        return Team(name, generator, solver, _cleanup_generator=True, _cleanup_solver=True)
+        return Team(name, generator, solver, _cleanup_generator=auto_cleanup, _cleanup_solver=auto_cleanup)
 
 
 @dataclass
@@ -126,7 +126,7 @@ class ArchivedTeam:
     def restore(self) -> Team:
         """Restores the archived docker images."""
         gen = self.generator.restore()
-        sol = self.generator.restore()
+        sol = self.solver.restore()
         _team_names.discard(self.name)
         return Team(self.name, gen, sol, _cleanup_generator=self._cleanup_generator, _cleanup_solver=self._cleanup_solver)
 

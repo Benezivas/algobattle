@@ -6,18 +6,12 @@ import datetime as dt
 
 from optparse import OptionParser
 from pathlib import Path
-from configparser import ConfigParser
 from importlib.metadata import version as pkg_version
-from typing import cast
 
 import algobattle
-from algobattle.fight_handler import FightHandler
 from algobattle.match import MatchInfo
-from algobattle.team import ArchivedTeam, Team, TeamInfo
-from algobattle.util import import_problem_from_path
-from algobattle.battle_wrapper import BattleWrapper
+from algobattle.team import TeamInfo
 from algobattle.ui import Ui
-from algobattle.docker_util import DockerError
 
 
 def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
@@ -93,7 +87,7 @@ def main():
         parser.add_option('--do_not_count_points', dest='do_not_count_points', action='store_true', help='If set, points are not calculated for the run.')
         parser.add_option('--silent', dest='silent', action='store_true', help='Disable forking the logging output to stderr.')
         parser.add_option('--ui', dest='display_ui', action='store_true', help='If set, the program sets the --silent option and displays a small ui on STDOUT that shows the progress of the battles.')
-        parser.add_option("--unsafe_build", dest="safe_build", action="store_false", help="If set, the docker image builds will not be isolated from each other, speeding up execution but leaving open an attack surface. Only recommende for local development.")
+        parser.add_option("--unsafe_build", dest="safe_build", action="store_false", default=True, help="If set, the docker image builds will not be isolated from each other, speeding up execution but leaving open an attack surface. Only recommende for local development.")
 
         options, _args = parser.parse_args()
 
@@ -121,47 +115,24 @@ def main():
         raise SystemExit("Received keyboard interrupt, terminating execution.")
 
     try:
-        problem = import_problem_from_path(problem_path)
-        if not problem:
-            raise SystemExit
-
         logger.debug('Options for this run: {}'.format(options))
         logger.debug('Contents of sys.argv: {}'.format(sys.argv))
         logger.debug('Using additional configuration options from file "%s".', options.config)
-        config = ConfigParser()
-        config.read(options.config)
-        build_timeout = float(config["run_parameters"]["timeout_build"])
         team_infos = [TeamInfo(*info) for info in zip(team_names, generators, solvers)]
-        safe_build: bool = options.safe_build
 
-        teams: list[Team | ArchivedTeam] = []
-        for info in team_infos:
-            try:
-                team = info.build(build_timeout)
-                if safe_build:
-                    team = team.archive()
-                teams.append(team)
-            except (ValueError, DockerError):
-                logger.warning(f"Building generators and solvers for team {info.name} failed, they will be excluded!")
-
-        if safe_build:
-            restored_teams = [team.restore() for team in teams if isinstance(team, ArchivedTeam)]
-        else:
-            restored_teams = cast(list[Team], teams)
-
-        fight_handler = FightHandler(problem, config)
-        battle_wrapper = BattleWrapper.initialize(options.battle_type, fight_handler, config)
-        match_info = MatchInfo(fight_handler, battle_wrapper, restored_teams, rounds=options.battle_rounds)
-
-        with ExitStack() as stack:
+        with MatchInfo.build(
+            problem_path=problem_path,
+            config_path=options.config,
+            team_infos=team_infos,
+            rounds=options.battle_rounds,
+            battle_type=options.battle_type,
+            safe_build=options.safe_build
+        ) as match_info, ExitStack() as stack:
             if display_ui:
                 ui = Ui()
                 stack.enter_context(ui)
             else:
                 ui = None
-            if safe_build:
-                for team in restored_teams:
-                    stack.enter_context(team)
 
             result = match_info.run_match(ui)
 

@@ -1,26 +1,68 @@
 """Central managing module for an algorithmic battle."""
 from __future__ import annotations
+from configparser import ConfigParser
 from dataclasses import dataclass
 from itertools import combinations
 import logging
+from pathlib import Path
 from prettytable import PrettyTable, DOUBLE_BORDER
 
 from algobattle.battle_wrapper import BattleWrapper
-from algobattle.observer import Observer, Subject
-from algobattle.team import Matchup, Team
+from algobattle.docker_util import DockerError
 from algobattle.fight_handler import FightHandler
+from algobattle.observer import Observer, Subject
+from algobattle.team import ArchivedTeam, Matchup, Team, TeamInfo
+from algobattle.util import import_problem_from_path
 
-logger = logging.getLogger('algobattle.match')
+logger = logging.getLogger("algobattle.match")
 
 
 @dataclass
 class MatchInfo:
     """Class specifying all the parameters to run a match."""
 
-    fight_handler: FightHandler
     battle_wrapper: BattleWrapper
     teams: list[Team]
     rounds: int = 5
+
+    @classmethod
+    def build(
+        cls,
+        *,
+        problem_path: Path,
+        config_path: Path,
+        team_infos: list[TeamInfo],
+        rounds: int = 5,
+        battle_type: str,
+        safe_build: bool = True,
+    ) -> MatchInfo:
+        """Builds a :cls:`MatchInfo` object from the provided data, including building the docker images."""
+        problem = import_problem_from_path(problem_path)
+        config = ConfigParser()
+        config.read(config_path)
+        build_timeout = float(config["run_parameters"]["timeout_build"])
+
+        teams: list[Team | ArchivedTeam] = []
+        for info in team_infos:
+            try:
+                team = info.build(build_timeout, auto_cleanup=safe_build)
+                if safe_build:
+                    team = team.archive()
+                teams.append(team)
+            except (ValueError, DockerError):
+                logger.warning(f"Building generators and solvers for team {info.name} failed, they will be excluded!")
+        restored_teams = [team.restore() if isinstance(team, ArchivedTeam) else team for team in teams]
+
+        fight_handler = FightHandler(problem, config)
+        battle_wrapper = BattleWrapper.initialize(battle_type, fight_handler, config)
+        return MatchInfo(battle_wrapper, restored_teams, rounds)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, _type, _value_, _traceback):
+        for team in self.teams:
+            team.cleanup()
 
     @property
     def grouped_matchups(self) -> list[tuple[Matchup, Matchup]]:
@@ -49,6 +91,7 @@ class MatchInfo:
                 result.notify()
         return result
 
+
 class MatchResult(Subject, dict[Matchup, list[BattleWrapper.Result]]):
     """The Result of a whole Match."""
 
@@ -70,7 +113,7 @@ class MatchResult(Subject, dict[Matchup, list[BattleWrapper.Result]]):
         if any(not 0 <= len(results) <= self.match.rounds for results in self.values()):
             raise ValueError
 
-        points = {team: 0. for team in self.match.teams}
+        points = {team: 0.0 for team in self.match.teams}
         if self.match.rounds == 0:
             return points
         points_per_round = round(achievable_points / self.match.rounds, 1)
