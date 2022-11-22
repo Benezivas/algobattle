@@ -1,0 +1,5 @@
+FROM mcr.microsoft.com/windows/servercore:20H2
+
+# outputs a static solution.
+COPY output /output
+ENTRYPOINT echo 1
