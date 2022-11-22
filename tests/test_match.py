@@ -7,11 +7,12 @@ from configparser import ConfigParser
 from pathlib import Path
 
 import algobattle
+from algobattle.battle import setup_logging
 from algobattle.battle_wrappers.iterated import Iterated
 from algobattle.battle_wrappers.averaged import Averaged
 from algobattle.fight_handler import FightHandler
 from algobattle.match import MatchInfo, MatchResult
-from algobattle.team import Team, Matchup
+from algobattle.team import Team, Matchup, TeamInfo
 from algobattle.docker_util import Image
 from . import testsproblem
 
@@ -53,7 +54,7 @@ class Matchtests(unittest.TestCase):
         cls.matchup0 = Matchup(cls.team0, cls.team1)
         cls.matchup1 = Matchup(cls.team1, cls.team0)
 
-        config_path = Path(algobattle.__file__).parent / 'config.ini'
+        config_path = Path(algobattle.__file__).parent / "config.ini"
         cls.config = ConfigParser()
         cls.config.read(config_path)
 
@@ -146,5 +147,40 @@ class Matchtests(unittest.TestCase):
     # TODO: Add tests for remaining functions
 
 
-if __name__ == '__main__':
+class Execution(unittest.TestCase):
+    """Some basic tests for the execution of the battles."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        setup_logging(Path.home() / ".algobattle_logs", verbose_logging=True, silent=False)
+        cls.problem = Path(__file__).parent / "testsproblem"
+        cls.config = cls.problem / "config_short_run_timeout.ini"
+
+    def test_basic(self):
+        team = TeamInfo("team0", self.problem / "generator", self.problem / "solver")
+        match_info = MatchInfo.build(
+            problem_path=self.problem, config_path=self.config, team_infos=[team], battle_type="iterated", rounds=2
+        )
+        with match_info:
+            match_info.run_match()
+
+    def test_multi_team(self):
+        team0 = TeamInfo("team0", self.problem / "generator", self.problem / "solver")
+        team1 = TeamInfo("team1", self.problem / "generator", self.problem / "solver")
+        match_info = MatchInfo.build(
+            problem_path=self.problem, config_path=self.config, team_infos=[team0, team1], battle_type="iterated", rounds=2
+        )
+        with match_info:
+            match_info.run_match()
+
+    def test_averaged(self):
+        team = TeamInfo("team0", self.problem / "generator", self.problem / "solver")
+        match_info = MatchInfo.build(
+            problem_path=self.problem, config_path=self.config, team_infos=[team], battle_type="averaged", rounds=2
+        )
+        with match_info:
+            match_info.run_match()
+
+
+if __name__ == "__main__":
     unittest.main()
