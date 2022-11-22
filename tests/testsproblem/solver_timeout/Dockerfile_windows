@@ -1,0 +1,4 @@
+FROM windows-base
+
+# causes an execution timeout.
+ENTRYPOINT cmd /c ping -t localhost > NUL

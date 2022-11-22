@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 from time import sleep
 from timeit import default_timer
-from typing import Any, Iterator, cast
+from typing import Any, Iterator, Literal, cast
 from uuid import uuid1
 from dataclasses import dataclass
 from docker import DockerClient
@@ -20,6 +20,8 @@ logger = logging.getLogger("algobattle.docker")
 
 
 _client_var: DockerClient | None = None
+
+
 def client() -> DockerClient:
     """Returns the docker api client, checking that it's still responsive."""
     global _client_var
@@ -33,6 +35,11 @@ def client() -> DockerClient:
         logger.error(err)
         raise SystemExit(f"Exited algobattle: {err}")
     return _client_var
+
+
+def get_os_type() -> Literal["linux", "windows"]:
+    """OS running inside docker containers."""
+    return client().info()["OSType"]
 
 
 class DockerError(Exception):
@@ -80,6 +87,7 @@ class ArchivedImage:
             raise DockerError(f"Docker APIError thrown while restoring '{self.name}'") from e
         return Image(self.name, self.id, self.description, path=self.path)
 
+
 @dataclass
 class Image:
     """Class defining a docker image.
@@ -100,6 +108,8 @@ class Image:
         image_name: str,
         description: str | None = None,
         timeout: float | None = None,
+        *,
+        dockerfile: str | None = None,
     ) -> Image:
         """Constructs the python Image object and uses the docker daemon to build the image.
 
@@ -122,6 +132,13 @@ class Image:
         """
         if not path.exists():
             raise DockerError(f"Error when building {image_name}: '{path}' does not exist on the file system.")
+        if path.is_file():
+            if dockerfile is not None:
+                raise DockerError(
+                    f"Error when building {image_name}: '{path}' refers to a file and 'dockerfile' is specified."
+                )
+            dockerfile = path.name
+            path = path.parent
         logger.debug(f"Building docker image with options: {path = !s}, {image_name = }, {timeout = }")
         try:
             try:
@@ -138,6 +155,7 @@ class Image:
                     forcerm=True,
                     quiet=True,
                     network_mode="host",
+                    dockerfile=dockerfile,
                 ),
             )
             if old_image is not None:
@@ -160,9 +178,7 @@ class Image:
     def __exit__(self, _type, _value_, _traceback):
         self.remove()
 
-    def run(
-        self, input: str = "", timeout: float | None = None, memory: int | None = None, cpus: int | None = None
-    ) -> str:
+    def run(self, input: str = "", timeout: float | None = None, memory: int | None = None, cpus: int | None = None) -> str:
         """Runs a docker image with the provided input and returns its output.
 
         Parameters
@@ -195,14 +211,17 @@ class Image:
 
         container: DockerContainer | None = None
         try:
-            container = cast(DockerContainer, client().containers.create(
-                image=self.id,
-                name=name,
-                mem_limit=memory,
-                nano_cpus=cpus,
-                detach=True,
-                network_mode="none",
-            ))
+            container = cast(
+                DockerContainer,
+                client().containers.create(
+                    image=self.id,
+                    name=name,
+                    mem_limit=memory,
+                    nano_cpus=cpus,
+                    detach=True,
+                    network_mode="none",
+                ),
+            )
             ok = container.put_archive("/", archive(input, "input"))
             if not ok:
                 raise DockerError(f"Copying input into container {self.name} failed")
@@ -217,8 +236,11 @@ class Image:
                 sleep(0.01)
             elapsed_time = round(default_timer() - start_time, 2)
 
-            if exit_code := cast(dict[str, Any], container.attrs)["State"]["ExitCode"] != 0:
-                raise DockerError(f"{self.description} exited with error code: {exit_code}")
+            if (exit_code := cast(dict[str, Any], container.attrs)["State"]["ExitCode"]) != 0:
+                raise DockerError(
+                    f"{self.description} exited with error code {exit_code} "
+                    f"and error message '{container.logs().decode()}'"
+                )
             output_iter, _stat = container.get_archive("output")
             output = extract(b"".join(output_iter), "output")
 

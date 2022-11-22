@@ -40,39 +40,13 @@ jobs:
     - name: install Docker
       if: runner.os == 'macOS'
       uses: docker-practice/actions-setup-docker@master
-    - name: get fake alpine image for tests
+    - name: setup windows base image
       if: runner.os == 'Windows'
       run: |
-        docker image tag mcr.microsoft.com/windows/servercore:ltsc2022 alpine
+        docker image tag mcr.microsoft.com/windows/nanoserver:ltsc2022 windows-base
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install . --user
     - name: Test using unittests
       run: python -m unittest --failfast
-
-  execute:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
-    steps:
-    - uses: actions/checkout@v2
-    - name: Set up Python
-      uses: actions/setup-python@v2
-      with:
-        python-version: "3.10"
-    - name: get fake alpine image for tests
-      if: runner.os == 'Windows'
-      run: |
-        docker image tag mcr.microsoft.com/windows/servercore:ltsc2022 alpine
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install . --user
-    - name: Run short battles with different options as a sanity check
-      run: |
-        algobattle tests/testsproblem --verbose --config=tests/testsproblem/config_short_run_timeout.ini --rounds=2
-        algobattle tests/testsproblem --verbose --config=tests/testsproblem/config_short_run_timeout.ini --rounds=2 --generators=tests/testsproblem/generator,tests/testsproblem/generator --solvers=tests/testsproblem/solver,tests/testsproblem/solver --team_names=team1,team2
-        algobattle tests/testsproblem --verbose --config=tests/testsproblem/config_short_run_timeout.ini --battle_type=averaged --rounds=2

@@ -1,0 +1,3 @@
+FROM windows-base
+
+RUN sleep 6000
