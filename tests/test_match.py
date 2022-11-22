@@ -13,7 +13,7 @@ from algobattle.battle_wrappers.averaged import Averaged
 from algobattle.fight_handler import FightHandler
 from algobattle.match import MatchInfo, MatchResult
 from algobattle.team import Team, Matchup, TeamInfo
-from algobattle.docker_util import Image
+from algobattle.docker_util import Image, get_os_type
 from . import testsproblem
 
 logging.disable(logging.CRITICAL)
@@ -156,6 +156,11 @@ class Execution(unittest.TestCase):
         setup_logging(Path.home() / ".algobattle_logs", verbose_logging=True, silent=False)
         cls.problem = Path(__file__).parent / "testsproblem"
         cls.config = cls.problem / "config_short_run_timeout.ini"
+        cls.generator = cls.problem / "generator"
+        cls.solver = cls.problem / "solver"
+        if get_os_type() == "windows":
+            cls.generator /= "Dockerfile_windows"
+            cls.solver /= "Dockerfile_windows"
 
     @classmethod
     def tearDownClass(cls) -> None:
@@ -163,7 +168,7 @@ class Execution(unittest.TestCase):
         return super().tearDownClass()
 
     def test_basic(self):
-        team = TeamInfo("team0", self.problem / "generator", self.problem / "solver")
+        team = TeamInfo("team0", self.generator, self.solver)
         match_info = MatchInfo.build(
             problem_path=self.problem, config_path=self.config, team_infos=[team], battle_type="iterated", rounds=2
         )
@@ -171,8 +176,8 @@ class Execution(unittest.TestCase):
             match_info.run_match()
 
     def test_multi_team(self):
-        team0 = TeamInfo("team0", self.problem / "generator", self.problem / "solver")
-        team1 = TeamInfo("team1", self.problem / "generator", self.problem / "solver")
+        team0 = TeamInfo("team0", self.generator, self.solver)
+        team1 = TeamInfo("team1", self.generator, self.solver)
         match_info = MatchInfo.build(
             problem_path=self.problem, config_path=self.config, team_infos=[team0, team1], battle_type="iterated", rounds=2
         )
@@ -180,7 +185,7 @@ class Execution(unittest.TestCase):
             match_info.run_match()
 
     def test_averaged(self):
-        team = TeamInfo("team0", self.problem / "generator", self.problem / "solver")
+        team = TeamInfo("team0", self.generator, self.solver)
         match_info = MatchInfo.build(
             problem_path=self.problem, config_path=self.config, team_infos=[team], battle_type="averaged", rounds=2
         )

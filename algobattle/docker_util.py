@@ -129,6 +129,11 @@ class Image:
         """
         if not path.exists():
             raise DockerError(f"Error when building {image_name}: '{path}' does not exist on the file system.")
+        if path.is_file():
+            if dockerfile is not None:
+                raise DockerError(f"Error when building {image_name}: '{path}' refers to a file and 'dockerfile' is specified.")
+            dockerfile = path.name
+            path = path.parent
         logger.debug(f"Building docker image with options: {path = !s}, {image_name = }, {timeout = }")
         try:
             try:
