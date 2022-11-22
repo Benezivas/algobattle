@@ -152,9 +152,15 @@ class Execution(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
+        logging.disable(logging.NOTSET) # reenable logging
         setup_logging(Path.home() / ".algobattle_logs", verbose_logging=True, silent=False)
         cls.problem = Path(__file__).parent / "testsproblem"
         cls.config = cls.problem / "config_short_run_timeout.ini"
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        logging.disable(logging.CRITICAL)
+        return super().tearDownClass()
 
     def test_basic(self):
         team = TeamInfo("team0", self.problem / "generator", self.problem / "solver")
