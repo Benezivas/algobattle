@@ -10,7 +10,7 @@ from uuid import uuid4
 import algobattle
 from algobattle.fight_handler import FightHandler
 from algobattle.team import Matchup, Team
-from algobattle.docker_util import Image
+from algobattle.docker_util import Image, get_os_type
 from . import testsproblem
 
 logging.disable(logging.CRITICAL)
@@ -24,8 +24,12 @@ class FightHandlertests(unittest.TestCase):
         """Set up a generator and a solver that always run successfully and fight handlers with two different configs."""
         problem = testsproblem.Problem()
         cls.problem_path = Path(testsproblem.__file__).parent
-        cls.gen_succ = Image.build(cls.problem_path / "generator", "gen_succ")
-        cls.sol_succ = Image.build(cls.problem_path / "solver", "sol_succ")
+        if get_os_type() == "windows":
+            cls.dockerfile = "Dockerfile_windows"
+        else:
+            cls.dockerfile = None
+        cls.gen_succ = Image.build(cls.problem_path / "generator", "gen_succ", dockerfile=cls.dockerfile)
+        cls.sol_succ = Image.build(cls.problem_path / "solver", "sol_succ", dockerfile=cls.dockerfile)
 
         config = ConfigParser()
         config.read(Path(algobattle.__file__).parent / "config.ini")
@@ -45,12 +49,12 @@ class FightHandlertests(unittest.TestCase):
     ) -> float:
 
         if isinstance(generator, str):
-            generator = Image.build(self.problem_path / generator, f"test_{generator}")
+            generator = Image.build(self.problem_path / generator, f"test_{generator}", dockerfile=self.dockerfile)
         elif generator is None:
             generator = self.gen_succ
 
         if isinstance(solver, str):
-            solver = Image.build(self.problem_path / solver, f"test_{solver}")
+            solver = Image.build(self.problem_path / solver, f"test_{solver}", dockerfile=self.dockerfile)
         elif solver is None:
             solver = self.sol_succ
 

@@ -6,7 +6,7 @@ import logging
 import random
 from pathlib import Path
 
-from algobattle.docker_util import DockerError, Image, client, DockerImage
+from algobattle.docker_util import DockerError, Image, client, DockerImage, get_os_type
 from . import testsproblem
 
 logging.disable(logging.CRITICAL)
@@ -19,21 +19,25 @@ class DockerTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         """Set up the path to the docker containers."""
         cls.problem_path = Path(testsproblem.__file__).parent
+        if get_os_type() == "windows":
+            cls.dockerfile = "Dockerfile_windows"
+        else:
+            cls.dockerfile = None
 
     def test_build_timeout(self):
         """Raises an error if building a container runs into a timeout."""
         with self.assertRaises(DockerError), Image.build(self.problem_path / "generator_build_timeout",
-                                                         "gen_built_to", timeout=0.5):
+                                                         "gen_built_to", timeout=0.5, dockerfile=self.dockerfile):
             pass
 
     def test_build_failed(self):
         """Raises an error if building a docker container fails for any reason other than a timeout."""
-        with self.assertRaises(DockerError), Image.build(self.problem_path / "generator_build_error", "gen_build_error"):
+        with self.assertRaises(DockerError), Image.build(self.problem_path / "generator_build_error", "gen_build_error", dockerfile=self.dockerfile):
             pass
 
     def test_build_successful(self):
         """Runs successfully if a docker container builds successfully."""
-        with Image.build(self.problem_path / "generator", "gen_succ"):
+        with Image.build(self.problem_path / "generator", "gen_succ", dockerfile=self.dockerfile):
             pass
 
     def test_build_nonexistant_path(self):
@@ -42,22 +46,22 @@ class DockerTests(unittest.TestCase):
             nonexistent_file = None
             while nonexistent_file is None or nonexistent_file.exists():
                 nonexistent_file = Path(str(random.randint(0, 2 ** 80)))
-            with Image.build(nonexistent_file, "foo_bar"):
+            with Image.build(nonexistent_file, "foo_bar", dockerfile=self.dockerfile):
                 pass
 
     def test_run_timeout(self):
         """`Image.run()` normally terminates when the container times out."""
-        with Image.build(self.problem_path / "generator_timeout", "gen_to") as image:
+        with Image.build(self.problem_path / "generator_timeout", "gen_to", dockerfile=self.dockerfile) as image:
             image.run(timeout=1.0)
 
     def test_run_error(self):
         """Raises an error if the container doesn't run successfully."""
-        with self.assertRaises(DockerError), Image.build(self.problem_path / "generator_execution_error", "gen_err") as image:
+        with self.assertRaises(DockerError), Image.build(self.problem_path / "generator_execution_error", "gen_err", dockerfile=self.dockerfile) as image:
             image.run(timeout=10.0)
 
     def test_archive(self):
         """Raises an error if the image can't be archived and restored properly."""
-        with Image.build(self.problem_path / "generator", "gen_arch") as image:
+        with Image.build(self.problem_path / "generator", "gen_arch", dockerfile=self.dockerfile) as image:
             original_tag = cast(DockerImage, client().images.get(image.id)).tags[0]
             archived = image.archive()
             assert (self.problem_path / "generator" / "gen_arch-archive.tar").is_file()
