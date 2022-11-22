@@ -152,7 +152,7 @@ class Execution(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        logging.disable(logging.NOTSET) # reenable logging
+        logging.disable(logging.NOTSET)     # reenable logging
         setup_logging(Path.home() / ".algobattle_logs", verbose_logging=True, silent=False)
         cls.problem = Path(__file__).parent / "testsproblem"
         cls.config = cls.problem / "config_short_run_timeout.ini"
