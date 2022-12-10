@@ -29,7 +29,7 @@ class BattleWrapper(ABC):
     config: Config
 
     @staticmethod
-    def initialize(wrapper_name: str, fight_handler: FightHandler, config: ConfigParser) -> BattleWrapper:
+    def initialize(wrapper_name: str, fight_handler: FightHandler, config: BattleWrapper.Config) -> BattleWrapper:
         """Try to import and initialize a Battle Wrapper from a given name.
 
         For this to work, a BattleWrapper module with the same name as the argument
@@ -60,10 +60,10 @@ class BattleWrapper(ABC):
             logger.critical(f"Importing a wrapper from the given path failed with the following exception: {e}")
             raise ValueError from e
 
-    def __init__(self, fight_handler: FightHandler, config: ConfigParser) -> None:
+    def __init__(self, fight_handler: FightHandler, config: BattleWrapper.Config) -> None:
         super().__init__()
         self.fight_handler = fight_handler
-        self.config = self.Config(**config)
+        self.config = config
 
     @abstractmethod
     def run_round(self, matchup: Matchup, observer: Observer | None = None) -> BattleWrapper.Result:
