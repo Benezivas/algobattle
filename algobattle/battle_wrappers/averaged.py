@@ -4,7 +4,6 @@ from dataclasses import InitVar, dataclass, field
 import logging
 
 from algobattle.battle_wrapper import BattleWrapper
-from algobattle.fight_handler import FightHandler
 from algobattle.observer import Observer
 from algobattle.team import Matchup
 from algobattle.util import inherit_docs

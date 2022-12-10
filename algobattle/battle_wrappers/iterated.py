@@ -1,11 +1,9 @@
 """Wrapper that repeats a battle on an instance size a number of times and averages the competitive ratio over all runs."""
 from __future__ import annotations
-from configparser import ConfigParser
 from dataclasses import InitVar, dataclass
 import logging
 
 from algobattle.battle_wrapper import BattleWrapper
-from algobattle.fight_handler import FightHandler
 from algobattle.observer import Observer
 from algobattle.team import Matchup
 from algobattle.util import inherit_docs
@@ -41,12 +39,7 @@ class Iterated(BattleWrapper):
         winner once the iteration cap is reached.
 
         During execution, this function updates the self.round_data dict,
-        which automatically notifies all observers subscribed to this object.
-
-        Parameters
-        ----------
-        fight_handler: FightHandler
-            Fight handler that manages the execution of a concrete fight.
+        which automatically notifies all observers subscribed to this object.s
         """
         base_increment = 0
         exponent = self.config.exponent
