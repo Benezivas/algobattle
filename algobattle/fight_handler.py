@@ -1,9 +1,8 @@
 """Class managing the execution of generators and solvers."""
 import logging
-from configparser import ConfigParser
 from typing import Any, Tuple
 
-from algobattle.docker_util import DockerError
+from algobattle.docker_util import DockerConfig, DockerError
 from algobattle.team import Matchup, Team
 from algobattle.problem import Problem
 
@@ -13,13 +12,9 @@ logger = logging.getLogger("algobattle.fight_handler")
 class FightHandler:
     """Class managing the execution of generators and solvers."""
 
-    def __init__(self, problem: Problem, config: ConfigParser) -> None:
+    def __init__(self, problem: Problem, config: DockerConfig) -> None:
         super().__init__()
-        self.timeout_generator = int(config["run_parameters"]["timeout_generator"])
-        self.timeout_solver = int(config["run_parameters"]["timeout_solver"])
-        self.space_generator = int(config["run_parameters"]["space_generator"])
-        self.space_solver = int(config["run_parameters"]["space_solver"])
-        self.cpus = int(config["run_parameters"]["cpus"])
+        self.config = config
         self.problem = problem
 
     def fight(self, matchup: Matchup, instance_size: int) -> float:
@@ -76,12 +71,12 @@ class FightHandler:
         RuntimeError
             If the container doesn't run successfully or any of the checks don't pass
         """
-        scaled_memory = self.problem.generator_memory_scaler(self.space_generator, instance_size)
+        scaled_memory = self.problem.generator_memory_scaler(self.config.space_generator, instance_size)
 
         logger.debug(f"Running generator of group {team}...\n")
 
         try:
-            encoded_output = team.generator.run(str(instance_size), self.timeout_generator, scaled_memory, self.cpus)
+            encoded_output = team.generator.run(str(instance_size), self.config.timeout_generator, scaled_memory, self.config.cpus)
         except DockerError:
             logger.warning(f"Generator of team '{team}' didn't run successfully!")
             raise RuntimeError
@@ -137,10 +132,10 @@ class FightHandler:
         RuntimeError
             If the container doesn't run successfully or any of the checks don't pass
         """
-        scaled_memory = self.problem.solver_memory_scaler(self.space_solver, instance_size)
+        scaled_memory = self.problem.solver_memory_scaler(self.config.space_solver, instance_size)
         try:
             encoded_output = team.solver.run(
-                self.problem.parser.encode(instance), self.timeout_solver, scaled_memory, self.cpus
+                self.problem.parser.encode(instance), self.config.timeout_solver, scaled_memory, self.config.cpus
             )
         except DockerError:
             logger.warning(f"Solver of team '{team}' didn't run successfully!")
