@@ -6,6 +6,7 @@ characteristic that they are responsible for updating some match data during
 their run, such that it contains the current state of the match.
 """
 from __future__ import annotations
+from dataclasses import dataclass
 import logging
 from abc import abstractmethod, ABC
 from importlib import import_module
@@ -20,6 +21,12 @@ logger = logging.getLogger('algobattle.battle_wrapper')
 
 class BattleWrapper(ABC):
     """Abstract Base class for wrappers that execute a specific kind of battle."""
+
+    @dataclass
+    class Config:
+        pass
+
+    config: Config
 
     @staticmethod
     def initialize(wrapper_name: str, fight_handler: FightHandler, config: ConfigParser) -> BattleWrapper:
@@ -53,9 +60,10 @@ class BattleWrapper(ABC):
             logger.critical(f"Importing a wrapper from the given path failed with the following exception: {e}")
             raise ValueError from e
 
-    def __init__(self, fight_handler: FightHandler) -> None:
+    def __init__(self, fight_handler: FightHandler, config: ConfigParser) -> None:
         super().__init__()
         self.fight_handler = fight_handler
+        self.config = self.Config(**config)
 
     @abstractmethod
     def run_round(self, matchup: Matchup, observer: Observer | None = None) -> BattleWrapper.Result:
