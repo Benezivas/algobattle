@@ -1,14 +1,13 @@
 """Main battle script. Executes all possible types of battles, see battle --help for all options."""
+from argparse import ArgumentParser
 from contextlib import ExitStack
+from dataclasses import dataclass
 import sys
 import logging
 import datetime as dt
 
-from optparse import OptionParser
 from pathlib import Path
-from importlib.metadata import version as pkg_version
 
-import algobattle
 from algobattle.match import MatchInfo
 from algobattle.team import TeamInfo
 from algobattle.ui import Ui
@@ -61,35 +60,38 @@ def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
     return logger
 
 
+@dataclass
+class SystemConfig:
+    verbose: bool
+    logging_path: Path
+    silent: bool
+    ui: bool
+    safe_build: bool
+
+
 def main():
     """Entrypoint of `algobattle` CLI."""
     try:
         if len(sys.argv) < 2:
             sys.exit('Expecting (relative) path to the parent directory of a problem file as argument. Use "battle --help" for more information on usage and options.')
 
-        problem_path = Path(sys.argv[1]).resolve()
+        parser = ArgumentParser()
+        parser.add_argument("path", type=Path, help="Path to the needed files if they aren't specified seperately.")
+        parser.add_argument("--problem", type=Path, default=None, help="Path to a problem file.")
+        parser.add_argument("--config", type=Path, default=None, help="Path to a config file.")
 
-        default_logging_path = Path.home() / '.algobattle_logs'
-        default_config_file = Path(algobattle.__file__).parent / 'config.ini'
+        parser.add_argument("--verbose", "-v", dest="verbose", action="store_true", help="More detailed log output.")
+        parser.add_argument("--logging_path", default=Path.home() / ".algobattle_logs", help="Folder that logs are written into.")
+        parser.add_argument("--silent", "-s", action="store_true", help="Disable forking to stderr.")
+        parser.add_argument("--ui", action="store_true", help="Display a small UI on STDOUT that shows the progress of the battle.")
+        parser.add_argument("--safe_build", action="store_true", help="Isolate docker image builds from each other. Significantly slows down battle setup but closes prevents images from interfering with each other.")
 
-        # Option parser to process arguments from the console.
-        usage = 'usage: %prog FILE [options]\nExpecting (relative) path to the directory of the problem as first argument.\nIf you provide generators, solvers and group numbers for multiple teams, make sure that the order is the same for all three arguments.'
-        parser = OptionParser(usage=usage, version=pkg_version(__package__))
-        parser.add_option('--verbose', dest='verbose_logging', action='store_true', help='Log all debug messages.')
-        parser.add_option('--logging_path', dest='logging_path', default=default_logging_path, help='Specify the folder into which the log file is written to. Can either be a relative or absolute path to folder. If nonexisting, a new folder will be created. Default: ~/.algobattle_logs/')
-        parser.add_option('--config_file', dest='config', default=default_config_file, help='Path to a .ini configuration file to be used for the run. Defaults to the packages config.ini')
-        parser.add_option('--solvers', dest='solvers', default=str(problem_path / 'solver'), help='Specify the folder names containing the solvers of all involved teams as a comma-seperated list. Default: arg1/solver/')
-        parser.add_option('--generators', dest='generators', default=str(problem_path / 'generator'), help='Specify the folder names containing the generators of all involved teams as a comma-seperated list. Default: arg1/generator/')
-        parser.add_option('--team_names', dest='team_names', default='0', help='Specify the team names of all involved teams as a list strings as a comma-seperated list. Default: "0"')
-        parser.add_option('--rounds', dest='battle_rounds', type=int, default='5', help='Number of rounds that are to be fought in the battle (points are split between all rounds). Default: 5')
-        parser.add_option('--battle_type', dest='battle_type', choices=['iterated', 'averaged'], default='iterated', help='Type of battle wrapper to be used. Possible options: iterated, averaged. Default: iterated')
-        parser.add_option('--points', dest='points', type=int, default='100', help='Number of points that are to be fought for. Default: 100')
-        parser.add_option('--do_not_count_points', dest='do_not_count_points', action='store_true', help='If set, points are not calculated for the run.')
-        parser.add_option('--silent', dest='silent', action='store_true', help='Disable forking the logging output to stderr.')
-        parser.add_option('--ui', dest='display_ui', action='store_true', help='If set, the program sets the --silent option and displays a small ui on STDOUT that shows the progress of the battles.')
-        parser.add_option("--unsafe_build", dest="safe_build", action="store_false", default=True, help="If set, the docker image builds will not be isolated from each other, speeding up execution but leaving open an attack surface. Only recommende for local development.")
+        parser.add_argument("--battle_type", choices=["iterated", "averaged"], default="iterated", help="ype of battle wrapper to be used.")
+        parser.add_argument("--team", dest="team_paths", help="Path to a folder containing /generator and /solver folders. For more detailed team configuration use the config file.")
+        parser.add_argument("--rounds", type=int, default=5, help="Number of rounds that are to be fought in the battle (points are split between all rounds).")
+        parser.add_argument("--points", type=int, default=100, help="number of points distributed between teams.")
 
-        options, _args = parser.parse_args()
+        options = parser.parse_args()
 
         display_ui = options.display_ui
         if display_ui:
