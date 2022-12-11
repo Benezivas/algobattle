@@ -11,8 +11,8 @@ from algobattle.battle_wrapper import BattleWrapper
 from algobattle.docker_util import DockerConfig, DockerError
 from algobattle.fight_handler import FightHandler
 from algobattle.observer import Observer, Subject
+from algobattle.problem import Problem
 from algobattle.team import ArchivedTeam, Matchup, Team, TeamInfo
-from algobattle.util import import_problem_from_path
 
 logger = logging.getLogger("algobattle.match")
 
@@ -20,10 +20,9 @@ logger = logging.getLogger("algobattle.match")
 @dataclass
 class MatchConfig:
     battle_type: str
-    problem_path: Path
     teams: list[TeamInfo]
-    rounds: int = 5
-    safe_build: bool = True
+    rounds: int
+    points: int
 
 
 @dataclass
@@ -35,15 +34,14 @@ class MatchInfo:
     rounds: int = 5
 
     @classmethod
-    def build(cls, config: MatchConfig, wrapper_cfg: BattleWrapper.Config, docker_cfg: DockerConfig = DockerConfig()) -> MatchInfo:
+    def build(cls, problem: Problem, config: MatchConfig, wrapper_cfg: BattleWrapper.Config, docker_cfg: DockerConfig = DockerConfig(), *, safe_build: bool = True) -> MatchInfo:
         """Builds a :cls:`MatchInfo` object from the provided data, including building the docker images."""
-        problem = import_problem_from_path(config.problem_path)
 
         teams: list[Team | ArchivedTeam] = []
         for info in config.teams:
             try:
-                team = info.build(docker_cfg.timeout_build, auto_cleanup=config.safe_build)
-                if config.safe_build:
+                team = info.build(docker_cfg.timeout_build, auto_cleanup=safe_build)
+                if safe_build:
                     team = team.archive()
                 teams.append(team)
             except (ValueError, DockerError):
