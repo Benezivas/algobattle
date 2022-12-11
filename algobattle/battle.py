@@ -8,11 +8,13 @@ import logging
 import datetime as dt
 from pathlib import Path
 import tomli
+from algobattle.battle_wrapper import BattleWrapper
+from algobattle.docker_util import DockerConfig
 
-from algobattle.match import MatchInfo
+from algobattle.match import MatchConfig, MatchInfo
 from algobattle.team import TeamInfo
 from algobattle.ui import Ui
-from algobattle.util import check_path
+from algobattle.util import check_path, import_problem_from_path
 
 
 def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
@@ -127,43 +129,30 @@ def main():
             else:
                 team_infos.append(TeamInfo(name=team_spec.name, generator=team_spec / "generator", solver=team_spec / "solver"))
         
+        sys_config = SystemConfig(**vars(namespaces["system"]))
+        battle_config = MatchConfig(**vars(namespaces["battle"]))
+        wrapper_config = BattleWrapper.Config()
+        docker_config = DockerConfig()
 
-        display_ui = options.display_ui
-        if display_ui:
-            options.silent = True
+        if sys_config.ui:
+            sys_config.silent = True
 
-        solvers = [Path(path) for path in options.solvers.split(',')]
-        generators = [Path(path) for path in options.generators.split(',')]
-        team_names = options.team_names.split(',')
 
-        if not (len(solvers) == len(generators) == len(team_names)):
-            raise SystemExit(f"The number of provided generator paths ({len(generators)}), solver paths ({len(solvers)}) and group numbers ({len(team_names)}) is not equal!")
-
-        for path in [problem_path, options.config] + solvers + generators:
-            if not path.exists():
-                raise SystemExit(f"Path '{path}' does not exist in the file system! "
-                                 "Use 'battle --help' for more information on usage and options.")
-
-        logger = setup_logging(options.logging_path, options.verbose_logging, options.silent)
+        logger = setup_logging(sys_config.logging_path, sys_config.verbose, sys_config.silent)
 
     except KeyboardInterrupt:
         raise SystemExit("Received keyboard interrupt, terminating execution.")
 
     try:
-        logger.debug('Options for this run: {}'.format(options))
-        logger.debug('Contents of sys.argv: {}'.format(sys.argv))
-        logger.debug('Using additional configuration options from file "%s".', options.config)
-        team_infos = [TeamInfo(*info) for info in zip(team_names, generators, solvers)]
-
+        problem = import_problem_from_path(sys_config.problem)
         with MatchInfo.build(
-            problem_path=problem_path,
-            config_path=options.config,
-            team_infos=team_infos,
-            rounds=options.battle_rounds,
-            battle_type=options.battle_type,
-            safe_build=options.safe_build
+            problem=problem,
+            config=battle_config,
+            wrapper_cfg=wrapper_config,
+            docker_cfg=docker_config,
+            safe_build=sys_config.safe_build,
         ) as match_info, ExitStack() as stack:
-            if display_ui:
+            if sys_config.ui:
                 ui = Ui()
                 stack.enter_context(ui)
             else:
@@ -173,8 +162,8 @@ def main():
 
             logger.info('#' * 78)
             logger.info(str(result))
-            if not options.do_not_count_points:
-                points = result.calculate_points(options.points)
+            if battle_config.points > 0:
+                points = result.calculate_points(battle_config.points)
                 for team, pts in points.items():
                     logger.info(f"Group {team} gained {pts:.1f} points.")
 
