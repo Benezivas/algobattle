@@ -7,11 +7,13 @@ import sys
 import logging
 import datetime as dt
 from pathlib import Path
+from typing import Literal
 import tomli
 from algobattle.battle_wrapper import BattleWrapper
 from algobattle.docker_util import DockerConfig
+from algobattle.fight_handler import FightHandler
 
-from algobattle.match import MatchConfig, MatchInfo
+from algobattle.match import MatchInfo
 from algobattle.team import TeamInfo
 from algobattle.ui import Ui
 from algobattle.util import check_path, import_problem_from_path
@@ -65,13 +67,17 @@ def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
 
 
 @dataclass
-class SystemConfig:
+class BattleConfig:
     problem: Path
     verbose: bool
     logging_path: Path
     silent: bool
     ui: bool
     safe_build: bool
+    battle_type: Literal["iterated", "averaged"]
+    teams: list[dict[str, str] | Path]
+    rounds: int
+    points: int
 
 
 def main():
@@ -110,49 +116,54 @@ def main():
         else:
             config = {}
 
-        namespaces = {name: Namespace(**config[name]) if name in config else Namespace() for name in ("system", "battle")}
-        parser.parse_args(("problem", "verbose", "logging_path", "silent", "ui", "safe_build"), namespaces["system"])
-        if namespaces["system"].problem is None:
-            namespaces["system"].problem = cfg_args.path
-        parser.parse_args(("battle_type", "team", "rounds", "points"), namespaces["battle"])
-        if namespaces["battle"].teams:
-            teams_pre = namespaces["battle"].teams
+        battle_config = Namespace(**config.get("algobattle", {}))
+        parser.parse_args(namespace=battle_config)
+        battle_config = BattleConfig(**vars(battle_config))
+
+        if battle_config.problem is None:
+            battle_config.problem = cfg_args.path
+        if battle_config.teams:
+            teams_pre = battle_config.teams
         else:
             teams_pre = [cfg_args.path]
         team_infos = []
         for team_spec in teams_pre:
             if isinstance(team_spec, dict):
                 try:
-                    team_infos.append(TeamInfo(**team_spec))
+                    name = team_spec["name"]
+                    gen = check_path(team_spec["generator"], type="dir")
+                    sol = check_path(team_spec["solver"], type="dir")
+                    team_infos.append(TeamInfo(name=name, generator=gen, solver=sol))
                 except TypeError:
                     raise SystemExit(f"The config file at {cfg_path} is incorrectly formatted!")
             else:
                 team_infos.append(TeamInfo(name=team_spec.name, generator=team_spec / "generator", solver=team_spec / "solver"))
-        
-        sys_config = SystemConfig(**vars(namespaces["system"]))
-        battle_config = MatchConfig(**vars(namespaces["battle"]))
+
         wrapper_config = BattleWrapper.Config()
         docker_config = DockerConfig()
 
-        if sys_config.ui:
-            sys_config.silent = True
+        if battle_config.ui:
+            battle_config.silent = True
 
 
-        logger = setup_logging(sys_config.logging_path, sys_config.verbose, sys_config.silent)
+        logger = setup_logging(battle_config.logging_path, battle_config.verbose, battle_config.silent)
 
     except KeyboardInterrupt:
         raise SystemExit("Received keyboard interrupt, terminating execution.")
 
     try:
-        problem = import_problem_from_path(sys_config.problem)
+        problem = import_problem_from_path(battle_config.problem)
+        fight_handler = FightHandler(problem, docker_config)
+        wrapper = BattleWrapper.initialize(battle_config.battle_type, fight_handler, wrapper_config)
         with MatchInfo.build(
             problem=problem,
-            config=battle_config,
-            wrapper_cfg=wrapper_config,
+            wrapper=wrapper,
+            teams=team_infos,
+            rounds=battle_config.rounds,
             docker_cfg=docker_config,
-            safe_build=sys_config.safe_build,
+            safe_build=battle_config.safe_build,
         ) as match_info, ExitStack() as stack:
-            if sys_config.ui:
+            if battle_config.ui:
                 ui = Ui()
                 stack.enter_context(ui)
             else:

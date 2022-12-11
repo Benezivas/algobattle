@@ -1,28 +1,17 @@
 """Central managing module for an algorithmic battle."""
 from __future__ import annotations
-from configparser import ConfigParser
 from dataclasses import dataclass
 from itertools import combinations
 import logging
-from pathlib import Path
 from prettytable import PrettyTable, DOUBLE_BORDER
 
 from algobattle.battle_wrapper import BattleWrapper
 from algobattle.docker_util import DockerConfig, DockerError
-from algobattle.fight_handler import FightHandler
 from algobattle.observer import Observer, Subject
 from algobattle.problem import Problem
 from algobattle.team import ArchivedTeam, Matchup, Team, TeamInfo
 
 logger = logging.getLogger("algobattle.match")
-
-
-@dataclass
-class MatchConfig:
-    battle_type: str
-    teams: list[TeamInfo]
-    rounds: int
-    points: int
 
 
 @dataclass
@@ -34,23 +23,21 @@ class MatchInfo:
     rounds: int = 5
 
     @classmethod
-    def build(cls, problem: Problem, config: MatchConfig, wrapper_cfg: BattleWrapper.Config, docker_cfg: DockerConfig = DockerConfig(), *, safe_build: bool = True) -> MatchInfo:
+    def build(cls, problem: Problem, wrapper: BattleWrapper, teams: list[TeamInfo], rounds: int, docker_cfg: DockerConfig = DockerConfig(), *, safe_build: bool = True) -> MatchInfo:
         """Builds a :cls:`MatchInfo` object from the provided data, including building the docker images."""
 
-        teams: list[Team | ArchivedTeam] = []
-        for info in config.teams:
+        built_teams: list[Team | ArchivedTeam] = []
+        for info in teams:
             try:
                 team = info.build(docker_cfg.timeout_build, auto_cleanup=safe_build)
                 if safe_build:
                     team = team.archive()
-                teams.append(team)
+                built_teams.append(team)
             except (ValueError, DockerError):
                 logger.warning(f"Building generators and solvers for team {info.name} failed, they will be excluded!")
-        restored_teams = [team.restore() if isinstance(team, ArchivedTeam) else team for team in teams]
+        restored_teams = [team.restore() if isinstance(team, ArchivedTeam) else team for team in built_teams]
 
-        fight_handler = FightHandler(problem, docker_cfg)
-        battle_wrapper = BattleWrapper.initialize(config.battle_type, fight_handler, wrapper_cfg)
-        return MatchInfo(battle_wrapper, restored_teams, config.rounds)
+        return MatchInfo(wrapper, restored_teams, rounds)
 
     def __enter__(self):
         return self
