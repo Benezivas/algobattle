@@ -1,13 +1,13 @@
 """Main battle script. Executes all possible types of battles, see battle --help for all options."""
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 from contextlib import ExitStack
 from dataclasses import dataclass
 from functools import partial
 import sys
 import logging
 import datetime as dt
-
 from pathlib import Path
+import tomli
 
 from algobattle.match import MatchInfo
 from algobattle.team import TeamInfo
@@ -64,6 +64,7 @@ def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
 
 @dataclass
 class SystemConfig:
+    problem: Path
     verbose: bool
     logging_path: Path
     silent: bool
@@ -84,16 +85,48 @@ def main():
 
         parser.add_argument("--verbose", "-v", dest="verbose", action="store_true", help="More detailed log output.")
         parser.add_argument("--logging_path", type=partial(check_path, type="dir"), default=Path.home() / ".algobattle_logs", help="Folder that logs are written into.")
-        parser.add_argument("--silent", "-s", action="store_true", help="Disable forking to stderr.")
+        parser.add_argument("--silent", "-s", dest="silent", action="store_true", help="Disable forking to stderr.")
         parser.add_argument("--ui", action="store_true", help="Display a small UI on STDOUT that shows the progress of the battle.")
         parser.add_argument("--safe_build", action="store_true", help="Isolate docker image builds from each other. Significantly slows down battle setup but closes prevents images from interfering with each other.")
 
         parser.add_argument("--battle_type", choices=["iterated", "averaged"], default="iterated", help="ype of battle wrapper to be used.")
-        parser.add_argument("--team", dest="team_paths", type=partial(check_path, type="dir"), help="Path to a folder containing /generator and /solver folders. For more detailed team configuration use the config file.")
+        parser.add_argument("--team", dest="teams", type=partial(check_path, type="dir"), help="Path to a folder containing /generator and /solver folders. For more detailed team configuration use the config file.")
         parser.add_argument("--rounds", type=int, default=5, help="Number of rounds that are to be fought in the battle (points are split between all rounds).")
         parser.add_argument("--points", type=int, default=100, help="number of points distributed between teams.")
 
-        options = parser.parse_args()
+        cfg_args = parser.parse_args(("path", "config"))
+        if cfg_args.config is not None:
+            cfg_path = cfg_args.config
+        else:
+            cfg_path = cfg_args.path / "config.toml"
+        if cfg_path.is_file():
+            with open(cfg_path, "rb") as file:
+                try:
+                    config = tomli.load(file)
+                except tomli.TOMLDecodeError as e:
+                    raise SystemExit(f"The config file at {cfg_path} is not a properly formatted TOML file!\n{e}")
+        else:
+            config = {}
+
+        namespaces = {name: Namespace(**config[name]) if name in config else Namespace() for name in ("system", "battle")}
+        parser.parse_args(("problem", "verbose", "logging_path", "silent", "ui", "safe_build"), namespaces["system"])
+        if namespaces["system"].problem is None:
+            namespaces["system"].problem = cfg_args.path
+        parser.parse_args(("battle_type", "team", "rounds", "points"), namespaces["battle"])
+        if namespaces["battle"].teams:
+            teams_pre = namespaces["battle"].teams
+        else:
+            teams_pre = [cfg_args.path]
+        team_infos = []
+        for team_spec in teams_pre:
+            if isinstance(team_spec, dict):
+                try:
+                    team_infos.append(TeamInfo(**team_spec))
+                except TypeError:
+                    raise SystemExit(f"The config file at {cfg_path} is incorrectly formatted!")
+            else:
+                team_infos.append(TeamInfo(name=team_spec.name, generator=team_spec / "generator", solver=team_spec / "solver"))
+        
 
         display_ui = options.display_ui
         if display_ui:
