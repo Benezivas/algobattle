@@ -1,7 +1,7 @@
 """Main battle script. Executes all possible types of battles, see battle --help for all options."""
 from argparse import ArgumentParser, Namespace
 from contextlib import ExitStack
-from dataclasses import dataclass
+from dataclasses import MISSING, dataclass, fields
 from functools import partial
 import sys
 import logging
@@ -17,6 +17,8 @@ from algobattle.match import MatchInfo
 from algobattle.team import TeamInfo
 from algobattle.ui import Ui
 from algobattle.util import check_path, import_problem_from_path
+from algobattle.battle_wrappers.averaged import Averaged
+from algobattle.battle_wrappers.iterated import Iterated
 
 
 def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
@@ -102,6 +104,17 @@ def main():
         parser.add_argument("--rounds", type=int, default=5, help="Number of rounds that are to be fought in the battle (points are split between all rounds).")
         parser.add_argument("--points", type=int, default=100, help="number of points distributed between teams.")
 
+        for wrapper in (Iterated, Averaged):
+            group = parser.add_argument_group(wrapper.type)
+            for field in fields(wrapper.Config):
+                if field.default_factory != MISSING:
+                    default = field.default_factory()
+                elif field.default != MISSING:
+                    default = field.default
+                else:
+                    default = None
+                group.add_argument(f"{wrapper.type}_{field.name}", type=field.type, default=default)
+
         cfg_args = parser.parse_args(("path", "config"))
         if cfg_args.config is not None:
             cfg_path = cfg_args.config
@@ -117,7 +130,7 @@ def main():
             config = {}
 
         battle_config = Namespace(**config.get("algobattle", {}))
-        parser.parse_args(namespace=battle_config)
+        parser.parse_args([field.name for field in fields(BattleConfig)], namespace=battle_config)
         battle_config = BattleConfig(**vars(battle_config))
 
         if battle_config.problem is None:
