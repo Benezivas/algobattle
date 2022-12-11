@@ -6,7 +6,7 @@ import importlib.util
 import sys
 from pathlib import Path
 import tarfile
-from typing import TypeVar
+from typing import Literal, TypeVar
 
 from algobattle.problem import Problem
 
@@ -75,3 +75,21 @@ def inherit_docs(obj: T) -> T:
     Python 3.5+ already does this, but pydocstyle needs a static hint.
     """
     return obj
+
+
+def check_path(path: str, *, type: Literal["file", "dir", "exists"] = "exists") -> Path:
+    """Parses a string into a Path. Raises a :cls:`ValueError` if it doesn't exist as the specified type."""
+    _path = Path(path)
+    match type:
+        case "file":
+            test = _path.is_file
+        case "dir":
+            test = _path.is_dir
+        case "exists":
+            test = _path.exists
+    if test():
+        return _path
+    else:
+        raise ValueError
+
+

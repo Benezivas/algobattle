@@ -2,6 +2,7 @@
 from argparse import ArgumentParser
 from contextlib import ExitStack
 from dataclasses import dataclass
+from functools import partial
 import sys
 import logging
 import datetime as dt
@@ -11,6 +12,7 @@ from pathlib import Path
 from algobattle.match import MatchInfo
 from algobattle.team import TeamInfo
 from algobattle.ui import Ui
+from algobattle.util import check_path
 
 
 def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
@@ -76,18 +78,18 @@ def main():
             sys.exit('Expecting (relative) path to the parent directory of a problem file as argument. Use "battle --help" for more information on usage and options.')
 
         parser = ArgumentParser()
-        parser.add_argument("path", type=Path, help="Path to the needed files if they aren't specified seperately.")
-        parser.add_argument("--problem", type=Path, default=None, help="Path to a problem file.")
-        parser.add_argument("--config", type=Path, default=None, help="Path to a config file.")
+        parser.add_argument("path", type=check_path, help="Path to the needed files if they aren't specified seperately.")
+        parser.add_argument("--problem", type=partial(check_path, type="file"), default=None, help="Path to a problem file.")
+        parser.add_argument("--config", type=partial(check_path, type="file"), default=None, help="Path to a config file.")
 
         parser.add_argument("--verbose", "-v", dest="verbose", action="store_true", help="More detailed log output.")
-        parser.add_argument("--logging_path", default=Path.home() / ".algobattle_logs", help="Folder that logs are written into.")
+        parser.add_argument("--logging_path", type=partial(check_path, type="dir"), default=Path.home() / ".algobattle_logs", help="Folder that logs are written into.")
         parser.add_argument("--silent", "-s", action="store_true", help="Disable forking to stderr.")
         parser.add_argument("--ui", action="store_true", help="Display a small UI on STDOUT that shows the progress of the battle.")
         parser.add_argument("--safe_build", action="store_true", help="Isolate docker image builds from each other. Significantly slows down battle setup but closes prevents images from interfering with each other.")
 
         parser.add_argument("--battle_type", choices=["iterated", "averaged"], default="iterated", help="ype of battle wrapper to be used.")
-        parser.add_argument("--team", dest="team_paths", help="Path to a folder containing /generator and /solver folders. For more detailed team configuration use the config file.")
+        parser.add_argument("--team", dest="team_paths", type=partial(check_path, type="dir"), help="Path to a folder containing /generator and /solver folders. For more detailed team configuration use the config file.")
         parser.add_argument("--rounds", type=int, default=5, help="Number of rounds that are to be fought in the battle (points are split between all rounds).")
         parser.add_argument("--points", type=int, default=100, help="number of points distributed between teams.")
 
@@ -97,8 +99,6 @@ def main():
         if display_ui:
             options.silent = True
 
-        problem_path = Path(problem_path)
-        options.config = Path(options.config)
         solvers = [Path(path) for path in options.solvers.split(',')]
         generators = [Path(path) for path in options.generators.split(',')]
         team_names = options.team_names.split(',')
