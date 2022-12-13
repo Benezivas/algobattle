@@ -68,11 +68,11 @@ def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
     return logger
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BattleConfig:
     problem: Path
     verbose: bool
-    logging_path: Path
+    logging_path: Path = Path.home() / ".algobattle_logs"
     silent: bool
     ui: bool
     safe_build: bool
@@ -115,7 +115,7 @@ def main():
                     default = None
                 group.add_argument(f"{wrapper.type}_{field.name}", type=field.type, default=default)
 
-        cfg_args = parser.parse_args(("path", "config"))
+        cfg_args = parser.parse_args()
         if cfg_args.config is not None:
             cfg_path = cfg_args.config
         else:
