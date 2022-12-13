@@ -79,79 +79,87 @@ class BattleConfig:
     teams: list[dict[str, str] | Path]
     rounds: int
     points: int
+    team_infos: list[TeamInfo]
+
+
+def parse_cli_args(args: list[str]) -> tuple[BattleConfig, BattleWrapper.Config, DockerConfig]:
+    """Parse a given CLI arg list into config objects."""
+    if len(args) < 2:
+        sys.exit('Expecting (relative) path to the parent directory of a problem file as argument. Use "battle --help" for more information on usage and options.')
+
+    parser = ArgumentParser()
+    parser.add_argument("path", type=check_path, help="Path to the needed files if they aren't specified seperately.")
+    parser.add_argument("--problem", type=partial(check_path, type="file"), default=None, help="Path to a problem file.")
+    parser.add_argument("--config", type=partial(check_path, type="file"), default=None, help="Path to a config file.")
+
+    parser.add_argument("--verbose", "-v", dest="verbose", action="store_true", help="More detailed log output.")
+    parser.add_argument("--logging_path", type=partial(check_path, type="dir"), default=Path.home() / ".algobattle_logs", help="Folder that logs are written into.")
+    parser.add_argument("--display", choices=["silent", "logs", "ui"], default="logs", help="Choose output mode, silent disables all output, logs displays the battle logs on STDERR, ui displays a small GUI showing the progress of the battle.")
+    parser.add_argument("--safe_build", action="store_true", help="Isolate docker image builds from each other. Significantly slows down battle setup but closes prevents images from interfering with each other.")
+
+    parser.add_argument("--battle_type", choices=["iterated", "averaged"], default="iterated", help="ype of battle wrapper to be used.")
+    parser.add_argument("--team", dest="teams", type=partial(check_path, type="dir"), help="Path to a folder containing /generator and /solver folders. For more detailed team configuration use the config file.")
+    parser.add_argument("--rounds", type=int, default=5, help="Number of rounds that are to be fought in the battle (points are split between all rounds).")
+    parser.add_argument("--points", type=int, default=100, help="number of points distributed between teams.")
+
+    for wrapper in (Iterated, Averaged):
+        group = parser.add_argument_group(wrapper.type)
+        for field in fields(wrapper.Config):
+            if field.default_factory != MISSING:
+                default = field.default_factory()
+            elif field.default != MISSING:
+                default = field.default
+            else:
+                default = None
+            group.add_argument(f"{wrapper.type}_{field.name}", type=field.type, default=default)
+
+    cfg_args = parser.parse_args(args)
+    if cfg_args.config is not None:
+        cfg_path = cfg_args.config
+    else:
+        cfg_path = cfg_args.path / "config.toml"
+    if cfg_path.is_file():
+        with open(cfg_path, "rb") as file:
+            try:
+                config = tomli.load(file)
+            except tomli.TOMLDecodeError as e:
+                raise SystemExit(f"The config file at {cfg_path} is not a properly formatted TOML file!\n{e}")
+    else:
+        config = {}
+
+    battle_config = Namespace(**config.get("algobattle", {}))
+    parser.parse_args(args, namespace=battle_config)
+    battle_config = BattleConfig(**vars(battle_config))
+
+    if battle_config.problem is None:
+        battle_config.problem = cfg_args.path
+    if battle_config.teams:
+        teams_pre = battle_config.teams
+    else:
+        teams_pre = [cfg_args.path]
+    battle_config.team_infos = []
+    for team_spec in teams_pre:
+        if isinstance(team_spec, dict):
+            try:
+                name = team_spec["name"]
+                gen = check_path(team_spec["generator"], type="dir")
+                sol = check_path(team_spec["solver"], type="dir")
+                battle_config.team_infos.append(TeamInfo(name=name, generator=gen, solver=sol))
+            except TypeError:
+                raise SystemExit(f"The config file at {cfg_path} is incorrectly formatted!")
+        else:
+            battle_config.team_infos.append(TeamInfo(name=team_spec.name, generator=team_spec / "generator", solver=team_spec / "solver"))
+
+    wrapper_config = BattleWrapper.Config()
+    docker_config = DockerConfig()
+
+    return battle_config, wrapper_config, docker_config
 
 
 def main():
     """Entrypoint of `algobattle` CLI."""
     try:
-        if len(sys.argv) < 2:
-            sys.exit('Expecting (relative) path to the parent directory of a problem file as argument. Use "battle --help" for more information on usage and options.')
-
-        parser = ArgumentParser()
-        parser.add_argument("path", type=check_path, help="Path to the needed files if they aren't specified seperately.")
-        parser.add_argument("--problem", type=partial(check_path, type="file"), default=None, help="Path to a problem file.")
-        parser.add_argument("--config", type=partial(check_path, type="file"), default=None, help="Path to a config file.")
-
-        parser.add_argument("--verbose", "-v", dest="verbose", action="store_true", help="More detailed log output.")
-        parser.add_argument("--logging_path", type=partial(check_path, type="dir"), default=Path.home() / ".algobattle_logs", help="Folder that logs are written into.")
-        parser.add_argument("--display", choices=["silent", "logs", "ui"], default="logs", help="Choose output mode, silent disables all output, logs displays the battle logs on STDERR, ui displays a small GUI showing the progress of the battle.")
-        parser.add_argument("--safe_build", action="store_true", help="Isolate docker image builds from each other. Significantly slows down battle setup but closes prevents images from interfering with each other.")
-
-        parser.add_argument("--battle_type", choices=["iterated", "averaged"], default="iterated", help="ype of battle wrapper to be used.")
-        parser.add_argument("--team", dest="teams", type=partial(check_path, type="dir"), help="Path to a folder containing /generator and /solver folders. For more detailed team configuration use the config file.")
-        parser.add_argument("--rounds", type=int, default=5, help="Number of rounds that are to be fought in the battle (points are split between all rounds).")
-        parser.add_argument("--points", type=int, default=100, help="number of points distributed between teams.")
-
-        for wrapper in (Iterated, Averaged):
-            group = parser.add_argument_group(wrapper.type)
-            for field in fields(wrapper.Config):
-                if field.default_factory != MISSING:
-                    default = field.default_factory()
-                elif field.default != MISSING:
-                    default = field.default
-                else:
-                    default = None
-                group.add_argument(f"{wrapper.type}_{field.name}", type=field.type, default=default)
-
-        cfg_args = parser.parse_args()
-        if cfg_args.config is not None:
-            cfg_path = cfg_args.config
-        else:
-            cfg_path = cfg_args.path / "config.toml"
-        if cfg_path.is_file():
-            with open(cfg_path, "rb") as file:
-                try:
-                    config = tomli.load(file)
-                except tomli.TOMLDecodeError as e:
-                    raise SystemExit(f"The config file at {cfg_path} is not a properly formatted TOML file!\n{e}")
-        else:
-            config = {}
-
-        battle_config = Namespace(**config.get("algobattle", {}))
-        parser.parse_args([field.name for field in fields(BattleConfig)], namespace=battle_config)
-        battle_config = BattleConfig(**vars(battle_config))
-
-        if battle_config.problem is None:
-            battle_config.problem = cfg_args.path
-        if battle_config.teams:
-            teams_pre = battle_config.teams
-        else:
-            teams_pre = [cfg_args.path]
-        team_infos = []
-        for team_spec in teams_pre:
-            if isinstance(team_spec, dict):
-                try:
-                    name = team_spec["name"]
-                    gen = check_path(team_spec["generator"], type="dir")
-                    sol = check_path(team_spec["solver"], type="dir")
-                    team_infos.append(TeamInfo(name=name, generator=gen, solver=sol))
-                except TypeError:
-                    raise SystemExit(f"The config file at {cfg_path} is incorrectly formatted!")
-            else:
-                team_infos.append(TeamInfo(name=team_spec.name, generator=team_spec / "generator", solver=team_spec / "solver"))
-
-        wrapper_config = BattleWrapper.Config()
-        docker_config = DockerConfig()
+        battle_config, wrapper_config, docker_config = parse_cli_args(sys.argv)
 
         logger = setup_logging(battle_config.logging_path, battle_config.verbose, battle_config.display != "logs")
 
@@ -165,7 +173,7 @@ def main():
         with MatchInfo.build(
             problem=problem,
             wrapper=wrapper,
-            teams=team_infos,
+            teams=battle_config.team_infos,
             rounds=battle_config.rounds,
             docker_cfg=docker_config,
             safe_build=battle_config.safe_build,
