@@ -1,7 +1,7 @@
 """Main battle script. Executes all possible types of battles, see battle --help for all options."""
 from argparse import ArgumentParser, Namespace
 from contextlib import ExitStack
-from dataclasses import MISSING, dataclass, fields
+from dataclasses import MISSING, InitVar, dataclass, fields
 from functools import partial
 import sys
 import logging
@@ -76,10 +76,9 @@ class BattleConfig:
     display: Literal["silent", "logs", "ui"]
     safe_build: bool
     battle_type: Literal["iterated", "averaged"]
-    teams: list[dict[str, str] | Path]
+    teams: list[TeamInfo]
     rounds: int
     points: int
-    team_infos: list[TeamInfo]
 
 
 def parse_cli_args(args: list[str]) -> tuple[BattleConfig, BattleWrapper.Config, DockerConfig]:
@@ -129,7 +128,6 @@ def parse_cli_args(args: list[str]) -> tuple[BattleConfig, BattleWrapper.Config,
 
     battle_config = Namespace(**config.get("algobattle", {}))
     parser.parse_args(args, namespace=battle_config)
-    battle_config = BattleConfig(**vars(battle_config))
 
     if battle_config.problem is None:
         battle_config.problem = cfg_args.path
@@ -137,19 +135,21 @@ def parse_cli_args(args: list[str]) -> tuple[BattleConfig, BattleWrapper.Config,
         teams_pre = battle_config.teams
     else:
         teams_pre = [cfg_args.path]
-    battle_config.team_infos = []
+
+    battle_config.teams = []
     for team_spec in teams_pre:
         if isinstance(team_spec, dict):
             try:
                 name = team_spec["name"]
                 gen = check_path(team_spec["generator"], type="dir")
                 sol = check_path(team_spec["solver"], type="dir")
-                battle_config.team_infos.append(TeamInfo(name=name, generator=gen, solver=sol))
+                battle_config.teams.append(TeamInfo(name=name, generator=gen, solver=sol))
             except TypeError:
                 raise SystemExit(f"The config file at {cfg_path} is incorrectly formatted!")
         else:
-            battle_config.team_infos.append(TeamInfo(name=team_spec.name, generator=team_spec / "generator", solver=team_spec / "solver"))
+            battle_config.teams.append(TeamInfo(name=team_spec.name, generator=team_spec / "generator", solver=team_spec / "solver"))
 
+    battle_config = BattleConfig(**vars(battle_config))
     wrapper_config = BattleWrapper.Config()
     docker_config = DockerConfig()
 
@@ -173,7 +173,7 @@ def main():
         with MatchInfo.build(
             problem=problem,
             wrapper=wrapper,
-            teams=battle_config.team_infos,
+            teams=battle_config.teams,
             rounds=battle_config.rounds,
             docker_cfg=docker_config,
             safe_build=battle_config.safe_build,
