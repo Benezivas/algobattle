@@ -83,8 +83,6 @@ class BattleConfig:
 
 def parse_cli_args(args: list[str]) -> tuple[BattleConfig, BattleWrapper.Config, DockerConfig]:
     """Parse a given CLI arg list into config objects."""
-    if len(args) < 2:
-        sys.exit('Expecting (relative) path to the parent directory of a problem file as argument. Use "battle --help" for more information on usage and options.')
 
     parser = ArgumentParser()
     parser.add_argument("path", type=check_path, help="Path to the needed files if they aren't specified seperately.")
@@ -122,7 +120,7 @@ def parse_cli_args(args: list[str]) -> tuple[BattleConfig, BattleWrapper.Config,
             try:
                 config = tomli.load(file)
             except tomli.TOMLDecodeError as e:
-                raise SystemExit(f"The config file at {cfg_path} is not a properly formatted TOML file!\n{e}")
+                raise ValueError(f"The config file at {cfg_path} is not a properly formatted TOML file!\n{e}")
     else:
         config = {}
 
@@ -145,7 +143,7 @@ def parse_cli_args(args: list[str]) -> tuple[BattleConfig, BattleWrapper.Config,
                 sol = check_path(team_spec["solver"], type="dir")
                 battle_config.teams.append(TeamInfo(name=name, generator=gen, solver=sol))
             except TypeError:
-                raise SystemExit(f"The config file at {cfg_path} is incorrectly formatted!")
+                raise ValueError(f"The config file at {cfg_path} is incorrectly formatted!")
         else:
             battle_config.teams.append(TeamInfo(name=team_spec.name, generator=team_spec / "generator", solver=team_spec / "solver"))
 
@@ -160,9 +158,10 @@ def main():
     """Entrypoint of `algobattle` CLI."""
     try:
         battle_config, wrapper_config, docker_config = parse_cli_args(sys.argv)
-
         logger = setup_logging(battle_config.logging_path, battle_config.verbose, battle_config.display != "logs")
 
+    except ValueError as e:
+        raise SystemExit from e
     except KeyboardInterrupt:
         raise SystemExit("Received keyboard interrupt, terminating execution.")
 
