@@ -99,6 +99,7 @@ def parse_cli_args(args: list[str]) -> tuple[BattleConfig, BattleWrapper.Config,
     parser.add_argument("--rounds", type=int, default=5, help="Number of rounds that are to be fought in the battle (points are split between all rounds).")
     parser.add_argument("--points", type=int, default=100, help="number of points distributed between teams.")
 
+    # battle wrappers have their configs automatically added to the CLI args
     for wrapper in (Iterated, Averaged):
         group = parser.add_argument_group(wrapper.type)
         for field in fields(wrapper.Config):
@@ -110,6 +111,9 @@ def parse_cli_args(args: list[str]) -> tuple[BattleConfig, BattleWrapper.Config,
                 default = None
             group.add_argument(f"{wrapper.type}_{field.name}", type=field.type, default=default)
 
+    # we want the hierarchy to basically be CLI > config file > defaults, so we need to first parse the CLI args to get
+    # the config file location, load that, and then parse CLI args again.
+    # you could skip the second parse by having argparse not set the default in the namespace, but then we have worse CLI help messages
     cfg_args = parser.parse_args(args)
     if cfg_args.config is not None:
         cfg_path = cfg_args.config
@@ -127,6 +131,7 @@ def parse_cli_args(args: list[str]) -> tuple[BattleConfig, BattleWrapper.Config,
     battle_config = Namespace(**config.get("algobattle", {}))
     parser.parse_args(args, namespace=battle_config)
 
+    # args where the defaults are dependend on other args
     if battle_config.problem is None:
         battle_config.problem = cfg_args.path
     if battle_config.teams:
@@ -134,6 +139,7 @@ def parse_cli_args(args: list[str]) -> tuple[BattleConfig, BattleWrapper.Config,
     else:
         teams_pre = [cfg_args.path]
 
+    # building TeamInfo objects from the args, ideally there'd be a better way to do this
     battle_config.teams = []
     for team_spec in teams_pre:
         if isinstance(team_spec, dict):
