@@ -73,8 +73,7 @@ class BattleConfig:
     problem: Path
     verbose: bool
     logging_path: Path = Path.home() / ".algobattle_logs"
-    silent: bool
-    ui: bool
+    display: Literal["silent", "logs", "ui"]
     safe_build: bool
     battle_type: Literal["iterated", "averaged"]
     teams: list[dict[str, str] | Path]
@@ -95,8 +94,7 @@ def main():
 
         parser.add_argument("--verbose", "-v", dest="verbose", action="store_true", help="More detailed log output.")
         parser.add_argument("--logging_path", type=partial(check_path, type="dir"), default=Path.home() / ".algobattle_logs", help="Folder that logs are written into.")
-        parser.add_argument("--silent", "-s", dest="silent", action="store_true", help="Disable forking to stderr.")
-        parser.add_argument("--ui", action="store_true", help="Display a small UI on STDOUT that shows the progress of the battle.")
+        parser.add_argument("--display", choices=["silent", "logs", "ui"], default="logs", help="Choose output mode, silent disables all output, logs displays the battle logs on STDERR, ui displays a small GUI showing the progress of the battle.")
         parser.add_argument("--safe_build", action="store_true", help="Isolate docker image builds from each other. Significantly slows down battle setup but closes prevents images from interfering with each other.")
 
         parser.add_argument("--battle_type", choices=["iterated", "averaged"], default="iterated", help="ype of battle wrapper to be used.")
@@ -155,11 +153,7 @@ def main():
         wrapper_config = BattleWrapper.Config()
         docker_config = DockerConfig()
 
-        if battle_config.ui:
-            battle_config.silent = True
-
-
-        logger = setup_logging(battle_config.logging_path, battle_config.verbose, battle_config.silent)
+        logger = setup_logging(battle_config.logging_path, battle_config.verbose, battle_config.display != "logs")
 
     except KeyboardInterrupt:
         raise SystemExit("Received keyboard interrupt, terminating execution.")
@@ -176,7 +170,7 @@ def main():
             docker_cfg=docker_config,
             safe_build=battle_config.safe_build,
         ) as match_info, ExitStack() as stack:
-            if battle_config.ui:
+            if battle_config.display == "ui":
                 ui = Ui()
                 stack.enter_context(ui)
             else:
