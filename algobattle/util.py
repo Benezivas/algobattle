@@ -1,12 +1,14 @@
 """Collection of utility functions."""
 from __future__ import annotations
+from argparse import _SUPPRESS_T, _ActionStr, Action
+from dataclasses import _MISSING_TYPE, MISSING, dataclass, field
 from io import BytesIO
 import logging
 import importlib.util
 import sys
 from pathlib import Path
 import tarfile
-from typing import Literal, TypeVar
+from typing import Any, Callable, Generic, Literal, Type, TypeVar
 
 from algobattle.problem import Problem
 
@@ -93,3 +95,17 @@ def check_path(path: str, *, type: Literal["file", "dir", "exists"] = "exists") 
         raise ValueError
 
 
+@dataclass(kw_only=True)
+class ArgSpec(Generic[T]):
+    """Further details of an CLI argument."""
+    extra_names: list[str] = field(default_factory=list)
+    parser: Callable[[str], T] | _MISSING_TYPE = MISSING
+    help: str | _MISSING_TYPE = MISSING
+
+    def as_argparser_args(self) -> tuple[list[str], dict[str, Any]]:
+        kwargs = {}
+        for attr, arg_name in (("help", "help"), ("parser", "type")):
+            if getattr(self, attr) is not MISSING:
+                kwargs[arg_name] = getattr(self, attr)
+
+        return self.extra_names, kwargs
