@@ -99,6 +99,14 @@ def parse_cli_args(args: list[str]) -> tuple[BattleConfig, BattleWrapper.Config,
     parser.add_argument("--rounds", type=int, default=5, help="Number of rounds that are to be fought in the battle (points are split between all rounds).")
     parser.add_argument("--points", type=int, default=100, help="number of points distributed between teams.")
 
+    parser.add_argument("--timeout_build", type=float, default=None, help="Timeout for the build step of each docker image.")
+    parser.add_argument("--timeout_generator", type=float, default=None, help="Time limit for the generator execution.")
+    parser.add_argument("--timeout_solver", type=float, default=None, help="Time limit for the solver execution.")
+    parser.add_argument("--space_generator", type=int, default=None, help="Memory limit for the generator execution, in MB.")
+    parser.add_argument("--space_solver", type=int, default=None, help="Memory limit the solver execution, in MB.")
+    parser.add_argument("--cpus", type=int, default=None, help="Number of cpu cores used for each docker container execution.")
+    
+
     # battle wrappers have their configs automatically added to the CLI args
     for wrapper in (Iterated, Averaged):
         group = parser.add_argument_group(wrapper.type)
