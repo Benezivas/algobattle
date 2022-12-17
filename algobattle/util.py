@@ -8,7 +8,7 @@ import importlib.util
 import sys
 from pathlib import Path
 import tarfile
-from typing import Any, Callable, Generic, Literal, Type, TypeVar
+from typing import Any, Callable, Generic, Literal, Protocol, Type, TypeVar
 
 from algobattle.problem import Problem
 
@@ -109,3 +109,10 @@ class ArgSpec(Generic[T]):
                 kwargs[arg_name] = getattr(self, attr)
 
         return self.extra_names, kwargs
+
+
+class CLIParseble(Protocol):
+    """Protocol for dataclass-like objects that can be parsed from the CLI."""
+    def as_argparse_args(self) -> list[tuple[list[str], dict[str, Any]]]:
+        pass
+
