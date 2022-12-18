@@ -1,14 +1,13 @@
 """Collection of utility functions."""
 from __future__ import annotations
-from argparse import _SUPPRESS_T, _ActionStr, Action
-from dataclasses import _MISSING_TYPE, MISSING, dataclass, field
+from dataclasses import _MISSING_TYPE, MISSING, dataclass, field, fields
 from io import BytesIO
 import logging
 import importlib.util
 import sys
 from pathlib import Path
 import tarfile
-from typing import Any, Callable, Generic, Literal, Protocol, Type, TypeVar
+from typing import Any, Callable, Generic, Literal, Protocol, TypeVar
 
 from algobattle.problem import Problem
 
@@ -102,17 +101,34 @@ class ArgSpec(Generic[T]):
     parser: Callable[[str], T] | _MISSING_TYPE = MISSING
     help: str | _MISSING_TYPE = MISSING
 
-    def as_argparser_args(self) -> tuple[list[str], dict[str, Any]]:
-        kwargs = {}
-        for attr, arg_name in (("help", "help"), ("parser", "type")):
-            if getattr(self, attr) is not MISSING:
-                kwargs[arg_name] = getattr(self, attr)
 
-        return self.extra_names, kwargs
-
-
+@dataclass
 class CLIParseble(Protocol):
     """Protocol for dataclass-like objects that can be parsed from the CLI."""
+
+    __args__: dict[str, ArgSpec[Any]] = field(default_factory=dict)
+
     def as_argparse_args(self) -> list[tuple[list[str], dict[str, Any]]]:
-        pass
+        """Constructs a list of `*args` and `**kwargs` that can be passed to `ArgumentParser.add_argument()`."""
+        arguments = []
+        for field in fields(self):
+            arg_spec = self.__args__.get(field.name, ArgSpec())
+            args = [f"--{field.name}"] + arg_spec.extra_names
+
+            kwargs = {}
+            kwargs["type"] = arg_spec.parser if arg_spec.parser is not MISSING else field.type
+            if arg_spec.help is not MISSING:
+                kwargs["help"] = arg_spec.help
+            if field.default is not MISSING:
+                kwargs["default"] = field.default
+            if field.type == bool:
+                if field.default == True:
+                    kwargs["action"] = "store_true"
+                elif field.default == False:
+                    kwargs["action"] = "store_false"
+            elif field.type == Literal:
+                kwargs["choices"] = list(self.__annotations__[field.name].__args__)
+
+            arguments.append((args, kwargs))
+        return arguments
 
