@@ -1,13 +1,14 @@
 """Collection of utility functions."""
 from __future__ import annotations
-from dataclasses import _MISSING_TYPE, MISSING, dataclass, field, fields
+from abc import ABC
+from dataclasses import _MISSING_TYPE, KW_ONLY, MISSING, dataclass, field, fields
 from io import BytesIO
 import logging
 import importlib.util
 import sys
 from pathlib import Path
 import tarfile
-from typing import Any, Callable, ClassVar, Generic, Literal, Protocol, Type, TypeVar, cast
+from typing import Any, Callable, Generic, Literal, TypeVar, cast
 
 from algobattle.problem import Problem
 
@@ -94,10 +95,11 @@ def check_path(path: str, *, type: Literal["file", "dir", "exists"] = "exists") 
         raise ValueError
 
 
-@dataclass(kw_only=True)
+@dataclass
 class _ArgSpec(Generic[T]):
     """Further details of an CLI argument."""
-    default: T | _MISSING_TYPE = MISSING
+    default: T
+    _: KW_ONLY
     extra_names: list[str] = field(default_factory=list)
     parser: Callable[[str], T] | _MISSING_TYPE = MISSING
     help: str | _MISSING_TYPE = MISSING
@@ -109,26 +111,47 @@ def ArgSpec(*, default: T | _MISSING_TYPE = MISSING, extra_names: list[str] | _M
     return cast(T, _ArgSpec(default=default, extra_names=extra_names, parser=parser, help=help))
 
 
-class CLIParsable(Protocol):
+class CLIParsable(ABC):
     """Protocol for dataclass-like objects that can be parsed from the CLI."""
+
+    __args__: dict[str, _ArgSpec[Any]]
+
+    def __init_subclass__(cls) -> None:
+        args = {}
+        for name, _type in cls.__annotations__.items():
+            if not hasattr(cls, name):
+                raise ValueError(f"CLIParsable class {cls} has no default value specified for field {name}!")
+            default_val = getattr(cls, name)
+            if isinstance(default_val, _ArgSpec):
+                if default_val.parser is MISSING:
+                    default_val.parser = _type
+                args[name] = default_val
+                setattr(cls, name, default_val.default)
+            else:
+                args[name] = _ArgSpec(default=default_val, parser=_type)
+        cls.__args__ = args
+        return super().__init_subclass__()
+
+    @classmethod
+    def _argspec(cls, name: str) -> _ArgSpec[Any]:
+        for c in cls.__mro__:
+            if name in getattr(c, "__args__", {}):
+                return getattr(c, "__args__")[name]
+        raise ValueError
 
     @classmethod
     def as_argparse_args(cls) -> list[tuple[list[str], dict[str, Any]]]:
         """Constructs a list of `*args` and `**kwargs` that can be passed to `ArgumentParser.add_argument()`."""
         arguments = []
         for field in fields(cls):
-            if isinstance(field.default, _ArgSpec):
-                arg_spec = field.default
-            else:
-                arg_spec = _ArgSpec(default=field.default)
-
+            arg_spec = cls._argspec(field.name)
             args = [f"--{field.name}"] + arg_spec.extra_names
-            kwargs = {}
-            kwargs["type"] = arg_spec.parser if arg_spec.parser is not MISSING else field.type
+            kwargs = {
+                "type": arg_spec.parser,
+                "default": arg_spec.default,
+            }
             if arg_spec.help is not MISSING:
                 kwargs["help"] = arg_spec.help
-            if field.default is not MISSING:
-                kwargs["default"] = arg_spec.default
             if field.type == bool:
                 if arg_spec.default == True:
                     kwargs["action"] = "store_true"
