@@ -7,7 +7,7 @@ import importlib.util
 import sys
 from pathlib import Path
 import tarfile
-from typing import Any, Callable, ClassVar, Generic, Literal, Protocol, Type, TypeVar
+from typing import Any, Callable, ClassVar, Generic, Literal, Protocol, Type, TypeVar, cast
 
 from algobattle.problem import Problem
 
@@ -103,10 +103,10 @@ class _ArgSpec(Generic[T]):
     help: str | _MISSING_TYPE = MISSING
 
 
-def ArgSpec(*, default: T | _MISSING_TYPE = MISSING, extra_names: list[str] | _MISSING_TYPE = MISSING, parser: Callable[[str], T] | _MISSING_TYPE = MISSING, help: str | _MISSING_TYPE = MISSING) -> Any:
+def ArgSpec(*, default: T | _MISSING_TYPE = MISSING, extra_names: list[str] | _MISSING_TYPE = MISSING, parser: Callable[[str], T] | _MISSING_TYPE = MISSING, help: str | _MISSING_TYPE = MISSING) -> T:
     if extra_names is MISSING:
         extra_names = []
-    return _ArgSpec(default=default, extra_names=extra_names, parser=parser, help=help)
+    return cast(T, _ArgSpec(default=default, extra_names=extra_names, parser=parser, help=help))
 
 
 class CLIParsable(Protocol):
