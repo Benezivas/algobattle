@@ -19,7 +19,7 @@ class FightHandler:
     timeout_solver: float | None = None
     space_generator: int | None = None
     space_solver: int | None = None
-    cpus: int | None = None
+    cpus: int = 1
 
     def fight(self, matchup: Matchup, instance_size: int) -> float:
         """Execute a single fight of a battle between a given generator and solver for a given instance size.
