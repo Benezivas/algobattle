@@ -104,6 +104,8 @@ class BattleConfig:
             except TypeError:
                 raise ValueError(f"The config file at {path} is incorrectly formatted!")
         config["teams"] = teams
+        for wrapper_name in ("iterated", "averaged"):
+            config.pop(wrapper_name, None)
         return BattleConfig(**config)
 
 _T = TypeVar("_T")
