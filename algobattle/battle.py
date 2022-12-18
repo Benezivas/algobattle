@@ -168,8 +168,6 @@ def main():
         battle_config, wrapper_config, docker_config = parse_cli_args(sys.argv)
         logger = setup_logging(battle_config.logging_path, battle_config.verbose, battle_config.display != "logs")
 
-    except ValueError as e:
-        raise SystemExit from e
     except KeyboardInterrupt:
         raise SystemExit("Received keyboard interrupt, terminating execution.")
 
