@@ -68,6 +68,13 @@ def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
     return logger
 
 
+@dataclass
+class ProgramConfig:
+    problem: Path
+    display: Literal["silent", "logs", "ui"] = "logs"
+    logs: Path = Path.home() / ".alogbattle_logs"
+
+
 @dataclass(kw_only=True)
 class BattleConfig:
     verbose: bool = False
@@ -97,7 +104,7 @@ _float = _optional(float)
 _int = _optional(int)
 
 
-def parse_cli_args(args: list[str]) -> tuple[BattleConfig, BattleWrapper.Config]:
+def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, BattleConfig, BattleWrapper.Config]:
     """Parse a given CLI arg list into config objects."""
 
     parser = ArgumentParser()
