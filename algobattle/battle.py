@@ -2,7 +2,7 @@
 from __future__ import annotations
 from argparse import ArgumentParser, Namespace
 from contextlib import ExitStack
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import partial
 import sys
 import logging
@@ -70,21 +70,21 @@ def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
 
 @dataclass(kw_only=True)
 class BattleConfig:
-    problem: Path
-    verbose: bool
+    problem: Path | None = None
+    verbose: bool = False
     logging_path: Path = Path.home() / ".algobattle_logs"
-    display: Literal["silent", "logs", "ui"]
-    safe_build: bool
-    battle_type: Literal["iterated", "averaged"]
-    teams: list[TeamInfo]
-    rounds: int
-    points: int
-    timeout_build: float | None
-    timeout_generator: float | None = None
-    timeout_solver: float | None = None
+    display: Literal["silent", "logs", "ui"] = "logs"
+    safe_build: bool = False
+    battle_type: Literal["iterated", "averaged"] = "iterated"
+    teams: list[TeamInfo] = field(default_factory=list)
+    rounds: int = 5
+    points: int = 100
+    timeout_build: float | None = 600
+    timeout_generator: float | None = 30
+    timeout_solver: float | None = 30
     space_generator: int | None = None
     space_solver: int | None = None
-    cpus: int | None = None
+    cpus: int = 1
 
     @staticmethod
     def from_file(path: Path) -> BattleConfig:
