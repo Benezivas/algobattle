@@ -7,7 +7,7 @@ import sys
 import logging
 import datetime as dt
 from pathlib import Path
-from typing import Literal
+from typing import Callable, Literal, TypeVar
 import tomli
 from algobattle.battle_wrapper import BattleWrapper
 from algobattle.docker_util import DockerConfig
@@ -81,6 +81,20 @@ class BattleConfig:
     points: int
 
 
+_T = TypeVar("_T")
+def _optional(f: Callable[[str], _T]) -> Callable[[str], _T | None]:
+    def inner(arg: str) -> _T | None:
+        if arg.lower() == "none":
+            return None
+        else:
+            return f(arg)
+    return inner
+
+
+_float = _optional(float)
+_int = _optional(int)
+
+
 def parse_cli_args(args: list[str]) -> tuple[BattleConfig, BattleWrapper.Config, DockerConfig]:
     """Parse a given CLI arg list into config objects."""
 
@@ -99,12 +113,12 @@ def parse_cli_args(args: list[str]) -> tuple[BattleConfig, BattleWrapper.Config,
     parser.add_argument("--rounds", type=int, default=5, help="Number of rounds that are to be fought in the battle (points are split between all rounds).")
     parser.add_argument("--points", type=int, default=100, help="number of points distributed between teams.")
 
-    parser.add_argument("--timeout_build", type=float, default=None, help="Timeout for the build step of each docker image.")
-    parser.add_argument("--timeout_generator", type=float, default=None, help="Time limit for the generator execution.")
-    parser.add_argument("--timeout_solver", type=float, default=None, help="Time limit for the solver execution.")
-    parser.add_argument("--space_generator", type=int, default=None, help="Memory limit for the generator execution, in MB.")
-    parser.add_argument("--space_solver", type=int, default=None, help="Memory limit the solver execution, in MB.")
-    parser.add_argument("--cpus", type=int, default=None, help="Number of cpu cores used for each docker container execution.")
+    parser.add_argument("--timeout_build", type=_float, default=None, help="Timeout for the build step of each docker image.")
+    parser.add_argument("--timeout_generator", type=_float, default=None, help="Time limit for the generator execution.")
+    parser.add_argument("--timeout_solver", type=_float, default=None, help="Time limit for the solver execution.")
+    parser.add_argument("--space_generator", type=_int, default=None, help="Memory limit for the generator execution, in MB.")
+    parser.add_argument("--space_solver", type=_int, default=None, help="Memory limit the solver execution, in MB.")
+    parser.add_argument("--cpus", type=_int, default=None, help="Number of cpu cores used for each docker container execution.")
     
 
     # battle wrappers have their configs automatically added to the CLI args
