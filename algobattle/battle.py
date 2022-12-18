@@ -70,13 +70,9 @@ def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
 
 @dataclass(kw_only=True)
 class BattleConfig:
-    problem: Path | None = None
     verbose: bool = False
-    logging_path: Path = Path.home() / ".algobattle_logs"
-    display: Literal["silent", "logs", "ui"] = "logs"
     safe_build: bool = False
     battle_type: Literal["iterated", "averaged"] = "iterated"
-    teams: list[TeamInfo] = field(default_factory=list)
     rounds: int = 5
     points: int = 100
     timeout_build: float | None = 600
