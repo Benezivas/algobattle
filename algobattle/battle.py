@@ -1,7 +1,7 @@
 """Main battle script. Executes all possible types of battles, see battle --help for all options."""
 from argparse import ArgumentParser, Namespace
 from contextlib import ExitStack
-from dataclasses import MISSING, InitVar, dataclass, fields
+from dataclasses import dataclass
 from functools import partial
 import sys
 import logging
@@ -16,7 +16,7 @@ from algobattle.fight_handler import FightHandler
 from algobattle.match import MatchInfo
 from algobattle.team import TeamInfo
 from algobattle.ui import Ui
-from algobattle.util import ArgSpec, CLIParsable, check_path, import_problem_from_path
+from algobattle.util import check_path, import_problem_from_path
 from algobattle.battle_wrappers.averaged import Averaged
 from algobattle.battle_wrappers.iterated import Iterated
 

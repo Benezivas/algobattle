@@ -1,7 +1,7 @@
 """Collection of utility functions."""
 from __future__ import annotations
 from abc import ABC
-from dataclasses import _MISSING_TYPE, KW_ONLY, MISSING, dataclass, field, fields
+from dataclasses import KW_ONLY, dataclass, field, fields
 from io import BytesIO
 import logging
 import importlib.util
@@ -95,6 +95,10 @@ def check_path(path: str, *, type: Literal["file", "dir", "exists"] = "exists") 
         raise ValueError
 
 
+class _MISSING_TYPE:
+    pass
+MISSING = _MISSING_TYPE()
+
 @dataclass
 class _ArgSpec(Generic[T]):
     """Further details of an CLI argument."""
@@ -105,8 +109,8 @@ class _ArgSpec(Generic[T]):
     help: str | _MISSING_TYPE = MISSING
 
 
-def ArgSpec(*, default: T | _MISSING_TYPE = MISSING, extra_names: list[str] | _MISSING_TYPE = MISSING, parser: Callable[[str], T] | _MISSING_TYPE = MISSING, help: str | _MISSING_TYPE = MISSING) -> T:
-    if extra_names is MISSING:
+def ArgSpec(*, default: T | _MISSING_TYPE = MISSING, extra_names: list[str] | None = None, parser: Callable[[str], T] | _MISSING_TYPE = MISSING, help: str | _MISSING_TYPE = MISSING) -> T:
+    if extra_names is None:
         extra_names = []
     return cast(T, _ArgSpec(default=default, extra_names=extra_names, parser=parser, help=help))
 
