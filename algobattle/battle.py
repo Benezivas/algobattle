@@ -1,4 +1,5 @@
 """Main battle script. Executes all possible types of battles, see battle --help for all options."""
+from __future__ import annotations
 from argparse import ArgumentParser, Namespace
 from contextlib import ExitStack
 from dataclasses import dataclass
@@ -85,6 +86,25 @@ class BattleConfig:
     space_solver: int | None = None
     cpus: int | None = None
 
+    @staticmethod
+    def from_file(path: Path) -> BattleConfig:
+        """Parses a BattleConfig object from a toml file."""
+        with open(path, "rb") as file:
+            try:
+                config = tomli.load(file)
+            except tomli.TOMLDecodeError as e:
+                raise ValueError(f"The file at {path} is not a properly formatted TOML file!\n{e}")
+        teams = []
+        for team_spec in config["teams"]:
+            try:
+                name = team_spec["name"]
+                gen = check_path(team_spec["generator"], type="dir")
+                sol = check_path(team_spec["solver"], type="dir")
+                teams.append(TeamInfo(name=name, generator=gen, solver=sol))
+            except TypeError:
+                raise ValueError(f"The config file at {path} is incorrectly formatted!")
+        config["teams"] = teams
+        return BattleConfig(**config)
 
 _T = TypeVar("_T")
 def _optional(f: Callable[[str], _T]) -> Callable[[str], _T | None]:
