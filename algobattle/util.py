@@ -103,7 +103,7 @@ class ArgSpec(Generic[T]):
 
 
 @dataclass
-class CLIParseble(Protocol):
+class CLIParsable(Protocol):
     """Protocol for dataclass-like objects that can be parsed from the CLI."""
 
     __args__: dict[str, ArgSpec[Any]] = field(default_factory=dict)
