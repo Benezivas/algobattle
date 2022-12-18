@@ -8,7 +8,7 @@ import sys
 import logging
 import datetime as dt
 from pathlib import Path
-from typing import Callable, Literal, TypeVar, cast
+from typing import Any, Callable, Literal, TypeVar, cast
 import tomli
 from algobattle.battle_wrapper import BattleWrapper
 from algobattle.fight_handler import FightHandler
@@ -89,6 +89,16 @@ class BattleConfig:
     space_generator: int | None = None
     space_solver: int | None = None
     cpus: int = 1
+
+    @property
+    def docker_params(self) -> dict[str, Any]:
+        return {
+            "timeout_generator": self.timeout_generator,
+            "timeout_solver": self.timeout_solver,
+            "space_generator": self.space_generator,
+            "space_solver": self.space_solver,
+            "cpus": self.cpus,
+        }
 
 
 _T = TypeVar("_T")
@@ -198,9 +208,7 @@ def main():
 
     try:
         problem = import_problem_from_path(program_config.problem)
-        fight_handler = FightHandler(problem, timeout_generator=battle_config.timeout_generator,
-            timeout_solver=battle_config.timeout_solver, space_generator=battle_config.space_solver,
-            space_solver=battle_config.space_solver, cpus=battle_config.cpus)
+        fight_handler = FightHandler(problem, **battle_config.docker_params)
         wrapper = BattleWrapper.initialize(battle_config.battle_type, fight_handler, wrapper_config)
         with TeamHandler.build(program_config.teams) as teams, ExitStack() as stack:
             if program_config.display == "ui":
