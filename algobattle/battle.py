@@ -82,27 +82,6 @@ class BattleConfig:
     space_solver: int | None = None
     cpus: int = 1
 
-    @staticmethod
-    def from_file(path: Path) -> BattleConfig:
-        """Parses a BattleConfig object from a toml file."""
-        with open(path, "rb") as file:
-            try:
-                config = tomli.load(file)
-            except tomli.TOMLDecodeError as e:
-                raise ValueError(f"The file at {path} is not a properly formatted TOML file!\n{e}")
-        teams = []
-        for team_spec in config["teams"]:
-            try:
-                name = team_spec["name"]
-                gen = check_path(team_spec["generator"], type="dir")
-                sol = check_path(team_spec["solver"], type="dir")
-                teams.append(TeamInfo(name=name, generator=gen, solver=sol))
-            except TypeError:
-                raise ValueError(f"The config file at {path} is incorrectly formatted!")
-        config["teams"] = teams
-        for wrapper_name in ("iterated", "averaged"):
-            config.pop(wrapper_name, None)
-        return BattleConfig(**config)
 
 _T = TypeVar("_T")
 def _optional(f: Callable[[str], _T]) -> Callable[[str], _T | None]:
