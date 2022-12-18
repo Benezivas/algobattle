@@ -6,7 +6,7 @@ import logging
 from algobattle.battle_wrapper import BattleWrapper
 from algobattle.observer import Observer
 from algobattle.team import Matchup
-from algobattle.util import inherit_docs
+from algobattle.util import ArgSpec, inherit_docs
 
 logger = logging.getLogger("algobattle.battle_wrappers.iterated")
 
@@ -16,9 +16,9 @@ class Iterated(BattleWrapper):
 
     @dataclass
     class Config(BattleWrapper.Config):
-        iteration_cap: int = 50_000
-        exponent: int = 2
-        approximation_ratio: float = 1
+        iteration_cap: int = ArgSpec(50_000, help="Maximum instance size that will be tried.")
+        exponent: int = ArgSpec(2, help="Determines how quickly the instance size grows.")
+        approximation_ratio: float = ArgSpec(1, help="Approximation ratio that a solver needs to achieve to pass.")
 
     config: Config
 

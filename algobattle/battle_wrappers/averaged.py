@@ -6,7 +6,7 @@ import logging
 from algobattle.battle_wrapper import BattleWrapper
 from algobattle.observer import Observer
 from algobattle.team import Matchup
-from algobattle.util import inherit_docs
+from algobattle.util import ArgSpec, inherit_docs
 
 logger = logging.getLogger("algobattle.battle_wrappers.averaged")
 
@@ -16,8 +16,8 @@ class Averaged(BattleWrapper):
 
     @dataclass
     class Config(BattleWrapper.Config):
-        instance_size: int = 10
-        iterations: int = 10
+        instance_size: int = ArgSpec(10, help="Instance size that will be fought at.")
+        iterations: int = ArgSpec(10, help="Number of iterations in each round.")
 
     config: Config
 
