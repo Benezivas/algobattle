@@ -7,7 +7,7 @@ import importlib.util
 import sys
 from pathlib import Path
 import tarfile
-from typing import Any, Callable, Generic, Literal, Protocol, TypeVar
+from typing import Any, Callable, ClassVar, Generic, Literal, Protocol, TypeVar
 
 from algobattle.problem import Problem
 
@@ -102,17 +102,22 @@ class ArgSpec(Generic[T]):
     help: str | _MISSING_TYPE = MISSING
 
 
-@dataclass
 class CLIParsable(Protocol):
     """Protocol for dataclass-like objects that can be parsed from the CLI."""
 
-    __args__: dict[str, ArgSpec[Any]] = field(default_factory=dict)
+    __args__: ClassVar[dict[str, ArgSpec[Any]]]
 
-    def as_argparse_args(self) -> list[tuple[list[str], dict[str, Any]]]:
+    def __init_subclass__(cls) -> None:
+        if not hasattr(cls, "__args__"):
+            cls.__args__ = {}
+        return super().__init_subclass__()
+
+    @classmethod
+    def as_argparse_args(cls) -> list[tuple[list[str], dict[str, Any]]]:
         """Constructs a list of `*args` and `**kwargs` that can be passed to `ArgumentParser.add_argument()`."""
         arguments = []
-        for field in fields(self):
-            arg_spec = self.__args__.get(field.name, ArgSpec())
+        for field in fields(cls):
+            arg_spec = cls.__args__.get(field.name, ArgSpec())
             args = [f"--{field.name}"] + arg_spec.extra_names
 
             kwargs = {}
@@ -127,8 +132,7 @@ class CLIParsable(Protocol):
                 elif field.default == False:
                     kwargs["action"] = "store_false"
             elif field.type == Literal:
-                kwargs["choices"] = list(self.__annotations__[field.name].__args__)
+                kwargs["choices"] = list(cls.__annotations__[field.name].__args__)
 
             arguments.append((args, kwargs))
         return arguments
-
