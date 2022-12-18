@@ -1,7 +1,7 @@
 """Central managing module for an algorithmic battle."""
 from __future__ import annotations
 from configparser import ConfigParser
-from dataclasses import InitVar, dataclass
+from dataclasses import dataclass
 import logging
 from pathlib import Path
 from prettytable import PrettyTable, DOUBLE_BORDER
@@ -15,23 +15,31 @@ from algobattle.util import import_problem_from_path
 logger = logging.getLogger("algobattle.match")
 
 
-@dataclass(kw_only=True)
+@dataclass
 class MatchInfo:
     """Class specifying all the parameters to run a match."""
 
-    battle_type: InitVar[str]
-    problem_path: InitVar[Path]
-    config_path: InitVar[Path]
+    battle_wrapper: BattleWrapper
     teams: TeamHandler
     rounds: int = 5
 
-    def __post_init__(self, battle_type: str, problem_path: Path, config_path: Path):
-        self.battle_wrapper: BattleWrapper
+    @classmethod
+    def build(
+        cls,
+        *,
+        problem_path: Path,
+        config_path: Path,
+        teams: TeamHandler,
+        rounds: int = 5,
+        battle_type: str,
+    ) -> MatchInfo:
+        """Builds a :cls:`MatchInfo` object from the provided data."""
         problem = import_problem_from_path(problem_path)
         config = ConfigParser()
         config.read(config_path)
         fight_handler = FightHandler(problem, config)
-        self.battle_wrapper = BattleWrapper.initialize(battle_type, fight_handler, config)
+        battle_wrapper = BattleWrapper.initialize(battle_type, fight_handler, config)
+        return MatchInfo(battle_wrapper, teams, rounds)
 
     def run_match(self, observer: Observer | None = None) -> MatchResult:
         """Executes the match with the specified parameters."""

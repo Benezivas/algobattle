@@ -131,7 +131,7 @@ def main():
             else:
                 ui = None
 
-            match_info = MatchInfo(battle_type=options.battle_type, problem_path=problem_path, config_path=options.config, teams=teams, rounds=options.battle_rounds)
+            match_info = MatchInfo.build(battle_type=options.battle_type, problem_path=problem_path, config_path=options.config, teams=teams, rounds=options.battle_rounds)
             result = match_info.run_match(ui)
 
             logger.info('#' * 78)
