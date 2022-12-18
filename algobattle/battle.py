@@ -165,7 +165,7 @@ def parse_cli_args(args: list[str]) -> tuple[BattleConfig, BattleWrapper.Config,
 def main():
     """Entrypoint of `algobattle` CLI."""
     try:
-        battle_config, wrapper_config, docker_config = parse_cli_args(sys.argv)
+        battle_config, wrapper_config, docker_config = parse_cli_args(sys.argv[1:])
         logger = setup_logging(battle_config.logging_path, battle_config.verbose, battle_config.display != "logs")
 
     except KeyboardInterrupt:
