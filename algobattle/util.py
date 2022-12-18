@@ -8,7 +8,7 @@ import importlib.util
 import sys
 from pathlib import Path
 import tarfile
-from typing import Any, Callable, Generic, Literal, TypeVar, cast
+from typing import Any, Callable, Generic, Literal, TypeVar, cast, get_type_hints
 
 from algobattle.problem import Problem
 
@@ -122,7 +122,9 @@ class CLIParsable(ABC):
 
     def __init_subclass__(cls) -> None:
         args = {}
-        for name, _type in cls.__annotations__.items():
+        for name, _type in get_type_hints(cls).items():
+            if name.startswith("__") and name.endswith("__"):
+                continue
             if not hasattr(cls, name):
                 raise ValueError(f"CLIParsable class {cls} has no default value specified for field {name}!")
             default_val = getattr(cls, name)
