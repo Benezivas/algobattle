@@ -110,14 +110,8 @@ def parse_cli_args(args: list[str]) -> tuple[BattleConfig, BattleWrapper.Config,
     # battle wrappers have their configs automatically added to the CLI args
     for wrapper in (Iterated, Averaged):
         group = parser.add_argument_group(wrapper.type)
-        for field in fields(wrapper.Config):
-            if field.default_factory != MISSING:
-                default = field.default_factory()
-            elif field.default != MISSING:
-                default = field.default
-            else:
-                default = None
-            group.add_argument(f"{wrapper.type}_{field.name}", type=field.type, default=default)
+        for args, kwargs in wrapper.Config.as_argparse_args():
+            group.add_argument(*args, **kwargs)
 
     # we want the hierarchy to basically be CLI > config file > defaults, so we need to first parse the CLI args to get
     # the config file location, load that, and then parse CLI args again.

@@ -14,6 +14,7 @@ from importlib import import_module
 from algobattle.fight_handler import FightHandler
 from algobattle.team import Matchup
 from algobattle.observer import Observer, Subject
+from algobattle.util import CLIParsable
 
 logger = logging.getLogger('algobattle.battle_wrapper')
 
@@ -22,7 +23,7 @@ class BattleWrapper(ABC):
     """Abstract Base class for wrappers that execute a specific kind of battle."""
 
     @dataclass
-    class Config:
+    class Config(CLIParsable):
         pass
 
     @staticmethod
