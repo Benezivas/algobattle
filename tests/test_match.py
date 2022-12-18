@@ -12,7 +12,7 @@ from algobattle.battle_wrappers.iterated import Iterated
 from algobattle.battle_wrappers.averaged import Averaged
 from algobattle.fight_handler import FightHandler
 from algobattle.match import MatchInfo, MatchResult
-from algobattle.team import Team, Matchup, TeamInfo
+from algobattle.team import Team, Matchup, TeamHandler, TeamInfo
 from algobattle.docker_util import Image, get_os_type
 from . import testsproblem
 
@@ -62,17 +62,17 @@ class Matchtests(unittest.TestCase):
 
         cls.wrapper_iter = Iterated(cls.fight_handler, cls.config)
         cls.wrapper_avg = Averaged(cls.fight_handler, cls.config)
-        cls.match_iter = MatchInfo(cls.wrapper_iter, [cls.team0, cls.team1])
-        cls.match_avg = MatchInfo(cls.wrapper_avg, [cls.team0, cls.team1])
+        cls.match_iter = MatchInfo(cls.wrapper_iter, TeamHandler((cls.team0, cls.team1)))
+        cls.match_avg = MatchInfo(cls.wrapper_avg, TeamHandler((cls.team0, cls.team1)))
 
     def test_all_battle_pairs_two_teams(self):
         """Two teams both generate and solve one time each."""
-        self.assertEqual(self.match_iter.matchups, [self.matchup0, self.matchup1])
+        self.assertEqual(self.match_iter.teams.matchups, [self.matchup0, self.matchup1])
 
     def test_all_battle_pairs_single_player(self):
         """A team playing against itself is the only battle pair in single player."""
-        match = MatchInfo(self.wrapper_iter, [self.team0])
-        self.assertEqual(match.matchups, [Matchup(self.team0, self.team0)])
+        match = MatchInfo(self.wrapper_iter, TeamHandler((self.team0,)))
+        self.assertEqual(match.teams.matchups, [Matchup(self.team0, self.team0)])
 
     def test_calculate_points_zero_rounds(self):
         """All teams get 0 points if no rounds have been fought."""
@@ -169,27 +169,27 @@ class Execution(unittest.TestCase):
 
     def test_basic(self):
         team = TeamInfo("team0", self.generator, self.solver)
-        match_info = MatchInfo.build(
-            problem_path=self.problem, config_path=self.config, team_infos=[team], battle_type="iterated", rounds=2
-        )
-        with match_info:
+        with TeamHandler.build([team]) as teams:
+            match_info = MatchInfo.build(
+                problem_path=self.problem, config_path=self.config, teams=teams, battle_type="iterated", rounds=2
+            )
             match_info.run_match()
 
     def test_multi_team(self):
         team0 = TeamInfo("team0", self.generator, self.solver)
         team1 = TeamInfo("team1", self.generator, self.solver)
-        match_info = MatchInfo.build(
-            problem_path=self.problem, config_path=self.config, team_infos=[team0, team1], battle_type="iterated", rounds=2
-        )
-        with match_info:
+        with TeamHandler.build([team0, team1]) as teams:
+            match_info = MatchInfo.build(
+                problem_path=self.problem, config_path=self.config, teams=teams, battle_type="iterated", rounds=2
+            )
             match_info.run_match()
 
     def test_averaged(self):
         team = TeamInfo("team0", self.generator, self.solver)
-        match_info = MatchInfo.build(
-            problem_path=self.problem, config_path=self.config, team_infos=[team], battle_type="averaged", rounds=2
-        )
-        with match_info:
+        with TeamHandler.build([team]) as teams:
+            match_info = MatchInfo.build(
+                problem_path=self.problem, config_path=self.config, teams=teams, battle_type="averaged", rounds=2
+            )
             match_info.run_match()
 
 

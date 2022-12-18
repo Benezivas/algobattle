@@ -2,10 +2,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from itertools import combinations
 from pathlib import Path
 from typing import Iterator
+import logging
 
 from algobattle.docker_util import DockerError, Image, ArchivedImage
+
+logger = logging.getLogger("algobattle.team")
+
 
 _team_names: set[str] = set()
 
@@ -141,3 +146,45 @@ class Matchup:
     def __iter__(self) -> Iterator[Team]:
         yield self.generator
         yield self.solver
+
+
+class TeamHandler(list[Team]):
+    """Handles building teams and cleaning them up."""
+
+    @staticmethod
+    def build(infos: list[TeamInfo], timeout: float | None = None, safe_build: bool = False) -> TeamHandler:
+        """Builds the specified team objects."""
+        teams: list[Team | ArchivedTeam] = []
+        for info in infos:
+            try:
+                team = info.build(timeout, auto_cleanup=safe_build)
+                if safe_build:
+                    team = team.archive()
+                teams.append(team)
+            except (ValueError, DockerError):
+                logger.warning(f"Building generators and solvers for team {info.name} failed, they will be excluded!")
+        restored_teams = [team.restore() if isinstance(team, ArchivedTeam) else team for team in teams]
+        return TeamHandler(restored_teams)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, _type, _value_, _traceback):
+        for team in self:
+            team.cleanup()
+
+    @property
+    def grouped_matchups(self) -> list[tuple[Matchup, Matchup]]:
+        """All matchups, grouped by the involved teams.
+
+        Each tuple's first matchup has the first team in the group generating, the second has it solving.
+        """
+        return [(Matchup(*g), Matchup(*g[::-1])) for g in combinations(self, 2)]
+
+    @property
+    def matchups(self) -> list[Matchup]:
+        """All matchups that will be fought."""
+        if len(self) == 1:
+            return [Matchup(self[0], self[0])]
+        else:
+            return [m for pair in self.grouped_matchups for m in pair]

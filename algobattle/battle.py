@@ -14,7 +14,7 @@ from algobattle.battle_wrapper import BattleWrapper
 from algobattle.fight_handler import FightHandler
 
 from algobattle.match import MatchInfo
-from algobattle.team import TeamInfo
+from algobattle.team import TeamHandler, TeamInfo
 from algobattle.ui import Ui
 from algobattle.util import check_path, import_problem_from_path
 from algobattle.battle_wrappers.averaged import Averaged
@@ -202,19 +202,14 @@ def main():
             timeout_solver=battle_config.timeout_solver, space_generator=battle_config.space_solver,
             space_solver=battle_config.space_solver, cpus=battle_config.cpus)
         wrapper = BattleWrapper.initialize(battle_config.battle_type, fight_handler, wrapper_config)
-        with MatchInfo.build(
-            problem=problem,
-            wrapper=wrapper,
-            teams=program_config.teams,
-            rounds=battle_config.rounds,
-            safe_build=battle_config.safe_build,
-        ) as match_info, ExitStack() as stack:
+        with TeamHandler.build(program_config.teams) as teams, ExitStack() as stack:
             if program_config.display == "ui":
                 ui = Ui()
                 stack.enter_context(ui)
             else:
                 ui = None
 
+            match_info = MatchInfo(wrapper, teams, rounds=battle_config.rounds)
             result = match_info.run_match(ui)
 
             logger.info('#' * 78)
