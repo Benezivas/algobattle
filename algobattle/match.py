@@ -6,7 +6,7 @@ import logging
 from prettytable import PrettyTable, DOUBLE_BORDER
 
 from algobattle.battle_wrapper import BattleWrapper
-from algobattle.docker_util import DockerConfig, DockerError
+from algobattle.docker_util import DockerError
 from algobattle.observer import Observer, Subject
 from algobattle.problem import Problem
 from algobattle.team import ArchivedTeam, Matchup, Team, TeamInfo
@@ -23,13 +23,13 @@ class MatchInfo:
     rounds: int = 5
 
     @classmethod
-    def build(cls, problem: Problem, wrapper: BattleWrapper, teams: list[TeamInfo], rounds: int, docker_cfg: DockerConfig = DockerConfig(), *, safe_build: bool = True) -> MatchInfo:
+    def build(cls, problem: Problem, wrapper: BattleWrapper, teams: list[TeamInfo], rounds: int, *, timeout: float | None = None, safe_build: bool = True) -> MatchInfo:
         """Builds a :cls:`MatchInfo` object from the provided data, including building the docker images."""
 
         built_teams: list[Team | ArchivedTeam] = []
         for info in teams:
             try:
-                team = info.build(docker_cfg.timeout_build, auto_cleanup=safe_build)
+                team = info.build(timeout, auto_cleanup=safe_build)
                 if safe_build:
                     team = team.archive()
                 built_teams.append(team)

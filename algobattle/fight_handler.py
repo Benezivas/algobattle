@@ -1,21 +1,25 @@
 """Class managing the execution of generators and solvers."""
+from dataclasses import KW_ONLY, dataclass
 import logging
 from typing import Any, Tuple
 
-from algobattle.docker_util import DockerConfig, DockerError
+from algobattle.docker_util import DockerError
 from algobattle.team import Matchup, Team
 from algobattle.problem import Problem
 
 logger = logging.getLogger("algobattle.fight_handler")
 
-
+@dataclass
 class FightHandler:
     """Class managing the execution of generators and solvers."""
 
-    def __init__(self, problem: Problem, config: DockerConfig) -> None:
-        super().__init__()
-        self.config = config
-        self.problem = problem
+    problem: Problem
+    _: KW_ONLY
+    timeout_generator: float | None = None
+    timeout_solver: float | None = None
+    space_generator: int | None = None
+    space_solver: int | None = None
+    cpus: int | None = None
 
     def fight(self, matchup: Matchup, instance_size: int) -> float:
         """Execute a single fight of a battle between a given generator and solver for a given instance size.
@@ -71,12 +75,12 @@ class FightHandler:
         RuntimeError
             If the container doesn't run successfully or any of the checks don't pass
         """
-        scaled_memory = self.problem.generator_memory_scaler(self.config.space_generator, instance_size)
+        scaled_memory = self.problem.generator_memory_scaler(self.space_generator, instance_size)
 
         logger.debug(f"Running generator of group {team}...\n")
 
         try:
-            encoded_output = team.generator.run(str(instance_size), self.config.timeout_generator, scaled_memory, self.config.cpus)
+            encoded_output = team.generator.run(str(instance_size), self.timeout_generator, scaled_memory, self.cpus)
         except DockerError:
             logger.warning(f"Generator of team '{team}' didn't run successfully!")
             raise RuntimeError
@@ -132,10 +136,10 @@ class FightHandler:
         RuntimeError
             If the container doesn't run successfully or any of the checks don't pass
         """
-        scaled_memory = self.problem.solver_memory_scaler(self.config.space_solver, instance_size)
+        scaled_memory = self.problem.solver_memory_scaler(self.space_solver, instance_size)
         try:
             encoded_output = team.solver.run(
-                self.problem.parser.encode(instance), self.config.timeout_solver, scaled_memory, self.config.cpus
+                self.problem.parser.encode(instance), self.timeout_solver, scaled_memory, self.cpus
             )
         except DockerError:
             logger.warning(f"Solver of team '{team}' didn't run successfully!")

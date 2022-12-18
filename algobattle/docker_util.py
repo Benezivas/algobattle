@@ -54,18 +54,6 @@ class DockerError(Exception):
 
 
 @dataclass
-class DockerConfig:
-    """Specifies settings relevant for the building and execution of docker images/containers."""
-
-    timeout_build: float | None = None
-    timeout_generator: float | None = None
-    timeout_solver: float | None = None
-    space_generator: int | None = None
-    space_solver: int | None = None
-    cpus: int | None = None
-
-
-@dataclass
 class ArchivedImage:
     """Defines an archived docker image."""
 

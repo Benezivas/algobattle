@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Callable, Literal, TypeVar
 import tomli
 from algobattle.battle_wrapper import BattleWrapper
-from algobattle.docker_util import DockerConfig
 from algobattle.fight_handler import FightHandler
 
 from algobattle.match import MatchInfo
@@ -79,6 +78,12 @@ class BattleConfig:
     teams: list[TeamInfo]
     rounds: int
     points: int
+    timeout_build: float | None
+    timeout_generator: float | None = None
+    timeout_solver: float | None = None
+    space_generator: int | None = None
+    space_solver: int | None = None
+    cpus: int | None = None
 
 
 _T = TypeVar("_T")
@@ -95,7 +100,7 @@ _float = _optional(float)
 _int = _optional(int)
 
 
-def parse_cli_args(args: list[str]) -> tuple[BattleConfig, BattleWrapper.Config, DockerConfig]:
+def parse_cli_args(args: list[str]) -> tuple[BattleConfig, BattleWrapper.Config]:
     """Parse a given CLI arg list into config objects."""
 
     parser = ArgumentParser()
@@ -113,12 +118,12 @@ def parse_cli_args(args: list[str]) -> tuple[BattleConfig, BattleWrapper.Config,
     parser.add_argument("--rounds", type=int, default=5, help="Number of rounds that are to be fought in the battle (points are split between all rounds).")
     parser.add_argument("--points", type=int, default=100, help="number of points distributed between teams.")
 
-    parser.add_argument("--timeout_build", type=_float, default=None, help="Timeout for the build step of each docker image.")
-    parser.add_argument("--timeout_generator", type=_float, default=None, help="Time limit for the generator execution.")
-    parser.add_argument("--timeout_solver", type=_float, default=None, help="Time limit for the solver execution.")
+    parser.add_argument("--timeout_build", type=_float, default=600, help="Timeout for the build step of each docker image.")
+    parser.add_argument("--timeout_generator", type=_float, default=30, help="Time limit for the generator execution.")
+    parser.add_argument("--timeout_solver", type=_float, default=30, help="Time limit for the solver execution.")
     parser.add_argument("--space_generator", type=_int, default=None, help="Memory limit for the generator execution, in MB.")
     parser.add_argument("--space_solver", type=_int, default=None, help="Memory limit the solver execution, in MB.")
-    parser.add_argument("--cpus", type=_int, default=None, help="Number of cpu cores used for each docker container execution.")
+    parser.add_argument("--cpus", type=_int, default=1, help="Number of cpu cores used for each docker container execution.")
     
 
     # battle wrappers have their configs automatically added to the CLI args
@@ -171,15 +176,14 @@ def parse_cli_args(args: list[str]) -> tuple[BattleConfig, BattleWrapper.Config,
 
     battle_config = BattleConfig(**vars(battle_config))
     wrapper_config = BattleWrapper.Config()
-    docker_config = DockerConfig()
 
-    return battle_config, wrapper_config, docker_config
+    return battle_config, wrapper_config
 
 
 def main():
     """Entrypoint of `algobattle` CLI."""
     try:
-        battle_config, wrapper_config, docker_config = parse_cli_args(sys.argv[1:])
+        battle_config, wrapper_config = parse_cli_args(sys.argv[1:])
         logger = setup_logging(battle_config.logging_path, battle_config.verbose, battle_config.display != "logs")
 
     except KeyboardInterrupt:
@@ -187,14 +191,15 @@ def main():
 
     try:
         problem = import_problem_from_path(battle_config.problem)
-        fight_handler = FightHandler(problem, docker_config)
+        fight_handler = FightHandler(problem, timeout_generator=battle_config.timeout_generator,
+            timeout_solver=battle_config.timeout_solver, space_generator=battle_config.space_solver,
+            space_solver=battle_config.space_solver, cpus=battle_config.cpus)
         wrapper = BattleWrapper.initialize(battle_config.battle_type, fight_handler, wrapper_config)
         with MatchInfo.build(
             problem=problem,
             wrapper=wrapper,
             teams=battle_config.teams,
             rounds=battle_config.rounds,
-            docker_cfg=docker_config,
             safe_build=battle_config.safe_build,
         ) as match_info, ExitStack() as stack:
             if battle_config.display == "ui":
