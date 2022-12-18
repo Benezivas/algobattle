@@ -10,7 +10,6 @@ from dataclasses import dataclass
 import logging
 from abc import abstractmethod, ABC
 from importlib import import_module
-from configparser import ConfigParser
 
 from algobattle.fight_handler import FightHandler
 from algobattle.team import Matchup
@@ -25,8 +24,6 @@ class BattleWrapper(ABC):
     @dataclass
     class Config:
         pass
-
-    config: Config
 
     @staticmethod
     def initialize(wrapper_name: str, fight_handler: FightHandler, config: BattleWrapper.Config) -> BattleWrapper:
