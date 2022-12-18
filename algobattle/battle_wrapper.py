@@ -72,10 +72,10 @@ class BattleWrapper(ABC):
         """
         raise NotImplementedError
 
-    @property
-    def type(self) -> str:
+    @classmethod
+    def name(cls) -> str:
         """Name of the type of this battle wrapper."""
-        return self.__class__.__name__
+        return cls.__name__
 
     class Result(Subject):
         """Result of a single battle."""

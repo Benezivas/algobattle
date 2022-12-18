@@ -109,9 +109,9 @@ def parse_cli_args(args: list[str]) -> tuple[BattleConfig, BattleWrapper.Config,
 
     # battle wrappers have their configs automatically added to the CLI args
     for wrapper in (Iterated, Averaged):
-        group = parser.add_argument_group(wrapper.type)
+        group = parser.add_argument_group(wrapper.name())
         for name, kwargs in wrapper.Config.as_argparse_args():
-            group.add_argument(f"--{wrapper.type}_{name}", **kwargs)
+            group.add_argument(f"--{wrapper.name().lower()}_{name}", **kwargs)
 
     # we want the hierarchy to basically be CLI > config file > defaults, so we need to first parse the CLI args to get
     # the config file location, load that, and then parse CLI args again.
