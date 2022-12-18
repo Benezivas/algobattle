@@ -1,7 +1,7 @@
 """Collection of utility functions."""
 from __future__ import annotations
 from abc import ABC
-from dataclasses import KW_ONLY, dataclass, field, fields
+from dataclasses import KW_ONLY, dataclass, fields
 from io import BytesIO
 import logging
 import importlib.util
@@ -109,7 +109,7 @@ class _ArgSpec(Generic[T]):
     help: str | None = None
 
 
-def ArgSpec(*, default: T, alias: str | None = None, parser: Callable[[str], T] | None = None, help: str | None = None) -> T:
+def ArgSpec(default: T, *, alias: str | None = None, parser: Callable[[str], T] | None = None, help: str | None = None) -> T:
     return cast(T, _ArgSpec(default=default, alias=alias, parser=parser, help=help))
 
 
