@@ -1,15 +1,12 @@
 """Central managing module for an algorithmic battle."""
 from __future__ import annotations
 from dataclasses import dataclass
-from itertools import combinations
 import logging
 from prettytable import PrettyTable, DOUBLE_BORDER
 
 from algobattle.battle_wrapper import BattleWrapper
-from algobattle.docker_util import DockerError
 from algobattle.observer import Observer, Subject
-from algobattle.problem import Problem
-from algobattle.team import ArchivedTeam, Matchup, Team, TeamInfo
+from algobattle.team import Matchup, Team, TeamHandler
 
 logger = logging.getLogger("algobattle.match")
 
@@ -19,53 +16,13 @@ class MatchInfo:
     """Class specifying all the parameters to run a match."""
 
     battle_wrapper: BattleWrapper
-    teams: list[Team]
+    teams: TeamHandler
     rounds: int = 5
-
-    @classmethod
-    def build(cls, problem: Problem, wrapper: BattleWrapper, teams: list[TeamInfo], rounds: int, *, timeout: float | None = None, safe_build: bool = True) -> MatchInfo:
-        """Builds a :cls:`MatchInfo` object from the provided data, including building the docker images."""
-
-        built_teams: list[Team | ArchivedTeam] = []
-        for info in teams:
-            try:
-                team = info.build(timeout, auto_cleanup=safe_build)
-                if safe_build:
-                    team = team.archive()
-                built_teams.append(team)
-            except (ValueError, DockerError):
-                logger.warning(f"Building generators and solvers for team {info.name} failed, they will be excluded!")
-        restored_teams = [team.restore() if isinstance(team, ArchivedTeam) else team for team in built_teams]
-
-        return MatchInfo(wrapper, restored_teams, rounds)
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, _type, _value_, _traceback):
-        for team in self.teams:
-            team.cleanup()
-
-    @property
-    def grouped_matchups(self) -> list[tuple[Matchup, Matchup]]:
-        """All matchups, grouped by the involved teams.
-
-        Each tuple's first matchup has the first team in the group generating, the second has it solving.
-        """
-        return [(Matchup(*g), Matchup(*g[::-1])) for g in combinations(self.teams, 2)]
-
-    @property
-    def matchups(self) -> list[Matchup]:
-        """All matchups that will be fought."""
-        if len(self.teams) == 1:
-            return [Matchup(self.teams[0], self.teams[0])]
-        else:
-            return [m for pair in self.grouped_matchups for m in pair]
 
     def run_match(self, observer: Observer | None = None) -> MatchResult:
         """Executes the match with the specified parameters."""
         result = MatchResult(self, observer)
-        for matchup in self.matchups:
+        for matchup in self.teams.matchups:
             for i in range(self.rounds):
                 logger.info("#" * 20 + f"  Running Round {i+1}/{self.rounds}  " + "#" * 20)
                 battle_result = self.battle_wrapper.run_round(matchup, observer)
@@ -79,7 +36,7 @@ class MatchResult(Subject, dict[Matchup, list[BattleWrapper.Result]]):
 
     def __init__(self, match: MatchInfo, observer: Observer | None = None):
         Subject.__init__(self, observer)
-        dict.__init__(self, {m: [] for m in match.matchups})
+        dict.__init__(self, {m: [] for m in match.teams.matchups})
         self.match = match
         self.notify_vars = True
 
@@ -100,7 +57,7 @@ class MatchResult(Subject, dict[Matchup, list[BattleWrapper.Result]]):
             return points
         points_per_round = round(achievable_points / self.match.rounds, 1)
 
-        for home_matchup, away_matchup in self.match.grouped_matchups:
+        for home_matchup, away_matchup in self.match.teams.grouped_matchups:
             for home_res, away_res in zip(self[home_matchup], self[away_matchup]):
                 total_score = home_res.score + away_res.score
                 if total_score == 0:
