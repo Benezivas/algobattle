@@ -1,4 +1,5 @@
 """Main battle script. Executes all possible types of battles, see battle --help for all options."""
+from configparser import ConfigParser
 from contextlib import ExitStack
 import sys
 import logging
@@ -10,7 +11,7 @@ from importlib.metadata import version as pkg_version
 
 import algobattle
 from algobattle.match import MatchInfo
-from algobattle.team import TeamInfo
+from algobattle.team import TeamHandler, TeamInfo
 from algobattle.ui import Ui
 
 
@@ -120,20 +121,17 @@ def main():
         logger.debug('Using additional configuration options from file "%s".', options.config)
         team_infos = [TeamInfo(*info) for info in zip(team_names, generators, solvers)]
 
-        with MatchInfo.build(
-            problem_path=problem_path,
-            config_path=options.config,
-            team_infos=team_infos,
-            rounds=options.battle_rounds,
-            battle_type=options.battle_type,
-            safe_build=options.safe_build
-        ) as match_info, ExitStack() as stack:
+        config = ConfigParser()
+        config.read(options.config)
+        timeout = float(config["run_parameters"]["timeout_build"])
+        with TeamHandler.build(team_infos, timeout=timeout, safe_build=options.safe_build) as teams, ExitStack() as stack:
             if display_ui:
                 ui = Ui()
                 stack.enter_context(ui)
             else:
                 ui = None
 
+            match_info = MatchInfo(battle_type=options.battle_type, problem_path=problem_path, config_path=options.config, teams=teams, rounds=options.battle_rounds)
             result = match_info.run_match(ui)
 
             logger.info('#' * 78)
