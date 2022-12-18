@@ -7,7 +7,7 @@ import importlib.util
 import sys
 from pathlib import Path
 import tarfile
-from typing import Any, Callable, ClassVar, Generic, Literal, Protocol, TypeVar
+from typing import Any, Callable, ClassVar, Generic, Literal, Protocol, Type, TypeVar
 
 from algobattle.problem import Problem
 
@@ -95,41 +95,44 @@ def check_path(path: str, *, type: Literal["file", "dir", "exists"] = "exists") 
 
 
 @dataclass(kw_only=True)
-class ArgSpec(Generic[T]):
+class _ArgSpec(Generic[T]):
     """Further details of an CLI argument."""
+    default: T | _MISSING_TYPE = MISSING
     extra_names: list[str] = field(default_factory=list)
     parser: Callable[[str], T] | _MISSING_TYPE = MISSING
     help: str | _MISSING_TYPE = MISSING
 
 
+def ArgSpec(*, default: T | _MISSING_TYPE = MISSING, extra_names: list[str] | _MISSING_TYPE = MISSING, parser: Callable[[str], T] | _MISSING_TYPE = MISSING, help: str | _MISSING_TYPE = MISSING) -> Any:
+    if extra_names is MISSING:
+        extra_names = []
+    return _ArgSpec(default=default, extra_names=extra_names, parser=parser, help=help)
+
+
 class CLIParsable(Protocol):
     """Protocol for dataclass-like objects that can be parsed from the CLI."""
-
-    __args__: ClassVar[dict[str, ArgSpec[Any]]]
-
-    def __init_subclass__(cls) -> None:
-        if not hasattr(cls, "__args__"):
-            cls.__args__ = {}
-        return super().__init_subclass__()
 
     @classmethod
     def as_argparse_args(cls) -> list[tuple[list[str], dict[str, Any]]]:
         """Constructs a list of `*args` and `**kwargs` that can be passed to `ArgumentParser.add_argument()`."""
         arguments = []
         for field in fields(cls):
-            arg_spec = cls.__args__.get(field.name, ArgSpec())
-            args = [f"--{field.name}"] + arg_spec.extra_names
+            if isinstance(field.default, _ArgSpec):
+                arg_spec = field.default
+            else:
+                arg_spec = _ArgSpec(default=field.default)
 
+            args = [f"--{field.name}"] + arg_spec.extra_names
             kwargs = {}
             kwargs["type"] = arg_spec.parser if arg_spec.parser is not MISSING else field.type
             if arg_spec.help is not MISSING:
                 kwargs["help"] = arg_spec.help
             if field.default is not MISSING:
-                kwargs["default"] = field.default
+                kwargs["default"] = arg_spec.default
             if field.type == bool:
-                if field.default == True:
+                if arg_spec.default == True:
                     kwargs["action"] = "store_true"
-                elif field.default == False:
+                elif arg_spec.default == False:
                     kwargs["action"] = "store_false"
             elif field.type == Literal:
                 kwargs["choices"] = list(cls.__annotations__[field.name].__args__)
