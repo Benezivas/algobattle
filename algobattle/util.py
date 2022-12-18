@@ -110,6 +110,7 @@ class _ArgSpec(Generic[T]):
 
 
 def ArgSpec(default: T, *, alias: str | None = None, parser: Callable[[str], T] | None = None, help: str | None = None) -> T:
+    """Structure specifying the CLI arg."""
     return cast(T, _ArgSpec(default=default, alias=alias, parser=parser, help=help))
 
 
