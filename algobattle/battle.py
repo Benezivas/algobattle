@@ -104,14 +104,13 @@ def parse_cli_args(args: list[str]) -> tuple[BattleConfig, BattleWrapper.Config]
     parser.add_argument("path", type=check_path, help="Path to the needed files if they aren't specified seperately.")
     parser.add_argument("--problem", type=partial(check_path, type="dir"), help="Path to a problem folder.")
     parser.add_argument("--config", type=partial(check_path, type="file"), help="Path to a config file.")
-
-    parser.add_argument("--verbose", "-v", dest="verbose", action="store_const", const=True, help="More detailed log output.")
     parser.add_argument("--logging_path", type=partial(check_path, type="dir"), help="Folder that logs are written into.")
     parser.add_argument("--display", choices=["silent", "logs", "ui"], help="Choose output mode, silent disables all output, logs displays the battle logs on STDERR, ui displays a small GUI showing the progress of the battle.")
+
+    parser.add_argument("--verbose", "-v", dest="verbose", action="store_const", const=True, help="More detailed log output.")
     parser.add_argument("--safe_build", action="store_const", const=True, help="Isolate docker image builds from each other. Significantly slows down battle setup but closes prevents images from interfering with each other.")
 
     parser.add_argument("--battle_type", choices=["iterated", "averaged"], help="Type of battle wrapper to be used.")
-    parser.add_argument("--team", dest="teams", type=partial(check_path, type="dir"), help="Path to a folder containing /generator and /solver folders. For more detailed team configuration use the config file.")
     parser.add_argument("--rounds", type=int, help="Number of rounds that are to be fought in the battle (points are split between all rounds).")
     parser.add_argument("--points", type=int, help="number of points distributed between teams.")
 
