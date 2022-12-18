@@ -22,6 +22,7 @@ dependencies = [
     "windows-curses; os_name == 'nt'",
 
     "prettytable",
+    "tomli",
 ]
 
 [project.scripts]
