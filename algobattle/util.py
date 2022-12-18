@@ -104,15 +104,13 @@ class _ArgSpec(Generic[T]):
     """Further details of an CLI argument."""
     default: T
     _: KW_ONLY
-    extra_names: list[str] = field(default_factory=list)
-    parser: Callable[[str], T] | _MISSING_TYPE = MISSING
-    help: str | _MISSING_TYPE = MISSING
+    alias: str | None = None
+    parser: Callable[[str], T] | None = None
+    help: str | None = None
 
 
-def ArgSpec(*, default: T | _MISSING_TYPE = MISSING, extra_names: list[str] | None = None, parser: Callable[[str], T] | _MISSING_TYPE = MISSING, help: str | _MISSING_TYPE = MISSING) -> T:
-    if extra_names is None:
-        extra_names = []
-    return cast(T, _ArgSpec(default=default, extra_names=extra_names, parser=parser, help=help))
+def ArgSpec(*, default: T, alias: str | None = None, parser: Callable[[str], T] | None = None, help: str | None = None) -> T:
+    return cast(T, _ArgSpec(default=default, alias=alias, parser=parser, help=help))
 
 
 class CLIParsable(ABC):
@@ -151,7 +149,7 @@ class CLIParsable(ABC):
         arguments = []
         for field in fields(cls):
             arg_spec = cls._argspec(field.name)
-            args = [f"--{field.name}"] + arg_spec.extra_names
+            name = field.name if arg_spec.alias is None else arg_spec.alias
             kwargs = {
                 "type": arg_spec.parser,
                 "default": arg_spec.default,
@@ -166,5 +164,5 @@ class CLIParsable(ABC):
             elif field.type == Literal:
                 kwargs["choices"] = list(cls.__annotations__[field.name].__args__)
 
-            arguments.append((args, kwargs))
+            arguments.append((name, kwargs))
         return arguments
