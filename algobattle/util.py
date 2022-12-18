@@ -95,10 +95,6 @@ def check_path(path: str, *, type: Literal["file", "dir", "exists"] = "exists") 
         raise ValueError
 
 
-class _MISSING_TYPE:
-    pass
-MISSING = _MISSING_TYPE()
-
 @dataclass
 class _ArgSpec(Generic[T]):
     """Further details of an CLI argument."""
@@ -122,27 +118,25 @@ class CLIParsable(ABC):
     def __init_subclass__(cls) -> None:
         args = {}
         for name, _type in get_type_hints(cls).items():
-            if name.startswith("__") and name.endswith("__"):
+            if (name.startswith("__") and name.endswith("__")) or not hasattr(cls, name):
                 continue
-            if not hasattr(cls, name):
-                raise ValueError(f"CLIParsable class {cls} has no default value specified for field {name}!")
             default_val = getattr(cls, name)
             if isinstance(default_val, _ArgSpec):
-                if default_val.parser is MISSING:
+                if default_val.parser is None:
                     default_val.parser = _type
+                if default_val.alias is None:
+                    default_val.alias = name
                 args[name] = default_val
                 setattr(cls, name, default_val.default)
-            else:
-                args[name] = _ArgSpec(default=default_val, parser=_type)
         cls.__args__ = args
         return super().__init_subclass__()
 
     @classmethod
-    def _argspec(cls, name: str) -> _ArgSpec[Any]:
+    def _argspec(cls, name: str) -> _ArgSpec[Any] | None:
         for c in cls.__mro__:
             if name in getattr(c, "__args__", {}):
                 return getattr(c, "__args__")[name]
-        raise ValueError
+        return None
 
     @classmethod
     def as_argparse_args(cls) -> list[tuple[list[str], dict[str, Any]]]:
@@ -150,20 +144,18 @@ class CLIParsable(ABC):
         arguments = []
         for field in fields(cls):
             arg_spec = cls._argspec(field.name)
-            name = field.name if arg_spec.alias is None else arg_spec.alias
-            kwargs = {
-                "type": arg_spec.parser,
-                "default": arg_spec.default,
-            }
-            if arg_spec.help is not MISSING:
-                kwargs["help"] = arg_spec.help
-            if field.type == bool:
-                if arg_spec.default == True:
-                    kwargs["action"] = "store_true"
-                elif arg_spec.default == False:
-                    kwargs["action"] = "store_false"
-            elif field.type == Literal:
-                kwargs["choices"] = list(cls.__annotations__[field.name].__args__)
+            if arg_spec is None:
+                continue
 
-            arguments.append((name, kwargs))
+            kwargs: dict[str, Any] = {
+                "type": arg_spec.parser,
+                "help": f"{arg_spec.help} Default: {arg_spec.default}" if arg_spec.help is not None else f"Default: {arg_spec.default}"
+            }
+            if field.type == bool:
+                kwargs["action"] = "store_const"
+                kwargs["const"] = not arg_spec.default
+            elif field.type == Literal:
+                kwargs["choices"] = cls.__annotations__[field.name].__args__
+
+            arguments.append((arg_spec.alias, kwargs))
         return arguments
