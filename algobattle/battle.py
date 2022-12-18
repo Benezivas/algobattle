@@ -16,7 +16,7 @@ from algobattle.fight_handler import FightHandler
 from algobattle.match import MatchInfo
 from algobattle.team import TeamInfo
 from algobattle.ui import Ui
-from algobattle.util import check_path, import_problem_from_path
+from algobattle.util import ArgSpec, CLIParsable, check_path, import_problem_from_path
 from algobattle.battle_wrappers.averaged import Averaged
 from algobattle.battle_wrappers.iterated import Iterated
 
@@ -86,7 +86,7 @@ def parse_cli_args(args: list[str]) -> tuple[BattleConfig, BattleWrapper.Config,
 
     parser = ArgumentParser()
     parser.add_argument("path", type=check_path, help="Path to the needed files if they aren't specified seperately.")
-    parser.add_argument("--problem", type=partial(check_path, type="file"), default=None, help="Path to a problem file.")
+    parser.add_argument("--problem", type=partial(check_path, type="dir"), default=None, help="Path to a problem folder.")
     parser.add_argument("--config", type=partial(check_path, type="file"), default=None, help="Path to a config file.")
 
     parser.add_argument("--verbose", "-v", dest="verbose", action="store_true", help="More detailed log output.")
