@@ -8,7 +8,7 @@ import sys
 import logging
 import datetime as dt
 from pathlib import Path
-from typing import Callable, Literal, TypeVar
+from typing import Callable, Literal, TypeVar, cast
 import tomli
 from algobattle.battle_wrapper import BattleWrapper
 from algobattle.fight_handler import FightHandler
@@ -71,8 +71,9 @@ def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
 @dataclass
 class ProgramConfig:
     problem: Path
-    display: Literal["silent", "logs", "ui"] = "logs"
-    logs: Path = Path.home() / ".alogbattle_logs"
+    display: Literal["silent", "logs", "ui"]
+    logs: Path
+    teams: list[TeamInfo]
 
 
 @dataclass(kw_only=True)
@@ -135,14 +136,9 @@ def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, BattleConfig, Battle
         for name, kwargs in wrapper.Config.as_argparse_args():
             group.add_argument(f"--{wrapper.name().lower()}_{name}", **kwargs)
 
-    # we want the hierarchy to basically be CLI > config file > defaults, so we need to first parse the CLI args to get
-    # the config file location, load that, and then parse CLI args again.
-    # you could skip the second parse by having argparse not set the default in the namespace, but then we have worse CLI help messages
-    cfg_args = parser.parse_args(args)
-    if cfg_args.config is not None:
-        cfg_path = cfg_args.config
-    else:
-        cfg_path = cfg_args.path / "config.toml"
+    parsed = parser.parse_args(args)
+
+    cfg_path = cast(Path, getattr(parsed, "config", parsed.path / "config.toml"))
     if cfg_path.is_file():
         with open(cfg_path, "rb") as file:
             try:
@@ -152,48 +148,56 @@ def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, BattleConfig, Battle
     else:
         config = {}
 
-    battle_config = Namespace(**config.get("algobattle", {}))
-    parser.parse_args(args, namespace=battle_config)
-
-    # args where the defaults are dependend on other args
-    if battle_config.problem is None:
-        battle_config.problem = cfg_args.path
-    if battle_config.teams:
-        teams_pre = battle_config.teams
+    if "teams" in config:
+        team_specs = config["teams"]
     else:
-        teams_pre = [cfg_args.path]
+        team_specs = [{
+            "name": parsed.path.name,
+            "generator": parsed.path / "generator",
+            "solver": parsed.path / "solver",
+        }]
+    teams = []
+    for spec in team_specs:
+        try:
+            name = spec["name"]
+            gen = check_path(spec["generator"], type="dir")
+            sol = check_path(spec["solver"], type="dir")
+            teams.append(TeamInfo(name=name, generator=gen, solver=sol))
+        except TypeError:
+            raise ValueError(f"The config file at {cfg_path} is incorrectly formatted!")
+    
+    program_config = ProgramConfig(
+        teams=teams,
+        problem=getattr(parsed, "problem", cast(Path, parsed.path)),
+        display=getattr(parsed, "display", "logs"),
+        logs=getattr(parsed, "logging_path", Path.home() / ".algobattle_logs"),
+    )
 
-    # building TeamInfo objects from the args, ideally there'd be a better way to do this
-    battle_config.teams = []
-    for team_spec in teams_pre:
-        if isinstance(team_spec, dict):
-            try:
-                name = team_spec["name"]
-                gen = check_path(team_spec["generator"], type="dir")
-                sol = check_path(team_spec["solver"], type="dir")
-                battle_config.teams.append(TeamInfo(name=name, generator=gen, solver=sol))
-            except TypeError:
-                raise ValueError(f"The config file at {cfg_path} is incorrectly formatted!")
-        else:
-            battle_config.teams.append(TeamInfo(name=team_spec.name, generator=team_spec / "generator", solver=team_spec / "solver"))
+    battle_config = BattleConfig(**config.get("algobattle", {}))
+    for name in vars(battle_config):
+        if hasattr(parsed, name):
+            setattr(battle_config, name, getattr(parsed, name))
 
-    battle_config = BattleConfig(**vars(battle_config))
-    wrapper_config = BattleWrapper.Config()
+    wrapper_config = BattleWrapper.Config(**config.get(battle_config.battle_type, {}))
+    for name in vars(battle_config):
+        cli_name = f"--{battle_config}_{name}"
+        if hasattr(parsed, cli_name):
+            setattr(battle_config, name, getattr(parsed, cli_name))
 
-    return battle_config, wrapper_config
+    return program_config, battle_config, wrapper_config
 
 
 def main():
     """Entrypoint of `algobattle` CLI."""
     try:
-        battle_config, wrapper_config = parse_cli_args(sys.argv[1:])
-        logger = setup_logging(battle_config.logging_path, battle_config.verbose, battle_config.display != "logs")
+        program_config, battle_config, wrapper_config = parse_cli_args(sys.argv[1:])
+        logger = setup_logging(program_config.logs, battle_config.verbose, program_config.display != "logs")
 
     except KeyboardInterrupt:
         raise SystemExit("Received keyboard interrupt, terminating execution.")
 
     try:
-        problem = import_problem_from_path(battle_config.problem)
+        problem = import_problem_from_path(program_config.problem)
         fight_handler = FightHandler(problem, timeout_generator=battle_config.timeout_generator,
             timeout_solver=battle_config.timeout_solver, space_generator=battle_config.space_solver,
             space_solver=battle_config.space_solver, cpus=battle_config.cpus)
@@ -201,11 +205,11 @@ def main():
         with MatchInfo.build(
             problem=problem,
             wrapper=wrapper,
-            teams=battle_config.teams,
+            teams=program_config.teams,
             rounds=battle_config.rounds,
             safe_build=battle_config.safe_build,
         ) as match_info, ExitStack() as stack:
-            if battle_config.display == "ui":
+            if program_config.display == "ui":
                 ui = Ui()
                 stack.enter_context(ui)
             else:
