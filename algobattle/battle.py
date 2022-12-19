@@ -104,7 +104,7 @@ def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, MatchConfig, BattleW
     parser.add_argument("--verbose", "-v", dest="verbose", action="store_const", const=True, help="More detailed log output.")
     parser.add_argument("--safe_build", action="store_const", const=True, help="Isolate docker image builds from each other. Significantly slows down battle setup but closes prevents images from interfering with each other.")
 
-    parser.add_argument("--battle_type", choices=["iterated", "averaged"], help="Type of battle wrapper to be used.")
+    parser.add_argument("--battle_type", type=BattleWrapper.get_wrapper, choices=[Iterated, Averaged], help="Type of battle wrapper to be used.")
     parser.add_argument("--rounds", type=int, help="Number of rounds that are to be fought in the battle (points are split between all rounds).")
     parser.add_argument("--points", type=int, help="number of points distributed between teams.")
 
@@ -159,12 +159,12 @@ def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, MatchConfig, BattleW
         logs=getattr(parsed, "logging_path", Path.home() / ".algobattle_logs"),
     )
 
-    match_config = MatchConfig(**config.get("algobattle", {}))
+    match_config = MatchConfig.from_dict(config.get("algobattle", {}))
     for name in vars(match_config):
         if hasattr(parsed, name):
             setattr(match_config, name, getattr(parsed, name))
 
-    wrapper_config = BattleWrapper.Config(**config.get(match_config.battle_type, {}))
+    wrapper_config = match_config.battle_type.Config(**config.get(match_config.battle_type.name(), {}))
     for name in vars(match_config):
         cli_name = f"--{match_config}_{name}"
         if hasattr(parsed, cli_name):
