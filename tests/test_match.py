@@ -7,7 +7,7 @@ from configparser import ConfigParser
 from pathlib import Path
 
 import algobattle
-from algobattle.battle import setup_logging
+from algobattle.battle import BattleConfig, setup_logging
 from algobattle.battle_wrappers.iterated import Iterated
 from algobattle.battle_wrappers.averaged import Averaged
 from algobattle.fight_handler import FightHandler
@@ -54,14 +54,11 @@ class Matchtests(unittest.TestCase):
         cls.matchup0 = Matchup(cls.team0, cls.team1)
         cls.matchup1 = Matchup(cls.team1, cls.team0)
 
-        config_path = Path(algobattle.__file__).parent / "config.ini"
-        cls.config = ConfigParser()
-        cls.config.read(config_path)
+        cls.config = BattleConfig()
+        cls.fight_handler = FightHandler(testsproblem.Problem())
 
-        cls.fight_handler = FightHandler(testsproblem.Problem(), cls.config)
-
-        cls.wrapper_iter = Iterated(cls.fight_handler, cls.config)
-        cls.wrapper_avg = Averaged(cls.fight_handler, cls.config)
+        cls.wrapper_iter = Iterated(cls.fight_handler, Iterated.Config())
+        cls.wrapper_avg = Averaged(cls.fight_handler, Averaged.Config())
         cls.match_iter = MatchInfo(cls.wrapper_iter, TeamHandler((cls.team0, cls.team1)))
         cls.match_avg = MatchInfo(cls.wrapper_avg, TeamHandler((cls.team0, cls.team1)))
 
@@ -170,9 +167,7 @@ class Execution(unittest.TestCase):
     def test_basic(self):
         team = TeamInfo("team0", self.generator, self.solver)
         with TeamHandler.build([team]) as teams:
-            match_info = MatchInfo.build(
-                problem_path=self.problem, config_path=self.config, teams=teams, battle_type="iterated", rounds=2
-            )
+            match_info = MatchInfo(, teams=teams, rounds=2)
             match_info.run_match()
 
     def test_multi_team(self):
