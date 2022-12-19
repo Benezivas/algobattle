@@ -2,10 +2,11 @@
 from __future__ import annotations
 from dataclasses import dataclass
 import logging
-from typing import Any, Literal
+from typing import Any, Literal, Type
 from prettytable import PrettyTable, DOUBLE_BORDER
 
 from algobattle.battle_wrapper import BattleWrapper
+from algobattle.battle_wrappers.iterated import Iterated
 from algobattle.fight_handler import FightHandler
 from algobattle.observer import Observer, Subject
 from algobattle.team import Matchup, Team, TeamHandler
@@ -18,7 +19,7 @@ logger = logging.getLogger("algobattle.match")
 class MatchConfig:
     verbose: bool = False
     safe_build: bool = False
-    battle_type: Literal["iterated", "averaged"] = "iterated"
+    battle_type: Type[BattleWrapper] = Iterated
     rounds: int = 5
     points: int = 100
     timeout_build: float | None = 600
@@ -42,7 +43,7 @@ class MatchConfig:
 def run_match(config: MatchConfig, wrapper_config: BattleWrapper.Config, problem: Problem, teams: TeamHandler, observer: Observer | None = None) -> MatchResult:
     """Executes the match with the specified parameters."""
     fight_handler = FightHandler(problem, **config.docker_params)
-    wrapper = BattleWrapper.initialize(config.battle_type, fight_handler, wrapper_config)
+    wrapper = config.battle_type(fight_handler, wrapper_config)
     result = MatchResult(config, teams, observer)
     for matchup in teams.matchups:
         for i in range(config.rounds):

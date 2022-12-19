@@ -10,6 +10,7 @@ from dataclasses import dataclass
 import logging
 from abc import abstractmethod, ABC
 from importlib import import_module
+from typing import Type
 
 from algobattle.fight_handler import FightHandler
 from algobattle.team import Matchup
@@ -27,24 +28,21 @@ class BattleWrapper(ABC):
         pass
 
     @staticmethod
-    def initialize(wrapper_name: str, fight_handler: FightHandler, config: BattleWrapper.Config) -> BattleWrapper:
-        """Try to import and initialize a Battle Wrapper from a given name.
+    def get_wrapper(wrapper_name: str) -> Type[BattleWrapper]:
+        """Try to import a Battle Wrapper from a given name.
 
         For this to work, a BattleWrapper module with the same name as the argument
         needs to be present in the algobattle/battle_wrappers folder.
 
         Parameters
         ----------
-        wrapper : str
+        wrapper_name : str
             Name of a battle wrapper module in algobattle/battle_wrappers.
-
-        config : ConfigParser
-            A ConfigParser object containing possible additional arguments for the battle_wrapper.
 
         Returns
         -------
         BattleWrapper
-            A BattleWrapper object of the given wrapper_name.
+            A BattleWrapper of the given wrapper_name.
 
         Raises
         ------
@@ -53,7 +51,7 @@ class BattleWrapper(ABC):
         """
         try:
             wrapper_module = import_module("algobattle.battle_wrappers." + wrapper_name)
-            return getattr(wrapper_module, wrapper_name.capitalize())(fight_handler, config)
+            return getattr(wrapper_module, wrapper_name.capitalize())
         except ImportError as e:
             logger.critical(f"Importing a wrapper from the given path failed with the following exception: {e}")
             raise ValueError from e
