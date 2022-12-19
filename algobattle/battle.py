@@ -1,19 +1,18 @@
 """Main battle script. Executes all possible types of battles, see battle --help for all options."""
 from __future__ import annotations
-from argparse import ArgumentParser, Namespace
+from argparse import ArgumentParser
 from contextlib import ExitStack
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from functools import partial
 import sys
 import logging
 import datetime as dt
 from pathlib import Path
-from typing import Any, Callable, Literal, TypeVar, cast
+from typing import Callable, Literal, TypeVar, cast
 import tomli
 from algobattle.battle_wrapper import BattleWrapper
-from algobattle.fight_handler import FightHandler
 
-from algobattle.match import MatchInfo
+from algobattle.match import MatchConfig, run_match
 from algobattle.team import TeamHandler, TeamInfo
 from algobattle.ui import Ui
 from algobattle.util import check_path, import_problem_from_path
@@ -76,29 +75,6 @@ class ProgramConfig:
     teams: list[TeamInfo]
 
 
-@dataclass(kw_only=True)
-class BattleConfig:
-    verbose: bool = False
-    safe_build: bool = False
-    battle_type: Literal["iterated", "averaged"] = "iterated"
-    rounds: int = 5
-    points: int = 100
-    timeout_build: float | None = 600
-    timeout_generator: float | None = 30
-    timeout_solver: float | None = 30
-    space_generator: int | None = None
-    space_solver: int | None = None
-    cpus: int = 1
-
-    @property
-    def docker_params(self) -> dict[str, Any]:
-        return {
-            "timeout_generator": self.timeout_generator,
-            "timeout_solver": self.timeout_solver,
-            "space_generator": self.space_generator,
-            "space_solver": self.space_solver,
-            "cpus": self.cpus,
-        }
 
 
 _T = TypeVar("_T")
@@ -115,7 +91,7 @@ _float = _optional(float)
 _int = _optional(int)
 
 
-def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, BattleConfig, BattleWrapper.Config]:
+def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, MatchConfig, BattleWrapper.Config]:
     """Parse a given CLI arg list into config objects."""
 
     parser = ArgumentParser()
@@ -183,33 +159,31 @@ def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, BattleConfig, Battle
         logs=getattr(parsed, "logging_path", Path.home() / ".algobattle_logs"),
     )
 
-    battle_config = BattleConfig(**config.get("algobattle", {}))
-    for name in vars(battle_config):
+    match_config = MatchConfig(**config.get("algobattle", {}))
+    for name in vars(match_config):
         if hasattr(parsed, name):
-            setattr(battle_config, name, getattr(parsed, name))
+            setattr(match_config, name, getattr(parsed, name))
 
-    wrapper_config = BattleWrapper.Config(**config.get(battle_config.battle_type, {}))
-    for name in vars(battle_config):
-        cli_name = f"--{battle_config}_{name}"
+    wrapper_config = BattleWrapper.Config(**config.get(match_config.battle_type, {}))
+    for name in vars(match_config):
+        cli_name = f"--{match_config}_{name}"
         if hasattr(parsed, cli_name):
-            setattr(battle_config, name, getattr(parsed, cli_name))
+            setattr(match_config, name, getattr(parsed, cli_name))
 
-    return program_config, battle_config, wrapper_config
+    return program_config, match_config, wrapper_config
 
 
 def main():
     """Entrypoint of `algobattle` CLI."""
     try:
-        program_config, battle_config, wrapper_config = parse_cli_args(sys.argv[1:])
-        logger = setup_logging(program_config.logs, battle_config.verbose, program_config.display != "logs")
+        program_config, match_config, wrapper_config = parse_cli_args(sys.argv[1:])
+        logger = setup_logging(program_config.logs, match_config.verbose, program_config.display != "logs")
 
     except KeyboardInterrupt:
         raise SystemExit("Received keyboard interrupt, terminating execution.")
 
     try:
         problem = import_problem_from_path(program_config.problem)
-        fight_handler = FightHandler(problem, **battle_config.docker_params)
-        wrapper = BattleWrapper.initialize(battle_config.battle_type, fight_handler, wrapper_config)
         with TeamHandler.build(program_config.teams) as teams, ExitStack() as stack:
             if program_config.display == "ui":
                 ui = Ui()
@@ -217,13 +191,12 @@ def main():
             else:
                 ui = None
 
-            match_info = MatchInfo(wrapper, teams, rounds=battle_config.rounds)
-            result = match_info.run_match(ui)
+            result = run_match(match_config, wrapper_config, problem, teams, ui)
 
             logger.info('#' * 78)
             logger.info(str(result))
-            if battle_config.points > 0:
-                points = result.calculate_points(battle_config.points)
+            if match_config.points > 0:
+                points = result.calculate_points(match_config.points)
                 for team, pts in points.items():
                     logger.info(f"Group {team} gained {pts:.1f} points.")
 
