@@ -38,11 +38,12 @@ class Utiltests(unittest.TestCase):
 
     def test_initialize_wrapper_existing_path(self):
         """Initializing an existing wrapper works as expected."""
-        self.assertIsInstance(BattleWrapper.initialize('iterated', self.fight_handler, self.config), Iterated)
+        self.assertEqual(BattleWrapper.get_wrapper("iterated"), Iterated)
 
     def test_initialize_wrapper_nonexistent_path(self):
         """Initializing a nonexistent wrapper raises an error."""
-        self.assertRaises(ValueError, lambda: BattleWrapper.initialize(self.rand_file_name, self.fight_handler, self.config))
+        with self.assertRaises(ValueError):
+            BattleWrapper.get_wrapper(self.rand_file_name)
 
 
 if __name__ == '__main__':

@@ -102,28 +102,28 @@ class Matchtests(unittest.TestCase):
 
     def test_calculate_points_averaged_no_successful_round(self):
         """Two teams should get an equal amount of points if nobody solved anything."""
-        result = MatchResult(MatchConfig(rounds=2, battle_type="averaged"), self.teams)
+        result = MatchResult(MatchConfig(rounds=2, battle_type=Averaged), self.teams)
         result[self.matchup0] = [Averaged.Result(1, 1, 1, [0, 0, 0]), Averaged.Result(1, 1, 1, [0, 0, 0])]
         result[self.matchup1] = [Averaged.Result(1, 1, 1, [0, 0, 0]), Averaged.Result(1, 1, 1, [0, 0, 0])]
         self.assertEqual(result.calculate_points(100), {self.team0: 50, self.team1: 50})
 
     def test_calculate_points_averaged_draw(self):
         """Two teams should get an equal amount of points if both solved a problem equally well."""
-        result = MatchResult(MatchConfig(rounds=2, battle_type="averaged"), self.teams)
+        result = MatchResult(MatchConfig(rounds=2, battle_type=Averaged), self.teams)
         result[self.matchup0] = [Averaged.Result(1, 1, 1, [1.5, 1.5, 1.5]), Averaged.Result(1, 1, 1, [1.5, 1.5, 1.5])]
         result[self.matchup1] = [Averaged.Result(1, 1, 1, [1.5, 1.5, 1.5]), Averaged.Result(1, 1, 1, [1.5, 1.5, 1.5])]
         self.assertEqual(result.calculate_points(100), {self.team0: 50, self.team1: 50})
 
     def test_calculate_points_averaged_domination(self):
         """One team should get all points if it solved anything and the other team nothing."""
-        result = MatchResult(MatchConfig(rounds=2, battle_type="averaged"), self.teams)
+        result = MatchResult(MatchConfig(rounds=2, battle_type=Averaged), self.teams)
         result[self.matchup0] = [Averaged.Result(1, 1, 1, [0, 0, 0]), Averaged.Result(1, 1, 1, [0, 0, 0])]
         result[self.matchup1] = [Averaged.Result(1, 1, 1, [1, 1, 1]), Averaged.Result(1, 1, 1, [1, 1, 1])]
         self.assertEqual(result.calculate_points(100), {self.team0: 100, self.team1: 0})
 
     def test_calculate_points_averaged_one_team_better(self):
         """One team should get more points than the other if it performed better."""
-        result = MatchResult(MatchConfig(rounds=2, battle_type="averaged"), self.teams)
+        result = MatchResult(MatchConfig(rounds=2, battle_type=Averaged), self.teams)
         result[self.matchup0] = [Averaged.Result(1, 1, 1, [1.5, 1.5, 1.5]), Averaged.Result(1, 1, 1, [1.5, 1.5, 1.5])]
         result[self.matchup1] = [Averaged.Result(1, 1, 1, [1, 1, 1]), Averaged.Result(1, 1, 1, [1, 1, 1])]
         self.assertEqual(result.calculate_points(100), {self.team0: 60, self.team1: 40})
@@ -157,22 +157,19 @@ class Execution(unittest.TestCase):
     def test_basic(self):
         team = TeamInfo("team0", self.generator, self.solver)
         with TeamHandler.build([team]) as teams:
-            wrapper_config = Iterated.Config()
-            run_match(self.config, wrapper_config, self.problem, teams)
+            run_match(self.config, self.iter_config, self.problem, teams)
 
     def test_multi_team(self):
         team0 = TeamInfo("team0", self.generator, self.solver)
         team1 = TeamInfo("team1", self.generator, self.solver)
         with TeamHandler.build([team0, team1]) as teams:
-            wrapper_config = Iterated.Config()
-            run_match(self.config, wrapper_config, self.problem, teams)
+            run_match(self.config, self.iter_config, self.problem, teams)
 
     def test_averaged(self):
         team = TeamInfo("team0", self.generator, self.solver)
         with TeamHandler.build([team]) as teams:
-            config = MatchConfig(timeout_generator=2, timeout_solver=2, rounds=2, battle_type="averaged")
-            wrapper_config = Averaged.Config()
-            run_match(config, wrapper_config, self.problem, teams)
+            config = MatchConfig(timeout_generator=2, timeout_solver=2, rounds=2, battle_type=Averaged)
+            run_match(config, self.avg_config, self.problem, teams)
 
 
 
