@@ -39,6 +39,13 @@ class MatchConfig:
             "cpus": self.cpus,
         }
 
+    @staticmethod
+    def from_dict(info: dict[str, Any]) -> MatchConfig:
+        """Parses a :cls:`MatchConfig` from a dict."""
+        copy = info.copy()
+        copy["battle_type"] = BattleWrapper.get_wrapper(copy["battle_type"])
+        return MatchConfig(**copy)
+
 
 def run_match(config: MatchConfig, wrapper_config: BattleWrapper.Config, problem: Problem, teams: TeamHandler, observer: Observer | None = None) -> MatchResult:
     """Executes the match with the specified parameters."""
