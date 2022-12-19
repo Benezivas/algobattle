@@ -3,12 +3,11 @@ from __future__ import annotations
 import unittest
 import logging
 
-from configparser import ConfigParser
 from pathlib import Path
 from uuid import uuid4
 
-import algobattle
 from algobattle.fight_handler import FightHandler
+from algobattle.match import MatchConfig
 from algobattle.team import Matchup, Team
 from algobattle.docker_util import Image, get_os_type
 from . import testsproblem
@@ -31,13 +30,11 @@ class FightHandlertests(unittest.TestCase):
         cls.gen_succ = Image.build(cls.problem_path / "generator", "gen_succ", dockerfile=cls.dockerfile)
         cls.sol_succ = Image.build(cls.problem_path / "solver", "sol_succ", dockerfile=cls.dockerfile)
 
-        config = ConfigParser()
-        config.read(Path(algobattle.__file__).parent / "config.ini")
-        cls.fight_handler = FightHandler(problem, config)
+        config = MatchConfig()
+        cls.fight_handler = FightHandler(problem, **config.docker_params)
 
-        config_short_run_timeout = ConfigParser()
-        config_short_run_timeout.read(cls.problem_path / "config_short_run_timeout.ini")
-        cls.fight_handler_short_to = FightHandler(problem, config_short_run_timeout)
+        config_short = MatchConfig(timeout_generator=2, timeout_solver=2)
+        cls.fight_handler_short_to = FightHandler(problem, **config_short.docker_params)
 
     @classmethod
     def tearDownClass(cls) -> None:
