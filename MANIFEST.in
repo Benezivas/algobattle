@@ -1,2 +1,1 @@
-include algobattle/config.ini
 graft algobattle/battle_wrappers
