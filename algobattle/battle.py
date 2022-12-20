@@ -8,7 +8,7 @@ import sys
 import logging
 import datetime as dt
 from pathlib import Path
-from typing import Callable, Literal, TypeVar, cast
+from typing import Literal
 import tomli
 from algobattle.battle_wrapper import BattleWrapper
 
@@ -69,6 +69,8 @@ def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
 
 @dataclass
 class ProgramConfig:
+    """CLI parameters for program execution."""
+
     problem: Path
     teams: list[TeamInfo]
     display: Literal["silent", "logs", "ui"] = "logs"
@@ -77,7 +79,6 @@ class ProgramConfig:
 
 def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, MatchConfig, BattleWrapper.Config]:
     """Parse a given CLI arg list into config objects."""
-
     parser = ArgumentParser()
     parser.add_argument("problem", type=check_path, help="Path to a folder with the problem file.")
     parser.add_argument("--config", type=partial(check_path, type="file"), help="Path to a config file, defaults to '{problem} / config.toml'.")
@@ -97,7 +98,6 @@ def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, MatchConfig, BattleW
     parser.add_argument("--space_generator", type=int, help="Memory limit for the generator execution, in MB.")
     parser.add_argument("--space_solver", type=int, help="Memory limit the solver execution, in MB.")
     parser.add_argument("--cpus", type=int, help="Number of cpu cores used for each docker container execution.")
-    
 
     # battle wrappers have their configs automatically added to the CLI args
     for wrapper in (Iterated, Averaged):
@@ -137,7 +137,7 @@ def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, MatchConfig, BattleW
         except KeyError:
             raise ValueError(f"The config file at {cfg_path} is incorrectly formatted!")
 
-    program_config = ProgramConfig(teams = teams, **getattr_set(parsed, "problem", "display", "logs"))
+    program_config = ProgramConfig(teams=teams, **getattr_set(parsed, "problem", "display", "logs"))
 
     match_config = MatchConfig.from_dict(config.get("algobattle", {}))
     for name in vars(match_config):

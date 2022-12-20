@@ -14,6 +14,7 @@ logger = logging.getLogger("algobattle.battle_wrappers.averaged")
 class Averaged(BattleWrapper):
     """Class of an adveraged battle Wrapper."""
 
+    @inherit_docs
     @dataclass
     class Config(BattleWrapper.Config):
         instance_size: int = ArgSpec(10, help="Instance size that will be fought at.")
@@ -27,7 +28,11 @@ class Averaged(BattleWrapper):
         Execute several fights between two teams on a fixed instance size
         and determine the average solution quality.
         """
-        logger.info("=" * 20 + f"Averaged Battle, Instance Size: {self.config.instance_size}, Rounds: {self.config.iterations} " + "=" * 20)
+        logger.info(
+            "=" * 20
+            + f"Averaged Battle, Instance Size: {self.config.instance_size}, Rounds: {self.config.iterations} "
+            + "=" * 20
+        )
         result = self.Result(self.config.instance_size, self.config.iterations, observer=observer)
         for i in range(self.config.iterations):
             logger.info(f"=============== Iteration: {i + 1}/{self.config.iterations} ===============")

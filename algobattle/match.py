@@ -2,7 +2,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 import logging
-from typing import Any, Literal, Type
+from typing import Any, Type
 from prettytable import PrettyTable, DOUBLE_BORDER
 
 from algobattle.battle_wrapper import BattleWrapper
@@ -17,6 +17,8 @@ logger = logging.getLogger("algobattle.match")
 
 @dataclass(kw_only=True)
 class MatchConfig:
+    """Parameters determining the match execution."""
+
     verbose: bool = False
     safe_build: bool = False
     battle_type: Type[BattleWrapper] = Iterated
@@ -31,6 +33,7 @@ class MatchConfig:
 
     @property
     def docker_params(self) -> dict[str, Any]:
+        """The parameters relevant to execution of docker containers, passable to FightHandler."""
         return {
             "timeout_generator": self.timeout_generator,
             "timeout_solver": self.timeout_solver,
@@ -50,7 +53,13 @@ class MatchConfig:
         return MatchConfig(**copy)
 
 
-def run_match(config: MatchConfig, wrapper_config: BattleWrapper.Config, problem: Problem, teams: TeamHandler, observer: Observer | None = None) -> MatchResult:
+def run_match(
+    config: MatchConfig,
+    wrapper_config: BattleWrapper.Config,
+    problem: Problem,
+    teams: TeamHandler,
+    observer: Observer | None = None,
+) -> MatchResult:
     """Executes the match with the specified parameters."""
     fight_handler = FightHandler(problem, **config.docker_params)
     wrapper = config.battle_type(fight_handler, wrapper_config)

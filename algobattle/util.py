@@ -12,7 +12,7 @@ from typing import Any, Callable, Generic, Literal, TypeVar, cast, get_type_hint
 
 from algobattle.problem import Problem
 
-logger = logging.getLogger('algobattle.util')
+logger = logging.getLogger("algobattle.util")
 
 
 def import_problem_from_path(problem_path: Path) -> Problem:
@@ -71,6 +71,8 @@ def extract(archive: bytes, filename: str) -> str:
 
 
 T = TypeVar("T")
+
+
 def inherit_docs(obj: T) -> T:
     """Decorator to mark a method as inheriting its docstring.
 
@@ -98,6 +100,7 @@ def check_path(path: str, *, type: Literal["file", "dir", "exists"] = "exists") 
 @dataclass
 class _ArgSpec(Generic[T]):
     """Further details of an CLI argument."""
+
     default: T
     _: KW_ONLY
     alias: str | None = None
@@ -149,7 +152,9 @@ class CLIParsable(ABC):
 
             kwargs: dict[str, Any] = {
                 "type": arg_spec.parser,
-                "help": f"{arg_spec.help} Default: {arg_spec.default}" if arg_spec.help is not None else f"Default: {arg_spec.default}"
+                "help": f"{arg_spec.help} Default: {arg_spec.default}"
+                if arg_spec.help is not None
+                else f"Default: {arg_spec.default}",
             }
             if field.type == bool:
                 kwargs["action"] = "store_const"

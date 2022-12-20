@@ -14,6 +14,7 @@ logger = logging.getLogger("algobattle.battle_wrappers.iterated")
 class Iterated(BattleWrapper):
     """Class of an iterated battle Wrapper."""
 
+    @inherit_docs
     @dataclass
     class Config(BattleWrapper.Config):
         iteration_cap: int = ArgSpec(50_000, help="Maximum instance size that will be tried.")

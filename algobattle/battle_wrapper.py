@@ -25,6 +25,8 @@ class BattleWrapper(ABC):
 
     @dataclass
     class Config(CLIParsable):
+        """Object containing the config variables the wrapper will use."""
+
         pass
 
     @staticmethod
