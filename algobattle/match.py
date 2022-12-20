@@ -42,8 +42,11 @@ class MatchConfig:
     @staticmethod
     def from_dict(info: dict[str, Any]) -> MatchConfig:
         """Parses a :cls:`MatchConfig` from a dict."""
-        copy = info.copy()
-        copy["battle_type"] = BattleWrapper.get_wrapper(copy["battle_type"])
+        if "battle_type" in info:
+            copy = info.copy()
+            copy["battle_type"] = BattleWrapper.get_wrapper(copy["battle_type"])
+        else:
+            copy = info
         return MatchConfig(**copy)
 
 

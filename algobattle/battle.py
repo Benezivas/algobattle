@@ -15,7 +15,7 @@ from algobattle.battle_wrapper import BattleWrapper
 from algobattle.match import MatchConfig, run_match
 from algobattle.team import TeamHandler, TeamInfo
 from algobattle.ui import Ui
-from algobattle.util import check_path, import_problem_from_path
+from algobattle.util import check_path, getattr_set, import_problem_from_path
 from algobattle.battle_wrappers.averaged import Averaged
 from algobattle.battle_wrappers.iterated import Iterated
 
@@ -70,36 +70,19 @@ def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
 @dataclass
 class ProgramConfig:
     problem: Path
-    display: Literal["silent", "logs", "ui"]
-    logs: Path
     teams: list[TeamInfo]
-
-
-
-
-_T = TypeVar("_T")
-def _optional(f: Callable[[str], _T]) -> Callable[[str], _T | None]:
-    def inner(arg: str) -> _T | None:
-        if arg.lower() == "none":
-            return None
-        else:
-            return f(arg)
-    return inner
-
-
-_float = _optional(float)
-_int = _optional(int)
+    display: Literal["silent", "logs", "ui"] = "logs"
+    logs: Path = Path.home() / ".algobattle_logs"
 
 
 def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, MatchConfig, BattleWrapper.Config]:
     """Parse a given CLI arg list into config objects."""
 
     parser = ArgumentParser()
-    parser.add_argument("path", type=check_path, help="Path to the needed files if they aren't specified seperately.")
-    parser.add_argument("--problem", type=partial(check_path, type="dir"), help="Path to a problem folder.")
-    parser.add_argument("--config", type=partial(check_path, type="file"), help="Path to a config file.")
-    parser.add_argument("--logging_path", type=partial(check_path, type="dir"), help="Folder that logs are written into.")
-    parser.add_argument("--display", choices=["silent", "logs", "ui"], help="Choose output mode, silent disables all output, logs displays the battle logs on STDERR, ui displays a small GUI showing the progress of the battle.")
+    parser.add_argument("problem", type=check_path, help="Path to a folder with the problem file.")
+    parser.add_argument("--config", type=partial(check_path, type="file"), help="Path to a config file, defaults to '{problem} / config.toml'.")
+    parser.add_argument("--logging_path", type=partial(check_path, type="dir"), help="Folder that logs are written into, defaults to '~/.algobattle_logs'.")
+    parser.add_argument("--display", choices=["silent", "logs", "ui"], help="Choose output mode, silent disables all output, logs displays the battle logs on STDERR, ui displays a small GUI showing the progress of the battle. Default: logs.")
 
     parser.add_argument("--verbose", "-v", dest="verbose", action="store_const", const=True, help="More detailed log output.")
     parser.add_argument("--safe_build", action="store_const", const=True, help="Isolate docker image builds from each other. Significantly slows down battle setup but closes prevents images from interfering with each other.")
@@ -108,11 +91,11 @@ def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, MatchConfig, BattleW
     parser.add_argument("--rounds", type=int, help="Number of rounds that are to be fought in the battle (points are split between all rounds).")
     parser.add_argument("--points", type=int, help="number of points distributed between teams.")
 
-    parser.add_argument("--timeout_build", type=_float, help="Timeout for the build step of each docker image.")
-    parser.add_argument("--timeout_generator", type=_float, help="Time limit for the generator execution.")
-    parser.add_argument("--timeout_solver", type=_float, help="Time limit for the solver execution.")
-    parser.add_argument("--space_generator", type=_int, help="Memory limit for the generator execution, in MB.")
-    parser.add_argument("--space_solver", type=_int, help="Memory limit the solver execution, in MB.")
+    parser.add_argument("--timeout_build", type=float, help="Timeout for the build step of each docker image.")
+    parser.add_argument("--timeout_generator", type=float, help="Time limit for the generator execution.")
+    parser.add_argument("--timeout_solver", type=float, help="Time limit for the solver execution.")
+    parser.add_argument("--space_generator", type=int, help="Memory limit for the generator execution, in MB.")
+    parser.add_argument("--space_solver", type=int, help="Memory limit the solver execution, in MB.")
     parser.add_argument("--cpus", type=int, help="Number of cpu cores used for each docker container execution.")
     
 
@@ -124,7 +107,7 @@ def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, MatchConfig, BattleW
 
     parsed = parser.parse_args(args)
 
-    cfg_path = cast(Path, getattr(parsed, "config", parsed.path / "config.toml"))
+    cfg_path = parsed.config if parsed.config is not None else parsed.problem / "config.toml"
     if cfg_path.is_file():
         with open(cfg_path, "rb") as file:
             try:
@@ -138,9 +121,9 @@ def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, MatchConfig, BattleW
         team_specs = config["teams"]
     else:
         team_specs = [{
-            "name": parsed.path.name,
-            "generator": parsed.path / "generator",
-            "solver": parsed.path / "solver",
+            "name": parsed.problem.name,
+            "generator": parsed.problem / "generator",
+            "solver": parsed.problem / "solver",
         }]
     teams = []
     for spec in team_specs:
@@ -151,23 +134,18 @@ def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, MatchConfig, BattleW
             teams.append(TeamInfo(name=name, generator=gen, solver=sol))
         except TypeError:
             raise ValueError(f"The config file at {cfg_path} is incorrectly formatted!")
-    
-    program_config = ProgramConfig(
-        teams=teams,
-        problem=getattr(parsed, "problem", cast(Path, parsed.path)),
-        display=getattr(parsed, "display", "logs"),
-        logs=getattr(parsed, "logging_path", Path.home() / ".algobattle_logs"),
-    )
+
+    program_config = ProgramConfig(teams = teams, **getattr_set(parsed, "problem", "display", "logs"))
 
     match_config = MatchConfig.from_dict(config.get("algobattle", {}))
     for name in vars(match_config):
-        if hasattr(parsed, name):
+        if getattr(parsed, name) is not None:
             setattr(match_config, name, getattr(parsed, name))
 
     wrapper_config = match_config.battle_type.Config(**config.get(match_config.battle_type.name(), {}))
-    for name in vars(match_config):
-        cli_name = f"--{match_config}_{name}"
-        if hasattr(parsed, cli_name):
+    for name in vars(wrapper_config):
+        cli_name = f"{match_config.battle_type.name().lower()}_{name}"
+        if getattr(parsed, cli_name) is not None:
             setattr(match_config, name, getattr(parsed, cli_name))
 
     return program_config, match_config, wrapper_config

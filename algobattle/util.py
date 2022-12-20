@@ -159,3 +159,8 @@ class CLIParsable(ABC):
 
             arguments.append((arg_spec.alias, kwargs))
         return arguments
+
+
+def getattr_set(o: object, *attrs: str) -> dict[str, Any]:
+    """Returns a dict of the given attributes and their values, if they are not `None`."""
+    return {a: getattr(o, a) for a in attrs if getattr(o, a, None) is not None}
