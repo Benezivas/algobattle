@@ -123,7 +123,7 @@ def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, MatchConfig, BattleW
         team_specs = config["teams"]
     else:
         team_specs = [{
-            "name": parsed.problem.name,
+            "name": "team 0",
             "generator": parsed.problem / "generator",
             "solver": parsed.problem / "solver",
         }]
