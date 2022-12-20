@@ -131,4 +131,4 @@ class MatchResult(Subject, dict[Matchup, list[BattleWrapper.Result]]):
             results = [str(r) for r in results]
             table.add_row([str(matchup.generator), str(matchup.solver), *results, *padding, average])
 
-        return f"Battle Type: {self.config.battle_type}\n{table}"
+        return f"Battle Type: {self.config.battle_type.name()}\n{table}"
