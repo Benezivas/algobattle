@@ -1,6 +1,6 @@
 """Tests for the Match class."""
 # pyright: reportMissingSuperCall=false
-import unittest
+from unittest import TestCase, main
 import logging
 from pathlib import Path
 
@@ -40,7 +40,7 @@ class TestTeam(Team):
         self.solver = TestImage(f"TestImage-{self.name}-solver")
 
 
-class Matchtests(unittest.TestCase):
+class Matchtests(TestCase):
     """Tests for the match object."""
 
     @classmethod
@@ -131,7 +131,7 @@ class Matchtests(unittest.TestCase):
     # TODO: Add tests for remaining functions
 
 
-class Execution(unittest.TestCase):
+class Execution(TestCase):
     """Some basic tests for the execution of the battles."""
 
     @classmethod
@@ -172,6 +172,5 @@ class Execution(unittest.TestCase):
             run_match(config, self.avg_config, self.problem, teams)
 
 
-
 if __name__ == "__main__":
-    unittest.main()
+    main()
