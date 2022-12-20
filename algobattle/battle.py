@@ -87,7 +87,7 @@ def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, MatchConfig, BattleW
     parser.add_argument("--verbose", "-v", dest="verbose", action="store_const", const=True, help="More detailed log output.")
     parser.add_argument("--safe_build", action="store_const", const=True, help="Isolate docker image builds from each other. Significantly slows down battle setup but closes prevents images from interfering with each other.")
 
-    parser.add_argument("--battle_type", type=BattleWrapper.get_wrapper, choices=[Iterated, Averaged], help="Type of battle wrapper to be used.")
+    parser.add_argument("--battle_type", choices=["iterated", "averaged"], help="Type of battle wrapper to be used.")
     parser.add_argument("--rounds", type=int, help="Number of rounds that are to be fought in the battle (points are split between all rounds).")
     parser.add_argument("--points", type=int, help="number of points distributed between teams.")
 
@@ -107,6 +107,8 @@ def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, MatchConfig, BattleW
 
     parsed = parser.parse_args(args)
 
+    if parsed.battle_type is not None:
+        parsed.battle_type = BattleWrapper.get_wrapper(parsed.battle_type)
     cfg_path = parsed.config if parsed.config is not None else parsed.problem / "config.toml"
     if cfg_path.is_file():
         with open(cfg_path, "rb") as file:
@@ -132,7 +134,7 @@ def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, MatchConfig, BattleW
             gen = check_path(spec["generator"], type="dir")
             sol = check_path(spec["solver"], type="dir")
             teams.append(TeamInfo(name=name, generator=gen, solver=sol))
-        except TypeError:
+        except KeyError:
             raise ValueError(f"The config file at {cfg_path} is incorrectly formatted!")
 
     program_config = ProgramConfig(teams = teams, **getattr_set(parsed, "problem", "display", "logs"))
@@ -142,11 +144,11 @@ def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, MatchConfig, BattleW
         if getattr(parsed, name) is not None:
             setattr(match_config, name, getattr(parsed, name))
 
-    wrapper_config = match_config.battle_type.Config(**config.get(match_config.battle_type.name(), {}))
+    wrapper_config = match_config.battle_type.Config(**config.get(match_config.battle_type.name().lower(), {}))
     for name in vars(wrapper_config):
         cli_name = f"{match_config.battle_type.name().lower()}_{name}"
         if getattr(parsed, cli_name) is not None:
-            setattr(match_config, name, getattr(parsed, cli_name))
+            setattr(wrapper_config, name, getattr(parsed, cli_name))
 
     return program_config, match_config, wrapper_config
 
