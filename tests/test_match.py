@@ -4,7 +4,7 @@ from unittest import TestCase, main
 import logging
 from pathlib import Path
 
-from algobattle.battle import setup_logging
+from algobattle.battle import ProgramConfig, parse_cli_args, setup_logging
 from algobattle.battle_wrappers.iterated import Iterated
 from algobattle.battle_wrappers.averaged import Averaged
 from algobattle.fight_handler import FightHandler
@@ -171,6 +171,27 @@ class Execution(TestCase):
             config = MatchConfig(timeout_generator=2, timeout_solver=2, rounds=2, battle_type=Averaged)
             run_match(config, self.avg_config, self.problem, teams)
 
+
+class Parsing(TestCase):
+    """Testing the parsing of CLI and config files."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        path = Path(__file__).parent
+        cls.problem_path = path / "testsproblem"
+        configs_path = path / "configs"
+        cls.default = configs_path / "default.toml"
+
+    def test_no_cfg_default(self):
+        program_cfg, match_cfg, wrapper_cfg = parse_cli_args([str(self.problem_path)])
+        self.assertEqual(program_cfg.problem, self.problem_path)
+        self.assertEqual(program_cfg.display, "logs")
+        self.assertEqual(program_cfg.logs, Path.home() / ".algobattle_logs")
+        self.assertEqual(len(program_cfg.teams), 1)
+        self.assertEqual(program_cfg.teams[0].generator, self.problem_path / "generator")
+        self.assertEqual(program_cfg.teams[0].solver, self.problem_path / "solver")
+        self.assertEqual(match_cfg, MatchConfig())
+        self.assertEqual(wrapper_cfg, Iterated.Config())
 
 if __name__ == "__main__":
     main()
