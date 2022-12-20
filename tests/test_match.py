@@ -179,19 +179,69 @@ class Parsing(TestCase):
     def setUpClass(cls) -> None:
         path = Path(__file__).parent
         cls.problem_path = path / "testsproblem"
-        configs_path = path / "configs"
-        cls.default = configs_path / "default.toml"
+        cls.configs_path = path / "configs"
 
     def test_no_cfg_default(self):
         program_cfg, match_cfg, wrapper_cfg = parse_cli_args([str(self.problem_path)])
         self.assertEqual(program_cfg.problem, self.problem_path)
         self.assertEqual(program_cfg.display, "logs")
         self.assertEqual(program_cfg.logs, Path.home() / ".algobattle_logs")
-        self.assertEqual(len(program_cfg.teams), 1)
-        self.assertEqual(program_cfg.teams[0].generator, self.problem_path / "generator")
-        self.assertEqual(program_cfg.teams[0].solver, self.problem_path / "solver")
+        self.assertEqual(program_cfg.teams, [TeamInfo("testsproblem", self.problem_path / "generator", self.problem_path / "solver")])
         self.assertEqual(match_cfg, MatchConfig())
         self.assertEqual(wrapper_cfg, Iterated.Config())
+
+    def test_empty_cfg(self):
+        program_cfg, match_cfg, wrapper_cfg = parse_cli_args([str(self.problem_path), "--config", str(self.configs_path / "empty.toml")])
+        self.assertEqual(program_cfg.problem, self.problem_path)
+        self.assertEqual(program_cfg.display, "logs")
+        self.assertEqual(program_cfg.logs, Path.home() / ".algobattle_logs")
+        self.assertEqual(program_cfg.teams, [TeamInfo("testsproblem", self.problem_path / "generator", self.problem_path / "solver")])
+        self.assertEqual(match_cfg, MatchConfig())
+        self.assertEqual(wrapper_cfg, Iterated.Config())
+
+    def test_cfg(self):
+        program_cfg, match_cfg, wrapper_cfg = parse_cli_args([str(self.problem_path), "--config", str(self.configs_path / "test.toml")])
+        self.assertEqual(program_cfg.problem, self.problem_path)
+        self.assertEqual(program_cfg.display, "logs")
+        self.assertEqual(program_cfg.logs, Path.home() / ".algobattle_logs")
+        self.assertEqual(program_cfg.teams, [TeamInfo("testsproblem", self.problem_path / "generator", self.problem_path / "solver")])
+        self.assertEqual(match_cfg, MatchConfig(points=10, space_generator=10, safe_build=True, battle_type=Averaged))
+        self.assertEqual(wrapper_cfg, Averaged.Config(iterations=1))
+
+    def test_cli(self):
+        program_cfg, match_cfg, wrapper_cfg = parse_cli_args([str(self.problem_path), "--points=10", "--space_generator=10", "--safe_build", "--battle_type=averaged", "--averaged_iterations=1"])
+        self.assertEqual(program_cfg.problem, self.problem_path)
+        self.assertEqual(program_cfg.display, "logs")
+        self.assertEqual(program_cfg.logs, Path.home() / ".algobattle_logs")
+        self.assertEqual(program_cfg.teams, [TeamInfo("testsproblem", self.problem_path / "generator", self.problem_path / "solver")])
+        self.assertEqual(match_cfg, MatchConfig(points=10, space_generator=10, safe_build=True, battle_type=Averaged))
+        self.assertEqual(wrapper_cfg, Averaged.Config(iterations=1))
+        self.assertEqual(wrapper_cfg, Averaged.Config(iterations=1))
+
+    def test_cli_overwrite_cfg(self):
+        program_cfg, match_cfg, wrapper_cfg = parse_cli_args([str(self.problem_path), "--points=20", "--safe_build", "--battle_type=iterated", "--averaged_iterations=1", f"--config={self.configs_path / 'test.toml'}"])
+        self.assertEqual(program_cfg.problem, self.problem_path)
+        self.assertEqual(program_cfg.display, "logs")
+        self.assertEqual(program_cfg.logs, Path.home() / ".algobattle_logs")
+        self.assertEqual(program_cfg.teams, [TeamInfo("testsproblem", self.problem_path / "generator", self.problem_path / "solver")])
+        self.assertEqual(match_cfg, MatchConfig(points=20, space_generator=10, safe_build=True, battle_type=Iterated))
+        self.assertEqual(wrapper_cfg, Iterated.Config())
+
+    def test_cli_no_problem_path(self):
+        with self.assertRaises(SystemExit):
+            parse_cli_args([])
+
+    def test_cli_incorrect_wrapper(self):
+        with self.assertRaises(SystemExit):
+            parse_cli_args([str(self.problem_path), "--battle_type=NotAWrapperName"])
+
+    def test_cfg_team(self):
+        program_cfg, _, _ = parse_cli_args([str(self.problem_path), f"--config={self.configs_path / 'teams.toml'}"])
+        self.assertEqual(program_cfg.teams, [TeamInfo("team 1", Path(), Path()), TeamInfo("team 2", Path(), Path())])
+
+    def test_cfg_team_no_name(self):
+        with self.assertRaises(ValueError):
+            parse_cli_args([str(self.problem_path), f"--config={self.configs_path / 'teams_incorrect.toml'}"])
 
 if __name__ == "__main__":
     main()
