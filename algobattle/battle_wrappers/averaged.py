@@ -1,14 +1,12 @@
 """Wrapper that iterates the instance size up to a point where the solving team is no longer able to solve an instance."""
 from __future__ import annotations
-from configparser import ConfigParser
 from dataclasses import InitVar, dataclass, field
 import logging
 
 from algobattle.battle_wrapper import BattleWrapper
-from algobattle.fight_handler import FightHandler
 from algobattle.observer import Observer
 from algobattle.team import Matchup
-from algobattle.util import inherit_docs
+from algobattle.util import ArgSpec, inherit_docs
 
 logger = logging.getLogger("algobattle.battle_wrappers.averaged")
 
@@ -16,14 +14,13 @@ logger = logging.getLogger("algobattle.battle_wrappers.averaged")
 class Averaged(BattleWrapper):
     """Class of an adveraged battle Wrapper."""
 
-    def __init__(self, fight_handler: FightHandler, config: ConfigParser) -> None:
-        super().__init__(fight_handler)
-        if "averaged" in config:
-            self.instance_size = int(config["averaged"].get("approximation_instance_size", "10"))
-            self.iterations = int(config["averaged"].get("approximation_iterations", "10"))
-        else:
-            self.instance_size = 10
-            self.iterations = 10
+    @inherit_docs
+    @dataclass
+    class Config(BattleWrapper.Config):
+        instance_size: int = ArgSpec(10, help="Instance size that will be fought at.")
+        iterations: int = ArgSpec(10, help="Number of iterations in each round.")
+
+    config: Config
 
     def run_round(self, matchup: Matchup, observer: Observer | None = None) -> Averaged.Result:
         """Execute one averaged battle between a generating and a solving team.
@@ -31,12 +28,16 @@ class Averaged(BattleWrapper):
         Execute several fights between two teams on a fixed instance size
         and determine the average solution quality.
         """
-        logger.info("=" * 20 + f"Averaged Battle, Instance Size: {self.instance_size}, Rounds: {self.iterations} " + "=" * 20)
-        result = self.Result(self.instance_size, self.iterations, observer=observer)
-        for i in range(self.iterations):
-            logger.info(f"=============== Iteration: {i + 1}/{self.iterations} ===============")
+        logger.info(
+            "=" * 20
+            + f"Averaged Battle, Instance Size: {self.config.instance_size}, Rounds: {self.config.iterations} "
+            + "=" * 20
+        )
+        result = self.Result(self.config.instance_size, self.config.iterations, observer=observer)
+        for i in range(self.config.iterations):
+            logger.info(f"=============== Iteration: {i + 1}/{self.config.iterations} ===============")
             result.curr_iter = i + 1
-            approx_ratio = self.fight_handler.fight(matchup, self.instance_size)
+            approx_ratio = self.fight_handler.fight(matchup, self.config.instance_size)
             result.approx_ratios.append(approx_ratio)
         return result
 

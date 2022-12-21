@@ -6,14 +6,16 @@ characteristic that they are responsible for updating some match data during
 their run, such that it contains the current state of the match.
 """
 from __future__ import annotations
+from dataclasses import dataclass
 import logging
 from abc import abstractmethod, ABC
 from importlib import import_module
-from configparser import ConfigParser
+from typing import Type
 
 from algobattle.fight_handler import FightHandler
 from algobattle.team import Matchup
 from algobattle.observer import Observer, Subject
+from algobattle.util import CLIParsable
 
 logger = logging.getLogger('algobattle.battle_wrapper')
 
@@ -21,25 +23,28 @@ logger = logging.getLogger('algobattle.battle_wrapper')
 class BattleWrapper(ABC):
     """Abstract Base class for wrappers that execute a specific kind of battle."""
 
+    @dataclass
+    class Config(CLIParsable):
+        """Object containing the config variables the wrapper will use."""
+
+        pass
+
     @staticmethod
-    def initialize(wrapper_name: str, fight_handler: FightHandler, config: ConfigParser) -> BattleWrapper:
-        """Try to import and initialize a Battle Wrapper from a given name.
+    def get_wrapper(wrapper_name: str) -> Type[BattleWrapper]:
+        """Try to import a Battle Wrapper from a given name.
 
         For this to work, a BattleWrapper module with the same name as the argument
         needs to be present in the algobattle/battle_wrappers folder.
 
         Parameters
         ----------
-        wrapper : str
+        wrapper_name : str
             Name of a battle wrapper module in algobattle/battle_wrappers.
-
-        config : ConfigParser
-            A ConfigParser object containing possible additional arguments for the battle_wrapper.
 
         Returns
         -------
         BattleWrapper
-            A BattleWrapper object of the given wrapper_name.
+            A BattleWrapper of the given wrapper_name.
 
         Raises
         ------
@@ -48,14 +53,15 @@ class BattleWrapper(ABC):
         """
         try:
             wrapper_module = import_module("algobattle.battle_wrappers." + wrapper_name)
-            return getattr(wrapper_module, wrapper_name.capitalize())(fight_handler, config)
+            return getattr(wrapper_module, wrapper_name.capitalize())
         except ImportError as e:
             logger.critical(f"Importing a wrapper from the given path failed with the following exception: {e}")
             raise ValueError from e
 
-    def __init__(self, fight_handler: FightHandler) -> None:
+    def __init__(self, fight_handler: FightHandler, config: BattleWrapper.Config) -> None:
         super().__init__()
         self.fight_handler = fight_handler
+        self.config = config
 
     @abstractmethod
     def run_round(self, matchup: Matchup, observer: Observer | None = None) -> BattleWrapper.Result:
@@ -66,10 +72,10 @@ class BattleWrapper(ABC):
         """
         raise NotImplementedError
 
-    @property
-    def type(self) -> str:
+    @classmethod
+    def name(cls) -> str:
         """Name of the type of this battle wrapper."""
-        return self.__class__.__name__
+        return cls.__name__
 
     class Result(Subject):
         """Result of a single battle."""

@@ -1,0 +1,8 @@
+[[teams]]
+name = "team 1"
+generator = "."
+solver = "."
+
+[[teams]]
+generator = "."
+solver = "."

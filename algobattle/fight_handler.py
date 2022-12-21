@@ -1,6 +1,6 @@
 """Class managing the execution of generators and solvers."""
+from dataclasses import KW_ONLY, dataclass
 import logging
-from configparser import ConfigParser
 from typing import Any, Tuple
 
 from algobattle.docker_util import DockerError
@@ -9,18 +9,17 @@ from algobattle.problem import Problem
 
 logger = logging.getLogger("algobattle.fight_handler")
 
-
+@dataclass
 class FightHandler:
     """Class managing the execution of generators and solvers."""
 
-    def __init__(self, problem: Problem, config: ConfigParser) -> None:
-        super().__init__()
-        self.timeout_generator = int(config["run_parameters"]["timeout_generator"])
-        self.timeout_solver = int(config["run_parameters"]["timeout_solver"])
-        self.space_generator = int(config["run_parameters"]["space_generator"])
-        self.space_solver = int(config["run_parameters"]["space_solver"])
-        self.cpus = int(config["run_parameters"]["cpus"])
-        self.problem = problem
+    problem: Problem
+    _: KW_ONLY
+    timeout_generator: float | None = None
+    timeout_solver: float | None = None
+    space_generator: int | None = None
+    space_solver: int | None = None
+    cpus: int = 1
 
     def fight(self, matchup: Matchup, instance_size: int) -> float:
         """Execute a single fight of a battle between a given generator and solver for a given instance size.

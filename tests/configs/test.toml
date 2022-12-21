@@ -1,0 +1,8 @@
+[algobattle]
+points = 10
+space_generator = 10
+safe_build = true
+battle_type = "averaged"
+
+[averaged]
+iterations = 1

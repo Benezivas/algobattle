@@ -1,104 +1,86 @@
 """Central managing module for an algorithmic battle."""
 from __future__ import annotations
-from configparser import ConfigParser
 from dataclasses import dataclass
-from itertools import combinations
 import logging
-from pathlib import Path
+from typing import Any, Type
 from prettytable import PrettyTable, DOUBLE_BORDER
 
 from algobattle.battle_wrapper import BattleWrapper
-from algobattle.docker_util import DockerError
+from algobattle.battle_wrappers.iterated import Iterated
 from algobattle.fight_handler import FightHandler
 from algobattle.observer import Observer, Subject
-from algobattle.team import ArchivedTeam, Matchup, Team, TeamInfo
-from algobattle.util import import_problem_from_path
+from algobattle.team import Matchup, Team, TeamHandler
+from algobattle.problem import Problem
 
 logger = logging.getLogger("algobattle.match")
 
 
-@dataclass
-class MatchInfo:
-    """Class specifying all the parameters to run a match."""
+@dataclass(kw_only=True)
+class MatchConfig:
+    """Parameters determining the match execution."""
 
-    battle_wrapper: BattleWrapper
-    teams: list[Team]
+    verbose: bool = False
+    safe_build: bool = False
+    battle_type: Type[BattleWrapper] = Iterated
     rounds: int = 5
-
-    @classmethod
-    def build(
-        cls,
-        *,
-        problem_path: Path,
-        config_path: Path,
-        team_infos: list[TeamInfo],
-        rounds: int = 5,
-        battle_type: str,
-        safe_build: bool = True,
-    ) -> MatchInfo:
-        """Builds a :cls:`MatchInfo` object from the provided data, including building the docker images."""
-        problem = import_problem_from_path(problem_path)
-        config = ConfigParser()
-        config.read(config_path)
-        build_timeout = float(config["run_parameters"]["timeout_build"])
-
-        teams: list[Team | ArchivedTeam] = []
-        for info in team_infos:
-            try:
-                team = info.build(build_timeout, auto_cleanup=safe_build)
-                if safe_build:
-                    team = team.archive()
-                teams.append(team)
-            except (ValueError, DockerError):
-                logger.warning(f"Building generators and solvers for team {info.name} failed, they will be excluded!")
-        restored_teams = [team.restore() if isinstance(team, ArchivedTeam) else team for team in teams]
-
-        fight_handler = FightHandler(problem, config)
-        battle_wrapper = BattleWrapper.initialize(battle_type, fight_handler, config)
-        return MatchInfo(battle_wrapper, restored_teams, rounds)
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, _type, _value_, _traceback):
-        for team in self.teams:
-            team.cleanup()
+    points: int = 100
+    timeout_build: float | None = 600
+    timeout_generator: float | None = 30
+    timeout_solver: float | None = 30
+    space_generator: int | None = None
+    space_solver: int | None = None
+    cpus: int = 1
 
     @property
-    def grouped_matchups(self) -> list[tuple[Matchup, Matchup]]:
-        """All matchups, grouped by the involved teams.
+    def docker_params(self) -> dict[str, Any]:
+        """The parameters relevant to execution of docker containers, passable to FightHandler."""
+        return {
+            "timeout_generator": self.timeout_generator,
+            "timeout_solver": self.timeout_solver,
+            "space_generator": self.space_generator,
+            "space_solver": self.space_solver,
+            "cpus": self.cpus,
+        }
 
-        Each tuple's first matchup has the first team in the group generating, the second has it solving.
-        """
-        return [(Matchup(*g), Matchup(*g[::-1])) for g in combinations(self.teams, 2)]
-
-    @property
-    def matchups(self) -> list[Matchup]:
-        """All matchups that will be fought."""
-        if len(self.teams) == 1:
-            return [Matchup(self.teams[0], self.teams[0])]
+    @staticmethod
+    def from_dict(info: dict[str, Any]) -> MatchConfig:
+        """Parses a :cls:`MatchConfig` from a dict."""
+        if "battle_type" in info:
+            copy = info.copy()
+            copy["battle_type"] = BattleWrapper.get_wrapper(copy["battle_type"])
         else:
-            return [m for pair in self.grouped_matchups for m in pair]
+            copy = info
+        return MatchConfig(**copy)
 
-    def run_match(self, observer: Observer | None = None) -> MatchResult:
-        """Executes the match with the specified parameters."""
-        result = MatchResult(self, observer)
-        for matchup in self.matchups:
-            for i in range(self.rounds):
-                logger.info("#" * 20 + f"  Running Round {i+1}/{self.rounds}  " + "#" * 20)
-                battle_result = self.battle_wrapper.run_round(matchup, observer)
-                result[matchup].append(battle_result)
-                result.notify()
-        return result
+
+def run_match(
+    config: MatchConfig,
+    wrapper_config: BattleWrapper.Config,
+    problem: Problem,
+    teams: TeamHandler,
+    observer: Observer | None = None,
+) -> MatchResult:
+    """Executes the match with the specified parameters."""
+    fight_handler = FightHandler(problem, **config.docker_params)
+    wrapper = config.battle_type(fight_handler, wrapper_config)
+    result = MatchResult(config, teams, observer)
+    for matchup in teams.matchups:
+        for i in range(config.rounds):
+            logger.info("#" * 20 + f"  Running Round {i+1}/{config.rounds}  " + "#" * 20)
+            battle_result = wrapper.run_round(matchup, observer)
+            result[matchup].append(battle_result)
+            result.notify()
+    return result
 
 
 class MatchResult(Subject, dict[Matchup, list[BattleWrapper.Result]]):
     """The Result of a whole Match."""
 
-    def __init__(self, match: MatchInfo, observer: Observer | None = None):
+    def __init__(self, config: MatchConfig, teams: TeamHandler, observer: Observer | None = None):
         Subject.__init__(self, observer)
-        dict.__init__(self, {m: [] for m in match.matchups})
-        self.match = match
+        dict.__init__(self, {m: [] for m in teams.matchups})
+        self.config = config
+        self.teams = teams
         self.notify_vars = True
 
     def calculate_points(self, achievable_points: int) -> dict[Team, float]:
@@ -107,18 +89,18 @@ class MatchResult(Subject, dict[Matchup, list[BattleWrapper.Result]]):
         Each pair of teams fights for the achievable points among one another.
         These achievable points are split over all rounds.
         """
-        if len(self.match.teams) == 1:
-            return {self.match.teams[0]: achievable_points}
+        if len(self.teams) == 1:
+            return {self.teams[0]: achievable_points}
 
-        if any(not 0 <= len(results) <= self.match.rounds for results in self.values()):
+        if any(not 0 <= len(results) <= self.config.rounds for results in self.values()):
             raise ValueError
 
-        points = {team: 0.0 for team in self.match.teams}
-        if self.match.rounds == 0:
+        points = {team: 0.0 for team in self.teams}
+        if self.config.rounds == 0:
             return points
-        points_per_round = round(achievable_points / self.match.rounds, 1)
+        points_per_round = round(achievable_points / self.config.rounds, 1)
 
-        for home_matchup, away_matchup in self.match.grouped_matchups:
+        for home_matchup, away_matchup in self.teams.grouped_matchups:
             for home_res, away_res in zip(self[home_matchup], self[away_matchup]):
                 total_score = home_res.score + away_res.score
                 if total_score == 0:
@@ -135,18 +117,18 @@ class MatchResult(Subject, dict[Matchup, list[BattleWrapper.Result]]):
         return points
 
     def __str__(self) -> str:
-        table = PrettyTable(field_names=["GEN", "SOL", *range(1, self.match.rounds + 1), "AVG"], min_width=5)
+        table = PrettyTable(field_names=["GEN", "SOL", *range(1, self.config.rounds + 1), "AVG"], min_width=5)
         table.set_style(DOUBLE_BORDER)
         table.align["AVG"] = "r"
-        for i in range(1, self.match.rounds + 1):
+        for i in range(1, self.config.rounds + 1):
             table.align[str(i)] = "r"
 
         for matchup, results in self.items():
-            if not 0 <= len(results) <= self.match.rounds:
+            if not 0 <= len(results) <= self.config.rounds:
                 raise RuntimeError
-            padding = [""] * (self.match.rounds - len(results))
+            padding = [""] * (self.config.rounds - len(results))
             average = "" if len(results) == 0 else results[0].format_score(sum(r.score for r in results) / len(results))
             results = [str(r) for r in results]
             table.add_row([str(matchup.generator), str(matchup.solver), *results, *padding, average])
 
-        return f"Battle Type: {self.match.battle_wrapper.type}\n{table}"
+        return f"Battle Type: {self.config.battle_type.name()}\n{table}"
