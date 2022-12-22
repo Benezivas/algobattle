@@ -30,19 +30,20 @@ class BattleWrapper(ABC):
 
         pass
 
-    __wrappers: dict[str, Type[BattleWrapper]] = {}
+    _wrappers: dict[str, Type[BattleWrapper]] = {}
 
     @staticmethod
     def all() -> dict[str, Type[BattleWrapper]]:
         """Returns a list of all registered wrappers."""
         for entrypoint in entry_points(group="algobattle.wrappers"):
-            if entrypoint.name not in BattleWrapper.__wrappers:
-                BattleWrapper.__wrappers = entrypoint.load()
-        return BattleWrapper.__wrappers
+            if entrypoint.name not in BattleWrapper._wrappers:
+                wrapper: Type[BattleWrapper] = entrypoint.load()
+                BattleWrapper._wrappers[wrapper.name()] = wrapper
+        return BattleWrapper._wrappers
 
     def __init_subclass__(cls) -> None:
-        if cls.name() not in BattleWrapper.__wrappers:
-            BattleWrapper.__wrappers[cls.name()] = cls
+        if cls.name() not in BattleWrapper._wrappers:
+            BattleWrapper._wrappers[cls.name()] = cls
         return super().__init_subclass__()
 
 
