@@ -46,7 +46,6 @@ class BattleWrapper(ABC):
             BattleWrapper._wrappers[cls.name()] = cls
         return super().__init_subclass__()
 
-
     @staticmethod
     def get_wrapper(wrapper_name: str) -> Type[BattleWrapper]:
         """Try to import a Battle Wrapper from a given name.
