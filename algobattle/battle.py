@@ -13,8 +13,8 @@ import tomli
 from algobattle.battle_wrapper import BattleWrapper
 
 # for now we need to manually import the default wrappers to make sure they're initialized
-from algobattle.battle_wrappers.iterated import Iterated    # type: ignore
-from algobattle.battle_wrappers.averaged import Averaged    # type: ignore
+from algobattle.battle_wrappers.iterated import Iterated    # type: ignore # noqa: F401
+from algobattle.battle_wrappers.averaged import Averaged    # type: ignore # noqa: F401
 
 from algobattle.match import MatchConfig, run_match
 from algobattle.team import TeamHandler, TeamInfo
