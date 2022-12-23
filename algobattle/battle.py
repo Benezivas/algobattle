@@ -12,12 +12,14 @@ from typing import Literal
 import tomli
 from algobattle.battle_wrapper import BattleWrapper
 
+# for now we need to manually import the default wrappers to make sure they're initialized
+from algobattle.battle_wrappers.iterated import Iterated    # type: ignore # noqa: F401
+from algobattle.battle_wrappers.averaged import Averaged    # type: ignore # noqa: F401
+
 from algobattle.match import MatchConfig, run_match
 from algobattle.team import TeamHandler, TeamInfo
 from algobattle.ui import Ui
 from algobattle.util import check_path, getattr_set, import_problem_from_path
-from algobattle.battle_wrappers.averaged import Averaged
-from algobattle.battle_wrappers.iterated import Iterated
 
 
 def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
@@ -88,7 +90,7 @@ def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, MatchConfig, BattleW
     parser.add_argument("--verbose", "-v", dest="verbose", action="store_const", const=True, help="More detailed log output.")
     parser.add_argument("--safe_build", action="store_const", const=True, help="Isolate docker image builds from each other. Significantly slows down battle setup but closes prevents images from interfering with each other.")
 
-    parser.add_argument("--battle_type", choices=["iterated", "averaged"], help="Type of battle wrapper to be used.")
+    parser.add_argument("--battle_type", choices=[name.lower() for name in BattleWrapper.all()], help="Type of battle wrapper to be used.")
     parser.add_argument("--rounds", type=int, help="Number of rounds that are to be fought in the battle (points are split between all rounds).")
     parser.add_argument("--points", type=int, help="number of points distributed between teams.")
 
@@ -100,10 +102,10 @@ def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, MatchConfig, BattleW
     parser.add_argument("--cpus", type=int, help="Number of cpu cores used for each docker container execution.")
 
     # battle wrappers have their configs automatically added to the CLI args
-    for wrapper in (Iterated, Averaged):
-        group = parser.add_argument_group(wrapper.name())
+    for wrapper_name, wrapper in BattleWrapper.all().items():
+        group = parser.add_argument_group(wrapper_name)
         for name, kwargs in wrapper.Config.as_argparse_args():
-            group.add_argument(f"--{wrapper.name().lower()}_{name}", **kwargs)
+            group.add_argument(f"--{wrapper_name.lower()}_{name}", **kwargs)
 
     parsed = parser.parse_args(args)
 

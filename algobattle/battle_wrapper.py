@@ -7,6 +7,7 @@ their run, such that it contains the current state of the match.
 """
 from __future__ import annotations
 from dataclasses import dataclass
+from importlib.metadata import entry_points
 import logging
 from abc import abstractmethod, ABC
 from importlib import import_module
@@ -28,6 +29,22 @@ class BattleWrapper(ABC):
         """Object containing the config variables the wrapper will use."""
 
         pass
+
+    _wrappers: dict[str, Type[BattleWrapper]] = {}
+
+    @staticmethod
+    def all() -> dict[str, Type[BattleWrapper]]:
+        """Returns a list of all registered wrappers."""
+        for entrypoint in entry_points(group="algobattle.wrappers"):
+            if entrypoint.name not in BattleWrapper._wrappers:
+                wrapper: Type[BattleWrapper] = entrypoint.load()
+                BattleWrapper._wrappers[wrapper.name()] = wrapper
+        return BattleWrapper._wrappers
+
+    def __init_subclass__(cls) -> None:
+        if cls.name() not in BattleWrapper._wrappers:
+            BattleWrapper._wrappers[cls.name()] = cls
+        return super().__init_subclass__()
 
     @staticmethod
     def get_wrapper(wrapper_name: str) -> Type[BattleWrapper]:
