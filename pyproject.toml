@@ -23,6 +23,7 @@ dependencies = [
 
     "prettytable",
     "tomli",
+    "pydantic",
 ]
 
 [project.scripts]
