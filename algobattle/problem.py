@@ -1,9 +1,8 @@
 """Abstract base class for problem classes used in concrete problem implementations."""
 from abc import ABC
 from dataclasses import dataclass
-from io import BytesIO
 from pathlib import Path
-from typing import Annotated, Any, TypeVar, get_type_hints
+from typing import Any, TypeVar, get_type_hints
 from pydantic import BaseModel
 
 from algobattle.util import FileArchive
@@ -64,8 +63,22 @@ class Instance(ABC, BaseModel):
         return excludes
 
 
+_Self = TypeVar("_Self", bound="Solution")
+
+
 class Solution(BaseModel):
     """Represents a potential solution to an instance of a problem."""
+
+    @classmethod
+    def parse(cls: type[_Self], source: FileArchive) -> _Self:
+        """Parses the generator output into a problem instance.
+        
+        The default implementation expects the object to be json encoded at a file 'solution.json'.
+        """
+        try:
+            return cls.parse_raw(source[Path("solution.json")])
+        except KeyError:
+            raise ContainerError
 
 
 @dataclass(kw_only=True)
