@@ -40,9 +40,9 @@ class Instance(ABC, BaseModel):
         except KeyError:
             raise ContainerError
 
-    def verify_semantics(self):
+    def check_semantics(self) -> bool:
         """Validates that the instance is semantically correct."""
-        pass
+        return True
 
     def encode(self, **kwargs: dict[str, Any]) -> FileArchive:
         """Encodes the instance into files so it can be passed to docker containers.
