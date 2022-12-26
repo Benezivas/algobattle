@@ -49,25 +49,34 @@ def import_problem_from_path(problem_path: Path) -> Problem:
         raise ValueError from e
 
 
-def archive(input: str, filename: str) -> bytes:
-    """Compresses a string into a tar archive."""
-    encoded = input.encode()
-    with BytesIO() as fh:
-        with BytesIO(initial_bytes=encoded) as source, tarfile.open(fileobj=fh, mode="w") as tar:
-            info = tarfile.TarInfo(filename)
-            info.size = len(encoded)
-            tar.addfile(info, source)
-        fh.seek(0)
-        return fh.getvalue()
+class FileArchive(dict[Path, bytes]):
+    """A collection of in-memory files."""
 
+    def archive(self) -> bytes:
+        """Compress into a tar archive."""
+        with BytesIO() as fh, tarfile.open(fileobj=fh, mode="w") as tar:
+            for path, data in self.items():
+                with BytesIO(initial_bytes=data) as source:
+                    info = tarfile.TarInfo(str(path))
+                    info.size = len(data)
+                    tar.addfile(info, source)
+            fh.seek(0)
+            return fh.getvalue()
 
-def extract(archive: bytes, filename: str) -> str:
-    """Retrieves the contents of a file from a tar archive."""
-    with BytesIO(initial_bytes=archive) as fh, tarfile.open(fileobj=fh, mode="r") as tar:
-        file = tar.extractfile(filename)
-        assert file is not None
-        with file as f:
-            return f.read().decode()
+    @staticmethod
+    def extract(data: bytes) -> FileArchive:
+        """Retrieves the contents of a tar archive."""
+        new = FileArchive()
+        with BytesIO(initial_bytes=data) as fh, tarfile.open(fileobj=fh, mode="r") as tar:
+            for info in tar.getmembers():
+                file = tar.extractfile(info)
+                if file is not None:
+                    new[Path(info.path)] = file.read()
+        return new
+
+    def subfolder(self, subfolder: Path) -> FileArchive:
+        """Creates a view at the files in a subfolder."""
+        return FileArchive({path.relative_to(subfolder): data for path, data in self.items() if subfolder in path.parents})
 
 
 T = TypeVar("T")
