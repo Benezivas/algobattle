@@ -26,8 +26,31 @@ class Hidden:
     pass
 
 
-class Instance(ABC, BaseModel):
+class Instance(ABC):
     """Represents a specific instance of a problem."""
+
+    @classmethod
+    def parse(cls: type[_Self], source: FileArchive) -> _Self:
+        """Parses the generator output into a problem instance."""
+        raise NotImplementedError
+
+    def check_semantics(self) -> bool:
+        """Validates that the instance is semantically correct."""
+        return True
+
+    def encode(self, **kwargs: dict[str, Any]) -> FileArchive:
+        """Encodes the instance into files so it can be passed to docker containers."""
+        raise NotImplementedError
+
+
+_Self = TypeVar("_Self", bound="InstanceModel")
+
+
+class InstanceModel(Instance, BaseModel):
+    """Represents a specific instance of a problem.
+    
+    Populated with default implementations to make creating custom problems easier.
+    """
 
     @classmethod
     def parse(cls: type[_Self], source: FileArchive) -> _Self:
@@ -39,10 +62,6 @@ class Instance(ABC, BaseModel):
             return cls.parse_raw(source[Path("instance.json")])
         except KeyError:
             raise ContainerError
-
-    def check_semantics(self) -> bool:
-        """Validates that the instance is semantically correct."""
-        return True
 
     def encode(self, **kwargs: dict[str, Any]) -> FileArchive:
         """Encodes the instance into files so it can be passed to docker containers.
@@ -58,7 +77,7 @@ class Instance(ABC, BaseModel):
         for name, annotation in get_type_hints(cls, include_extras=True).items():
             if hasattr(annotation, "__metadata__") and Hidden in annotation.__metadata__:
                 excludes[name] = True
-            elif issubclass(annotation, Instance):
+            elif issubclass(annotation, InstanceModel):
                 excludes[name] = annotation._excludes()
         return excludes
 
@@ -66,8 +85,23 @@ class Instance(ABC, BaseModel):
 _Self = TypeVar("_Self", bound="Solution")
 
 
-class Solution(BaseModel):
+class Solution(ABC):
     """Represents a potential solution to an instance of a problem."""
+
+    @classmethod
+    def parse(cls: type[_Self], source: FileArchive) -> _Self:
+        """Parses the generator output into a problem instance."""
+        raise NotImplementedError
+
+
+_Self = TypeVar("_Self", bound="SolutionModel")
+
+
+class SolutionModel(Solution, BaseModel):
+    """Represents a potential solution to an instance of a problem.
+    
+    Populated with default implementations to make creating custom problems easier.
+    """
 
     @classmethod
     def parse(cls: type[_Self], source: FileArchive) -> _Self:
