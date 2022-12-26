@@ -20,6 +20,11 @@ class ContainerError(ProblemError):
     pass
 
 
+class Hidden:
+    """Marker class indicating that a field will not be parsed into the solver input."""
+    pass
+
+
 class Instance(ABC, BaseModel):
     """Represents a specific instance of a problem."""
 
