@@ -1,8 +1,8 @@
 """Abstract base class for problem classes used in concrete problem implementations."""
-from abc import ABC
-from dataclasses import dataclass
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Generic, TypeVar, get_type_hints
+from typing import Any, Callable, ClassVar, Generic, Literal, Protocol, TypeVar, get_type_hints
 from pydantic import BaseModel
 
 from algobattle.util import FileArchive
@@ -29,6 +29,7 @@ class Hidden:
 class Instance(ABC):
     """Represents a specific instance of a problem."""
 
+    @abstractmethod
     @classmethod
     def parse(cls: type[_Self], source: FileArchive) -> _Self:
         """Parses the generator output into a problem instance."""
@@ -38,6 +39,7 @@ class Instance(ABC):
         """Validates that the instance is semantically correct."""
         return True
 
+    @abstractmethod
     def encode(self, **kwargs: dict[str, Any]) -> FileArchive:
         """Encodes the instance into files so it can be passed to docker containers."""
         raise NotImplementedError
@@ -46,7 +48,7 @@ class Instance(ABC):
 _Self = TypeVar("_Self", bound="InstanceModel")
 
 
-class InstanceModel(Instance, BaseModel):
+class InstanceModel(Instance, BaseModel, ABC):
     """Represents a specific instance of a problem.
     
     Populated with default implementations to make creating custom problems easier.
@@ -88,6 +90,7 @@ _Self = TypeVar("_Self", bound="Solution")
 class Solution(ABC):
     """Represents a potential solution to an instance of a problem."""
 
+    @abstractmethod
     @classmethod
     def parse(cls: type[_Self], source: FileArchive) -> _Self:
         """Parses the generator output into a problem instance."""
@@ -97,7 +100,7 @@ class Solution(ABC):
 _Self = TypeVar("_Self", bound="SolutionModel")
 
 
-class SolutionModel(Solution, BaseModel):
+class SolutionModel(Solution, BaseModel, ABC):
     """Represents a potential solution to an instance of a problem.
     
     Populated with default implementations to make creating custom problems easier.
