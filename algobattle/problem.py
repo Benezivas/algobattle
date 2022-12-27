@@ -1,6 +1,6 @@
 """Abstract base class for problem classes used in concrete problem implementations."""
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import InitVar, dataclass, field
 from pathlib import Path
 from typing import Any, Callable, ClassVar, Generic, Literal, Protocol, TypeVar, get_type_hints
 from pydantic import BaseModel
@@ -26,7 +26,7 @@ class Hidden:
     pass
 
 
-class Instance(ABC):
+class Instance(Protocol):
     """Represents a specific instance of a problem."""
 
     @abstractmethod
@@ -48,7 +48,7 @@ class Instance(ABC):
 _Self = TypeVar("_Self", bound="InstanceModel")
 
 
-class InstanceModel(Instance, BaseModel, ABC):
+class InstanceModel(Instance, BaseModel):
     """Represents a specific instance of a problem.
     
     Populated with default implementations to make creating custom problems easier.
@@ -87,7 +87,7 @@ class InstanceModel(Instance, BaseModel, ABC):
 _Self = TypeVar("_Self", bound="Solution")
 
 
-class Solution(ABC):
+class Solution(Protocol):
     """Represents a potential solution to an instance of a problem."""
 
     @abstractmethod
@@ -100,7 +100,7 @@ class Solution(ABC):
 _Self = TypeVar("_Self", bound="SolutionModel")
 
 
-class SolutionModel(Solution, BaseModel, ABC):
+class SolutionModel(Solution, BaseModel):
     """Represents a potential solution to an instance of a problem.
     
     Populated with default implementations to make creating custom problems easier.
@@ -142,11 +142,50 @@ class Problem(Generic[_InstanceT, _SolutionT]):
     """
 
 
-_InstanceT, _SolutionT = TypeVar("_InstanceT", bound=Instance), TypeVar("_SolutionT", bound=Solution)
-
-
 @dataclass(kw_only=True, frozen=True)
 class DecisionProblem(Problem[_InstanceT, _SolutionT]):
     """A :cls:`Problem` where all valid solutions are equally good."""
 
     calculate_score: Callable[[_InstanceT, _SolutionT], float] = field(init=False, default=lambda i, s: 1)
+
+
+class OptimizationInstance(Instance, Protocol):
+    """An instance that contains an optimal solution against which other solutions are checked."""
+
+    solution: "OptimizationSolution"
+
+
+class OptimizationSolution(Solution, Protocol):
+    """A solution for an optimization problem."""
+
+    @abstractmethod
+    def valuate(self) -> float:
+        """Evaluates this solution."""
+        raise NotImplementedError
+
+
+_OptiInstT, _OptiSolT = TypeVar("_OptiInstT", bound=OptimizationInstance), TypeVar("_OptiSolT", bound=OptimizationSolution)
+
+
+@dataclass(kw_only=True, frozen=True)
+class OptimizationProblem(Problem[_OptiInstT, _OptiSolT]):
+    """A :cls:`Problem` that compares solver solutions to an optimal solution provided by the generator."""
+
+    direction: InitVar[Literal["minimize", "maximize"]]
+    calculate_score: Callable[[_OptiInstT, _OptiSolT], float] = field(init=False)
+
+    def __post_init__(self, direction: Literal["minimize", "maximize"]):
+        def score(instance: _OptiInstT, solution: _OptiSolT) -> float:
+            gen = instance.solution.valuate()
+            sol = solution.valuate()
+            if gen == 0:
+                return 1
+            if sol == 0:
+                return 0
+            match direction:
+                case "minimize":
+                    score = gen / sol
+                case "maximize":
+                    score = sol / gen
+            return max(0, min(1, score))
+        object.__setattr__(self, "calculate_score", score)
