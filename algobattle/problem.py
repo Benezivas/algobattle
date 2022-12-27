@@ -140,3 +140,13 @@ class Problem(Generic[_InstanceT, _SolutionT]):
     A value of 0 indicating that the solver failed completely
     and 1 that it solved the instance perfectly.
     """
+
+
+_InstanceT, _SolutionT = TypeVar("_InstanceT", bound=Instance), TypeVar("_SolutionT", bound=Solution)
+
+
+@dataclass(kw_only=True, frozen=True)
+class DecisionProblem(Problem[_InstanceT, _SolutionT]):
+    """A :cls:`Problem` where all valid solutions are equally good."""
+
+    calculate_score: Callable[[_InstanceT, _SolutionT], float] = field(init=False, default=lambda i, s: 1)
