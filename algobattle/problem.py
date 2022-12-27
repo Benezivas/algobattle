@@ -118,7 +118,7 @@ class SolutionModel(Solution, BaseModel):
 _InstanceT, _SolutionT = TypeVar("_InstanceT", bound=Instance), TypeVar("_SolutionT", bound=Solution)
 
 
-@dataclass(kw_only=True)
+@dataclass(kw_only=True, frozen=True)
 class Problem(Generic[_InstanceT, _SolutionT]):
     """Dataclass specifying what a problem's instances and solutions look like."""
 
