@@ -2,7 +2,7 @@
 from abc import ABC
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, TypeVar, get_type_hints
+from typing import Any, Generic, TypeVar, get_type_hints
 from pydantic import BaseModel
 
 from algobattle.util import FileArchive
@@ -115,18 +115,18 @@ class SolutionModel(Solution, BaseModel):
             raise ContainerError
 
 
+_InstanceT, _SolutionT = TypeVar("_InstanceT", bound=Instance), TypeVar("_SolutionT", bound=Solution)
+
+
 @dataclass(kw_only=True)
-class Problem:
+class Problem(Generic[_InstanceT, _SolutionT]):
     """Dataclass specifying what a problem's instances and solutions look like."""
 
     name: str
     """Name of the problem."""
     start_size: int = 1
     """Smallest valid size for this problem"""
-    instance_type: type[Instance]
+    instance_type: type[_InstanceT]
     """Type of the instances of this problem."""
-    solution_type: type[Solution]
+    solution_type: type[_SolutionT]
     """Type of the solutions of this problem."""
-
-    def __str__(self) -> str:
-        return self.name
