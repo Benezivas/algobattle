@@ -2,7 +2,7 @@
 from abc import ABC
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Generic, TypeVar, get_type_hints
+from typing import Any, Callable, Generic, TypeVar, get_type_hints
 from pydantic import BaseModel
 
 from algobattle.util import FileArchive
@@ -130,3 +130,10 @@ class Problem(Generic[_InstanceT, _SolutionT]):
     """Type of the instances of this problem."""
     solution_type: type[_SolutionT]
     """Type of the solutions of this problem."""
+    calculate_score: Callable[[_InstanceT, _SolutionT], float]
+    """Scores a proposed solution for an instance.
+    
+    Return values are clamped to fall inside [0, 1].
+    A value of 0 indicating that the solver failed completely
+    and 1 that it solved the instance perfectly.
+    """
