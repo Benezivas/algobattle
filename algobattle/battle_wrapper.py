@@ -10,15 +10,25 @@ from dataclasses import dataclass
 from importlib.metadata import entry_points
 import logging
 from abc import abstractmethod, ABC
-from importlib import import_module
-from typing import Type
+from typing import Generator, Literal, Type
 
-from algobattle.fight_handler import FightHandler
-from algobattle.team import Matchup
+from algobattle.problem import Instance, Solution
 from algobattle.observer import Observer, Subject
-from algobattle.util import CLIParsable
+from algobattle.util import CLIParsable, FileArchive
 
 logger = logging.getLogger('algobattle.battle_wrapper')
+
+
+class FightResult:
+    pass
+
+@dataclass
+class Success(FightResult):
+    score: float
+
+@dataclass
+class Failure(FightResult):
+    reason: Literal["gen timeout", "gen failure", "sol timeout", "sol failure"]
 
 
 class BattleWrapper(ABC):
@@ -46,48 +56,31 @@ class BattleWrapper(ABC):
             BattleWrapper._wrappers[cls.name()] = cls
         return super().__init_subclass__()
 
-    @staticmethod
-    def get_wrapper(wrapper_name: str) -> Type[BattleWrapper]:
-        """Try to import a Battle Wrapper from a given name.
-
-        For this to work, a BattleWrapper module with the same name as the argument
-        needs to be present in the algobattle/battle_wrappers folder.
-
-        Parameters
-        ----------
-        wrapper_name : str
-            Name of a battle wrapper module in algobattle/battle_wrappers.
-
-        Returns
-        -------
-        BattleWrapper
-            A BattleWrapper of the given wrapper_name.
-
-        Raises
-        ------
-        ValueError
-            If the wrapper does not exist in the battle_wrappers folder.
-        """
-        try:
-            wrapper_module = import_module("algobattle.battle_wrappers." + wrapper_name)
-            return getattr(wrapper_module, wrapper_name.capitalize())
-        except ImportError as e:
-            logger.critical(f"Importing a wrapper from the given path failed with the following exception: {e}")
-            raise ValueError from e
-
-    def __init__(self, fight_handler: FightHandler, config: BattleWrapper.Config) -> None:
+    def __init__(self, config: BattleWrapper.Config, observer: Observer | None = None) -> None:
         super().__init__()
-        self.fight_handler = fight_handler
         self.config = config
+        self.observer = observer
 
     @abstractmethod
-    def run_round(self, matchup: Matchup, observer: Observer | None = None) -> BattleWrapper.Result:
-        """Execute a full round of fights between two teams configured in the fight_handler.
-
-        During execution, the concrete BattleWrapper should update the round_data dict
-        to which Observers can subscribe in order to react to new intermediate results.
-        """
+    def generate_instance_sizes(self, minimum_size: int) -> Generator[int, FightResult, BattleWrapper.Result]:
+        """Calculates the next instance size that should be fought over"""
         raise NotImplementedError
+
+    def generator_input(self) -> FileArchive | None:
+        """Create additional input that will be given to the given to the generator."""
+        return None
+
+    def process_generator_output(self, instance: Instance):
+        """Process the instance created by the generator"""
+        return
+
+    def solver_input(self) -> FileArchive | None:
+        """Create additional input that will be given to the given to the solver."""
+        return None
+
+    def process_solver_output(self, solution: Solution):
+        """Process the solution created by the solver"""
+        return
 
     @classmethod
     def name(cls) -> str:
