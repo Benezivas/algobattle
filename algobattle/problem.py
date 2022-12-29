@@ -35,20 +35,35 @@ class ProblemData(Protocol):
         """Parses the container output into problem data."""
         ...
 
-    def check_semantics(self, size: int) -> bool:
-        """Validates that the parsed data is semantically correct."""
-        ...
-
     @abstractmethod
     def encode(self, target_dir: Path, size: int, team: Literal["generator", "solver"]) -> None:
         """Encodes the problem data into files that can be passed to docker containers."""
         ...
 
 
+class Instance(ProblemData, Protocol):
+    """A specific instance of a problem."""
+
+    def check_semantics(self, size: int) -> bool:
+        """Validates that the parsed data is semantically correct."""
+        ...
+
+
+_Instance = TypeVar("_Instance", bound=Instance, contravariant=True)
+
+
+class Solution(Generic[_Instance], ProblemData, Protocol):
+    """A solution of a problem instance."""
+
+    def check_semantics(self, size: int, instance: _Instance) -> bool:
+        """Validates that the parsed data is semantically correct."""
+        ...
+
+
 _Self = TypeVar("_Self", bound="_JsonEncodable")
 
 
-class _JsonEncodable(ProblemData, BaseModel, ABC):
+class _JsonEncodable(BaseModel, ABC):
     """Problem data that can easily be encoded into and decoded from json files."""
 
     filename: ClassVar[str]
@@ -60,10 +75,6 @@ class _JsonEncodable(ProblemData, BaseModel, ABC):
             return cls.parse_file(source_dir / cls.filename)
         except Exception as e:
             raise ContainerError from e
-
-    @inherit_docs
-    def check_semantics(self, size: int) -> bool:
-        return True
 
     @inherit_docs
     def encode(self, target_dir: Path, size: int, team: Literal["generator", "solver"]) -> None:
@@ -84,34 +95,40 @@ class _JsonEncodable(ProblemData, BaseModel, ABC):
         return excludes
 
 
-class Instance(_JsonEncodable, ABC):
+class JsonInstance(_JsonEncodable, Instance, ABC):
     """Represents a specific instance of a problem."""
 
     filename = "instance.json"
 
+    def check_semantics(self, size: int) -> bool:
+        return True
 
-class Solution(_JsonEncodable, ABC):
+
+class JsonSolution(_JsonEncodable, Solution[_Instance], ABC):
     """Represents a potential solution to an instance of a problem."""
 
     filename = "solution.json"
 
+    def check_semantics(self, size: int, instance: _Instance) -> bool:
+        return True
 
-_InstanceT, _SolutionT = TypeVar("_InstanceT", bound=Instance), TypeVar("_SolutionT", bound=Solution)
+
+_Solution = TypeVar("_Solution", bound=Solution[Instance])
 
 
 @dataclass(kw_only=True, frozen=True)
-class Problem(Generic[_InstanceT, _SolutionT]):
+class Problem(Generic[_Instance, _Solution]):
     """Dataclass specifying what a problem's instances and solutions look like."""
 
     name: str
     """Name of the problem."""
     start_size: int = 1
     """Smallest valid size for this problem"""
-    instance_type: type[_InstanceT]
+    instance_type: type[_Instance]
     """Type of the instances of this problem."""
-    solution_type: type[_SolutionT]
+    solution_type: type[_Solution]
     """Type of the solutions of this problem."""
-    calculate_score: Callable[[_InstanceT, _SolutionT], float]
+    calculate_score: Callable[[_Instance, _Solution], float]
     """Scores a proposed solution for an instance.
     
     Return values are clamped to fall inside [0, 1].
@@ -121,10 +138,10 @@ class Problem(Generic[_InstanceT, _SolutionT]):
 
 
 @dataclass(kw_only=True, frozen=True)
-class DecisionProblem(Problem[_InstanceT, _SolutionT]):
+class DecisionProblem(Problem[_Instance, _Solution]):
     """A :cls:`Problem` where all valid solutions are equally good."""
 
-    calculate_score: Callable[[_InstanceT, _SolutionT], float] = field(init=False, default=lambda i, s: 1)
+    calculate_score: Callable[[_Instance, _Solution], float] = field(init=False, default=lambda i, s: 1)
 
 
 class OptimizationInstance(Instance, Protocol):
