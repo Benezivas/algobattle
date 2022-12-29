@@ -46,11 +46,14 @@ class MatchConfig:
     def from_dict(info: dict[str, Any]) -> MatchConfig:
         """Parses a :cls:`MatchConfig` from a dict."""
         if "battle_type" in info:
-            copy = info.copy()
-            copy["battle_type"] = BattleWrapper.get_wrapper(copy["battle_type"])
+            try:
+                wrapper = BattleWrapper.all()[info["battle_type"]]
+            except KeyError:
+                raise ValueError(f"Attempted to use invalid battle wrapper {info['battle_type']}.")
+            update = {"battle_type": wrapper}
         else:
-            copy = info
-        return MatchConfig(**copy)
+            update = {}
+        return MatchConfig(**(info | update))
 
 
 def run_match(
