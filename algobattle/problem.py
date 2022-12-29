@@ -5,10 +5,7 @@ from pathlib import Path
 from typing import Any, Callable, ClassVar, Generic, Literal, Protocol, TypeVar, get_type_hints
 from pydantic import BaseModel
 
-from algobattle.util import FileArchive
-
-
-_Self = TypeVar("_Self", bound="Instance")
+from algobattle.util import inherit_docs
 
 
 class ProblemError(Exception):
@@ -26,52 +23,55 @@ class Hidden:
     pass
 
 
-class Instance(Protocol):
-    """Represents a specific instance of a problem."""
+_Self = TypeVar("_Self", bound="ProblemData")
+
+
+class ProblemData(Protocol):
+    """Represents problem data that docker containers can interact with."""
 
     @abstractmethod
     @classmethod
-    def parse(cls: type[_Self], source: FileArchive) -> _Self:
-        """Parses the generator output into a problem instance."""
-        raise NotImplementedError
+    def decode(cls: type[_Self], source_dir: Path, size: int) -> _Self:
+        """Parses the container output into problem data."""
+        ...
 
-    def check_semantics(self) -> bool:
-        """Validates that the instance is semantically correct."""
+    def check_semantics(self, size: int) -> bool:
+        """Validates that the parsed data is semantically correct."""
+        ...
+
+    @abstractmethod
+    def encode(self, target_dir: Path, size: int, team: Literal["generator", "solver"]) -> None:
+        """Encodes the problem data into files that can be passed to docker containers."""
+        ...
+
+
+_Self = TypeVar("_Self", bound="_JsonEncodable")
+
+
+class _JsonEncodable(ProblemData, BaseModel, ABC):
+    """Problem data that can easily be encoded into and decoded from json files."""
+
+    filename: ClassVar[str]
+
+    @inherit_docs
+    @classmethod
+    def decode(cls: type[_Self], source_dir: Path, size: int) -> _Self:
+        try:
+            return cls.parse_file(source_dir / cls.filename)
+        except Exception as e:
+            raise ContainerError from e
+
+    @inherit_docs
+    def check_semantics(self, size: int) -> bool:
         return True
 
-    @abstractmethod
-    def encode(self, **kwargs: dict[str, Any]) -> FileArchive:
-        """Encodes the instance into files so it can be passed to docker containers."""
-        raise NotImplementedError
-
-
-_Self = TypeVar("_Self", bound="InstanceModel")
-
-
-class InstanceModel(Instance, BaseModel):
-    """Represents a specific instance of a problem.
-    
-    Populated with default implementations to make creating custom problems easier.
-    """
-
-    @classmethod
-    def parse(cls: type[_Self], source: FileArchive) -> _Self:
-        """Parses the generator output into a problem instance.
-        
-        The default implementation expects the object to be json encoded at a file 'instance.json'.
-        """
+    @inherit_docs
+    def encode(self, target_dir: Path, size: int, team: Literal["generator", "solver"]) -> None:
         try:
-            return cls.parse_raw(source[Path("instance.json")])
-        except KeyError:
-            raise ContainerError
-
-    def encode(self, **kwargs: dict[str, Any]) -> FileArchive:
-        """Encodes the instance into files so it can be passed to docker containers.
-        
-        By default a single file `instance.json` is generated and attributes annotated with :cls:`Hidden` are ignored.
-        Battle wrappers may specify additional arguments via `kwargs` to fine tune the info passed to containers.
-        """
-        return FileArchive({Path("instance.json"): self.json(exclude=self._excludes()).encode()})
+            with open(target_dir / self.filename, "w") as f:
+                f.write(self.json(exclude=self._excludes()))
+        except Exception as e:
+            raise ContainerError from e
 
     @classmethod
     def _excludes(cls) -> dict[str | int, Any]:
@@ -79,43 +79,21 @@ class InstanceModel(Instance, BaseModel):
         for name, annotation in get_type_hints(cls, include_extras=True).items():
             if hasattr(annotation, "__metadata__") and Hidden in annotation.__metadata__:
                 excludes[name] = True
-            elif issubclass(annotation, InstanceModel):
+            elif issubclass(annotation, _JsonEncodable):
                 excludes[name] = annotation._excludes()
         return excludes
 
 
-_Self = TypeVar("_Self", bound="Solution")
+class Instance(_JsonEncodable, ABC):
+    """Represents a specific instance of a problem."""
+
+    filename = "instance.json"
 
 
-class Solution(Protocol):
+class Solution(_JsonEncodable, ABC):
     """Represents a potential solution to an instance of a problem."""
 
-    @abstractmethod
-    @classmethod
-    def parse(cls: type[_Self], source: FileArchive) -> _Self:
-        """Parses the generator output into a problem instance."""
-        raise NotImplementedError
-
-
-_Self = TypeVar("_Self", bound="SolutionModel")
-
-
-class SolutionModel(Solution, BaseModel):
-    """Represents a potential solution to an instance of a problem.
-    
-    Populated with default implementations to make creating custom problems easier.
-    """
-
-    @classmethod
-    def parse(cls: type[_Self], source: FileArchive) -> _Self:
-        """Parses the generator output into a problem instance.
-        
-        The default implementation expects the object to be json encoded at a file 'solution.json'.
-        """
-        try:
-            return cls.parse_raw(source[Path("solution.json")])
-        except KeyError:
-            raise ContainerError
+    filename = "solution.json"
 
 
 _InstanceT, _SolutionT = TypeVar("_InstanceT", bound=Instance), TypeVar("_SolutionT", bound=Solution)
