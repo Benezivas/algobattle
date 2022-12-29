@@ -11,9 +11,8 @@ from docker import DockerClient
 from docker.errors import APIError, BuildError, DockerException, ImageNotFound
 from docker.models.images import Image as DockerImage
 from docker.models.containers import Container as DockerContainer
+from docker.types import Mount
 from requests import Timeout
-
-from algobattle.util import archive, extract
 
 
 logger = logging.getLogger("algobattle.docker")
@@ -166,13 +165,15 @@ class Image:
     def __exit__(self, _type, _value_, _traceback):
         self.remove()
 
-    def run(self, input: str = "", timeout: float | None = None, memory: int | None = None, cpus: int | None = None) -> str:
+    def run(self, input_dir: Path, output_dir: Path, timeout: float | None = None, memory: int | None = None, cpus: int | None = None) -> None:
         """Runs a docker image with the provided input and returns its output.
 
         Parameters
         ----------
-        input
-            The input string the container will be provided with.
+        input_dir
+            The input folder provided to the docker container.
+        input_dir
+            The folder where the container places its output.
         timeout
             Timeout in seconds.
         memory
@@ -197,6 +198,9 @@ class Image:
         if cpus is not None:
             cpus = int(cpus * 1000000000)
 
+        input_mount = Mount(target="/input", source=str(input_dir), type="bind", read_only=True)
+        output_mount = Mount(target="/output", source=str(output_dir), type="bind")
+
         container: DockerContainer | None = None
         try:
             container = cast(
@@ -208,11 +212,9 @@ class Image:
                     nano_cpus=cpus,
                     detach=True,
                     network_mode="none",
+                    mounts=[input_mount, output_mount],
                 ),
             )
-            ok = container.put_archive("/", archive(input, "input"))
-            if not ok:
-                raise DockerError(f"Copying input into container {self.name} failed")
 
             container.start()
             start_time = default_timer()
@@ -229,14 +231,10 @@ class Image:
                     f"{self.description} exited with error code {exit_code} "
                     f"and error message '{container.logs().decode()}'"
                 )
-            output_iter, _stat = container.get_archive("output")
-            output = extract(b"".join(output_iter), "output")
 
         except ImageNotFound as e:
             raise DockerError(f"Image {self.name} (id={self.id}) does not exist") from e
         except APIError as e:
-            if cast(str, e.explanation).startswith("Could not find the file output in container"):
-                return ""
             raise DockerError(f"Docker API Error thrown while running {self.name}") from e
         finally:
             if container is not None:
@@ -246,7 +244,6 @@ class Image:
                     raise DockerError(f"Couldn't remove {name}") from e
 
         logger.debug(f"Approximate elapsed runtime: {elapsed_time}/{timeout} seconds.")
-        return output
 
     def remove(self) -> None:
         """Removes the image from the docker daemon.
