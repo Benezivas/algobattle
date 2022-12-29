@@ -144,13 +144,7 @@ class DecisionProblem(Problem[_Instance, _Solution]):
     calculate_score: Callable[[_Instance, _Solution], float] = field(init=False, default=lambda i, s: 1)
 
 
-class OptimizationInstance(Instance, Protocol):
-    """An instance that contains an optimal solution against which other solutions are checked."""
-
-    solution: "OptimizationSolution"
-
-
-class OptimizationSolution(Solution, Protocol):
+class OptimizationSolution(Solution[_Instance], Protocol):
     """A solution for an optimization problem."""
 
     @abstractmethod
@@ -159,28 +153,27 @@ class OptimizationSolution(Solution, Protocol):
         raise NotImplementedError
 
 
-_OptiInstT, _OptiSolT = TypeVar("_OptiInstT", bound=OptimizationInstance), TypeVar("_OptiSolT", bound=OptimizationSolution)
+class OptimizationInstance(Instance, Protocol):
+    """An instance that contains an optimal solution against which other solutions are checked."""
+
+    solution: OptimizationSolution["OptimizationInstance"]
 
 
-@dataclass(kw_only=True, frozen=True)
-class OptimizationProblem(Problem[_OptiInstT, _OptiSolT]):
-    """A :cls:`Problem` that compares solver solutions to an optimal solution provided by the generator."""
+_OptiInst, _OptiSol = TypeVar("_OptiInst", bound=OptimizationInstance), TypeVar("_OptiSol", bound=OptimizationSolution[OptimizationInstance])
 
-    direction: InitVar[Literal["minimize", "maximize"]]
-    calculate_score: Callable[[_OptiInstT, _OptiSolT], float] = field(init=False)
 
-    def __post_init__(self, direction: Literal["minimize", "maximize"]):
-        def score(instance: _OptiInstT, solution: _OptiSolT) -> float:
-            gen = instance.solution.valuate()
-            sol = solution.valuate()
-            if gen == 0:
-                return 1
-            if sol == 0:
-                return 0
-            match direction:
-                case "minimize":
-                    score = gen / sol
-                case "maximize":
-                    score = sol / gen
-            return max(0, min(1, score))
-        object.__setattr__(self, "calculate_score", score)
+def approximation_ratio(direction: Literal["minimize", "maximize"]) -> Callable[[_OptiInst, OptimizationSolution[_OptiInst]], float]:
+    def score(instance: _OptiInst, solution: OptimizationSolution[_OptiInst]) -> float:
+        gen = instance.solution.valuate()
+        sol = solution.valuate()
+        if gen == 0:
+            return 1
+        if sol == 0:
+            return 0
+        match direction:
+            case "minimize":
+                score = gen / sol
+            case "maximize":
+                score = sol / gen
+        return max(0, min(1, score))
+    return score
