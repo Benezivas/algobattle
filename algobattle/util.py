@@ -2,12 +2,11 @@
 from __future__ import annotations
 from abc import ABC
 from dataclasses import KW_ONLY, dataclass, fields
-from io import BytesIO
 import logging
 import importlib.util
 import sys
 from pathlib import Path
-import tarfile
+from tempfile import TemporaryDirectory
 from typing import Any, Callable, Generic, Literal, TypeVar, cast, get_type_hints
 
 from algobattle.problem import Problem
@@ -148,3 +147,10 @@ class CLIParsable(ABC):
 def getattr_set(o: object, *attrs: str) -> dict[str, Any]:
     """Returns a dict of the given attributes and their values, if they are not `None`."""
     return {a: getattr(o, a) for a in attrs if getattr(o, a, None) is not None}
+
+
+class TempDir(TemporaryDirectory[Any]):
+    
+    def __enter__(self):
+        super().__enter__()
+        return Path(self.name)
