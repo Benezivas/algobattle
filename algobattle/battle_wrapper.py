@@ -10,11 +10,12 @@ from dataclasses import dataclass
 from importlib.metadata import entry_points
 import logging
 from abc import abstractmethod, ABC
+from pathlib import Path
 from typing import Generator, Literal, Type
 
 from algobattle.problem import Instance, Solution
-from algobattle.observer import Observer, Subject
-from algobattle.util import CLIParsable, FileArchive
+from algobattle.observer import Subject
+from algobattle.util import CLIParsable
 
 logger = logging.getLogger('algobattle.battle_wrapper')
 
@@ -56,29 +57,28 @@ class BattleWrapper(ABC):
             BattleWrapper._wrappers[cls.name()] = cls
         return super().__init_subclass__()
 
-    def __init__(self, config: BattleWrapper.Config, observer: Observer | None = None) -> None:
+    def __init__(self, config: BattleWrapper.Config) -> None:
         super().__init__()
         self.config = config
-        self.observer = observer
 
     @abstractmethod
     def generate_instance_sizes(self, minimum_size: int) -> Generator[int, FightResult, BattleWrapper.Result]:
         """Calculates the next instance size that should be fought over"""
         raise NotImplementedError
 
-    def generator_input(self) -> FileArchive | None:
-        """Create additional input that will be given to the given to the generator."""
-        return None
+    def generator_input(self, path: Path):
+        """Create additional input that will be available to the generator."""
+        return
 
     def process_generator_output(self, instance: Instance):
         """Process the instance created by the generator"""
         return
 
-    def solver_input(self) -> FileArchive | None:
-        """Create additional input that will be given to the given to the solver."""
-        return None
+    def solver_input(self, path: Path):
+        """Create additional input that will be given to the solver."""
+        return
 
-    def process_solver_output(self, solution: Solution):
+    def process_solver_output(self, solution: Solution[Instance]):
         """Process the solution created by the solver"""
         return
 
