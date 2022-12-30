@@ -31,8 +31,8 @@ class FightError(Exception):
         super().__init__(*args)
 
 
-class InvalidOutput(FightError):
-    """Indicates that the created instance or solution is invalid."""
+class EncodingError(FightError):
+    """Indicates that some data structured couldn't be encoded or decoded properly."""
     pass
 
 
@@ -92,7 +92,7 @@ class FightHandler(Generic[_Instance, _Solution]):
             return GeneratorFailure(score=1, generator=e)
 
         try:
-            sol_result = self.solve(size=size, timeout=timeout_solver, space=space_solver, cpus=cpus)
+            sol_result = self.solve(gen_result.data, size=size, timeout=timeout_solver, space=space_solver, cpus=cpus)
         except FightError as e:
             return GeneratorSuccess(score=1, generator=gen_result, solver=e)
 
@@ -127,59 +127,51 @@ class FightHandler(Generic[_Instance, _Solution]):
                 instance = self.problem.instance_type.decode(output, size)
             except Exception as e:
                 logger.warning(f"Generator of team '{self.matchup.generator}' output a syntactically incorrect instance!")
-                raise FightError(runtime) from e
+                raise EncodingError(runtime) from e
         
         if not instance.check_semantics(size):
             logger.warning(f"Generator of team '{self.matchup.generator}' output a semantically incorrect instance!")
-            raise InvalidOutput(runtime)
+            raise EncodingError(runtime)
 
         logger.info(f"Generator of team '{self.matchup.generator}' output a valid instance.")
         return Result(instance, runtime)
 
-    def solve(self, size: int, timeout: float | None = ..., space: int | None = ..., cpus: int = ...) -> Result[_Solution]:
-        """Execute the solver of `team` and check the validity of the generated output.
+    def solve(self, instance: _Instance, size: int, timeout: float | None = ..., space: int | None = ..., cpus: int = ...) -> Result[_Solution]:
+        """Execute the solver and process its output."""
+        logger.debug(f"Running generator of team {self.matchup.generator}.")
+        if timeout is ellipsis:
+            timeout = self.timeout_generator
+        if space is ellipsis:
+            space = self.space_generator
+        if cpus is ellipsis:
+            cpus = self.cpus
 
-        If the validity checks pass, return the solver solution.
+        with TempDir() as input, TempDir() as output:
+            (input / "instance").mkdir()
+            try:
+                instance.encode(input / "instance", size, "solver")
+            except Exception as e:
+                logger.warning(f"Problem instance couldn't be encoded into files!")
+                raise EncodingError from e
 
-        Parameters
-        ----------
-        instance_size : int
-            The instance size, expected to be a positive int.
+            try:
+                runtime = self.matchup.solver.solver.run(input, output, timeout=timeout, memory=space, cpus=cpus)
+            except ExecutionError as e:
+                logger.warning(f"Solver of team '{self.matchup.solver}' crashed!")
+                raise FightError(e.time) from e
+            except DockerError as e:
+                logger.warning(f"Solver of team '{self.matchup.solver}' couldn't be executed successfully!")
+                raise FightError from e
 
-        Returns
-        -------
-        any
-            If the validity checks pass, solution in whatever
-            format that is specified.
+            try:
+                solution = self.problem.solution_type.decode(output, size)
+            except Exception as e:
+                logger.warning(f"Solver of team '{self.matchup.generator}' output a syntactically incorrect Solution!")
+                raise EncodingError(runtime) from e
+        
+        if not solution.check_semantics(size, instance):
+            logger.warning(f"Solver of team '{self.matchup.generator}' output a semantically incorrect instance!")
+            raise EncodingError(runtime)
 
-        Raises
-        ------
-        RuntimeError
-            If the container doesn't run successfully or any of the checks don't pass
-        """
-        scaled_memory = self.problem.solver_memory_scaler(self.space_solver, instance_size)
-        try:
-            encoded_output = team.solver.run(
-                self.problem.parser.encode(instance), self.timeout_solver, scaled_memory, self.cpus
-            )
-        except DockerError:
-            logger.warning(f"Solver of team '{team}' didn't run successfully!")
-            raise RuntimeError
-
-        if not encoded_output:
-            logger.warning(f"No output was generated when running the solver of group {team}!")
-            raise RuntimeError
-
-        raw_solver_solution = self.problem.parser.decode(encoded_output)
-
-        logger.debug("Checking validity of the solvers solution...")
-
-        solver_solution = self.problem.parser.parse_solution(raw_solver_solution, instance_size)
-        if not self.problem.verifier.verify_semantics_of_solution(solver_solution, instance_size, True):
-            logger.warning(f"Solver of group {team} created a malformed solution at instance size {instance_size}!")
-            raise RuntimeError
-        elif not self.problem.verifier.verify_solution_against_instance(instance, solver_solution, instance_size, False):
-            logger.warning(f"Solver of group {team} yields an incorrect solution at instance size {instance_size}!")
-            raise RuntimeError
-
-        return solver_solution
+        logger.info(f"Solver of team '{self.matchup.generator}' output a valid solution.")
+        return Result(solution, runtime)
