@@ -2,7 +2,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 import logging
-from typing import Any, Type
+from typing import Any, Type, TypeVar
 from prettytable import PrettyTable, DOUBLE_BORDER
 
 from algobattle.battle_wrapper import BattleWrapper
@@ -10,7 +10,7 @@ from algobattle.battle_wrappers.iterated import Iterated
 from algobattle.fight_handler import FightHandler
 from algobattle.observer import Observer, Subject
 from algobattle.team import Matchup, Team, TeamHandler
-from algobattle.problem import Problem
+from algobattle.problem import Instance, Problem, Solution
 
 logger = logging.getLogger("algobattle.match")
 
@@ -21,7 +21,7 @@ class MatchConfig:
 
     verbose: bool = False
     safe_build: bool = False
-    battle_type: Type[BattleWrapper] = Iterated
+    battle_type: Type[BattleWrapper[Any, Any]] = Iterated
     rounds: int = 5
     points: int = 100
     timeout_build: float | None = 600
@@ -56,21 +56,28 @@ class MatchConfig:
         return MatchConfig(**(info | update))
 
 
+_Instance, _Solution = TypeVar("_Instance", bound=Instance), TypeVar("_Solution", bound=Solution[Instance])
+
+
 def run_match(
     config: MatchConfig,
     wrapper_config: BattleWrapper.Config,
-    problem: Problem,
+    problem: Problem[_Instance, _Solution],
     teams: TeamHandler,
     observer: Observer | None = None,
 ) -> MatchResult:
     """Executes the match with the specified parameters."""
-    fight_handler = FightHandler(problem, **config.docker_params)
-    wrapper = config.battle_type(fight_handler, wrapper_config)
     result = MatchResult(config, teams, observer)
     for matchup in teams.matchups:
+        fight_handler = FightHandler(problem=problem, matchup=matchup, **config.docker_params)
         for i in range(config.rounds):
             logger.info("#" * 20 + f"  Running Round {i+1}/{config.rounds}  " + "#" * 20)
-            battle_result = wrapper.run_round(matchup, observer)
+            wrapper = config.battle_type(wrapper_config, problem)
+            try:
+                battle_result = wrapper.run_battle(fight_handler)
+            except Exception:
+                logger.critical(f"Unhandeled error during execution of battle wrapper!")
+                battle_result = wrapper.Result()    # type: ignore
             result[matchup].append(battle_result)
             result.notify()
     return result
