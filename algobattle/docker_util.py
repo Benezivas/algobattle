@@ -165,7 +165,7 @@ class Image:
     def __exit__(self, _type, _value_, _traceback):
         self.remove()
 
-    def run(self, input_dir: Path, output_dir: Path, timeout: float | None = None, memory: int | None = None, cpus: int | None = None) -> None:
+    def run(self, input_dir: Path, output_dir: Path, timeout: float | None = None, memory: int | None = None, cpus: int | None = None) -> float:
         """Runs a docker image with the provided input and returns its output.
 
         Parameters
@@ -244,6 +244,7 @@ class Image:
                     raise DockerError(f"Couldn't remove {name}") from e
 
         logger.debug(f"Approximate elapsed runtime: {elapsed_time}/{timeout} seconds.")
+        return elapsed_time
 
     def remove(self) -> None:
         """Removes the image from the docker daemon.
