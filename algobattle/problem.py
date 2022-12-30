@@ -1,11 +1,16 @@
 """Abstract base class for problem classes used in concrete problem implementations."""
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+import importlib.util
+import logging
+import sys
 from pathlib import Path
 from typing import Any, Callable, ClassVar, Generic, Literal, Protocol, TypeVar, get_type_hints
 from pydantic import BaseModel
 
 from algobattle.util import inherit_docs
+
+logger = logging.getLogger("algobattle.problem")
 
 
 class ProblemError(Exception):
@@ -114,6 +119,7 @@ class JsonSolution(_JsonEncodable, Solution[_Instance], ABC):
 
 
 _Solution = TypeVar("_Solution", bound=Solution[Instance])
+_Self = TypeVar("_Self", bound="Problem[Any, Any]")
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -135,6 +141,40 @@ class Problem(Generic[_Instance, _Solution]):
     A value of 0 indicating that the solver failed completely
     and 1 that it solved the instance perfectly.
     """
+
+    @classmethod
+    def import_from_path(cls: type[_Self], path: Path) -> _Self:
+        """Try to import and initialize a Problem object from a given path.
+
+        Parameters
+        ----------
+        path : Path
+            Path in the file system to a problem folder.
+
+        Returns
+        -------
+        Problem
+            Returns an object of the problem.
+
+        Raises
+        ------
+        ValueError
+            If the path doesn't point to a file containing a valid problem.
+        """
+        if not (path / "__init__.py").is_file():
+            raise ValueError
+
+        try:
+            spec = importlib.util.spec_from_file_location("problem", path / "__init__.py")
+            assert spec is not None
+            assert spec.loader is not None
+            Problem = importlib.util.module_from_spec(spec)
+            sys.modules[spec.name] = Problem
+            spec.loader.exec_module(Problem)
+            return Problem.problem
+        except ImportError as e:
+            logger.critical(f"Importing the given problem failed with the following exception: {e}")
+            raise ValueError from e
 
 
 @dataclass(kw_only=True, frozen=True)

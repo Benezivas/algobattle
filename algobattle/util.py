@@ -3,49 +3,12 @@ from __future__ import annotations
 from abc import ABC
 from dataclasses import KW_ONLY, dataclass, fields
 import logging
-import importlib.util
-import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any, Callable, Generic, Literal, TypeVar, cast, get_type_hints
 
-from algobattle.problem import Problem
 
 logger = logging.getLogger("algobattle.util")
-
-
-def import_problem_from_path(problem_path: Path) -> Problem:
-    """Try to import and initialize a Problem object from a given path.
-
-    Parameters
-    ----------
-    problem_path : Path
-        Path in the file system to a problem folder.
-
-    Returns
-    -------
-    Problem
-        Returns an object of the problem.
-
-    Raises
-    ------
-    ValueError
-        If the path doesn't point to a file containing a valid problem.
-    """
-    if not (problem_path / "__init__.py").is_file():
-        raise ValueError
-
-    try:
-        spec = importlib.util.spec_from_file_location("problem", problem_path / "__init__.py")
-        assert spec is not None
-        assert spec.loader is not None
-        Problem = importlib.util.module_from_spec(spec)
-        sys.modules[spec.name] = Problem
-        spec.loader.exec_module(Problem)
-        return Problem.Problem()
-    except ImportError as e:
-        logger.critical(f"Importing the given problem failed with the following exception: {e}")
-        raise ValueError from e
 
 
 T = TypeVar("T")

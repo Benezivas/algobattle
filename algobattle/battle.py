@@ -17,9 +17,10 @@ from algobattle.battle_wrappers.iterated import Iterated    # type: ignore # noq
 from algobattle.battle_wrappers.averaged import Averaged    # type: ignore # noqa: F401
 
 from algobattle.match import MatchConfig, run_match
+from algobattle.problem import Problem
 from algobattle.team import TeamHandler, TeamInfo
 from algobattle.ui import Ui
-from algobattle.util import check_path, getattr_set, import_problem_from_path
+from algobattle.util import check_path, getattr_set
 
 
 def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
@@ -165,7 +166,7 @@ def main():
         raise SystemExit("Received keyboard interrupt, terminating execution.")
 
     try:
-        problem = import_problem_from_path(program_config.problem)
+        problem = Problem.import_from_path(program_config.problem)
         with TeamHandler.build(program_config.teams) as teams, ExitStack() as stack:
             if program_config.display == "ui":
                 ui = Ui()
