@@ -5,7 +5,7 @@ import logging
 from typing import Any, Generic, TypeGuard, TypeVar
 
 from algobattle.docker_util import DockerError, ExecutionError
-from algobattle.team import Matchup, Team
+from algobattle.team import Matchup
 from algobattle.problem import Instance, Problem, ProblemData, Solution
 from algobattle.util import TempDir
 
