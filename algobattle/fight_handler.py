@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 import logging
 from typing import Any, Generic, TypeGuard, TypeVar
 
-from algobattle.docker_util import DockerError
+from algobattle.docker_util import DockerError, ExecutionError
 from algobattle.team import Matchup, Team
 from algobattle.problem import Instance, Problem, ProblemData, Solution
 from algobattle.util import TempDir
@@ -25,6 +25,10 @@ class Result(Generic[_T]):
 
 class FightError(Exception):
     """Raised when a team's program doesn't generate valid output."""
+
+    def __init__(self, runtime: float | None = None, *args: object) -> None:
+        self.runtime = runtime
+        super().__init__(*args)
 
 
 class InvalidOutput(FightError):
@@ -114,42 +118,23 @@ class FightHandler(Generic[_Instance, _Solution]):
                 runtime = self.matchup.generator.generator.run(input, output, timeout=timeout, memory=space, cpus=cpus)
             except ExecutionError as e:
                 logger.warning(f"Generator of team '{self.matchup.generator}' crashed!")
-                return Failure("execution", time=e.time)
-            except DockerError:
+                raise FightError(e.time) from e
+            except DockerError as e:
                 logger.warning(f"Generator of team '{self.matchup.generator}' couldn't be executed successfully!")
-                return Failure("execution", time=-1)
+                raise FightError from e
 
-            
+            try:
+                instance = self.problem.instance_type.decode(output, size)
+            except Exception as e:
+                logger.warning(f"Generator of team '{self.matchup.generator}' output a syntactically incorrect instance!")
+                raise FightError(runtime) from e
+        
+        if not instance.check_semantics(size):
+            logger.warning(f"Generator of team '{self.matchup.generator}' output a semantically incorrect instance!")
+            raise InvalidOutput(runtime)
 
-        if not encoded_output:
-            logger.warning(f"No output was generated when running the generator group {team}!")
-            raise RuntimeError
-
-        raw_instance_with_solution = self.problem.parser.decode(encoded_output)
-
-        logger.debug("Checking generated instance and certificate...")
-
-        raw_instance, raw_solution = self.problem.parser.split_into_instance_and_solution(raw_instance_with_solution)
-        instance = self.problem.parser.parse_instance(raw_instance, instance_size)
-        generator_solution = self.problem.parser.parse_solution(raw_solution, instance_size)
-
-        if not self.problem.verifier.verify_semantics_of_instance(instance, instance_size):
-            logger.warning("Generator {} created a malformed instance!".format(team))
-            raise RuntimeError
-
-        if not self.problem.verifier.verify_semantics_of_solution(generator_solution, instance_size, True):
-            logger.warning("Generator {team} created a malformed solution at instance size!")
-            raise RuntimeError
-
-        if not self.problem.verifier.verify_solution_against_instance(instance, generator_solution, instance_size, True):
-            logger.warning(f"Generator {team} failed due to a wrong certificate for its generated instance!")
-            raise RuntimeError
-
-        self.problem.parser.postprocess_instance(instance, instance_size)
-
-        logger.info(f"Generated instance and certificate by group {team} are valid!\n")
-
-        return instance, generator_solution
+        logger.info(f"Generator of team '{self.matchup.generator}' output a valid instance.")
+        return Result(instance, runtime)
 
     def solve(self, size: int, timeout: float | None = ..., space: int | None = ..., cpus: int = ...) -> Result[_Solution]:
         """Execute the solver of `team` and check the validity of the generated output.
