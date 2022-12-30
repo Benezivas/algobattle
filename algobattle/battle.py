@@ -110,7 +110,7 @@ def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, MatchConfig, BattleW
     parsed = parser.parse_args(args)
 
     if parsed.battle_type is not None:
-        parsed.battle_type = BattleWrapper.get_wrapper(parsed.battle_type)
+        parsed.battle_type = BattleWrapper.all()[parsed.battle_type]
     cfg_path = parsed.config if parsed.config is not None else parsed.problem / "config.toml"
     if cfg_path.is_file():
         with open(cfg_path, "rb") as file:
