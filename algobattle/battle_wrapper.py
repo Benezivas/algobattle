@@ -20,16 +20,45 @@ from algobattle.util import CLIParsable
 logger = logging.getLogger('algobattle.battle_wrapper')
 
 
+@dataclass
+class _RunData:
+    time: float
+    status: Literal["success", "failure", "timeout"]
+
+
+@dataclass
+class GeneratorData(_RunData):
+    """Detailed info about the generator's execution."""
+    instance: Instance
+
+
+@dataclass
+class SolverData(_RunData):
+    """Detailed info about the solver's execution."""
+    solution: Solution[Instance]
+
+
+@dataclass
 class FightResult:
-    pass
-
-@dataclass
-class Success(FightResult):
+    """The result of a single fight."""
     score: float
+    generator: GeneratorData
+    solver: SolverData
 
-@dataclass
-class Failure(FightResult):
-    reason: Literal["gen timeout", "gen failure", "sol timeout", "sol failure"]
+
+class FightSpec:
+    """Data defining the execution of a single fight."""
+
+    def __init__(self, size: int = ..., *, gen_timeout: float | None = ..., gen_memory: int | None = ..., gen_cpus: int | None = ..., 
+        sol_timeout: float | None = ..., sol_memory: int | None = ..., sol_cpus: int | None = ...) -> None:
+        self.size = size
+        self.gen_timeout = gen_timeout
+        self.gen_memory = gen_memory
+        self.gen_cpus = gen_cpus
+        self.sol_timeout = sol_timeout
+        self.sol_memory = sol_memory
+        self.sol_cpus = sol_cpus
+        super().__init__()
 
 
 class BattleWrapper(ABC):
@@ -62,7 +91,7 @@ class BattleWrapper(ABC):
         self.config = config
 
     @abstractmethod
-    def generate_instance_sizes(self, minimum_size: int) -> Generator[int, FightResult, BattleWrapper.Result]:
+    def generate_instance_sizes(self, minimum_size: int) -> Generator[FightSpec, FightResult, BattleWrapper.Result]:
         """Calculates the next instance size that should be fought over"""
         raise NotImplementedError
 
@@ -70,16 +99,8 @@ class BattleWrapper(ABC):
         """Create additional input that will be available to the generator."""
         return
 
-    def process_generator_output(self, instance: Instance):
-        """Process the instance created by the generator"""
-        return
-
     def solver_input(self, path: Path):
         """Create additional input that will be given to the solver."""
-        return
-
-    def process_solver_output(self, solution: Solution[Instance]):
-        """Process the solution created by the solver"""
         return
 
     @classmethod
