@@ -1,6 +1,6 @@
 """Abstract base class for problem classes used in concrete problem implementations."""
 from abc import ABC, abstractmethod
-from dataclasses import InitVar, dataclass, field
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, ClassVar, Generic, Literal, Protocol, TypeVar, get_type_hints
 from pydantic import BaseModel
