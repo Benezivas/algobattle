@@ -49,14 +49,14 @@ class FightResult:
 class FightSpec:
     """Data defining the execution of a single fight."""
 
-    def __init__(self, size: int = ..., *, gen_timeout: float | None = ..., gen_memory: int | None = ..., gen_cpus: int | None = ..., 
-        sol_timeout: float | None = ..., sol_memory: int | None = ..., sol_cpus: int | None = ...) -> None:
+    def __init__(self, size: int = ..., *, gen_timeout: float | None = ..., gen_space: int | None = ..., gen_cpus: int | None = ..., 
+        sol_timeout: float | None = ..., sol_space: int | None = ..., sol_cpus: int | None = ...) -> None:
         self.size = size
         self.gen_timeout = gen_timeout
-        self.gen_memory = gen_memory
+        self.gen_space = gen_space
         self.gen_cpus = gen_cpus
         self.sol_timeout = sol_timeout
-        self.sol_memory = sol_memory
+        self.sol_space = sol_space
         self.sol_cpus = sol_cpus
         super().__init__()
 
