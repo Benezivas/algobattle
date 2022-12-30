@@ -44,13 +44,20 @@ def get_os_type() -> Literal["linux", "windows"]:
 class DockerError(Exception):
     """Error type for any issue during the execution of a docker command.
 
-    The only error raised by any function in the docker module.
+    Parent class of all exceptions raised by functions in the docker module.
     """
 
-    def __init__(self, message: str = "", level: int = logging.WARNING, *args: object) -> None:
+    def __init__(self, message: str = "", *args: object, level: int = logging.WARNING) -> None:
         logger.log(level=level, msg=message)
         super().__init__(message, *args)
 
+class ExecutionError(DockerError):
+    """Exception raised when the execution of a container fails."""
+
+    def __init__(self, message: str = "", *args: object, time: float = 0, level: int = logging.WARNING) -> None:
+        logger.log(level=level, msg=message)
+        self.time = time
+        super().__init__(message, *args)
 
 @dataclass
 class ArchivedImage:
@@ -202,6 +209,7 @@ class Image:
         output_mount = Mount(target="/output", source=str(output_dir), type="bind")
 
         container: DockerContainer | None = None
+        elapsed_time = 0
         try:
             container = cast(
                 DockerContainer,
@@ -227,9 +235,10 @@ class Image:
             elapsed_time = round(default_timer() - start_time, 2)
 
             if (exit_code := cast(dict[str, Any], container.attrs)["State"]["ExitCode"]) != 0:
-                raise DockerError(
+                raise ExecutionError(
                     f"{self.description} exited with error code {exit_code} "
-                    f"and error message '{container.logs().decode()}'"
+                    f"and error message '{container.logs().decode()}'",
+                    time=elapsed_time
                 )
 
         except ImageNotFound as e:
