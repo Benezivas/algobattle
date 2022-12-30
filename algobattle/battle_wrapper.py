@@ -10,58 +10,20 @@ from dataclasses import dataclass
 from importlib.metadata import entry_points
 import logging
 from abc import abstractmethod, ABC
-from pathlib import Path
-from typing import Generator, Literal, Type
+from typing import Any, Generic, TypeVar
+from algobattle.fight_handler import FightHandler
 
-from algobattle.problem import Instance, Solution
 from algobattle.observer import Subject
+from algobattle.problem import Instance, Problem, Solution
 from algobattle.util import CLIParsable
 
 logger = logging.getLogger('algobattle.battle_wrapper')
 
 
-@dataclass
-class _RunData:
-    time: float
-    status: Literal["success", "failure", "timeout"]
+_Instance, _Solution = TypeVar("_Instance", bound=Instance), TypeVar("_Solution", bound=Solution[Any])
 
 
-@dataclass
-class GeneratorData(_RunData):
-    """Detailed info about the generator's execution."""
-    instance: Instance
-
-
-@dataclass
-class SolverData(_RunData):
-    """Detailed info about the solver's execution."""
-    solution: Solution[Instance]
-
-
-@dataclass
-class FightResult:
-    """The result of a single fight."""
-    score: float
-    generator: GeneratorData
-    solver: SolverData
-
-
-class FightSpec:
-    """Data defining the execution of a single fight."""
-
-    def __init__(self, size: int = ..., *, gen_timeout: float | None = ..., gen_space: int | None = ..., gen_cpus: int | None = ..., 
-        sol_timeout: float | None = ..., sol_space: int | None = ..., sol_cpus: int | None = ...) -> None:
-        self.size = size
-        self.gen_timeout = gen_timeout
-        self.gen_space = gen_space
-        self.gen_cpus = gen_cpus
-        self.sol_timeout = sol_timeout
-        self.sol_space = sol_space
-        self.sol_cpus = sol_cpus
-        super().__init__()
-
-
-class BattleWrapper(ABC):
+class BattleWrapper(Generic[_Instance, _Solution], ABC):
     """Abstract Base class for wrappers that execute a specific kind of battle."""
 
     @dataclass
@@ -70,14 +32,14 @@ class BattleWrapper(ABC):
 
         pass
 
-    _wrappers: dict[str, Type[BattleWrapper]] = {}
+    _wrappers: dict[str, type[BattleWrapper[Any, Any]]] = {}
 
     @staticmethod
-    def all() -> dict[str, Type[BattleWrapper]]:
+    def all() -> dict[str, type[BattleWrapper[Any, Any]]]:
         """Returns a list of all registered wrappers."""
         for entrypoint in entry_points(group="algobattle.wrappers"):
             if entrypoint.name not in BattleWrapper._wrappers:
-                wrapper: Type[BattleWrapper] = entrypoint.load()
+                wrapper: type[BattleWrapper[Any, Any]] = entrypoint.load()
                 BattleWrapper._wrappers[wrapper.name()] = wrapper
         return BattleWrapper._wrappers
 
@@ -86,22 +48,15 @@ class BattleWrapper(ABC):
             BattleWrapper._wrappers[cls.name()] = cls
         return super().__init_subclass__()
 
-    def __init__(self, config: BattleWrapper.Config) -> None:
+    def __init__(self, config: BattleWrapper.Config, problem: Problem[_Instance, _Solution]) -> None:
         super().__init__()
         self.config = config
+        self.problem = problem
 
     @abstractmethod
-    def generate_instance_sizes(self, minimum_size: int) -> Generator[FightSpec, FightResult, BattleWrapper.Result]:
+    def run_battle(self, fight_handler: FightHandler[_Instance, _Solution]) -> BattleWrapper.Result:
         """Calculates the next instance size that should be fought over"""
         raise NotImplementedError
-
-    def generator_input(self, path: Path):
-        """Create additional input that will be available to the generator."""
-        return
-
-    def solver_input(self, path: Path):
-        """Create additional input that will be given to the solver."""
-        return
 
     @classmethod
     def name(cls) -> str:
