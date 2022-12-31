@@ -131,7 +131,7 @@ class Match(Subject):
 
         return points
 
-    def __str__(self) -> str:
+    def display(self) -> str:
         table = PrettyTable(field_names=["GEN", "SOL", *range(1, self.config.rounds + 1), "AVG"], min_width=5)
         table.set_style(DOUBLE_BORDER)
         table.align["AVG"] = "r"
