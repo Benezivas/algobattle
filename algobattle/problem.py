@@ -60,7 +60,7 @@ class Problem(Encodable, ABC):
             """Encodes the solution into files that can be passed to docker containers."""
             raise NotImplementedError
 
-        def check_semantics(self, instance: "Problem", size: int) -> bool:
+        def check_semantics(self, size: int, instance: "Problem") -> bool:
             """Validates that the parsed solution is semantically correct."""
             return True
 
