@@ -1,11 +1,11 @@
 """Collection of utility functions."""
-from __future__ import annotations
-from abc import ABC
+from abc import ABC, abstractmethod
 from dataclasses import KW_ONLY, dataclass, fields
 import logging
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Callable, Generic, Literal, TypeVar, cast, get_type_hints
+from typing import Any, Callable, ClassVar, Generic, Literal, Protocol, TypeVar, cast, get_type_hints, Self
+from pydantic import BaseModel
 
 
 logger = logging.getLogger("algobattle.util")
@@ -117,3 +117,51 @@ class TempDir(TemporaryDirectory[Any]):
     def __enter__(self):
         super().__enter__()
         return Path(self.name)
+
+
+class Encodable(Protocol):
+    """Represents problem data that docker containers can interact with."""
+
+    @abstractmethod
+    @classmethod
+    def decode(cls: type[Self], source_dir: Path, size: int) -> Self:
+        """Parses the container output into problem data."""
+        ...
+
+    @abstractmethod
+    def encode(self, target_dir: Path, size: int, team: Literal["generator", "solver"]) -> None:
+        """Encodes the data into files that can be passed to docker containers."""
+        ...
+
+
+@dataclass(kw_only=True)
+class Hidden:
+    """Marker class indicating that a field will not be parsed into the solver input."""
+    generator: bool = True
+    solver: bool = True
+
+
+class BaseModel(BaseModel, ABC):
+    """Problem data that can easily be encoded into and decoded from json files."""
+
+    filename: ClassVar[str]
+
+    @inherit_docs
+    @classmethod
+    def decode(cls: type[Self], source_dir: Path, size: int) -> Self:
+        return cls.parse_file(source_dir / cls.filename)
+
+    @inherit_docs
+    def encode(self, target_dir: Path, size: int, team: Literal["generator", "solver"]) -> None:
+        with open(target_dir / self.filename, "w") as f:
+            f.write(self.json(exclude=self._excludes(team)))
+
+    @classmethod
+    def _excludes(cls, team: Literal["generator", "solver"]) -> dict[str | int, Any]:
+        excludes = {}
+        for name, annotation in get_type_hints(cls, include_extras=True).items():
+            if hasattr(annotation, "__metadata__"):
+                excludes[name] = any(isinstance(o, Hidden) and getattr(o, team) for o in annotation.__metadata__)
+            elif issubclass(annotation, BaseModel):
+                excludes[name] = annotation._excludes(team)
+        return excludes
