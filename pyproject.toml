@@ -2,9 +2,9 @@
 name = "algobattle"
 version = "4.0.0"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = {text = "MIT"}
-authors = [{name = "Jan Dreier"}, {name = "Henri Lotze"}]
+authors = [{name = "Imogen Hergeth"}, {name = "Jan Dreier"}, {name = "Henri Lotze"}]
 urls = {github = "https://github.com/Benezivas/algobattle"}
 classifiers = [
     "Development Status :: 5 - Production/Stable",
