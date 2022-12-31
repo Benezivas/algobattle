@@ -14,16 +14,13 @@ from typing import Any, Generic, TypeVar
 from algobattle.fight_handler import FightHandler
 
 from algobattle.observer import Subject
-from algobattle.problem import Instance, Problem, Solution
+from algobattle.problem import Problem
 from algobattle.util import CLIParsable
 
 logger = logging.getLogger('algobattle.battle_wrapper')
 
 
-_Instance, _Solution = TypeVar("_Instance", bound=Instance), TypeVar("_Solution", bound=Solution[Any])
-
-
-class BattleWrapper(Generic[_Instance, _Solution], ABC):
+class BattleWrapper(ABC):
     """Abstract Base class for wrappers that execute a specific kind of battle."""
 
     @dataclass
@@ -32,14 +29,14 @@ class BattleWrapper(Generic[_Instance, _Solution], ABC):
 
         pass
 
-    _wrappers: dict[str, type[BattleWrapper[Any, Any]]] = {}
+    _wrappers: dict[str, type[BattleWrapper]] = {}
 
     @staticmethod
-    def all() -> dict[str, type[BattleWrapper[Any, Any]]]:
+    def all() -> dict[str, type[BattleWrapper]]:
         """Returns a list of all registered wrappers."""
         for entrypoint in entry_points(group="algobattle.wrappers"):
             if entrypoint.name not in BattleWrapper._wrappers:
-                wrapper: type[BattleWrapper[Any, Any]] = entrypoint.load()
+                wrapper: type[BattleWrapper] = entrypoint.load()
                 BattleWrapper._wrappers[wrapper.name()] = wrapper
         return BattleWrapper._wrappers
 
@@ -48,13 +45,13 @@ class BattleWrapper(Generic[_Instance, _Solution], ABC):
             BattleWrapper._wrappers[cls.name()] = cls
         return super().__init_subclass__()
 
-    def __init__(self, config: BattleWrapper.Config, problem: Problem[_Instance, _Solution]) -> None:
+    def __init__(self, config: BattleWrapper.Config, problem: type[Problem]) -> None:
         super().__init__()
         self.config = config
         self.problem = problem
 
     @abstractmethod
-    def run_battle(self, fight_handler: FightHandler[_Instance, _Solution]) -> BattleWrapper.Result:
+    def run_battle(self, fight_handler: FightHandler) -> BattleWrapper.Result:
         """Calculates the next instance size that should be fought over"""
         raise NotImplementedError
 
