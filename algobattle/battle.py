@@ -16,7 +16,7 @@ from algobattle.battle_wrapper import BattleWrapper
 from algobattle.battle_wrappers.iterated import Iterated    # type: ignore # noqa: F401
 from algobattle.battle_wrappers.averaged import Averaged    # type: ignore # noqa: F401
 
-from algobattle.match import MatchConfig, run_match
+from algobattle.match import MatchConfig, Match
 from algobattle.problem import Problem
 from algobattle.team import TeamHandler, TeamInfo
 from algobattle.ui import Ui
@@ -174,7 +174,7 @@ def main():
             else:
                 ui = None
 
-            result = run_match(match_config, wrapper_config, problem, teams, ui)
+            result = Match.run(match_config, wrapper_config, problem, teams, ui)
 
             logger.info('#' * 78)
             logger.info(str(result))

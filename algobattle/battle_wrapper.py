@@ -5,23 +5,25 @@ responsible for executing specific types of battle. They share the
 characteristic that they are responsible for updating some match data during
 their run, such that it contains the current state of the match.
 """
-from __future__ import annotations
 from dataclasses import dataclass
 from importlib.metadata import entry_points
 import logging
 from abc import abstractmethod, ABC
-from typing import Any, Generic, TypeVar
+from typing import ClassVar, Literal
 from algobattle.fight_handler import FightHandler
 
 from algobattle.observer import Subject
-from algobattle.problem import Problem
 from algobattle.util import CLIParsable
 
 logger = logging.getLogger('algobattle.battle_wrapper')
 
 
-class BattleWrapper(ABC):
+class BattleWrapper(Subject, ABC):
     """Abstract Base class for wrappers that execute a specific kind of battle."""
+
+    _wrappers: ClassVar[dict[str, type["BattleWrapper"]]] = {}
+
+    scoring_team: ClassVar[Literal["generator", "solver"]] = "solver"
 
     @dataclass
     class Config(CLIParsable):
@@ -29,10 +31,8 @@ class BattleWrapper(ABC):
 
         pass
 
-    _wrappers: dict[str, type[BattleWrapper]] = {}
-
     @staticmethod
-    def all() -> dict[str, type[BattleWrapper]]:
+    def all() -> dict[str, type["BattleWrapper"]]:
         """Returns a list of all registered wrappers."""
         for entrypoint in entry_points(group="algobattle.wrappers"):
             if entrypoint.name not in BattleWrapper._wrappers:
@@ -45,14 +45,19 @@ class BattleWrapper(ABC):
             BattleWrapper._wrappers[cls.name()] = cls
         return super().__init_subclass__()
 
-    def __init__(self, config: BattleWrapper.Config, problem: type[Problem]) -> None:
-        super().__init__()
-        self.config = config
-        self.problem = problem
+    @abstractmethod
+    def score(self) -> float:
+        """The score achieved by the solver of this battle."""
+        raise NotImplementedError
+
+    @staticmethod
+    def format_score(score: float) -> str:
+        """Formats a score nicely."""
+        return f"{score:.2f}"
 
     @abstractmethod
-    def run_battle(self, fight_handler: FightHandler) -> BattleWrapper.Result:
-        """Calculates the next instance size that should be fought over"""
+    def display(self) -> str:
+        """Nicely formats the object."""
         raise NotImplementedError
 
     @classmethod
@@ -60,25 +65,7 @@ class BattleWrapper(ABC):
         """Name of the type of this battle wrapper."""
         return cls.__name__
 
-    class Result(Subject):
-        """Result of a single battle."""
-
-        @property
-        @abstractmethod
-        def score(self) -> float:
-            """The score achieved by the solver of this battle."""
-            raise NotImplementedError
-
-        @staticmethod
-        @abstractmethod
-        def format_score(score: float) -> str:
-            """Formats a score nicely."""
-            raise NotImplementedError
-
-        def __str__(self) -> str:
-            return self.format_score(self.score)
-
-        @abstractmethod
-        def display(self) -> str:
-            """Nicely formats the object."""
-            raise NotImplementedError
+    @abstractmethod
+    def run_battle(self, config: Config, fight_handler: FightHandler, min_size: int) -> None:
+        """Calculates the next instance size that should be fought over"""
+        raise NotImplementedError
