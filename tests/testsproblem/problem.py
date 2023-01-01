@@ -1,6 +1,6 @@
 """Problem class built for tests."""
 import logging
-from typing import Annotated, SupportsFloat
+from typing import Annotated, ClassVar, SupportsFloat
 
 from algobattle.problem import ProblemModel, SolutionModel
 from algobattle.util import Hidden
@@ -19,8 +19,8 @@ class Solution(SolutionModel):
 class Tests(ProblemModel):
     """Artificial problem used for tests."""
 
-    name = "Tests"
-    min_size = 0
+    name: ClassVar[str] = "Tests"
+    min_size: ClassVar[int] = 5
     Solution = Solution
 
     val: int
