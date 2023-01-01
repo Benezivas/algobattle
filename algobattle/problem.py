@@ -104,8 +104,21 @@ class ProblemModel(BaseModel, Problem, ABC):
 
     filename = "instance.json"
 
+    class Config:
+        fields = {
+            "filename": {"exclude": True},
+            "name": {"exclude": True},
+            "min_size": {"exclude": True},
+            "Solution": {"exclude": True},
+        }
+
 
 class SolutionModel(BaseModel, Problem.Solution, ABC):
     """A solution that can easily be parsed to/from a json file."""
 
     filename = "solution.json"
+
+    class Config:
+        fields = {
+            "filename": {"exclude": True},
+        }
