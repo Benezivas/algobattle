@@ -1,17 +1,16 @@
 """Wrapper that repeats a battle on an instance size a number of times and averages the competitive ratio over all runs."""
 from __future__ import annotations
-from dataclasses import InitVar, dataclass
+from dataclasses import dataclass
 import logging
 
 from algobattle.battle_wrapper import BattleWrapper
-from algobattle.observer import Observer
-from algobattle.team import Matchup
+from algobattle.fight_handler import FightHandler
 from algobattle.util import ArgSpec, inherit_docs
 
 logger = logging.getLogger("algobattle.battle_wrappers.iterated")
 
 
-class Iterated(BattleWrapper):
+class Iterated(BattleWrapper, notify_var_changes=True):
     """Class of an iterated battle Wrapper."""
 
     @inherit_docs
@@ -21,9 +20,7 @@ class Iterated(BattleWrapper):
         exponent: int = ArgSpec(2, help="Determines how quickly the instance size grows.")
         approximation_ratio: float = ArgSpec(1, help="Approximation ratio that a solver needs to achieve to pass.")
 
-    config: Config
-
-    def run_round(self, matchup: Matchup, observer: Observer | None = None) -> Iterated.Result:
+    def run_battle(self, config: Config, fight_handler: FightHandler, min_size: int) -> None:
         """Execute one iterative battle between a generating and a solving team.
 
         Incrementally try to search for the highest n for which the solver is
@@ -43,63 +40,51 @@ class Iterated(BattleWrapper):
         which automatically notifies all observers subscribed to this object.s
         """
         base_increment = 0
-        exponent = self.config.exponent
-        result = self.Result(0, self.config.iteration_cap, self.fight_handler.problem.n_start, observer)
-        result.notify()
         alive = True
+        self.reached = 0
+        self.cap = config.iteration_cap
+        self.current = min_size
 
-        logger.info(f"==================== Iterative Battle, Instanze Size Cap: {result.n_cap} ====================")
         while alive:
-            logger.info(f"=============== Instance Size: {result.current}/{result.n_cap} ===============")
-
-            approx_ratio = self.fight_handler.fight(matchup, result.current)
-            if approx_ratio == 0.0 or approx_ratio > self.config.approximation_ratio:
-                logger.info(f"Solver {matchup.solver} does not meet the required solution quality at instance size "
-                            f"{result.current}. ({approx_ratio}/{self.config.approximation_ratio})")
+            result = fight_handler.fight(self.current)
+            score = result.score
+            if score < config.approximation_ratio:
+                logger.info(f"Solver does not meet the required solution quality at instance size "
+                            f"{self.current}. ({score}/{config.approximation_ratio})")
                 alive = False
 
             if not alive and base_increment > 1:
                 # The step size increase was too aggressive, take it back and reset the base_increment
-                logger.info(f"Setting the solution cap to {result.current}...")
-                result.n_cap = result.current
-                result.current -= base_increment**exponent
+                logger.info(f"Setting the solution cap to {self.current}...")
+                self.cap = self.current
+                self.current -= base_increment ** config.exponent
                 base_increment = 0
                 alive = True
-            elif result.current > result.reached and alive:
+            elif self.current > self.reached and alive:
                 # We solved an instance of bigger size than before
-                result.reached = result.current
+                self.reached = self.current
 
-            if result.current + 1 > result.n_cap:
+            if self.current + 1 > self.cap:
                 alive = False
             else:
                 base_increment += 1
-                result.current += base_increment**exponent
+                self.current += base_increment ** config.exponent
 
-                if result.current >= result.n_cap:
+                if self.current >= self.cap:
                     # We have failed at this value of n already, reset the step size!
-                    result.current -= base_increment**exponent - 1
+                    self.current -= base_increment ** config.exponent - 1
                     base_increment = 1
 
-        return result
 
     @inherit_docs
-    @dataclass
-    class Result(BattleWrapper.Result):
-        reached: int
-        n_cap: int
-        current: int
-        observer: InitVar[Observer | None] = None
+    def score(self) -> float:
+        return self.reached
 
-        @inherit_docs
-        @property
-        def score(self) -> float:
-            return self.reached
+    @inherit_docs
+    @staticmethod
+    def format_score(score: float) -> str:
+        return str(int(score))
 
-        @inherit_docs
-        @staticmethod
-        def format_score(score: float) -> str:
-            return str(int(score))
-
-        @inherit_docs
-        def display(self) -> str:
-            return f"current cap: {self.n_cap}\nsolved: {self.reached}\nattempting: {self.current}"
+    @inherit_docs
+    def display(self) -> str:
+        return f"current cap: {self.cap}\nsolved: {self.reached}\nattempting: {self.current}"

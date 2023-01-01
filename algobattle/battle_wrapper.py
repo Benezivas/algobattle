@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from importlib.metadata import entry_points
 import logging
 from abc import abstractmethod, ABC
-from typing import ClassVar, Literal
+from typing import Any, ClassVar, Literal
 from algobattle.fight_handler import FightHandler
 
 from algobattle.observer import Subject
@@ -40,10 +40,10 @@ class BattleWrapper(Subject, ABC):
                 BattleWrapper._wrappers[wrapper.name()] = wrapper
         return BattleWrapper._wrappers
 
-    def __init_subclass__(cls) -> None:
+    def __init_subclass__(cls, notify_var_changes: bool = False) -> None:
         if cls.name() not in BattleWrapper._wrappers:
             BattleWrapper._wrappers[cls.name()] = cls
-        return super().__init_subclass__()
+        return super().__init_subclass__(notify_var_changes)
 
     @abstractmethod
     def score(self) -> float:
@@ -66,6 +66,6 @@ class BattleWrapper(Subject, ABC):
         return cls.__name__
 
     @abstractmethod
-    def run_battle(self, config: Config, fight_handler: FightHandler, min_size: int) -> None:
+    def run_battle(self, config: Any, fight_handler: FightHandler, min_size: int) -> None:
         """Calculates the next instance size that should be fought over"""
         raise NotImplementedError
