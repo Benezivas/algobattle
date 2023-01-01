@@ -21,7 +21,6 @@ class FightHandlertests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         """Set up a generator and a solver that always run successfully and fight handlers with two different configs."""
-        problem = testsproblem.Problem()
         cls.problem_path = Path(testsproblem.__file__).parent
         if get_os_type() == "windows":
             cls.dockerfile = "Dockerfile_windows"
@@ -30,87 +29,70 @@ class FightHandlertests(unittest.TestCase):
         cls.gen_succ = Image.build(cls.problem_path / "generator", "gen_succ", dockerfile=cls.dockerfile)
         cls.sol_succ = Image.build(cls.problem_path / "solver", "sol_succ", dockerfile=cls.dockerfile)
 
-        config = MatchConfig()
-        cls.fight_handler = FightHandler(problem, **config.docker_params)
-
-        config_short = MatchConfig(timeout_generator=2, timeout_solver=2)
-        cls.fight_handler_short_to = FightHandler(problem, **config_short.docker_params)
+        cls.config_short = MatchConfig(timeout_generator=2, timeout_solver=2)
 
     @classmethod
     def tearDownClass(cls) -> None:
         cls.gen_succ.remove()
         cls.sol_succ.remove()
 
-    def _build_and_run(
-        self, handler: FightHandler | None = None, generator: str | Image | None = None, solver: str | Image | None = None
-    ) -> float:
-
-        if isinstance(generator, str):
-            generator = Image.build(self.problem_path / generator, f"test_{generator}", dockerfile=self.dockerfile)
-        elif generator is None:
-            generator = self.gen_succ
-
-        if isinstance(solver, str):
-            solver = Image.build(self.problem_path / solver, f"test_{solver}", dockerfile=self.dockerfile)
-        elif solver is None:
-            solver = self.sol_succ
-
-        if handler is None:
-            handler = self.fight_handler
-
+    def _build_and_run(self, config: MatchConfig = MatchConfig(), gen_name: str = "gen_succ", sol_name: str = "sol_succ") -> float:
+        generator = Image.build(self.problem_path / gen_name, f"test_{gen_name}", dockerfile=self.dockerfile)
+        solver = Image.build(self.problem_path / sol_name, f"test_{sol_name}", dockerfile=self.dockerfile)
         team = Team(uuid4().hex[:8], generator, solver)
         matchup = Matchup(team, team)
-        result = handler.fight(matchup, 1)
+        handler = FightHandler(problem=testsproblem.Problem, matchup=matchup, **config.docker_params)
+        result = handler.fight(5)
         team.cleanup()
         if generator != self.gen_succ:
             generator.remove()
         if solver != self.sol_succ:
             solver.remove()
-        return result
+        return result.score
 
     def test_one_fight_gen_timeout(self):
         """An approximation of 1.0 is returned if the generator times out."""
-        result = self._build_and_run(handler=self.fight_handler_short_to, generator="generator_timeout")
+        result = self._build_and_run(self.config_short, gen_name="generator_timeout")
         self.assertEqual(result, 1.0)
 
     def test_one_fight_gen_exec_error(self):
         """An approximation of 1.0 is returned if the generator fails on execution."""
-        result = self._build_and_run(generator="generator_execution_error")
+        result = self._build_and_run(gen_name="generator_execution_error")
         self.assertEqual(result, 1.0)
 
     def test_one_fight_gen_wrong_instance(self):
         """An approximation of 1.0 is returned if the generator returns a bad instance."""
-        result = self._build_and_run(generator="generator_wrong_instance")
+        result = self._build_and_run(gen_name="generator_wrong_instance")
         self.assertEqual(result, 1.0)
 
     def test_one_fight_gen_malformed_sol(self):
         """An approximation of 1.0 is returned if the generator returns a malformed certificate."""
-        result = self._build_and_run(generator="generator_malformed_solution")
+        result = self._build_and_run(gen_name="generator_malformed_solution")
         self.assertEqual(result, 1.0)
 
     def test_one_fight_gen_wrong_cert(self):
         """An approximation of 1.0 is returned if the generator returns a bad certificate."""
-        result = self._build_and_run(generator="generator_wrong_certificate")
+        result = self._build_and_run(gen_name="generator_wrong_certificate")
         self.assertEqual(result, 1.0)
 
     def test_one_fight_sol_timeout(self):
         """An approximation ratio of 0.0 is returned if the solver times out."""
-        result = self._build_and_run(handler=self.fight_handler_short_to, solver="solver_timeout")
+        result = self._build_and_run(self.config_short, sol_name="solver_timeout")
         self.assertEqual(result, 0.0)
 
     def test_one_fight_sol_exec_error(self):
         """An approximation ratio of 0.0 is returned if the solver fails on execution."""
-        result = self._build_and_run(solver="solver_execution_error")
+        result = self._build_and_run(sol_name="solver_execution_error")
         self.assertEqual(result, 0.0)
 
     def test_one_fight_sol_malformed(self):
         """An approximation ratio of 0.0 is returned if the solver returns a malformed certificate."""
-        result = self._build_and_run(solver="solver_malformed_solution")
+        result = self._build_and_run(sol_name="solver_malformed_solution")
         self.assertEqual(result, 0.0)
 
     def test_one_fight_sol_wrong_cert(self):
         """An approximation ratio of 0.0 is returned if the solver returns a bad certificate."""
-        result = self._build_and_run(solver="solver_wrong_certificate")
+        result = self._build_and_run(sol_name="solver_wrong_certificate")
         self.assertEqual(result, 0.0)
 
     def test_one_fight_successful(self):
