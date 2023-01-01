@@ -1,5 +1,6 @@
 """Class managing the execution of generators and solvers."""
 from dataclasses import dataclass
+import json
 import logging
 from typing import Generic, Mapping, TypeVar
 
@@ -74,23 +75,23 @@ class FightHandler(Subject):
         timeout_solver: float | None = ...,
         space_solver: int | None = ...,
         cpus: int = ...,
-        generator_battle_data: Mapping[str, Encodable] = {},
-        solver_battle_data: Mapping[str, Encodable] = {},
-        generator_battle_spec: Mapping[str, type[Encodable]] | None = None,
-        solver_battle_spec: Mapping[str, type[Encodable]] | None = None,
+        generator_battle_input: Mapping[str, Encodable] = {},
+        solver_battle_input: Mapping[str, Encodable] = {},
+        generator_battle_output: Mapping[str, type[Encodable]] = {},
+        solver_battle_output: Mapping[str, type[Encodable]] = {},
     ) -> FightResult:
         """Execute a single fight of a battle, running the generator and solver and handling any errors gracefully."""
         self.notify()
         try:
             gen_result = self.generate(
-                size=size, timeout=timeout_generator, space=space_genrator, cpus=cpus, battle_data=generator_battle_data, output_spec=generator_battle_spec
+                size=size, timeout=timeout_generator, space=space_genrator, cpus=cpus, battle_input=generator_battle_input, battle_output=generator_battle_output
             )
         except FightError as e:
             return FightResult(score=1, generator=e, solver=None)
 
         try:
             sol_result = self.solve(
-                gen_result.data, size=size, timeout=timeout_solver, space=space_solver, cpus=cpus, battle_data=solver_battle_data, output_spec=solver_battle_spec
+                gen_result.data, size=size, timeout=timeout_solver, space=space_solver, cpus=cpus, battle_input=solver_battle_input, battle_output=solver_battle_output
             )
         except FightError as e:
             return FightResult(score=1, generator=gen_result, solver=e)
@@ -106,8 +107,8 @@ class FightHandler(Subject):
         timeout: float | None = ...,
         space: int | None = ...,
         cpus: int = ...,
-        battle_data: Mapping[str, Encodable] | None = None,
-        output_spec: Mapping[str, type[Encodable]] | None = None,
+        battle_input: Mapping[str, Encodable] = {},
+        battle_output: Mapping[str, type[Encodable]] = {},
     ) -> Result[Problem]:
         """Execute the generator and process its output."""
         logger.debug(f"Running generator of team {self.matchup.generator}.")
@@ -121,12 +122,12 @@ class FightHandler(Subject):
         with TempDir() as input, TempDir() as output:
             with open(input / "size") as f:
                 f.write(str(size))
-            if battle_data:
+            if battle_input:
                 (input / "battle_data").mkdir()
-                encode(battle_data, input / "battle_data", size, "generator")
+                encode(battle_input, input / "battle_data", size, "generator")
             
             (output / "instance").mkdir()
-            if output_spec:
+            if battle_output:
                 (output / "battle_data").mkdir()
 
             try:
@@ -144,17 +145,17 @@ class FightHandler(Subject):
                 logger.warning(f"Generator of team '{self.matchup.generator}' output a syntactically incorrect instance!")
                 raise EncodingError(runtime) from e
 
-            if output_spec:
-                battle_output = decode(output_spec, output / "battle_data", size)
+            if battle_output:
+                decoded_output = decode(battle_output, output / "battle_data", size)
             else:
-                battle_output = {}
+                decoded_output = {}
 
         if not instance.check_semantics(size):
             logger.warning(f"Generator of team '{self.matchup.generator}' output a semantically incorrect instance!")
             raise EncodingError(runtime)
 
         logger.info(f"Generator of team '{self.matchup.generator}' output a valid instance.")
-        return Result(runtime, instance, battle_output)
+        return Result(runtime, instance, decoded_output)
 
     def solve(
         self,
@@ -163,8 +164,8 @@ class FightHandler(Subject):
         timeout: float | None = ...,
         space: int | None = ...,
         cpus: int = ...,
-        battle_data: Mapping[str, Encodable] | None = None,
-        output_spec: Mapping[str, type[Encodable]] | None = None,
+        battle_input: Mapping[str, Encodable] = {},
+        battle_output: Mapping[str, type[Encodable]] = {},
     ) -> Result[Problem.Solution]:
         """Execute the solver and process its output."""
         logger.debug(f"Running generator of team {self.matchup.generator}.")
@@ -182,12 +183,12 @@ class FightHandler(Subject):
             except Exception as e:
                 logger.warning(f"Problem instance couldn't be encoded into files!")
                 raise EncodingError from e
-            if battle_data:
+            if battle_input:
                 (input / "battle_data").mkdir()
-                encode(battle_data, input / "battle_data", size, "generator")
+                encode(battle_input, input / "battle_data", size, "generator")
             
             (output / "solution").mkdir()
-            if output_spec:
+            if battle_output:
                 (output / "battle_data").mkdir()
 
             try:
@@ -205,14 +206,14 @@ class FightHandler(Subject):
                 logger.warning(f"Solver of team '{self.matchup.generator}' output a syntactically incorrect Solution!")
                 raise EncodingError(runtime) from e
 
-            if output_spec:
-                battle_output = decode(output_spec, output / "battle_data", size)
+            if battle_output:
+                decoded_output = decode(battle_output, output / "battle_data", size)
             else:
-                battle_output = {}
+                decoded_output = {}
 
         if not solution.check_semantics(size, instance):
             logger.warning(f"Solver of team '{self.matchup.generator}' output a semantically incorrect instance!")
             raise EncodingError(runtime)
 
         logger.info(f"Solver of team '{self.matchup.generator}' output a valid solution.")
-        return Result(runtime, solution, battle_output)
+        return Result(runtime, solution, decoded_output)
