@@ -8,21 +8,26 @@ from algobattle.util import Hidden
 logger = logging.getLogger('algobattle.problems.testsproblem')
 
 
+class Solution(SolutionModel):
+    val: int
+
+    def check_semantics(self, size: int, instance: "Tests") -> bool:
+        return super().check_semantics(size, instance)
+
+
+
 class Tests(ProblemModel):
     """Artificial problem used for tests."""
 
-    class Solution(SolutionModel):
-        difference: int
-
     name = "Tests"
     min_size = 0
+    Solution = Solution
 
-    first_val: int
-    second_val: int
+    val: int
     solution: Annotated[Solution, Hidden()]
 
     def check_semantics(self, size: int) -> bool:
-        return self.first_val + self.second_val <= size and self.solution.check_semantics(size, self)
+        return self.val <= size and self.solution.val <= self.val
 
     def calculate_score(self, solution: Solution, size: int) -> SupportsFloat:
-        return self.first_val - self.second_val == solution.difference
+        return solution.val / self.val
