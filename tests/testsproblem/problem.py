@@ -22,7 +22,7 @@ class Tests(ProblemModel):
     solution: Annotated[Solution, Hidden()]
 
     def check_semantics(self, size: int) -> bool:
-        return self.first_val + self.second_val <= size
+        return self.first_val + self.second_val <= size and self.solution.check_semantics(size, self)
 
     def calculate_score(self, solution: Solution, size: int) -> SupportsFloat:
         return self.first_val - self.second_val == solution.difference
