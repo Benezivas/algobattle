@@ -8,7 +8,7 @@ from algobattle.util import CLIParsable, inherit_docs, argspec
 logger = logging.getLogger("algobattle.battle_wrappers.averaged")
 
 
-class Averaged(BattleWrapper, notify_var_changes=True):
+class Averaged(BattleWrapper):
     """Class of an adveraged battle Wrapper."""
 
     @inherit_docs

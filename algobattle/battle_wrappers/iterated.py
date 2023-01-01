@@ -9,7 +9,7 @@ from algobattle.util import CLIParsable, inherit_docs, argspec
 logger = logging.getLogger("algobattle.battle_wrappers.iterated")
 
 
-class Iterated(BattleWrapper, notify_var_changes=True):
+class Iterated(BattleWrapper):
     """Class of an iterated battle Wrapper."""
 
     @inherit_docs

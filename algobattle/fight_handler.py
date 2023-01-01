@@ -1,9 +1,10 @@
 """Class managing the execution of generators and solvers."""
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import logging
-from typing import Generic, TypeGuard, TypeVar
+from typing import Generic, TypeVar
 
 from algobattle.docker_util import DockerError, ExecutionError
+from algobattle.observer import Observer, Subject
 from algobattle.team import Matchup
 from algobattle.problem import Problem
 from algobattle.util import TempDir
@@ -52,11 +53,12 @@ class FightResult:
 
 
 @dataclass(kw_only=True)
-class FightHandler:
+class FightHandler(Subject):
     """Class managing the execution of generators and solvers."""
 
     problem: type[Problem]
     matchup: Matchup
+    observer: Observer | None = None
     timeout_generator: float | None = None
     timeout_solver: float | None = None
     space_generator: int | None = None
@@ -73,6 +75,7 @@ class FightHandler:
         cpus: int = ...,
     ) -> FightResult:
         """Execute a single fight of a battle, running the generator and solver and handling any errors gracefully."""
+        self.notify()
         try:
             gen_result = self.generate(size=size, timeout=timeout_generator, space=space_genrator, cpus=cpus)
         except FightError as e:

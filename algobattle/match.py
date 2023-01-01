@@ -86,7 +86,7 @@ class Match(Subject):
         result = cls(config, wrapper_config, problem, teams, observer)
         for matchup in teams.matchups:
             result.results[matchup] = []
-            fight_handler = FightHandler(problem=problem, matchup=matchup, **config.docker_params)
+            fight_handler = FightHandler(problem=problem, matchup=matchup, observer=observer, **config.docker_params)
             for i in range(config.rounds):
                 logger.info("#" * 20 + f"  Running Round {i+1}/{config.rounds}  " + "#" * 20)
                 wrapper = config.battle_type(observer=observer)
