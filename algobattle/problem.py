@@ -4,7 +4,7 @@ import importlib.util
 import logging
 import sys
 from pathlib import Path
-from typing import ClassVar, Literal, SupportsFloat, Self
+from typing import Any, ClassVar, Literal, SupportsFloat, Self
 from pydantic import BaseModel
 
 from algobattle.util import CustomEncodable, BaseModel
@@ -65,7 +65,7 @@ class Problem(CustomEncodable, ABC):
             return True
 
     @abstractmethod
-    def calculate_score(self, solution: Solution, size: int) -> SupportsFloat:
+    def calculate_score(self, solution: Any, size: int) -> SupportsFloat:
         """Calculates how well a solution solves this problem instance.
         
         Return values are clamped to fall inside [0, 1].
