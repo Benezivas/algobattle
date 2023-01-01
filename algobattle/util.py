@@ -38,11 +38,10 @@ def check_path(path: str, *, type: Literal["file", "dir", "exists"] = "exists") 
         raise ValueError
 
 
-def argspec(*, default: T, help: str = "", alias: str | None = None, parser: Callable[[str], T] | None = None) -> T:
+def argspec(*, default: T, help: str = "", parser: Callable[[str], T] | None = None) -> T:
     """Structure specifying the CLI arg."""
     metadata = {
         "help": help,
-        "alias": alias,
         "parser": parser,
     }
     return field(default=default, metadata={key: val for key, val in metadata.items() if val is not None})
@@ -74,7 +73,7 @@ class CLIParsable(Protocol):
             elif get_origin(field.type) == Literal:
                 kwargs["choices"] = field.type.__args__
 
-            arguments.append(([field.metadata.get("alias", field.name)], kwargs))
+            arguments.append(([field.name], kwargs))
         return arguments
 
 
