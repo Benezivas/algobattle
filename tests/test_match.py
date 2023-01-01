@@ -7,7 +7,6 @@ from pathlib import Path
 from algobattle.battle import parse_cli_args, setup_logging
 from algobattle.battle_wrappers.iterated import Iterated
 from algobattle.battle_wrappers.averaged import Averaged
-from algobattle.fight_handler import FightHandler
 from algobattle.match import MatchConfig, Match
 from algobattle.team import Team, Matchup, TeamHandler, TeamInfo
 from algobattle.docker_util import Image, get_os_type

@@ -5,7 +5,7 @@ import json
 import logging
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Callable, ClassVar, Literal, Mapping, Protocol, TypeVar, Union, dataclass_transform, get_origin, get_type_hints, Self
+from typing import Any, Callable, ClassVar, Literal, Mapping, Protocol, TypeVar, dataclass_transform, get_origin, get_type_hints, Self
 from pydantic import BaseModel
 
 
@@ -93,8 +93,8 @@ class TempDir(TemporaryDirectory[Any]):
 class CustomEncodable(ABC):
     """Represents problem data that docker containers can interact with."""
 
-    @abstractmethod
     @classmethod
+    @abstractmethod
     def decode(cls: type[Self], source_dir: Path, size: int) -> Self:
         """Parses the container output into problem data."""
         ...

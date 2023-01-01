@@ -31,8 +31,8 @@ class Problem(CustomEncodable, ABC):
     min_size: ClassVar[int] = 0
     """Minimum size of valid instances of this problem."""
 
-    @abstractmethod
     @classmethod
+    @abstractmethod
     def decode(cls: type[Self], source_dir: Path, size: int) -> Self:
         """Parses the container output into a problem instance."""
         raise NotImplementedError
@@ -49,8 +49,8 @@ class Problem(CustomEncodable, ABC):
     class Solution(CustomEncodable, ABC):
         """A proposed solution for an instance of this problem."""
 
-        @abstractmethod
         @classmethod
+        @abstractmethod
         def decode(cls: type[Self], source_dir: Path, size: int) -> Self:
             """Parses the container output into problem data."""
             raise NotImplementedError
