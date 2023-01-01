@@ -12,7 +12,7 @@ class Solution(SolutionModel):
     val: int
 
     def check_semantics(self, size: int, instance: "Tests") -> bool:
-        return super().check_semantics(size, instance)
+        return self.val <= instance.val
 
 
 
@@ -27,7 +27,7 @@ class Tests(ProblemModel):
     solution: Annotated[Solution, Hidden()]
 
     def check_semantics(self, size: int) -> bool:
-        return self.val <= size and self.solution.val <= self.val
+        return self.val <= size and self.solution.check_semantics(size, self)
 
     def calculate_score(self, solution: Solution, size: int) -> SupportsFloat:
         return solution.val / self.val

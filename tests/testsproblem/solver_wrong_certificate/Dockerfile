@@ -1,5 +1,5 @@
 FROM alpine
 
 # outputs a static, artificially wrong solution.
-COPY output /output
+COPY output /output/solution
 ENTRYPOINT echo 1

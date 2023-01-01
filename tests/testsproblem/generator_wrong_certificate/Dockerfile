@@ -1,5 +1,5 @@
 FROM alpine
 
 # outputs a static string encoding an instance with an artificially wrong certificate.
-COPY output /output
+COPY output /output/instance
 ENTRYPOINT echo 1
