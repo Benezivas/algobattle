@@ -79,12 +79,16 @@ class FightHandler(Subject):
         """Execute a single fight of a battle, running the generator and solver and handling any errors gracefully."""
         self.notify()
         try:
-            gen_result = self.generate(size=size, timeout=timeout_generator, space=space_genrator, cpus=cpus, battle_data=generator_data)
+            gen_result = self.generate(
+                size=size, timeout=timeout_generator, space=space_genrator, cpus=cpus, battle_data=generator_data
+            )
         except FightError as e:
             return FightResult(score=1, generator=e, solver=None)
 
         try:
-            sol_result = self.solve(gen_result.data, size=size, timeout=timeout_solver, space=space_solver, cpus=cpus, battle_data=solver_data)
+            sol_result = self.solve(
+                gen_result.data, size=size, timeout=timeout_solver, space=space_solver, cpus=cpus, battle_data=solver_data
+            )
         except FightError as e:
             return FightResult(score=1, generator=gen_result, solver=e)
 
@@ -93,7 +97,14 @@ class FightHandler(Subject):
         logger.info(f"Solver of group {self.matchup.generator} yields a valid solution with an approx. ratio of {score}.")
         return FightResult(score, gen_result, sol_result)
 
-    def generate(self, size: int, timeout: float | None = ..., space: int | None = ..., cpus: int = ..., battle_data: Mapping[str, Encodable] = {}) -> Result[Problem]:
+    def generate(
+        self,
+        size: int,
+        timeout: float | None = ...,
+        space: int | None = ...,
+        cpus: int = ...,
+        battle_data: Mapping[str, Encodable] | None = None,
+    ) -> Result[Problem]:
         """Execute the generator and process its output."""
         logger.debug(f"Running generator of team {self.matchup.generator}.")
         if timeout is Ellipsis:
@@ -133,7 +144,13 @@ class FightHandler(Subject):
         return Result(instance, runtime)
 
     def solve(
-        self, instance: Problem, size: int, timeout: float | None = ..., space: int | None = ..., cpus: int = ..., battle_data: Mapping[str, Encodable] = {}
+        self,
+        instance: Problem,
+        size: int,
+        timeout: float | None = ...,
+        space: int | None = ...,
+        cpus: int = ...,
+        battle_data: Mapping[str, Encodable] | None = None,
     ) -> Result[Problem.Solution]:
         """Execute the solver and process its output."""
         logger.debug(f"Running generator of team {self.matchup.generator}.")
