@@ -5,7 +5,7 @@ import json
 import logging
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Callable, ClassVar, Literal, Mapping, Protocol, TypeVar, dataclass_transform, get_origin, get_type_hints, Self
+from typing import Any, Callable, ClassVar, Literal, Mapping, Protocol, TypeVar, Union, dataclass_transform, get_origin, get_type_hints, Self
 from pydantic import BaseModel
 
 
@@ -111,7 +111,7 @@ Encodable = CustomEncodable | str | bytes | dict[Any, Any] | None
 def encode(data: Mapping[str, Encodable], target_dir: Path, size: int, team: Literal["generator", "solver"]) -> None:
     """Encodes data into a folder.
     
-    Each element will be encoded into a file or folder named after its key. Encodables use their own method,
+    Each element will be encoded into a file or folder named after its key. :cls:`CustomEncodables` use their own method,
     strings will be encoded with utf8, bytes are written as is, and dictionaries will be encoded as json.
     """
     for name, obj in data.items():
@@ -127,6 +127,35 @@ def encode(data: Mapping[str, Encodable], target_dir: Path, size: int, team: Lit
         elif isinstance(obj, dict):
             with open(target_dir / name) as f:
                 json.dump(obj, f)
+
+
+def decode(data_spec: Mapping[str, type[Encodable]], source_dir: Path, size: int) -> dict[str, Encodable | None]:
+    """Decodes data from a folder.
+    
+    The output is a dictionary with the same keys as `data_spec` and values that are objects of the specified types.
+    :cls:`CustomEncodables` use their own method, strings will be decoded with utf8, bytes are read directly,
+    and dictionaries will be decoded from json.
+    Any :cls:`Excpeption`s are caught and the corresponding field in the dict be set to `None`.
+    """
+    out = {}
+    for name, cls in data_spec.items():
+        try:
+            if issubclass(cls, CustomEncodable):
+                (source_dir / name).mkdir()
+                out[name] = cls.decode(source_dir / name, size)
+            elif issubclass(cls, str):
+                with open(source_dir / name, "w") as f:
+                    out[name] = f.read()
+            elif issubclass(cls, bytes):
+                with open(source_dir / name, "wb") as f:
+                    out[name] = f.read()
+            elif issubclass(cls, dict):
+                with open(source_dir / name) as f:
+                    out[name] = json.load(f)
+        except Exception as e:
+            logger.critical(f"Failed to decode {cls} object from data at {source_dir / name}!\nException: {e}")
+            out[name] = None
+    return out
 
 
 @dataclass(kw_only=True)
