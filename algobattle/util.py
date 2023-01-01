@@ -1,10 +1,11 @@
 """Collection of utility functions."""
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, fields
+import json
 import logging
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Callable, ClassVar, Literal, Protocol, TypeVar, dataclass_transform, get_origin, get_type_hints, Self
+from typing import Any, Callable, ClassVar, Literal, Mapping, Protocol, TypeVar, dataclass_transform, get_origin, get_type_hints, Self
 from pydantic import BaseModel
 
 
@@ -89,7 +90,7 @@ class TempDir(TemporaryDirectory[Any]):
         return Path(self.name)
 
 
-class Encodable(Protocol):
+class CustomEncodable(ABC):
     """Represents problem data that docker containers can interact with."""
 
     @abstractmethod
@@ -102,6 +103,30 @@ class Encodable(Protocol):
     def encode(self, target_dir: Path, size: int, team: Literal["generator", "solver"]) -> None:
         """Encodes the data into files that can be passed to docker containers."""
         ...
+
+
+Encodable = CustomEncodable | str | bytes | dict[Any, Any]
+
+
+def encode(data: Mapping[str, Encodable], target_dir: Path, size: int, team: Literal["generator", "solver"]) -> None:
+    """Encodes data into a folder.
+    
+    Each element will be encoded into a file or folder named after its key. Encodables use their own method,
+    strings will be encoded with utf8, bytes are written as is, and dictionaries will be encoded as json.
+    """
+    for name, obj in data.items():
+        if isinstance(obj, CustomEncodable):
+            (target_dir / name).mkdir()
+            obj.encode(target_dir / name, size, team)
+        elif isinstance(obj, str):
+            with open(target_dir / name, "w") as f:
+                f.write(obj)
+        elif isinstance(obj, bytes):
+            with open(target_dir / name, "wb") as f:
+                f.write(obj)
+        else:
+            with open(target_dir / name) as f:
+                json.dump(obj, f)
 
 
 @dataclass(kw_only=True)

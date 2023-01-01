@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import ClassVar, Literal, SupportsFloat, Self
 from pydantic import BaseModel
 
-from algobattle.util import Encodable, BaseModel
+from algobattle.util import CustomEncodable, BaseModel
 
 logger = logging.getLogger("algobattle.problem")
 
@@ -22,7 +22,7 @@ class ContainerError(ProblemError):
     pass
 
 
-class Problem(Encodable, ABC):
+class Problem(CustomEncodable, ABC):
     """Problem base class."""
 
     name: ClassVar[str]
@@ -46,7 +46,7 @@ class Problem(Encodable, ABC):
         """Validates that the parsed instance is semantically correct."""
         return True
 
-    class Solution(Encodable, ABC):
+    class Solution(CustomEncodable, ABC):
         """A proposed solution for an instance of this problem."""
 
         @abstractmethod
