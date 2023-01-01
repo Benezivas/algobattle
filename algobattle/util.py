@@ -74,7 +74,7 @@ class CLIParsable(Protocol):
             elif get_origin(field.type) == Literal:
                 kwargs["choices"] = field.type.__args__
 
-            arguments.append((field.metadata.get("alias", field.name), kwargs))
+            arguments.append(([field.metadata.get("alias", field.name)], kwargs))
         return arguments
 
 
