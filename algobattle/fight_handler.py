@@ -124,6 +124,10 @@ class FightHandler(Subject):
             if battle_data:
                 (input / "battle_data").mkdir()
                 encode(battle_data, input / "battle_data", size, "generator")
+            
+            (output / "instance").mkdir()
+            if output_spec:
+                (output / "battle_data").mkdir()
 
             try:
                 runtime = self.matchup.generator.generator.run(input, output, timeout=timeout, memory=space, cpus=cpus)
@@ -135,7 +139,7 @@ class FightHandler(Subject):
                 raise FightError from e
 
             try:
-                instance = self.problem.decode(output, size)
+                instance = self.problem.decode(output / "instance", size)
             except Exception as e:
                 logger.warning(f"Generator of team '{self.matchup.generator}' output a syntactically incorrect instance!")
                 raise EncodingError(runtime) from e
@@ -181,6 +185,10 @@ class FightHandler(Subject):
             if battle_data:
                 (input / "battle_data").mkdir()
                 encode(battle_data, input / "battle_data", size, "generator")
+            
+            (output / "solution").mkdir()
+            if output_spec:
+                (output / "battle_data").mkdir()
 
             try:
                 runtime = self.matchup.solver.solver.run(input, output, timeout=timeout, memory=space, cpus=cpus)
@@ -192,7 +200,7 @@ class FightHandler(Subject):
                 raise FightError from e
 
             try:
-                solution = self.problem.Solution.decode(output, size)
+                solution = self.problem.Solution.decode(output / "solution", size)
             except Exception as e:
                 logger.warning(f"Solver of team '{self.matchup.generator}' output a syntactically incorrect Solution!")
                 raise EncodingError(runtime) from e
