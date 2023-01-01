@@ -101,7 +101,7 @@ class FightHandler(Subject):
 
         score = self.problem.calculate_score(gen_result.data, sol_result.data, size)
         score = max(0, min(1, float(score)))
-        logger.info(f"Solver of group {self.matchup.generator} yields a valid solution with an approx. ratio of {score}.")
+        logger.info(f"Solver of group {self.matchup.generator} yields a valid solution with a score of {score}.")
         return FightResult(score, gen_result, sol_result)
 
     def generate(
