@@ -1,5 +1,5 @@
 """Class managing the execution of generators and solvers."""
-from dataclasses import dataclass
+from dataclasses import InitVar, dataclass
 import json
 import logging
 from typing import Generic, Mapping, TypeVar
@@ -60,12 +60,15 @@ class FightHandler(Subject):
 
     problem: type[Problem]
     matchup: Matchup
-    observer: Observer | None = None
+    observer: InitVar[Observer | None] = None
     timeout_generator: float | None = None
     timeout_solver: float | None = None
     space_generator: int | None = None
     space_solver: int | None = None
     cpus: int = 1
+
+    def __post_init__(self, observer):
+        super().__init__(observer)
 
     def fight(
         self,
@@ -120,12 +123,12 @@ class FightHandler(Subject):
             cpus = self.cpus
 
         with TempDir() as input, TempDir() as output:
-            with open(input / "size") as f:
+            with open(input / "size", "w+") as f:
                 f.write(str(size))
             if battle_input:
                 (input / "battle_data").mkdir()
                 encode(battle_input, input / "battle_data", size, "generator")
-            with open(input / "info.json") as f:
+            with open(input / "info.json", "w+") as f:
                 json.dump({
                     "size": size,
                     "timeout": timeout,
@@ -195,7 +198,7 @@ class FightHandler(Subject):
             if battle_input:
                 (input / "battle_data").mkdir()
                 encode(battle_input, input / "battle_data", size, "solver")
-            with open(input / "info.json") as f:
+            with open(input / "info.json", "w+") as f:
                 json.dump({
                     "size": size,
                     "timeout": timeout,

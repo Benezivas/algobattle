@@ -115,18 +115,22 @@ def encode(data: Mapping[str, Encodable], target_dir: Path, size: int, team: Lit
     strings will be encoded with utf8, bytes are written as is, and dictionaries will be encoded as json.
     """
     for name, obj in data.items():
-        if isinstance(obj, CustomEncodable):
-            (target_dir / name).mkdir()
-            obj.encode(target_dir / name, size, team)
-        elif isinstance(obj, str):
-            with open(target_dir / name, "w") as f:
-                f.write(obj)
-        elif isinstance(obj, bytes):
-            with open(target_dir / name, "wb") as f:
-                f.write(obj)
-        elif isinstance(obj, dict):
-            with open(target_dir / name) as f:
-                json.dump(obj, f)
+        try:
+            if isinstance(obj, CustomEncodable):
+                (target_dir / name).mkdir()
+                obj.encode(target_dir / name, size, team)
+            elif isinstance(obj, str):
+                with open(target_dir / name, "w+") as f:
+                    f.write(obj)
+            elif isinstance(obj, bytes):
+                with open(target_dir / name, "wb+") as f:
+                    f.write(obj)
+            elif isinstance(obj, dict):
+                with open(target_dir / name, "w+") as f:
+                    json.dump(obj, f)
+        except Exception as e:
+            logger.critical(f"Failed to encode {obj} from into files at {target_dir / name}!\nException: {e}")
+
 
 
 def decode(data_spec: Mapping[str, type[Encodable]], source_dir: Path, size: int) -> dict[str, Encodable | None]:
@@ -144,13 +148,13 @@ def decode(data_spec: Mapping[str, type[Encodable]], source_dir: Path, size: int
                 (source_dir / name).mkdir()
                 out[name] = cls.decode(source_dir / name, size)
             elif issubclass(cls, str):
-                with open(source_dir / name, "w") as f:
+                with open(source_dir / name, "r") as f:
                     out[name] = f.read()
             elif issubclass(cls, bytes):
-                with open(source_dir / name, "wb") as f:
+                with open(source_dir / name, "rb") as f:
                     out[name] = f.read()
             elif issubclass(cls, dict):
-                with open(source_dir / name) as f:
+                with open(source_dir / name, "r") as f:
                     out[name] = json.load(f)
         except Exception as e:
             logger.critical(f"Failed to decode {cls} object from data at {source_dir / name}!\nException: {e}")

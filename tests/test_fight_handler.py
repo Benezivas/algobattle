@@ -36,7 +36,7 @@ class FightHandlertests(unittest.TestCase):
         cls.gen_succ.remove()
         cls.sol_succ.remove()
 
-    def _build_and_run(self, config: MatchConfig = MatchConfig(), gen_name: str = "gen_succ", sol_name: str = "sol_succ") -> float:
+    def _build_and_run(self, config: MatchConfig = MatchConfig(), gen_name: str = "generator", sol_name: str = "solver") -> float:
         generator = Image.build(self.problem_path / gen_name, f"test_{gen_name}", dockerfile=self.dockerfile)
         solver = Image.build(self.problem_path / sol_name, f"test_{sol_name}", dockerfile=self.dockerfile)
         team = Team(uuid4().hex[:8], generator, solver)
