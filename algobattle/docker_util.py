@@ -172,7 +172,7 @@ class Image:
     def __exit__(self, _type, _value_, _traceback):
         self.remove()
 
-    def run(self, input_dir: Path, output_dir: Path, timeout: float | None = None, memory: int | None = None, cpus: int | None = None) -> float:
+    def run(self, input_dir: Path | None = None, output_dir: Path | None = None, timeout: float | None = None, memory: int | None = None, cpus: int | None = None) -> float:
         """Runs a docker image with the provided input and returns its output.
 
         Parameters
@@ -205,8 +205,11 @@ class Image:
         if cpus is not None:
             cpus = int(cpus * 1000000000)
 
-        input_mount = Mount(target="/input", source=str(input_dir), type="bind", read_only=True)
-        output_mount = Mount(target="/output", source=str(output_dir), type="bind")
+        mounts = []
+        if input_dir is not None:
+            mounts.append(Mount(target="/input", source=str(input_dir), type="bind", read_only=True))
+        if output_dir is not None:
+            mounts.append(Mount(target="/output", source=str(output_dir), type="bind"))
 
         container: DockerContainer | None = None
         elapsed_time = 0
@@ -220,7 +223,7 @@ class Image:
                     nano_cpus=cpus,
                     detach=True,
                     network_mode="none",
-                    mounts=[input_mount, output_mount],
+                    mounts=mounts,
                 ),
             )
 
