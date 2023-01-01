@@ -160,7 +160,7 @@ class Execution(TestCase):
         problem_path = Path(__file__).parent / "testsproblem"
         cls.problem = TestProblem
         cls.config = MatchConfig(timeout_generator=2, timeout_solver=2, rounds=2)
-        cls.iter_config = Iterated.Config(iteration_cap=5)
+        cls.iter_config = Iterated.Config(iteration_cap=10)
         cls.avg_config = Averaged.Config(instance_size=5, iterations=3)
         cls.generator = problem_path / "generator"
         cls.solver = problem_path / "solver"
