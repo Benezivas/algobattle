@@ -1,5 +1,5 @@
 FROM alpine
 
 # outputs a static, artificially wrong solution.
-COPY instance.json /instance.json
-ENTRYPOINT mv /instance.json /output/instance/instance.json
+COPY solution.json /solution.json
+ENTRYPOINT mv /solution.json /output/solution/solution.json

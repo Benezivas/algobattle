@@ -1,5 +1,5 @@
 FROM alpine
 
 # outputs a static, semantically wrong solution.
-COPY output /output/solution
-ENTRYPOINT echo 1
+COPY solution.json /solution.json
+ENTRYPOINT mv /solution.json /output/solution/solution.json
