@@ -74,21 +74,23 @@ class FightHandler(Subject):
         timeout_solver: float | None = ...,
         space_solver: int | None = ...,
         cpus: int = ...,
-        generator_data: Mapping[str, Encodable] = {},
-        solver_data: Mapping[str, Encodable] = {},
+        generator_battle_data: Mapping[str, Encodable] = {},
+        solver_battle_data: Mapping[str, Encodable] = {},
+        generator_battle_spec: Mapping[str, type[Encodable]] | None = None,
+        solver_battle_spec: Mapping[str, type[Encodable]] | None = None,
     ) -> FightResult:
         """Execute a single fight of a battle, running the generator and solver and handling any errors gracefully."""
         self.notify()
         try:
             gen_result = self.generate(
-                size=size, timeout=timeout_generator, space=space_genrator, cpus=cpus, battle_data=generator_data
+                size=size, timeout=timeout_generator, space=space_genrator, cpus=cpus, battle_data=generator_battle_data, output_spec=generator_battle_spec
             )
         except FightError as e:
             return FightResult(score=1, generator=e, solver=None)
 
         try:
             sol_result = self.solve(
-                gen_result.data, size=size, timeout=timeout_solver, space=space_solver, cpus=cpus, battle_data=solver_data
+                gen_result.data, size=size, timeout=timeout_solver, space=space_solver, cpus=cpus, battle_data=solver_battle_data, output_spec=solver_battle_spec
             )
         except FightError as e:
             return FightResult(score=1, generator=gen_result, solver=e)
