@@ -184,12 +184,11 @@ class BaseModel(BaseModel, CustomEncodable, ABC):
         with open(target_dir / self.filename, "w") as f:
             f.write(self.json(exclude=self._excludes(team)))
 
-    @classmethod
-    def _excludes(cls, team: Literal["generator", "solver"]) -> dict[str | int, Any]:
+    def _excludes(self, team: Literal["generator", "solver"]) -> dict[str | int, Any]:
         excludes = {}
-        for name, annotation in get_type_hints(cls, include_extras=True).items():
+        for name, annotation in get_type_hints(self, include_extras=True).items():
             if hasattr(annotation, "__metadata__"):
-                excludes[name] = any(isinstance(o, Hidden) and getattr(o, team) for o in annotation.__metadata__)
-            elif issubclass(annotation, BaseModel):
-                excludes[name] = annotation._excludes(team)
+                excludes[name] = any(o == Hidden or (isinstance(o, Hidden) and getattr(o, team)) for o in annotation.__metadata__)
+            elif isinstance(getattr(self, name, None), BaseModel):
+                excludes[name] = getattr(self, name)._excludes(team)
         return excludes
