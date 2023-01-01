@@ -67,6 +67,21 @@ class Ui(Observer):
         else:
             return
 
+        if self.match_result is not None:
+            try:
+                match_display = self.match_result.display()
+            except Exception:
+                match_display = ""
+        else:
+            match_display = ""
+        if self.battle_info is not None:
+            try:
+                battle_display = self.battle_info.display()
+            except Exception:
+                battle_display = ""
+        else:
+            battle_display = ""
+
         out = [
             r"              _    _             _           _   _   _       ",
             r"             / \  | | __ _  ___ | |__   __ _| |_| |_| | ___  ",
@@ -75,9 +90,9 @@ class Ui(Observer):
             r"          /_/   \_\_|\__, |\___/|_.__/ \__,_|\__|\__|_|\___| ",
             r"                      |___/                                  ",
             f"Algobattle version {pkg_version(__package__)}",
-            self.match_result.display() if self.match_result is not None else "",
+            match_display,
             "",
-            self.battle_info.display() if self.battle_info is not None else "",
+            battle_display,
         ]
 
         self.stdscr.clear()
