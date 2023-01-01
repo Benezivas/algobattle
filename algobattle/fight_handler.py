@@ -1,13 +1,13 @@
 """Class managing the execution of generators and solvers."""
 from dataclasses import dataclass
 import logging
-from typing import Generic, TypeVar
+from typing import Generic, Mapping, TypeVar
 
 from algobattle.docker_util import DockerError, ExecutionError
 from algobattle.observer import Observer, Subject
 from algobattle.team import Matchup
 from algobattle.problem import Problem
-from algobattle.util import TempDir
+from algobattle.util import Encodable, TempDir, encode
 
 logger = logging.getLogger("algobattle.fight_handler")
 
@@ -73,16 +73,18 @@ class FightHandler(Subject):
         timeout_solver: float | None = ...,
         space_solver: int | None = ...,
         cpus: int = ...,
+        generator_data: Mapping[str, Encodable] = {},
+        solver_data: Mapping[str, Encodable] = {},
     ) -> FightResult:
         """Execute a single fight of a battle, running the generator and solver and handling any errors gracefully."""
         self.notify()
         try:
-            gen_result = self.generate(size=size, timeout=timeout_generator, space=space_genrator, cpus=cpus)
+            gen_result = self.generate(size=size, timeout=timeout_generator, space=space_genrator, cpus=cpus, battle_data=generator_data)
         except FightError as e:
             return FightResult(score=1, generator=e, solver=None)
 
         try:
-            sol_result = self.solve(gen_result.data, size=size, timeout=timeout_solver, space=space_solver, cpus=cpus)
+            sol_result = self.solve(gen_result.data, size=size, timeout=timeout_solver, space=space_solver, cpus=cpus, battle_data=solver_data)
         except FightError as e:
             return FightResult(score=1, generator=gen_result, solver=e)
 
@@ -91,7 +93,7 @@ class FightHandler(Subject):
         logger.info(f"Solver of group {self.matchup.generator} yields a valid solution with an approx. ratio of {score}.")
         return FightResult(score, gen_result, sol_result)
 
-    def generate(self, size: int, timeout: float | None = ..., space: int | None = ..., cpus: int = ...) -> Result[Problem]:
+    def generate(self, size: int, timeout: float | None = ..., space: int | None = ..., cpus: int = ..., battle_data: Mapping[str, Encodable] = {}) -> Result[Problem]:
         """Execute the generator and process its output."""
         logger.debug(f"Running generator of team {self.matchup.generator}.")
         if timeout is Ellipsis:
@@ -104,6 +106,9 @@ class FightHandler(Subject):
         with TempDir() as input, TempDir() as output:
             with open(input / "size") as f:
                 f.write(str(size))
+            if battle_data:
+                (input / "battle_data").mkdir()
+                encode(battle_data, input / "battle_data", size, "generator")
 
             try:
                 runtime = self.matchup.generator.generator.run(input, output, timeout=timeout, memory=space, cpus=cpus)
@@ -128,7 +133,7 @@ class FightHandler(Subject):
         return Result(instance, runtime)
 
     def solve(
-        self, instance: Problem, size: int, timeout: float | None = ..., space: int | None = ..., cpus: int = ...
+        self, instance: Problem, size: int, timeout: float | None = ..., space: int | None = ..., cpus: int = ..., battle_data: Mapping[str, Encodable] = {}
     ) -> Result[Problem.Solution]:
         """Execute the solver and process its output."""
         logger.debug(f"Running generator of team {self.matchup.generator}.")
@@ -146,6 +151,9 @@ class FightHandler(Subject):
             except Exception as e:
                 logger.warning(f"Problem instance couldn't be encoded into files!")
                 raise EncodingError from e
+            if battle_data:
+                (input / "battle_data").mkdir()
+                encode(battle_data, input / "battle_data", size, "generator")
 
             try:
                 runtime = self.matchup.solver.solver.run(input, output, timeout=timeout, memory=space, cpus=cpus)
