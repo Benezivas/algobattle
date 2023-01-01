@@ -7,7 +7,7 @@ from algobattle.docker_util import DockerError, ExecutionError
 from algobattle.observer import Observer, Subject
 from algobattle.team import Matchup
 from algobattle.problem import Problem
-from algobattle.util import Encodable, TempDir, encode
+from algobattle.util import Encodable, TempDir, decode, encode
 
 logger = logging.getLogger("algobattle.fight_handler")
 
@@ -25,8 +25,9 @@ T = TypeVar("T", Problem, Problem.Solution)
 class Result(Generic[T]):
     """Result of a single generator or solver execution."""
 
-    data: T
     time: float
+    data: T
+    battle_data: dict[str, Encodable]
 
 
 class FightError(Exception):
@@ -104,6 +105,7 @@ class FightHandler(Subject):
         space: int | None = ...,
         cpus: int = ...,
         battle_data: Mapping[str, Encodable] | None = None,
+        output_spec: Mapping[str, type[Encodable]] | None = None,
     ) -> Result[Problem]:
         """Execute the generator and process its output."""
         logger.debug(f"Running generator of team {self.matchup.generator}.")
@@ -136,12 +138,17 @@ class FightHandler(Subject):
                 logger.warning(f"Generator of team '{self.matchup.generator}' output a syntactically incorrect instance!")
                 raise EncodingError(runtime) from e
 
+            if output_spec:
+                battle_output = decode(output_spec, output / "battle_data", size)
+            else:
+                battle_output = {}
+
         if not instance.check_semantics(size):
             logger.warning(f"Generator of team '{self.matchup.generator}' output a semantically incorrect instance!")
             raise EncodingError(runtime)
 
         logger.info(f"Generator of team '{self.matchup.generator}' output a valid instance.")
-        return Result(instance, runtime)
+        return Result(runtime, instance, battle_output)
 
     def solve(
         self,
@@ -151,6 +158,7 @@ class FightHandler(Subject):
         space: int | None = ...,
         cpus: int = ...,
         battle_data: Mapping[str, Encodable] | None = None,
+        output_spec: Mapping[str, type[Encodable]] | None = None,
     ) -> Result[Problem.Solution]:
         """Execute the solver and process its output."""
         logger.debug(f"Running generator of team {self.matchup.generator}.")
@@ -187,9 +195,14 @@ class FightHandler(Subject):
                 logger.warning(f"Solver of team '{self.matchup.generator}' output a syntactically incorrect Solution!")
                 raise EncodingError(runtime) from e
 
+            if output_spec:
+                battle_output = decode(output_spec, output / "battle_data", size)
+            else:
+                battle_output = {}
+
         if not solution.check_semantics(size, instance):
             logger.warning(f"Solver of team '{self.matchup.generator}' output a semantically incorrect instance!")
             raise EncodingError(runtime)
 
         logger.info(f"Solver of team '{self.matchup.generator}' output a valid solution.")
-        return Result(solution, runtime)
+        return Result(runtime, solution, battle_output)
