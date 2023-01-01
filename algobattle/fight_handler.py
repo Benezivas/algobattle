@@ -224,7 +224,7 @@ class FightHandler(Subject):
             try:
                 solution = self.problem.Solution.decode(output / "solution", size)
             except Exception as e:
-                logger.warning(f"Solver of team '{self.matchup.generator}' output a syntactically incorrect Solution!")
+                logger.warning(f"Solver of team '{self.matchup.generator}' output a syntactically incorrect solution!")
                 raise EncodingError(runtime) from e
 
             if battle_output:
@@ -233,7 +233,7 @@ class FightHandler(Subject):
                 decoded_output = {}
 
         if not solution.check_semantics(size, instance):
-            logger.warning(f"Solver of team '{self.matchup.generator}' output a semantically incorrect instance!")
+            logger.warning(f"Solver of team '{self.matchup.generator}' output a semantically incorrect solution!")
             raise EncodingError(runtime)
 
         logger.info(f"Solver of team '{self.matchup.generator}' output a valid solution.")
