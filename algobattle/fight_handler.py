@@ -194,7 +194,7 @@ class FightHandler(Subject):
                 raise EncodingError from e
             if battle_input:
                 (input / "battle_data").mkdir()
-                encode(battle_input, input / "battle_data", size, "generator")
+                encode(battle_input, input / "battle_data", size, "solver")
             with open(input / "info.json") as f:
                 json.dump({
                     "size": size,
