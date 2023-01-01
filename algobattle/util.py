@@ -105,7 +105,7 @@ class CustomEncodable(ABC):
         ...
 
 
-Encodable = CustomEncodable | str | bytes | dict[Any, Any]
+Encodable = CustomEncodable | str | bytes | dict[Any, Any] | None
 
 
 def encode(data: Mapping[str, Encodable], target_dir: Path, size: int, team: Literal["generator", "solver"]) -> None:
@@ -124,7 +124,7 @@ def encode(data: Mapping[str, Encodable], target_dir: Path, size: int, team: Lit
         elif isinstance(obj, bytes):
             with open(target_dir / name, "wb") as f:
                 f.write(obj)
-        else:
+        elif isinstance(obj, dict):
             with open(target_dir / name) as f:
                 json.dump(obj, f)
 
@@ -136,7 +136,7 @@ class Hidden:
     solver: bool = True
 
 
-class BaseModel(BaseModel, ABC):
+class BaseModel(BaseModel, CustomEncodable, ABC):
     """Problem data that can easily be encoded into and decoded from json files."""
 
     filename: ClassVar[str]
