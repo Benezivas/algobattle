@@ -11,10 +11,10 @@ from algobattle.util import TempDir
 logger = logging.getLogger("algobattle.fight_handler")
 
 
-#* in principle we could do a lot better typing in this module
-#* but really it doesn't matter since there is no realistic case where different problems and solutions can sensibly be mixed
-#* there also is the issue that TypeVars aren't subscriptable, which makes any attempt at this rather futile
-#* since the most common errors (using a problem and solution type that don't match) won't be preventable
+# * in principle we could do a lot better typing in this module
+# * but really it doesn't matter since there is no realistic case where different problems and solutions can sensibly be mixed
+# * there also is the issue that TypeVars aren't subscriptable, which makes any attempt at this rather futile
+# * since the most common errors (using a problem and solution type that don't match) won't be preventable
 
 
 T = TypeVar("T", Problem, Problem.Solution)
@@ -23,6 +23,7 @@ T = TypeVar("T", Problem, Problem.Solution)
 @dataclass
 class Result(Generic[T]):
     """Result of a single generator or solver execution."""
+
     data: T
     time: float
 
@@ -37,46 +38,17 @@ class FightError(Exception):
 
 class EncodingError(FightError):
     """Indicates that some data structured couldn't be encoded or decoded properly."""
+
     pass
 
 
 @dataclass
 class FightResult:
     """The result of a single fight."""
+
     score: float
     generator: Result[Problem] | FightError
     solver: Result[Problem.Solution] | FightError | None
-
-
-@dataclass
-class GeneratorFailure(FightResult):
-    """The result of a fight where the generator didn't run successfully."""
-    generator: FightError
-    solver: None = field(default=None, init=False)
-
-
-@dataclass
-class GeneratorSuccess(FightResult):
-    """The result of a fight where the generator ran successfully."""
-    generator: Result[Problem]
-    solver: Result[Problem.Solution] | FightError
-
-
-def generator_success(result: FightResult) -> TypeGuard[GeneratorSuccess]:
-    """Checks whether both programs ran successfully."""
-    return isinstance(result.generator, Result)
-
-
-@dataclass
-class Success(FightResult):
-    """The result of a fight were both programs ran successfully."""
-    generator: Result[Problem]
-    solver: Result[Problem.Solution]
-
-
-def is_success(result: FightResult) -> TypeGuard[Success]:
-    """Checks whether both programs ran successfully."""
-    return isinstance(result.solver, Result)
 
 
 @dataclass(kw_only=True)
@@ -91,22 +63,30 @@ class FightHandler:
     space_solver: int | None = None
     cpus: int = 1
 
-    def fight(self, size: int, timeout_generator: float | None = ..., space_genrator: int | None = ..., timeout_solver: float | None = ..., space_solver: int | None = ..., cpus: int = ...) -> FightResult:
+    def fight(
+        self,
+        size: int,
+        timeout_generator: float | None = ...,
+        space_genrator: int | None = ...,
+        timeout_solver: float | None = ...,
+        space_solver: int | None = ...,
+        cpus: int = ...,
+    ) -> FightResult:
         """Execute a single fight of a battle, running the generator and solver and handling any errors gracefully."""
         try:
             gen_result = self.generate(size=size, timeout=timeout_generator, space=space_genrator, cpus=cpus)
         except FightError as e:
-            return GeneratorFailure(score=1, generator=e)
+            return FightResult(score=1, generator=e, solver=None)
 
         try:
             sol_result = self.solve(gen_result.data, size=size, timeout=timeout_solver, space=space_solver, cpus=cpus)
         except FightError as e:
-            return GeneratorSuccess(score=1, generator=gen_result, solver=e)
+            return FightResult(score=1, generator=gen_result, solver=e)
 
         score = self.problem.calculate_score(gen_result.data, sol_result.data, size)
         score = max(0, min(1, float(score)))
         logger.info(f"Solver of group {self.matchup.generator} yields a valid solution with an approx. ratio of {score}.")
-        return Success(score, gen_result, sol_result)
+        return FightResult(score, gen_result, sol_result)
 
     def generate(self, size: int, timeout: float | None = ..., space: int | None = ..., cpus: int = ...) -> Result[Problem]:
         """Execute the generator and process its output."""
@@ -136,7 +116,7 @@ class FightHandler:
             except Exception as e:
                 logger.warning(f"Generator of team '{self.matchup.generator}' output a syntactically incorrect instance!")
                 raise EncodingError(runtime) from e
-        
+
         if not instance.check_semantics(size):
             logger.warning(f"Generator of team '{self.matchup.generator}' output a semantically incorrect instance!")
             raise EncodingError(runtime)
@@ -144,7 +124,9 @@ class FightHandler:
         logger.info(f"Generator of team '{self.matchup.generator}' output a valid instance.")
         return Result(instance, runtime)
 
-    def solve(self, instance: Problem, size: int, timeout: float | None = ..., space: int | None = ..., cpus: int = ...) -> Result[Problem.Solution]:
+    def solve(
+        self, instance: Problem, size: int, timeout: float | None = ..., space: int | None = ..., cpus: int = ...
+    ) -> Result[Problem.Solution]:
         """Execute the solver and process its output."""
         logger.debug(f"Running generator of team {self.matchup.generator}.")
         if timeout is Ellipsis:
@@ -176,7 +158,7 @@ class FightHandler:
             except Exception as e:
                 logger.warning(f"Solver of team '{self.matchup.generator}' output a syntactically incorrect Solution!")
                 raise EncodingError(runtime) from e
-        
+
         if not solution.check_semantics(size, instance):
             logger.warning(f"Solver of team '{self.matchup.generator}' output a semantically incorrect instance!")
             raise EncodingError(runtime)
