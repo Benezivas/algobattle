@@ -1,10 +1,9 @@
 """Wrapper that iterates the instance size up to a point where the solving team is no longer able to solve an instance."""
-from dataclasses import dataclass
 import logging
 
 from algobattle.battle_wrapper import BattleWrapper
 from algobattle.fight_handler import FightHandler
-from algobattle.util import ArgSpec, inherit_docs
+from algobattle.util import CLIParsable, inherit_docs, argspec
 
 logger = logging.getLogger("algobattle.battle_wrappers.averaged")
 
@@ -13,10 +12,9 @@ class Averaged(BattleWrapper, notify_var_changes=True):
     """Class of an adveraged battle Wrapper."""
 
     @inherit_docs
-    @dataclass
-    class Config(BattleWrapper.Config):
-        instance_size: int = ArgSpec(10, help="Instance size that will be fought at.")
-        iterations: int = ArgSpec(10, help="Number of iterations in each round.")
+    class Config(CLIParsable):
+        instance_size: int = argspec(default=10, help="Instance size that will be fought at.")
+        iterations: int = argspec(default=10, help="Number of iterations in each round.")
 
 
     def run_battle(self, config: Config, fight_handler: FightHandler, min_size: int) -> None:

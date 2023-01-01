@@ -1,10 +1,10 @@
 """Collection of utility functions."""
 from abc import ABC, abstractmethod
-from dataclasses import KW_ONLY, dataclass, fields
+from dataclasses import dataclass, field, fields
 import logging
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Callable, ClassVar, Generic, Literal, Protocol, TypeVar, cast, get_type_hints, Self
+from typing import Any, Callable, ClassVar, Literal, Protocol, TypeVar, dataclass_transform, get_origin, get_type_hints, Self
 from pydantic import BaseModel
 
 
@@ -38,72 +38,43 @@ def check_path(path: str, *, type: Literal["file", "dir", "exists"] = "exists") 
         raise ValueError
 
 
-@dataclass
-class _ArgSpec(Generic[T]):
-    """Further details of an CLI argument."""
-
-    default: T
-    _: KW_ONLY
-    alias: str | None = None
-    parser: Callable[[str], T] | None = None
-    help: str | None = None
-
-
-def ArgSpec(default: T, *, alias: str | None = None, parser: Callable[[str], T] | None = None, help: str | None = None) -> T:
+def argspec(*, default: T, help: str = "", alias: str | None = None, parser: Callable[[str], T] | None = None) -> T:
     """Structure specifying the CLI arg."""
-    return cast(T, _ArgSpec(default=default, alias=alias, parser=parser, help=help))
+    metadata = {
+        "help": help,
+        "alias": alias,
+        "parser": parser,
+    }
+    return field(default=default, metadata={key: val for key, val in metadata.items() if val is not None})
 
 
-class CLIParsable(ABC):
+@dataclass_transform(field_specifiers=(argspec,))
+class CLIParsable(Protocol):
     """Protocol for dataclass-like objects that can be parsed from the CLI."""
 
-    __args__: dict[str, _ArgSpec[Any]]
-
     def __init_subclass__(cls) -> None:
-        args = {}
-        for name, _type in get_type_hints(cls).items():
-            if (name.startswith("__") and name.endswith("__")) or not hasattr(cls, name):
-                continue
-            default_val = getattr(cls, name)
-            if isinstance(default_val, _ArgSpec):
-                if default_val.parser is None:
-                    default_val.parser = _type
-                if default_val.alias is None:
-                    default_val.alias = name
-                args[name] = default_val
-                setattr(cls, name, default_val.default)
-        cls.__args__ = args
-        return super().__init_subclass__()
+        dataclass(cls)
+        super().__init_subclass__()
 
-    @classmethod
-    def _argspec(cls, name: str) -> _ArgSpec[Any] | None:
-        for c in cls.__mro__:
-            if name in getattr(c, "__args__", {}):
-                return getattr(c, "__args__")[name]
-        return None
+    def __init__(self, **kwargs) -> None:
+        super().__init__()
 
     @classmethod
     def as_argparse_args(cls) -> list[tuple[list[str], dict[str, Any]]]:
         """Constructs a list of `*args` and `**kwargs` that can be passed to `ArgumentParser.add_argument()`."""
         arguments = []
         for field in fields(cls):
-            arg_spec = cls._argspec(field.name)
-            if arg_spec is None:
-                continue
-
-            kwargs: dict[str, Any] = {
-                "type": arg_spec.parser,
-                "help": f"{arg_spec.help} Default: {arg_spec.default}"
-                if arg_spec.help is not None
-                else f"Default: {arg_spec.default}",
+            kwargs = {
+                "type": field.metadata.get("parser", field.type),
+                "help": field.metadata.get("help", "") + f" Default: {field.default}",
             }
             if field.type == bool:
                 kwargs["action"] = "store_const"
-                kwargs["const"] = not arg_spec.default
-            elif field.type == Literal:
-                kwargs["choices"] = cls.__annotations__[field.name].__args__
+                kwargs["const"] = not field.default
+            elif get_origin(field.type) == Literal:
+                kwargs["choices"] = field.type.__args__
 
-            arguments.append((arg_spec.alias, kwargs))
+            arguments.append((field.metadata.get("alias", field.name), kwargs))
         return arguments
 
 

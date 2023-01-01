@@ -25,11 +25,8 @@ class BattleWrapper(Subject, ABC):
 
     scoring_team: ClassVar[Literal["generator", "solver"]] = "solver"
 
-    @dataclass
-    class Config(CLIParsable):
-        """Object containing the config variables the wrapper will use."""
-
-        pass
+    Config: ClassVar[type[CLIParsable]]
+    """Object containing the config variables the wrapper will use."""
 
     @staticmethod
     def all() -> dict[str, type["BattleWrapper"]]:

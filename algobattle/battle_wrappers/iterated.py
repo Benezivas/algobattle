@@ -1,11 +1,10 @@
 """Wrapper that repeats a battle on an instance size a number of times and averages the competitive ratio over all runs."""
 from __future__ import annotations
-from dataclasses import dataclass
 import logging
 
 from algobattle.battle_wrapper import BattleWrapper
 from algobattle.fight_handler import FightHandler
-from algobattle.util import ArgSpec, inherit_docs
+from algobattle.util import CLIParsable, inherit_docs, argspec
 
 logger = logging.getLogger("algobattle.battle_wrappers.iterated")
 
@@ -14,11 +13,10 @@ class Iterated(BattleWrapper, notify_var_changes=True):
     """Class of an iterated battle Wrapper."""
 
     @inherit_docs
-    @dataclass
-    class Config(BattleWrapper.Config):
-        iteration_cap: int = ArgSpec(50_000, help="Maximum instance size that will be tried.")
-        exponent: int = ArgSpec(2, help="Determines how quickly the instance size grows.")
-        approximation_ratio: float = ArgSpec(1, help="Approximation ratio that a solver needs to achieve to pass.")
+    class Config(CLIParsable):
+        iteration_cap: int = argspec(default=50_000, help="Maximum instance size that will be tried.")
+        exponent: int = argspec(default=2, help="Determines how quickly the instance size grows.")
+        approximation_ratio: float = argspec(default=1, help="Approximation ratio that a solver needs to achieve to pass.")
 
     def run_battle(self, config: Config, fight_handler: FightHandler, min_size: int) -> None:
         """Execute one iterative battle between a generating and a solving team.
