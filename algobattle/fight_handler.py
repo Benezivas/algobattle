@@ -125,6 +125,15 @@ class FightHandler(Subject):
             if battle_input:
                 (input / "battle_data").mkdir()
                 encode(battle_input, input / "battle_data", size, "generator")
+            with open(input / "info.json") as f:
+                json.dump({
+                    "size": size,
+                    "timeout": timeout,
+                    "space": space,
+                    "cpus": cpus,
+                    "input_battle_data": {name: obj.__class__.__name__ for name, obj in battle_input.items()},
+                    "output_battle_data": {name: cls.__name__ for name, cls in battle_output.items()},
+                }, f)
             
             (output / "instance").mkdir()
             if battle_output:
@@ -186,6 +195,15 @@ class FightHandler(Subject):
             if battle_input:
                 (input / "battle_data").mkdir()
                 encode(battle_input, input / "battle_data", size, "generator")
+            with open(input / "info.json") as f:
+                json.dump({
+                    "size": size,
+                    "timeout": timeout,
+                    "space": space,
+                    "cpus": cpus,
+                    "input_battle_data": {name: obj.__class__.__name__ for name, obj in battle_input.items()},
+                    "output_battle_data": {name: cls.__name__ for name, cls in battle_output.items()},
+                }, f)
             
             (output / "solution").mkdir()
             if battle_output:
