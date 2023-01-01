@@ -97,7 +97,7 @@ class FightHandler(Subject):
                 gen_result.data, size=size, timeout=timeout_solver, space=space_solver, cpus=cpus, battle_input=solver_battle_input, battle_output=solver_battle_output
             )
         except FightError as e:
-            return FightResult(score=1, generator=gen_result, solver=e)
+            return FightResult(score=0, generator=gen_result, solver=e)
 
         score = self.problem.calculate_score(gen_result.data, sol_result.data, size)
         score = max(0, min(1, float(score)))
