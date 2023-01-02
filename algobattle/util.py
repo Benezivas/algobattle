@@ -5,10 +5,11 @@ import json
 import logging
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Callable, ClassVar, Literal, Mapping, Protocol, TypeVar, dataclass_transform, get_origin, Self, TYPE_CHECKING
+from typing import Any, Callable, ClassVar, Literal, Mapping, Protocol, TypeVar, dataclass_transform, get_origin, Self
 from pydantic import BaseModel
-if TYPE_CHECKING:
-    from algobattle.team import Role
+
+
+Role = Literal["generator", "solver"]
 
 logger = logging.getLogger("algobattle.util")
 

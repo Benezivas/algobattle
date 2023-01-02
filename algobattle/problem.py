@@ -5,8 +5,7 @@ import logging
 import sys
 from pathlib import Path
 from typing import Any, ClassVar, SupportsFloat, Self
-from algobattle.team import Role
-from algobattle.util import CustomEncodable, BaseModel
+from algobattle.util import CustomEncodable, BaseModel, Role
 
 logger = logging.getLogger("algobattle.problem")
 

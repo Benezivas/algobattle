@@ -10,9 +10,8 @@ import logging
 from abc import abstractmethod, ABC
 from typing import Any, ClassVar
 from algobattle.fight_handler import FightHandler
-from algobattle.team import Role
 from algobattle.observer import Subject
-from algobattle.util import CLIParsable
+from algobattle.util import CLIParsable, Role
 
 logger = logging.getLogger('algobattle.battle_wrapper')
 
