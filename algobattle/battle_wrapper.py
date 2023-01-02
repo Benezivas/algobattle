@@ -5,15 +5,26 @@ responsible for executing specific types of battle. They share the
 characteristic that they are responsible for updating some match data during
 their run, such that it contains the current state of the match.
 """
+from dataclasses import dataclass
 from importlib.metadata import entry_points
 import logging
 from abc import abstractmethod, ABC
-from typing import Any, ClassVar
-from algobattle.fight_handler import FightHandler
+from typing import Any, ClassVar, Mapping
+from algobattle.docker_util import DockerError, Generator, Result, Solver
 from algobattle.observer import Subject
-from algobattle.util import CLIParsable, Role
+from algobattle.problem import Problem
+from algobattle.util import CLIParsable, Encodable, Role
 
-logger = logging.getLogger('algobattle.battle_wrapper')
+logger = logging.getLogger("algobattle.battle_wrapper")
+
+
+@dataclass
+class CombinedResults:
+    """The result of one execution of the generator and the solver with the generated instance."""
+
+    score: float
+    generator: Result[Problem] | DockerError
+    solver: Result[Problem.Solution] | DockerError | None
 
 
 class BattleWrapper(Subject, ABC):
@@ -61,6 +72,53 @@ class BattleWrapper(Subject, ABC):
         return cls.__name__
 
     @abstractmethod
-    def run_battle(self, config: Any, fight_handler: FightHandler, min_size: int) -> None:
+    def run_battle(self, config: Any, min_size: int) -> None:
         """Calculates the next instance size that should be fought over"""
         raise NotImplementedError
+
+    def run_programs(
+        self,
+        generator: Generator,
+        solver: Solver,
+        size: int,
+        timeout_generator: float | None = ...,
+        space_generator: int | None = ...,
+        timeout_solver: float | None = ...,
+        space_solver: int | None = ...,
+        cpus: int = ...,
+        generator_battle_input: Mapping[str, Encodable] = {},
+        solver_battle_input: Mapping[str, Encodable] = {},
+        generator_battle_output: Mapping[str, type[Encodable]] = {},
+        solver_battle_output: Mapping[str, type[Encodable]] = {},
+    ) -> CombinedResults:
+        """Execute a single fight of a battle, running the generator and solver and handling any errors gracefully."""
+        self.notify()
+        try:
+            gen_result = generator.run(
+                size=size,
+                timeout=timeout_generator,
+                space=space_generator,
+                cpus=cpus,
+                battle_input=generator_battle_input,
+                battle_output=generator_battle_output,
+            )
+        except DockerError as e:
+            return CombinedResults(score=1, generator=e, solver=None)
+
+        try:
+            sol_result = solver.run(
+                gen_result.data,
+                size=size,
+                timeout=timeout_solver,
+                space=space_solver,
+                cpus=cpus,
+                battle_input=solver_battle_input,
+                battle_output=solver_battle_output,
+            )
+        except DockerError as e:
+            return CombinedResults(score=0, generator=gen_result, solver=e)
+
+        score = gen_result.data.calculate_score(sol_result.data, size)
+        score = max(0, min(1, float(score)))
+        logger.info(f"Solver of group {solver.team.name} yields a valid solution with a score of {score}.")
+        return CombinedResults(score, gen_result, sol_result)
