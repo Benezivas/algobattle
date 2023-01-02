@@ -63,7 +63,7 @@ class CLIParsable(Protocol):
 
     @classmethod
     def as_argparse_args(cls) -> list[tuple[str, dict[str, Any]]]:
-        """Constructs a list of `*args` and `**kwargs` that can be passed to `ArgumentParser.add_argument()`."""
+        """Constructs a list of argument names and `**kwargs` that can be passed to `ArgumentParser.add_argument()`."""
         arguments: list[tuple[str, dict[str, Any]]] = []
         resolved_annotations = get_type_hints(cls)
         for field in fields(cls):
