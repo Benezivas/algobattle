@@ -5,7 +5,7 @@ import json
 import logging
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Callable, ClassVar, Literal, Mapping, Protocol, TypeVar, dataclass_transform, get_origin, Self
+from typing import Any, Callable, ClassVar, Literal, Mapping, Protocol, TypeVar, dataclass_transform, get_origin, Self, get_type_hints
 from pydantic import BaseModel
 
 
@@ -65,9 +65,10 @@ class CLIParsable(Protocol):
     def as_argparse_args(cls) -> list[tuple[list[str], dict[str, Any]]]:
         """Constructs a list of `*args` and `**kwargs` that can be passed to `ArgumentParser.add_argument()`."""
         arguments = []
+        resolved_annotations = get_type_hints(cls)
         for field in fields(cls):
             kwargs = {
-                "type": field.metadata.get("parser", field.type),
+                "type": field.metadata.get("parser", resolved_annotations[field.name]),
                 "help": field.metadata.get("help", "") + f" Default: {field.default}",
             }
             if field.type == bool:
