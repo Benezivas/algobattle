@@ -14,7 +14,6 @@ from docker.models.images import Image as DockerImage
 from docker.models.containers import Container as DockerContainer
 from docker.types import Mount
 from requests import Timeout
-from algobattle.observer import Observer, Subject
 from algobattle.util import Encodable, CustomEncodable, Role, TempDir, encode, decode
 from algobattle.problem import Problem
 if TYPE_CHECKING:
