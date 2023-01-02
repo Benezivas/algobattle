@@ -4,8 +4,9 @@ import logging
 from pathlib import Path
 from time import sleep
 from timeit import default_timer
-from typing import Any, Iterator, Literal, cast
+from typing import Any, Generic, Iterator, Literal, Mapping, TypeVar, cast, TYPE_CHECKING
 from uuid import uuid1
+import json
 from dataclasses import dataclass
 from docker import DockerClient
 from docker.errors import APIError, BuildError, DockerException, ImageNotFound
@@ -13,6 +14,11 @@ from docker.models.images import Image as DockerImage
 from docker.models.containers import Container as DockerContainer
 from docker.types import Mount
 from requests import Timeout
+from algobattle.observer import Observer, Subject
+from algobattle.util import Encodable, CustomEncodable, Role, TempDir, encode, decode
+from algobattle.problem import Problem
+if TYPE_CHECKING:
+    from algobattle.team import Team
 
 
 logger = logging.getLogger("algobattle.docker")
@@ -47,17 +53,23 @@ class DockerError(Exception):
     Parent class of all exceptions raised by functions in the docker module.
     """
 
-    def __init__(self, message: str = "", *args: object, level: int = logging.WARNING) -> None:
-        logger.log(level=level, msg=message)
-        super().__init__(message, *args)
+    pass
 
 class ExecutionError(DockerError):
     """Exception raised when the execution of a container fails."""
 
-    def __init__(self, message: str = "", *args: object, time: float = 0, level: int = logging.WARNING) -> None:
-        logger.log(level=level, msg=message)
-        self.time = time
-        super().__init__(message, *args)
+    def __init__(self, *args: object, runtime: float, exit_code: int, error_message: str) -> None:
+        self.runtime = runtime
+        self.exit_code = exit_code
+        self.error_message = error_message
+        super().__init__(runtime, *args)
+
+
+class EncodingError(DockerError):
+    """Indicates that some data structured couldn't be encoded or decoded properly."""
+
+    pass
+
 
 @dataclass
 class ArchivedImage:
@@ -78,7 +90,8 @@ class ArchivedImage:
                 raise KeyError
             self.path.unlink()
         except APIError as e:
-            raise DockerError(f"Docker APIError thrown while restoring '{self.name}'") from e
+            logger.warning(f"Docker APIError thrown while restoring '{self.name}'")
+            raise DockerError from e
         return Image(self.name, self.id, self.description, path=self.path)
 
 
@@ -125,12 +138,12 @@ class Image:
             OS errors, and errors thrown by the docker daemon.
         """
         if not path.exists():
-            raise DockerError(f"Error when building {image_name}: '{path}' does not exist on the file system.")
+            logger.warning(f"Error when building {image_name}: '{path}' does not exist on the file system.")
+            raise DockerError
         if path.is_file():
             if dockerfile is not None:
-                raise DockerError(
-                    f"Error when building {image_name}: '{path}' refers to a file and 'dockerfile' is specified."
-                )
+                logger.warning(f"Error when building {image_name}: '{path}' refers to a file and 'dockerfile' is specified.")
+                raise DockerError
             dockerfile = path.name
             path = path.parent
         logger.debug(f"Building docker image with options: {path = !s}, {image_name = }, {timeout = }")
@@ -158,11 +171,14 @@ class Image:
                     old_image.remove(force=True)
 
         except Timeout as e:
-            raise DockerError(f"Build process for '{path}' ran into a timeout!") from e
+            logger.warning(f"Build process for '{path}' ran into a timeout!")
+            raise DockerError from e
         except BuildError as e:
-            raise DockerError(f"Building '{path}' did not complete successfully:\n{e.msg}") from e
+            logger.warning(f"Building '{path}' did not complete successfully:\n{e.msg}")
+            raise DockerError from e
         except APIError as e:
-            raise DockerError(f"Docker APIError thrown while building '{path}':\n{e}") from e
+            logger.warning(f"Docker APIError thrown while building '{path}':\n{e}")
+            raise DockerError from e
 
         return cls(image_name, cast(str, image.id), description if description is not None else image_name, path=path)
 
@@ -238,16 +254,14 @@ class Image:
             elapsed_time = round(default_timer() - start_time, 2)
 
             if (exit_code := cast(dict[str, Any], container.attrs)["State"]["ExitCode"]) != 0:
-                raise ExecutionError(
-                    f"{self.description} exited with error code {exit_code} "
-                    f"and error message '{container.logs().decode()}'",
-                    time=elapsed_time
-                )
+                raise ExecutionError(runtime=elapsed_time, exit_code=exit_code, error_message=container.logs().decode())
 
         except ImageNotFound as e:
-            raise DockerError(f"Image {self.name} (id={self.id}) does not exist") from e
+            logger.warning(f"Image {self.name} (id={self.id}) does not exist")
+            raise DockerError from e
         except APIError as e:
-            raise DockerError(f"Docker API Error thrown while running {self.name}") from e
+            logger.warning(f"Docker API Error thrown while running {self.name}")
+            raise DockerError from e
         finally:
             if container is not None:
                 try:
