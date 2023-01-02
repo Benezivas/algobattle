@@ -328,7 +328,7 @@ class Result(Generic[T]):
     battle_data: dict[str, Encodable] | None
 
 
-class Program(Subject):
+class Program:
     """A higher level interface for a team's programs."""
 
     role: Role
@@ -338,12 +338,12 @@ class Program(Subject):
         cls.data_role = "instance" if cls.role == "generator" else "solution"
         return super().__init_subclass__()
 
-    def __init__(self, image: Image, config: Config, team: Team, data_type: type[CustomEncodable], observer: Observer | None = None) -> None:
+    def __init__(self, image: Image, config: Config, team: Team, data_type: type[CustomEncodable]) -> None:
         self.image = image
         self.config = config
         self.team = team
         self.data_type = data_type
-        super().__init__(observer)
+        super().__init__()
 
     def _run(self,
         size: int,
