@@ -72,7 +72,7 @@ class BattleWrapper(Subject, ABC):
         return cls.__name__
 
     @abstractmethod
-    def run_battle(self, config: Any, min_size: int) -> None:
+    def run_battle(self, generator: Generator, solver: Solver, config: Any, min_size: int) -> None:
         """Calculates the next instance size that should be fought over"""
         raise NotImplementedError
 

@@ -7,7 +7,6 @@ from prettytable import PrettyTable, DOUBLE_BORDER
 
 from algobattle.battle_wrapper import BattleWrapper
 from algobattle.battle_wrappers.iterated import Iterated
-from algobattle.fight_handler import FightHandler
 from algobattle.observer import Observer, Subject
 from algobattle.team import Matchup, Team, TeamHandler
 from algobattle.problem import Problem
@@ -86,13 +85,12 @@ class Match(Subject):
         result = cls(config, wrapper_config, problem, teams, observer)
         for matchup in teams.matchups:
             result.results[matchup] = []
-            fight_handler = FightHandler(problem=problem, matchup=matchup, observer=observer, **config.docker_params)
             for i in range(config.rounds):
                 logger.info("#" * 20 + f"  Running Round {i+1}/{config.rounds}  " + "#" * 20)
                 wrapper = config.battle_type(observer=observer)
                 result.results[matchup].append(wrapper)
                 try:
-                    wrapper.run_battle(wrapper_config, fight_handler, problem.min_size)
+                    wrapper.run_battle(matchup.generator.generator, matchup.solver.solver, wrapper_config, problem.min_size)
                 except Exception as e:
                     logger.critical(f"Unhandeled error during execution of battle wrapper!\n{e}")
                 result.notify()
