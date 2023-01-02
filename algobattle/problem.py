@@ -88,12 +88,17 @@ class Problem(CustomEncodable, ABC):
             spec = importlib.util.spec_from_file_location("problem", path / "__init__.py")
             assert spec is not None
             assert spec.loader is not None
-            Problem = importlib.util.module_from_spec(spec)
-            sys.modules[spec.name] = Problem
-            spec.loader.exec_module(Problem)
-            if isinstance(Problem, BaseModel):
-                Problem.update_forward_refs(Solution=Problem.Solution)
-            return Problem.Problem
+            problem_module = importlib.util.module_from_spec(spec)
+            sys.modules[spec.name] = problem_module
+            spec.loader.exec_module(problem_module)
+            problem_cls = problem_module.Problem
+            if not issubclass(problem_cls, Problem):
+                raise ValueError(f"Variable 'Problem' in {path / '__init__.py'} is not a Problem class.")
+            if issubclass(problem_cls, BaseModel):
+                problem_cls.update_forward_refs(Solution=problem_cls.Solution)
+            if issubclass(problem_cls.Solution, BaseModel):
+                problem_cls.Solution.update_forward_refs()
+            return problem_cls
         except Exception as e:
             logger.critical(f"Importing the given problem failed with the following exception: {e}")
             raise ValueError from e
