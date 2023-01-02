@@ -120,5 +120,5 @@ class BattleWrapper(Subject, ABC):
 
         score = gen_result.data.calculate_score(sol_result.data, size)
         score = max(0, min(1, float(score)))
-        logger.info(f"Solver of group {solver.team.name} yields a valid solution with a score of {score}.")
+        logger.info(f"Solver of group {solver.team_name} yields a valid solution with a score of {score}.")
         return CombinedResults(score, gen_result, sol_result)

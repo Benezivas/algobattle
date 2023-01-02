@@ -1,10 +1,11 @@
 """Leightweight wrapper around docker functionality."""
 from __future__ import annotations
+from abc import ABC
 import logging
 from pathlib import Path
 from time import sleep
 from timeit import default_timer
-from typing import Any, Generic, Iterator, Literal, Mapping, TypeVar, cast, TYPE_CHECKING
+from typing import Any, Generic, Iterator, Literal, Mapping, Self, TypeVar, cast, TYPE_CHECKING
 from uuid import uuid1
 import json
 from dataclasses import dataclass
@@ -327,7 +328,7 @@ class Result(Generic[T]):
     battle_data: dict[str, Encodable] | None
 
 
-class Program:
+class Program(ABC):
     """A higher level interface for a team's programs."""
 
     role: Role
@@ -337,12 +338,34 @@ class Program:
         cls.data_role = "instance" if cls.role == "generator" else "solution"
         return super().__init_subclass__()
 
-    def __init__(self, image: Image, config: Config, team: Team, data_type: type[CustomEncodable]) -> None:
+    def __init__(self, image: Image, config: Config, team_name: str, data_type: type[CustomEncodable]) -> None:
         self.image = image
         self.config = config
-        self.team = team
+        self.team_name = team_name  # we can't take a ref to the Team object here since it won't be created til after the Programs
         self.data_type = data_type
         super().__init__()
+
+    @classmethod
+    def build(
+        cls,
+        path: Path,
+        team_name: str,
+        problem_type: type[Problem],
+        config: Config,
+        timeout: float | None = None,
+    ) -> type[Self]:
+        """Creates a program by building the specified docker image."""
+        image = Image.build(
+            path=path,
+            image_name=f"{cls.role}-{team_name}",
+            description=f"{cls.role} for team {team_name}",
+            timeout=timeout,
+        )
+        if cls.role == "generator":
+            data_type = problem_type
+        else:
+            data_type = problem_type.Solution
+        return cls(image, config, team_name, data_type)
 
     def _run(self,
         size: int,
@@ -354,7 +377,7 @@ class Program:
         battle_output: Mapping[str, type[Encodable]] = {},
         ) -> Result[Any]:
         """Execute the program, processing input and output data."""
-        logger.debug(f"Running {self.role} of team {self.team.name}.")
+        logger.debug(f"Running {self.role} of team {self.team_name}.")
         if timeout is Ellipsis:
             timeout = self.config.timeout
         if space is Ellipsis:
@@ -398,17 +421,17 @@ class Program:
             try:
                 runtime = self.image.run(input, output, timeout=timeout, memory=space, cpus=cpus)
             except ExecutionError as e:
-                logger.warning(f"{self.role.capitalize()} of team {self.team.name} crashed!")
+                logger.warning(f"{self.role.capitalize()} of team {self.team_name} crashed!")
                 logger.info(f"After {e.runtime:.2f}s, with exit code {e.exit_code} and error message:\n{e.error_message}")
                 raise
             except DockerError as e:
-                logger.warning(f"{self.role.capitalize()} of team {self.team.name} couldn't be executed successfully!")
+                logger.warning(f"{self.role.capitalize()} of team {self.team_name} couldn't be executed successfully!")
                 raise
 
             try:
                 output_data = self.data_type.decode(output / "instance", size)
             except Exception as e:
-                logger.warning(f"Generator of team {self.team.name} output a syntactically incorrect instance!")
+                logger.warning(f"Generator of team {self.team_name} output a syntactically incorrect instance!")
                 raise EncodingError from e
 
             if battle_output:
@@ -424,11 +447,11 @@ class Program:
             correct_semantics = output_data.check_semantics(size, input_instance)
         
         if not correct_semantics:
-            logger.warning(f"Generator of team {self.team.name} output a semantically incorrect instance!")
+            logger.warning(f"Generator of team {self.team_name} output a semantically incorrect instance!")
             raise EncodingError
         
 
-        logger.info(f"{self.role.capitalize()} of team {self.team.name} output a valid instance.")
+        logger.info(f"{self.role.capitalize()} of team {self.team_name} output a valid instance.")
         return Result(data=output_data, runtime=runtime, battle_data=decoded_battle_output)
 
 
