@@ -4,8 +4,8 @@ import importlib.util
 import logging
 import sys
 from pathlib import Path
-from typing import Any, ClassVar, Literal, SupportsFloat, Self
-
+from typing import Any, ClassVar, SupportsFloat, Self
+from algobattle.team import Role
 from algobattle.util import CustomEncodable, BaseModel
 
 logger = logging.getLogger("algobattle.problem")
@@ -37,7 +37,7 @@ class Problem(CustomEncodable, ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def encode(self, target_dir: Path, size: int, team: Literal["generator", "solver"]) -> None:
+    def encode(self, target_dir: Path, size: int, team: Role) -> None:
         """Encodes the problem instance into files that can be passed to docker containers."""
         raise NotImplementedError
 
@@ -55,7 +55,7 @@ class Problem(CustomEncodable, ABC):
             raise NotImplementedError
 
         @abstractmethod
-        def encode(self, target_dir: Path, size: int, team: Literal["generator", "solver"]) -> None:
+        def encode(self, target_dir: Path, size: int, team: Role) -> None:
             """Encodes the solution into files that can be passed to docker containers."""
             raise NotImplementedError
 

@@ -8,9 +8,9 @@ their run, such that it contains the current state of the match.
 from importlib.metadata import entry_points
 import logging
 from abc import abstractmethod, ABC
-from typing import Any, ClassVar, Literal
+from typing import Any, ClassVar
 from algobattle.fight_handler import FightHandler
-
+from algobattle.team import Role
 from algobattle.observer import Subject
 from algobattle.util import CLIParsable
 
@@ -22,7 +22,7 @@ class BattleWrapper(Subject, ABC):
 
     _wrappers: ClassVar[dict[str, type["BattleWrapper"]]] = {}
 
-    scoring_team: ClassVar[Literal["generator", "solver"]] = "solver"
+    scoring_team: ClassVar[Role] = "solver"
 
     Config: ClassVar[type[CLIParsable]]
     """Object containing the config variables the wrapper will use."""

@@ -4,12 +4,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from itertools import combinations
 from pathlib import Path
-from typing import Iterator
+from typing import Iterator, Literal
 import logging
 
 from algobattle.docker_util import DockerError, Image, ArchivedImage
 
 logger = logging.getLogger("algobattle.team")
+
+
+Role = Literal["generator", "solver"]
 
 
 _team_names: set[str] = set()

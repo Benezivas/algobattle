@@ -5,9 +5,10 @@ import json
 import logging
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Callable, ClassVar, Literal, Mapping, Protocol, TypeVar, dataclass_transform, get_origin, Self
+from typing import Any, Callable, ClassVar, Literal, Mapping, Protocol, TypeVar, dataclass_transform, get_origin, Self, TYPE_CHECKING
 from pydantic import BaseModel
-
+if TYPE_CHECKING:
+    from algobattle.team import Role
 
 logger = logging.getLogger("algobattle.util")
 
@@ -100,7 +101,7 @@ class CustomEncodable(ABC):
         ...
 
     @abstractmethod
-    def encode(self, target_dir: Path, size: int, team: Literal["generator", "solver"]) -> None:
+    def encode(self, target_dir: Path, size: int, team: Role) -> None:
         """Encodes the data into files that can be passed to docker containers."""
         ...
 
@@ -108,7 +109,7 @@ class CustomEncodable(ABC):
 Encodable = CustomEncodable | str | bytes | dict[Any, Any] | None
 
 
-def encode(data: Mapping[str, Encodable], target_dir: Path, size: int, team: Literal["generator", "solver"]) -> None:
+def encode(data: Mapping[str, Encodable], target_dir: Path, size: int, team: Role) -> None:
     """Encodes data into a folder.
     
     Each element will be encoded into a file or folder named after its key. :cls:`CustomEncodables` use their own method,
@@ -173,11 +174,11 @@ class BaseModel(BaseModel, CustomEncodable, ABC):
         return cls.parse_file(source_dir / cls.filename)
 
     @inherit_docs
-    def encode(self, target_dir: Path, size: int, team: Literal["generator", "solver"]) -> None:
+    def encode(self, target_dir: Path, size: int, team: Role) -> None:
         with open(target_dir / self.filename, "w") as f:
             f.write(self.json(exclude=self._excludes(team)))
 
-    def _excludes(self, team: Literal["generator", "solver"]) -> dict[str | int, Any]:
+    def _excludes(self, team: Role) -> dict[str | int, Any]:
         excludes = {}
         for name, field in self.__fields__.items():
             hidden = field.field_info.extra.get("hidden", False)
