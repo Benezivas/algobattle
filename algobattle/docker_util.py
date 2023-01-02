@@ -307,3 +307,180 @@ class Image:
         except APIError as e:
             raise DockerError(f"Docker APIError thrown while archiving '{self.name}'") from e
         return ArchivedImage(path, self.name, self.id, self.description)
+
+
+@dataclass
+class Config:
+    timeout: float | None = 30
+    space: int | None = None
+    cpus: int = 1
+
+
+T = TypeVar("T", bound=Encodable)
+
+
+@dataclass
+class Result(Generic[T]):
+    """Result of a single generator or solver execution."""
+
+    data: T
+    runtime: float
+    battle_data: dict[str, Encodable] | None
+
+
+class Program(Subject):
+    """A higher level interface for a team's programs."""
+
+    role: Role
+    data_role: Literal["instance", "solution"]
+
+    def __init_subclass__(cls) -> None:
+        cls.data_role = "instance" if cls.role == "generator" else "solution"
+        return super().__init_subclass__()
+
+    def __init__(self, image: Image, config: Config, team: Team, data_type: type[CustomEncodable], observer: Observer | None = None) -> None:
+        self.image = image
+        self.config = config
+        self.team = team
+        self.data_type = data_type
+        super().__init__(observer)
+
+    def _run(self,
+        size: int,
+        input_instance: Problem | None = None,
+        timeout: float | None = ...,
+        space: int | None = ...,
+        cpus: int = ...,
+        battle_input: Mapping[str, Encodable] = {},
+        battle_output: Mapping[str, type[Encodable]] = {},
+        ) -> Result[Any]:
+        """Execute the program, processing input and output data."""
+        logger.debug(f"Running {self.role} of team {self.team.name}.")
+        if timeout is Ellipsis:
+            timeout = self.config.timeout
+        if space is Ellipsis:
+            space = self.config.space
+        if cpus is Ellipsis:
+            cpus = self.config.cpus
+
+        with TempDir() as input, TempDir() as output:
+            if self.role == "generator":
+                with open(input / "size", "w+") as f:
+                    f.write(str(size))
+            else:
+                assert input_instance is not None
+                (input / "instance").mkdir()
+                try:
+                    input_instance.encode(input / "instance", size, self.role)
+                except Exception as e:
+                    logger.critical(f"Problem instance couldn't be encoded into files!")
+                    raise DockerError from e
+            if battle_input:
+                (input / "battle_data").mkdir()
+                try:
+                    encode(battle_input, input / "battle_data", size, self.role)
+                except Exception as e:
+                    logger.critical(f"Battle data couldn't be encoded into files!")
+                    raise DockerError from e
+            with open(input / "info.json", "w+") as f:
+                json.dump({
+                    "size": size,
+                    "timeout": timeout,
+                    "space": space,
+                    "cpus": cpus,
+                    "battle_input": {name: obj.__class__.__name__ for name, obj in battle_input.items()},
+                    "battle_output": {name: cls.__name__ for name, cls in battle_output.items()},
+                }, f)
+            
+            (output / self.data_role).mkdir()
+            if battle_output:
+                (output / "battle_data").mkdir()
+
+            try:
+                runtime = self.image.run(input, output, timeout=timeout, memory=space, cpus=cpus)
+            except ExecutionError as e:
+                logger.warning(f"{self.role.capitalize()} of team {self.team.name} crashed!")
+                logger.info(f"After {e.runtime:.2f}s, with exit code {e.exit_code} and error message:\n{e.error_message}")
+                raise
+            except DockerError as e:
+                logger.warning(f"{self.role.capitalize()} of team {self.team.name} couldn't be executed successfully!")
+                raise
+
+            try:
+                output_data = self.data_type.decode(output / "instance", size)
+            except Exception as e:
+                logger.warning(f"Generator of team {self.team.name} output a syntactically incorrect instance!")
+                raise EncodingError from e
+
+            if battle_output:
+                decoded_battle_output = decode(battle_output, output / "battle_data", size)
+            else:
+                decoded_battle_output = None
+
+        if self.role == "generator":
+            assert isinstance(output_data, Problem)
+            correct_semantics = output_data.check_semantics(size)
+        else:
+            assert isinstance(output_data, Problem.Solution)
+            correct_semantics = output_data.check_semantics(size, input_instance)
+        
+        if not correct_semantics:
+            logger.warning(f"Generator of team {self.team.name} output a semantically incorrect instance!")
+            raise EncodingError
+        
+
+        logger.info(f"{self.role.capitalize()} of team {self.team.name} output a valid instance.")
+        return Result(data=output_data, runtime=runtime, battle_data=decoded_battle_output)
+
+
+class Generator(Program):
+    """A higher level interface for a team's generator."""
+
+    role = "generator"
+
+    def run(
+        self,
+        size: int,
+        timeout: float | None = ...,
+        space: int | None = ...,
+        cpus: int = ...,
+        battle_input: Mapping[str, Encodable] = {},
+        battle_output: Mapping[str, type[Encodable]] = {},
+        ) -> Result[Problem]:
+        """Execute the generator, passing in the size and processing the created problem instance."""
+        return self._run(
+            size=size,
+            input_instance=None,
+            timeout=timeout,
+            space=space,
+            cpus=cpus,
+            battle_input=battle_input,
+            battle_output=battle_output
+        )
+
+
+class Solver(Program):
+    """A higher level interface for a team's solver."""
+
+    role = "generator"
+
+    def run(
+        self,
+        instance: Problem,
+        size: int,
+        timeout: float | None = ...,
+        space: int | None = ...,
+        cpus: int = ...,
+        battle_input: Mapping[str, Encodable] = {},
+        battle_output: Mapping[str, type[Encodable]] = {},
+        ) -> Result[Problem.Solution]:
+        """Execute the solver, passing in the problem instance and processing the created solution."""
+        return self._run(
+            size=size,
+            input_instance=instance,
+            timeout=timeout,
+            space=space,
+            cpus=cpus,
+            battle_input=battle_input,
+            battle_output=battle_output
+        )
