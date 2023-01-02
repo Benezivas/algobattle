@@ -62,9 +62,9 @@ class CLIParsable(Protocol):
         super().__init__()
 
     @classmethod
-    def as_argparse_args(cls) -> list[tuple[list[str], dict[str, Any]]]:
+    def as_argparse_args(cls) -> list[tuple[str, dict[str, Any]]]:
         """Constructs a list of `*args` and `**kwargs` that can be passed to `ArgumentParser.add_argument()`."""
-        arguments = []
+        arguments: list[tuple[str, dict[str, Any]]] = []
         resolved_annotations = get_type_hints(cls)
         for field in fields(cls):
             kwargs = {
@@ -77,7 +77,7 @@ class CLIParsable(Protocol):
             elif get_origin(field.type) == Literal:
                 kwargs["choices"] = field.type.__args__
 
-            arguments.append(([field.name], kwargs))
+            arguments.append((field.name, kwargs))
         return arguments
 
 
