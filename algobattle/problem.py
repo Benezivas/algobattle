@@ -5,7 +5,6 @@ import logging
 import sys
 from pathlib import Path
 from typing import Any, ClassVar, Literal, SupportsFloat, Self
-from pydantic import BaseModel
 
 from algobattle.util import CustomEncodable, BaseModel
 
@@ -93,6 +92,8 @@ class Problem(CustomEncodable, ABC):
             Problem = importlib.util.module_from_spec(spec)
             sys.modules[spec.name] = Problem
             spec.loader.exec_module(Problem)
+            if isinstance(Problem, BaseModel):
+                Problem.update_forward_refs(Solution=Problem.Solution)
             return Problem.Problem
         except Exception as e:
             logger.critical(f"Importing the given problem failed with the following exception: {e}")
