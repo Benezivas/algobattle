@@ -1,9 +1,9 @@
 """Problem class built for tests."""
 import logging
-from typing import Annotated, ClassVar, SupportsFloat
+from typing import ClassVar, SupportsFloat
+from pydantic import Field
 
 from algobattle.problem import ProblemModel, SolutionModel
-from algobattle.util import Hidden
 
 logger = logging.getLogger('algobattle.problems.testsproblem')
 
@@ -24,7 +24,7 @@ class Tests(ProblemModel):
     Solution = Solution
 
     val: int
-    solution: Annotated[Solution, Hidden()]
+    solution: Solution = Field(hidden=True)
 
     def check_semantics(self, size: int) -> bool:
         return self.val <= size and self.solution.check_semantics(size, self)

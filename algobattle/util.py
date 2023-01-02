@@ -5,7 +5,7 @@ import json
 import logging
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Callable, ClassVar, Literal, Mapping, Protocol, TypeVar, dataclass_transform, get_origin, get_type_hints, Self
+from typing import Any, Callable, ClassVar, Literal, Mapping, Protocol, TypeVar, dataclass_transform, get_origin, Self
 from pydantic import BaseModel
 
 
@@ -162,13 +162,6 @@ def decode(data_spec: Mapping[str, type[Encodable]], source_dir: Path, size: int
     return out
 
 
-@dataclass(kw_only=True)
-class Hidden:
-    """Marker class indicating that a field will not be parsed into the solver input."""
-    generator: bool = True
-    solver: bool = True
-
-
 class BaseModel(BaseModel, CustomEncodable, ABC):
     """Problem data that can easily be encoded into and decoded from json files."""
 
@@ -186,9 +179,10 @@ class BaseModel(BaseModel, CustomEncodable, ABC):
 
     def _excludes(self, team: Literal["generator", "solver"]) -> dict[str | int, Any]:
         excludes = {}
-        for name, annotation in get_type_hints(self, include_extras=True).items():
-            if hasattr(annotation, "__metadata__"):
-                excludes[name] = any(o == Hidden or (isinstance(o, Hidden) and getattr(o, team)) for o in annotation.__metadata__)
+        for name, field in self.__fields__.items():
+            hidden = field.field_info.extra.get("hidden", False)
+            if (isinstance(hidden, str) and hidden == team) or (isinstance(hidden, bool) and hidden):
+                excludes[name] = True
             elif isinstance(getattr(self, name, None), BaseModel):
                 excludes[name] = getattr(self, name)._excludes(team)
         return excludes
