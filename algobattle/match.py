@@ -23,23 +23,6 @@ class MatchConfig:
     battle_type: type[BattleWrapper] = Iterated
     rounds: int = 5
     points: int = 100
-    timeout_build: float | None = 600
-    timeout_generator: float | None = 30
-    timeout_solver: float | None = 30
-    space_generator: int | None = None
-    space_solver: int | None = None
-    cpus: int = 1
-
-    @property
-    def docker_params(self) -> dict[str, Any]:
-        """The parameters relevant to execution of docker containers, passable to FightHandler."""
-        return {
-            "timeout_generator": self.timeout_generator,
-            "timeout_solver": self.timeout_solver,
-            "space_generator": self.space_generator,
-            "space_solver": self.space_solver,
-            "cpus": self.cpus,
-        }
 
     @staticmethod
     def from_dict(info: dict[str, Any]) -> MatchConfig:

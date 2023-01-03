@@ -167,7 +167,7 @@ def main():
 
     try:
         problem = Problem.import_from_path(program_config.problem)
-        with TeamHandler.build(program_config.teams) as teams, ExitStack() as stack:
+        with TeamHandler.build(program_config.teams, problem, ) as teams, ExitStack() as stack:
             if program_config.display == "ui":
                 ui = Ui()
                 stack.enter_context(ui)
