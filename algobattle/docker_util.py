@@ -391,15 +391,18 @@ class Program(ABC):
         set_params: dict[str, Any] = {}
         if timeout is Ellipsis:
             timeout = self.config.timeout
+        else:
             set_params["timeout"] = timeout
         if space is Ellipsis:
             space = self.config.space
+        else:
             set_params["space"] = space
         if cpus is Ellipsis:
             cpus = self.config.cpus
+        else:
             set_params["cpus"] = cpus
         if set_params:
-            param_msg = "with parameters " + ", ".join(f"{k}: {v}" for k, v in set_params.items())
+            param_msg = " with parameters " + ", ".join(f"{k}: {v}" for k, v in set_params.items())
         else:
             param_msg = ""
         logger.debug(f"Running {self.role} of team {self.team_name} at size {size}{param_msg}.")
