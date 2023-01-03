@@ -1,6 +1,3 @@
 {
-    "val": 4,
-    "solution": {
-        "val": 3
-    }
+    "semantics": true
 }
