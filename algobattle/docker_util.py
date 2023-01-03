@@ -482,6 +482,12 @@ class Program(ABC):
         """
         self.image.remove()
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, _type, _value_, _traceback):
+        self.remove()
+
 class Generator(Program):
     """A higher level interface for a team's generator."""
 
