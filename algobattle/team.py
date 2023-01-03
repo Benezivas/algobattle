@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Iterator
 import logging
 
-from algobattle.docker_util import RunParameters, DockerError, ArchivedImage, Generator, Solver
+from algobattle.docker_util import DockerConfig, DockerError, ArchivedImage, Generator, Solver
 from algobattle.problem import Problem
 from algobattle.util import TempDir
 
@@ -25,7 +25,7 @@ class TeamInfo:
     generator: Path
     solver: Path
 
-    def build(self, problem: type[Problem], config: RunParameters, timeout: float | None = None, *, auto_cleanup=True) -> Team:
+    def build(self, problem: type[Problem], config: DockerConfig, *, auto_cleanup=True) -> Team:
         """Builds the specified docker files into images and return the corresponding team.
 
         Raises
@@ -38,9 +38,9 @@ class TeamInfo:
         name = self.name.replace(" ", "_").lower()  # Lower case needed for docker tag created from name
         if name in _team_names:
             raise ValueError
-        generator = Generator.build(self.generator, self.name, problem, config, timeout)
+        generator = Generator.build(self.generator, self.name, problem, config.generator, config.build_timeout)
         try:
-            solver = Solver.build(self.solver, self.name, problem, config, timeout)
+            solver = Solver.build(self.solver, self.name, problem, config.solver, config.build_timeout)
         except DockerError:
             generator.remove()
             raise
@@ -135,14 +135,14 @@ class TeamHandler(list[Team]):
     """Handles building teams and cleaning them up."""
 
     @staticmethod
-    def build(infos: list[TeamInfo], problem: type[Problem], config: RunParameters, timeout: float | None = None, safe_build: bool = False) -> TeamHandler:
+    def build(infos: list[TeamInfo], problem: type[Problem], config: DockerConfig, safe_build: bool = False) -> TeamHandler:
         """Builds the specified team objects."""
         if safe_build:
             with TempDir() as folder:
                 archives: list[_ArchivedTeam] = []
                 for info in infos:
                     try:
-                        team = info.build(problem, config, timeout, auto_cleanup=True)
+                        team = info.build(problem, config, auto_cleanup=True)
                         team = team.archive(folder)
                         archives.append(team)
                     except Exception:
@@ -152,7 +152,7 @@ class TeamHandler(list[Team]):
             teams: list[Team] = []
             for info in infos:
                 try:
-                    team = info.build(problem, config, timeout, auto_cleanup=safe_build)
+                    team = info.build(problem, config, auto_cleanup=safe_build)
                     teams.append(team)
                 except (ValueError, DockerError):
                     logger.warning(f"Building generators and solvers for team {info.name} failed, they will be excluded!")
