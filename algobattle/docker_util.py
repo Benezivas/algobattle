@@ -383,13 +383,21 @@ class Program(ABC):
         battle_output: Mapping[str, type[Encodable]] = {},
         ) -> Result[Any]:
         """Execute the program, processing input and output data."""
-        logger.debug(f"Running {self.role} of team {self.team_name}.")
+        set_params: dict[str, Any] = {}
         if timeout is Ellipsis:
             timeout = self.config.timeout
+            set_params["timeout"] = timeout
         if space is Ellipsis:
             space = self.config.space
+            set_params["space"] = space
         if cpus is Ellipsis:
             cpus = self.config.cpus
+            set_params["cpus"] = cpus
+        if set_params:
+            param_msg = "with parameters " + ", ".join(f"{k}: {v}" for k, v in set_params.items())
+        else:
+            param_msg = ""
+        logger.debug(f"Running {self.role} of team {self.team_name} at size {size}{param_msg}.")
 
         with TempDir() as input, TempDir() as output:
             if self.role == "generator":
