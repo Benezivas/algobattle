@@ -1,5 +1,0 @@
-FROM windows-base
-
-# outputs a static, artificially wrong solution.
-COPY solution.json /solution.json
-ENTRYPOINT move \solution.json \output\solution\solution.json
