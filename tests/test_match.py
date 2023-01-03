@@ -9,25 +9,10 @@ from algobattle.battle_wrappers.iterated import Iterated
 from algobattle.battle_wrappers.averaged import Averaged
 from algobattle.match import MatchConfig, Match
 from algobattle.team import Team, Matchup, TeamHandler, TeamInfo
-from algobattle.docker_util import Image, get_os_type
+from algobattle.docker_util import get_os_type
 from .testsproblem import Problem as TestProblem
 
 logging.disable(logging.CRITICAL)
-
-
-class TestImage(Image):
-    """Docker image that doesn't rely on an actual docker daemon image."""
-
-    def __init__(self, image_name: str) -> None:
-        self.name = image_name
-        self.id = image_name
-        self.description = image_name
-
-    def run(self, input_dir: Path | None = None, output_dir: Path | None = None, timeout: float | None = None, memory: int | None = None, cpus: int | None = None) -> float:
-        return 1
-
-    def remove(self) -> None:
-        return
 
 
 class TestTeam(Team):
@@ -35,8 +20,6 @@ class TestTeam(Team):
 
     def __init__(self, team_name: str) -> None:
         self.name = team_name
-        self.generator = TestImage(f"TestImage-{self.name}-generator")
-        self.solver = TestImage(f"TestImage-{self.name}-solver")
 
 
 class Matchtests(TestCase):
