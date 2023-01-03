@@ -43,12 +43,12 @@ class BattleWrapper(Subject, ABC):
         for entrypoint in entry_points(group="algobattle.wrappers"):
             if entrypoint.name not in BattleWrapper._wrappers:
                 wrapper: type[BattleWrapper] = entrypoint.load()
-                BattleWrapper._wrappers[wrapper.name()] = wrapper
+                BattleWrapper._wrappers[wrapper.name().lower()] = wrapper
         return BattleWrapper._wrappers
 
     def __init_subclass__(cls, notify_var_changes: bool = False) -> None:
         if cls.name() not in BattleWrapper._wrappers:
-            BattleWrapper._wrappers[cls.name()] = cls
+            BattleWrapper._wrappers[cls.name().lower()] = cls
         return super().__init_subclass__(notify_var_changes)
 
     @abstractmethod
