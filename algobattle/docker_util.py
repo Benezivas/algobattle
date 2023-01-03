@@ -306,7 +306,7 @@ class Image:
 
 
 @dataclass
-class Config:
+class RunParameters:
     timeout: float | None = 30
     space: int | None = None
     cpus: int = 1
@@ -334,7 +334,7 @@ class Program(ABC):
         cls.data_role = "instance" if cls.role == "generator" else "solution"
         return super().__init_subclass__()
 
-    def __init__(self, image: Image, config: Config, team_name: str, data_type: type[CustomEncodable]) -> None:
+    def __init__(self, image: Image, config: RunParameters, team_name: str, data_type: type[CustomEncodable]) -> None:
         self.image = image
         self.config = config
         self.team_name = team_name  # we can't take a ref to the Team object here since it won't be created til after the Programs
@@ -347,7 +347,7 @@ class Program(ABC):
         image: Path | Image | ArchivedImage,
         team_name: str,
         problem_type: type[Problem],
-        config: Config,
+        config: RunParameters,
         timeout: float | None = None,
     ) -> Self:
         """Creates a program by building the specified docker image."""

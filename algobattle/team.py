@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Iterator
 import logging
 
-from algobattle.docker_util import Config, DockerError, ArchivedImage, Generator, Solver
+from algobattle.docker_util import RunParameters, DockerError, ArchivedImage, Generator, Solver
 from algobattle.problem import Problem
 from algobattle.util import TempDir
 
@@ -25,7 +25,7 @@ class TeamInfo:
     generator: Path
     solver: Path
 
-    def build(self, problem: type[Problem], config: Config, timeout: float | None = None, *, auto_cleanup=True) -> Team:
+    def build(self, problem: type[Problem], config: RunParameters, timeout: float | None = None, *, auto_cleanup=True) -> Team:
         """Builds the specified docker files into images and return the corresponding team.
 
         Raises
@@ -135,7 +135,7 @@ class TeamHandler(list[Team]):
     """Handles building teams and cleaning them up."""
 
     @staticmethod
-    def build(infos: list[TeamInfo], problem: type[Problem], config: Config, timeout: float | None = None, safe_build: bool = False) -> TeamHandler:
+    def build(infos: list[TeamInfo], problem: type[Problem], config: RunParameters, timeout: float | None = None, safe_build: bool = False) -> TeamHandler:
         """Builds the specified team objects."""
         if safe_build:
             with TempDir() as folder:
