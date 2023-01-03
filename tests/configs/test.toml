@@ -1,8 +1,10 @@
-[algobattle]
+[match]
 points = 10
-space_generator = 10
 safe_build = true
 battle_type = "averaged"
+
+[docker.generator]
+space = 10
 
 [averaged]
 iterations = 1
