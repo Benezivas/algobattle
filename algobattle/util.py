@@ -165,7 +165,7 @@ def decode(data_spec: Mapping[str, type[Encodable]], source_dir: Path, size: int
     return out
 
 
-class BaseModel(BaseModel, CustomEncodable, ABC):
+class EncodableModel(BaseModel, CustomEncodable, ABC):
     """Problem data that can easily be encoded into and decoded from json files."""
 
     filename: ClassVar[str]
@@ -186,6 +186,6 @@ class BaseModel(BaseModel, CustomEncodable, ABC):
             hidden = field.field_info.extra.get("hidden", False)
             if (isinstance(hidden, str) and hidden == team) or (isinstance(hidden, bool) and hidden):
                 excludes[name] = True
-            elif isinstance(getattr(self, name, None), BaseModel):
+            elif isinstance(getattr(self, name, None), EncodableModel):
                 excludes[name] = getattr(self, name)._excludes(team)
         return excludes

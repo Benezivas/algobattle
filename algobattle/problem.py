@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, ClassVar, SupportsFloat, Self, Generic, TypeVar
 from pydantic import Field
 from pydantic.generics import GenericModel
-from algobattle.util import CustomEncodable, BaseModel, Role
+from algobattle.util import CustomEncodable, EncodableModel, Role
 
 logger = logging.getLogger("algobattle.problem")
 
@@ -96,9 +96,9 @@ class Problem(CustomEncodable, ABC):
             problem_cls = problem_module.Problem
             if not issubclass(problem_cls, Problem):
                 raise ValueError(f"Variable 'Problem' in {path / '__init__.py'} is not a Problem class.")
-            if issubclass(problem_cls, BaseModel):
+            if issubclass(problem_cls, EncodableModel):
                 problem_cls.update_forward_refs(Solution=problem_cls.Solution)
-            if issubclass(problem_cls.Solution, BaseModel):
+            if issubclass(problem_cls.Solution, EncodableModel):
                 problem_cls.Solution.update_forward_refs()
             return problem_cls
         except Exception as e:
@@ -106,7 +106,7 @@ class Problem(CustomEncodable, ABC):
             raise ValueError from e
 
 
-class ProblemModel(BaseModel, Problem, ABC):
+class ProblemModel(EncodableModel, Problem, ABC):
     """A Problem that can easily be parsed to/from a json file."""
 
     filename = "instance.json"
@@ -120,7 +120,7 @@ class ProblemModel(BaseModel, Problem, ABC):
         }
 
 
-class SolutionModel(BaseModel, Problem.Solution, ABC):
+class SolutionModel(EncodableModel, Problem.Solution, ABC):
     """A solution that can easily be parsed to/from a json file."""
 
     filename = "solution.json"
