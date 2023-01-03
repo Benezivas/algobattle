@@ -78,10 +78,15 @@ class ExecutionError(DockerError):
 
 
 class EncodingError(DockerError):
-    """Indicates that some data structured couldn't be encoded or decoded properly."""
+    """Indicates that the given data couldn't be encoded or decoded properly."""
 
     pass
 
+
+class SemanticsError(DockerError):
+    """Indicates that the parsed data is semantically incorrect."""
+
+    pass
 
 @dataclass
 class ArchivedImage:
@@ -462,7 +467,7 @@ class Program(ABC):
         
         if not correct_semantics:
             logger.warning(f"{self.role.capitalize()} of team {self.team_name} output a semantically incorrect {self.data_role}!")
-            raise EncodingError
+            raise SemanticsError
         
 
         logger.info(f"{self.role.capitalize()} of team {self.team_name} output a valid {self.data_role}.")
