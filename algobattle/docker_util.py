@@ -25,6 +25,20 @@ logger = logging.getLogger("algobattle.docker")
 _client_var: DockerClient | None = None
 
 
+@dataclass
+class RunParameters:
+    timeout: float | None = 30
+    space: int | None = None
+    cpus: int = 1
+
+
+@dataclass
+class DockerConfig:
+    build_timeout: float | None = None
+    generator: RunParameters = RunParameters()
+    solver: RunParameters = RunParameters()
+
+
 def client() -> DockerClient:
     """Returns the docker api client, checking that it's still responsive."""
     global _client_var
@@ -301,13 +315,6 @@ class Image:
         except APIError as e:
             raise DockerError(f"Docker APIError thrown while archiving '{self.name}'") from e
         return ArchivedImage(path, self.name, self.id, self.description)
-
-
-@dataclass
-class RunParameters:
-    timeout: float | None = 30
-    space: int | None = None
-    cpus: int = 1
 
 
 T = TypeVar("T", bound=Encodable)
