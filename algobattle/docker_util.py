@@ -349,7 +349,7 @@ class Program(ABC):
         problem_type: type[Problem],
         config: Config,
         timeout: float | None = None,
-    ) -> type[Self]:
+    ) -> Self:
         """Creates a program by building the specified docker image."""
         if isinstance(image, Path):
             image = Image.build(
