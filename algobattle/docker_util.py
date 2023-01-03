@@ -25,14 +25,14 @@ logger = logging.getLogger("algobattle.docker")
 _client_var: DockerClient | None = None
 
 
-@dataclass
+@dataclass(frozen=True)
 class RunParameters:
     timeout: float | None = 30
     space: int | None = None
     cpus: int = 1
 
 
-@dataclass
+@dataclass(frozen=True)
 class DockerConfig:
     build_timeout: float | None = None
     generator: RunParameters = RunParameters()
