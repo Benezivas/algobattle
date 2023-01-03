@@ -5,6 +5,7 @@ import random
 from pathlib import Path
 
 from algobattle.battle_wrappers.iterated import Iterated
+from algobattle.battle_wrappers.averaged import Averaged
 from algobattle.match import MatchConfig
 from algobattle.problem import Problem
 from algobattle.battle_wrapper import BattleWrapper
@@ -34,14 +35,10 @@ class Utiltests(unittest.TestCase):
         with self.assertRaises(ValueError):
             Problem.import_from_path(Path(self.rand_file_name))
 
-    def test_initialize_wrapper_existing_path(self):
+    def test_default_wrappers(self):
         """Initializing an existing wrapper works as expected."""
         self.assertEqual(BattleWrapper.all()["iterated"], Iterated)
-
-    def test_initialize_wrapper_nonexistent_path(self):
-        """Initializing a nonexistent wrapper raises an error."""
-        with self.assertRaises(ValueError):
-            BattleWrapper.all()[self.rand_file_name]
+        self.assertEqual(BattleWrapper.all()["averaged"], Averaged)
 
 
 if __name__ == '__main__':
