@@ -143,7 +143,7 @@ def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, MatchConfig, BattleW
 
     program_config = ProgramConfig(teams=teams, **getattr_set(parsed, "problem", "display", "logs"))
 
-    match_config = MatchConfig.from_dict(config.get("algobattle", {}))
+    match_config = MatchConfig.from_dict(config.get("match", {}))
     for name in vars(match_config):
         if getattr(parsed, name) is not None:
             setattr(match_config, name, getattr(parsed, name))
