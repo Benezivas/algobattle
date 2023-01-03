@@ -4,10 +4,10 @@ import importlib.util
 import logging
 import sys
 from pathlib import Path
-from typing import Any, ClassVar, SupportsFloat, Self, Generic, TypeVar
+from typing import Any, ClassVar, Literal, Protocol, SupportsFloat, Self, Generic, TypeVar
 from pydantic import Field
 from pydantic.generics import GenericModel
-from algobattle.util import CustomEncodable, EncodableModel, Role
+from algobattle.util import CustomEncodable, EncodableModel, Role, inherit_docs
 
 logger = logging.getLogger("algobattle.problem")
 
@@ -129,6 +129,37 @@ class SolutionModel(EncodableModel, Problem.Solution, ABC):
         fields = {
             "filename": {"exclude": True},
         }
+
+
+class Optimization(ProblemModel, ABC):
+    """A problem mixin where each instance comes with a solution and the goal is to provide a better scoring solution."""
+
+    solution: "Solution"
+
+    @inherit_docs
+    def calculate_score(self, solution: Any, size: int) -> SupportsFloat:
+        assert isinstance(solution, self.Solution)
+        gen_score = self.solution.score(size, self)
+        if gen_score == 0:
+            return 1
+        sol_score = solution.score(size, self)
+        if sol_score == 0:
+            return 0
+
+        if self.Solution.direction == "minimize":
+            return gen_score / sol_score
+        else:
+            return sol_score / gen_score
+
+    class Solution(SolutionModel):
+        """A solution with an associated score."""
+
+        direction: ClassVar[Literal["minimize", "maximize"]] = "maximize"
+
+        @abstractmethod
+        def score(self, size: int, instance: Any) -> float:
+            """Calculate the score of this solution for the given problem instance."""
+            raise NotImplementedError        
 
 
 class DirectedGraph(ProblemModel):
