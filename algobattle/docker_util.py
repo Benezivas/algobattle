@@ -291,13 +291,9 @@ class Image:
         except APIError as e:
             raise DockerError(f"Docker APIError thrown while removing '{self.name}'") from e
 
-    def archive(self) -> ArchivedImage:
+    def archive(self, dir: Path) -> ArchivedImage:
         """Archives the image into a .tar file at the targeted directory."""
-        if self.path.is_dir():
-            path = self.path
-        else:
-            path = self.path.parent
-        path = path / f"{self.name}-archive.tar"
+        path = dir / f"{self.name}-archive.tar"
         try:
             image = cast(DockerImage, client().images.get(self.name))
             with open(path, "wb") as file:
