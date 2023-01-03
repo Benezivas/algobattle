@@ -9,7 +9,7 @@ from algobattle.battle_wrappers.iterated import Iterated
 from algobattle.battle_wrappers.averaged import Averaged
 from algobattle.match import MatchConfig, Match
 from algobattle.team import Team, Matchup, TeamHandler, TeamInfo
-from algobattle.docker_util import get_os_type
+from algobattle.docker_util import DockerConfig, RunParameters, get_os_type
 from .testsproblem import Problem as TestProblem
 
 logging.disable(logging.CRITICAL)
@@ -142,7 +142,9 @@ class Execution(TestCase):
         setup_logging(Path.home() / ".algobattle_logs", verbose_logging=True, silent=False)
         problem_path = Path(__file__).parent / "testsproblem"
         cls.problem = TestProblem
-        cls.config = MatchConfig(timeout_generator=2, timeout_solver=2, rounds=2)
+        cls.config = MatchConfig(rounds=2)
+        run_params = RunParameters(timeout=2)
+        cls.docker_config = DockerConfig(generator=run_params, solver=run_params)
         cls.iter_config = Iterated.Config(iteration_cap=10)
         cls.avg_config = Averaged.Config(instance_size=5, iterations=3)
         cls.generator = problem_path / "generator"
@@ -158,19 +160,19 @@ class Execution(TestCase):
 
     def test_basic(self):
         team = TeamInfo("team0", self.generator, self.solver)
-        with TeamHandler.build([team]) as teams:
+        with TeamHandler.build([team], self.problem, self.docker_config) as teams:
             Match.run(self.config, self.iter_config, TestProblem, teams)
 
     def test_multi_team(self):
         team0 = TeamInfo("team0", self.generator, self.solver)
         team1 = TeamInfo("team1", self.generator, self.solver)
-        with TeamHandler.build([team0, team1]) as teams:
+        with TeamHandler.build([team0, team1], self.problem, self.docker_config) as teams:
             Match.run(self.config, self.iter_config, TestProblem, teams)
 
     def test_averaged(self):
         team = TeamInfo("team0", self.generator, self.solver)
-        with TeamHandler.build([team]) as teams:
-            config = MatchConfig(timeout_generator=2, timeout_solver=2, rounds=2, battle_type=Averaged)
+        with TeamHandler.build([team], self.problem, self.docker_config) as teams:
+            config = MatchConfig(rounds=2, battle_type=Averaged)
             Match.run(config, self.avg_config, TestProblem, teams)
 
 
