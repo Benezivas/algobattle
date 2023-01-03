@@ -150,7 +150,7 @@ class ProgramTests(TestCase):
 
     def test_sol_succ(self):
         """The solver outputs a solution with a low quality."""
-        with Solver.build(*self.dockerfile("solver_bad_solution"), TestProblem, self.params) as sol:
+        with Solver.build(*self.dockerfile("solver"), TestProblem, self.params) as sol:
             res = sol.run(self.instance, 5)
             correct = TestProblem.Solution(semantics=True, quality=True)
             self.assertEqual(res.data, correct)
