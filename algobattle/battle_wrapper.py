@@ -81,6 +81,7 @@ class BattleWrapper(Subject, ABC):
         generator: Generator,
         solver: Solver,
         size: int,
+        *,
         timeout_generator: float | None = ...,
         space_generator: int | None = ...,
         timeout_solver: float | None = ...,

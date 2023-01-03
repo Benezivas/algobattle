@@ -375,6 +375,7 @@ class Program(ABC):
     def _run(self,
         size: int,
         input_instance: Problem | None = None,
+        *,
         timeout: float | None = ...,
         space: int | None = ...,
         cpus: int = ...,
@@ -481,6 +482,7 @@ class Generator(Program):
     def run(
         self,
         size: int,
+        *,
         timeout: float | None = ...,
         space: int | None = ...,
         cpus: int = ...,
@@ -508,6 +510,7 @@ class Solver(Program):
         self,
         instance: Problem,
         size: int,
+        *,
         timeout: float | None = ...,
         space: int | None = ...,
         cpus: int = ...,
