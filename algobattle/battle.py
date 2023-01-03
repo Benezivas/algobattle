@@ -14,7 +14,8 @@ from algobattle.battle_wrapper import BattleWrapper
 
 # for now we need to manually import the default wrappers to make sure they're initialized
 from algobattle.battle_wrappers.iterated import Iterated    # type: ignore # noqa: F401
-from algobattle.battle_wrappers.averaged import Averaged    # type: ignore # noqa: F401
+from algobattle.battle_wrappers.averaged import Averaged
+from algobattle.docker_util import DockerConfig    # type: ignore # noqa: F401
 
 from algobattle.match import MatchConfig, Match
 from algobattle.problem import Problem
@@ -80,7 +81,7 @@ class ProgramConfig:
     logs: Path = Path.home() / ".algobattle_logs"
 
 
-def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, MatchConfig, BattleWrapper.Config]:
+def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, DockerConfig, MatchConfig, BattleWrapper.Config]:
     """Parse a given CLI arg list into config objects."""
     parser = ArgumentParser()
     parser.add_argument("problem", type=check_path, help="Path to a folder with the problem file.")
@@ -148,19 +149,26 @@ def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, MatchConfig, BattleW
         if getattr(parsed, name) is not None:
             setattr(match_config, name, getattr(parsed, name))
 
+    docker_params = config.get("docker", {})
+    docker_config = DockerConfig(
+        build_timeout=docker_params.get("build_timeout"),
+        generator=docker_params.get("generator", {}),
+        solver=docker_params.get("solver", {}),
+    )
+
     wrapper_config = match_config.battle_type.Config(**config.get(match_config.battle_type.name().lower(), {}))
     for name in vars(wrapper_config):
         cli_name = f"{match_config.battle_type.name().lower()}_{name}"
         if getattr(parsed, cli_name) is not None:
             setattr(wrapper_config, name, getattr(parsed, cli_name))
 
-    return program_config, match_config, wrapper_config
+    return program_config, docker_config, match_config, wrapper_config
 
 
 def main():
     """Entrypoint of `algobattle` CLI."""
     try:
-        program_config, match_config, wrapper_config = parse_cli_args(sys.argv[1:])
+        program_config, docker_config, match_config, wrapper_config = parse_cli_args(sys.argv[1:])
         logger = setup_logging(program_config.logs, match_config.verbose, program_config.display != "logs")
 
     except KeyboardInterrupt:
@@ -168,7 +176,7 @@ def main():
 
     try:
         problem = Problem.import_from_path(program_config.problem)
-        with TeamHandler.build(program_config.teams, problem, ) as teams, ExitStack() as stack:
+        with TeamHandler.build(program_config.teams, problem, docker_config) as teams, ExitStack() as stack:
             if program_config.display == "ui":
                 ui = Ui()
                 stack.enter_context(ui)
