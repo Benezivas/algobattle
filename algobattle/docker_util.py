@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 from time import sleep
 from timeit import default_timer
-from typing import Any, Generic, Iterator, Literal, Mapping, Self, TypeVar, cast, TYPE_CHECKING
+from typing import Any, Generic, Iterator, Literal, Mapping, Self, TypeVar, cast
 from uuid import uuid1
 import json
 from dataclasses import dataclass
@@ -17,8 +17,6 @@ from docker.types import Mount
 from requests import Timeout
 from algobattle.util import Encodable, CustomEncodable, Role, TempDir, encode, decode
 from algobattle.problem import Problem
-if TYPE_CHECKING:
-    from algobattle.team import Team
 
 
 logger = logging.getLogger("algobattle.docker")
