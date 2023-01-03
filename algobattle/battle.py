@@ -15,7 +15,7 @@ from algobattle.battle_wrapper import BattleWrapper
 # for now we need to manually import the default wrappers to make sure they're initialized
 from algobattle.battle_wrappers.iterated import Iterated    # type: ignore # noqa: F401
 from algobattle.battle_wrappers.averaged import Averaged    # type: ignore # noqa: F401
-from algobattle.docker_util import DockerConfig
+from algobattle.docker_util import DockerConfig, RunParameters
 
 from algobattle.match import MatchConfig, Match
 from algobattle.problem import Problem
@@ -152,8 +152,8 @@ def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, DockerConfig, MatchC
     docker_params = config.get("docker", {})
     docker_config = DockerConfig(
         build_timeout=docker_params.get("build_timeout"),
-        generator=docker_params.get("generator", {}),
-        solver=docker_params.get("solver", {}),
+        generator=RunParameters(**docker_params.get("generator", {})),
+        solver=RunParameters(**docker_params.get("solver", {})),
     )
     if getattr(parsed, "timeout_build") is not None:
         object.__setattr__(docker_config, "build_timeout", parsed.timeout_build)
