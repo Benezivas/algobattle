@@ -437,7 +437,7 @@ class Program(ABC):
             try:
                 output_data = self.data_type.decode(output / "instance", size)
             except Exception as e:
-                logger.warning(f"Generator of team {self.team_name} output a syntactically incorrect instance!")
+                logger.warning(f"{self.role.capitalize()} of team {self.team_name} output a syntactically incorrect {self.data_role}!")
                 raise EncodingError from e
 
             if battle_output:
@@ -453,11 +453,11 @@ class Program(ABC):
             correct_semantics = output_data.check_semantics(size, input_instance)
         
         if not correct_semantics:
-            logger.warning(f"Generator of team {self.team_name} output a semantically incorrect instance!")
+            logger.warning(f"{self.role.capitalize()} of team {self.team_name} output a semantically incorrect {self.data_role}!")
             raise EncodingError
         
 
-        logger.info(f"{self.role.capitalize()} of team {self.team_name} output a valid instance.")
+        logger.info(f"{self.role.capitalize()} of team {self.team_name} output a valid {self.data_role}.")
         return Result(data=output_data, runtime=runtime, battle_data=decoded_battle_output)
 
     def remove(self) -> None:
