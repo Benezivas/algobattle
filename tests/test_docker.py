@@ -7,6 +7,7 @@ import random
 from pathlib import Path
 
 from algobattle.docker_util import DockerError, Image, client, DockerImage, get_os_type
+from algobattle.util import TempDir
 from . import testsproblem
 
 logging.disable(logging.CRITICAL)
@@ -66,9 +67,9 @@ class DockerTests(unittest.TestCase):
 
     def test_archive(self):
         """Raises an error if the image can't be archived and restored properly."""
-        with Image.build(self.problem_path / "generator", "gen_arch", dockerfile=self.dockerfile) as image:
+        with Image.build(self.problem_path / "generator", "gen_arch", dockerfile=self.dockerfile) as image, TempDir() as folder:
             original_tag = cast(DockerImage, client().images.get(image.id)).tags[0]
-            archived = image.archive()
+            archived = image.archive(folder)
             assert (self.problem_path / "generator" / "gen_arch-archive.tar").is_file()
             restored = archived.restore()
             docker_image = cast(DockerImage, client().images.get(restored.id))
