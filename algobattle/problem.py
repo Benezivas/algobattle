@@ -4,7 +4,7 @@ import importlib.util
 import logging
 import sys
 from pathlib import Path
-from typing import Any, ClassVar, Literal, Protocol, SupportsFloat, Self, Generic, TypeVar
+from typing import Any, ClassVar, Literal, SupportsFloat, Self, Generic, TypeVar
 from pydantic import Field
 from pydantic.generics import GenericModel
 from algobattle.util import CustomEncodable, EncodableModel, Role, inherit_docs
