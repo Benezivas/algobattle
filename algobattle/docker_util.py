@@ -454,6 +454,19 @@ class Program(ABC):
         logger.info(f"{self.role.capitalize()} of team {self.team_name} output a valid instance.")
         return Result(data=output_data, runtime=runtime, battle_data=decoded_battle_output)
 
+    def remove(self) -> None:
+        """Removes the underlying image from the docker daemon.
+
+        **This will not cause the python object to be deleted.** Attempting to run the image after it has been removed will
+        cause runtime errors.
+        Will not throw an error if the image has been removed already.
+
+        Raises
+        ------
+        DockerError
+            When removing the image fails
+        """
+        self.image.remove()
 
 class Generator(Program):
     """A higher level interface for a team's generator."""
