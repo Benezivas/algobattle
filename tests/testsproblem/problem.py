@@ -8,11 +8,7 @@ from algobattle.problem import ProblemModel, SolutionModel
 logger = logging.getLogger('algobattle.problems.testsproblem')
 
 
-class Solution(SolutionModel):
-    val: int
 
-    def check_semantics(self, size: int, instance: "Tests") -> bool:
-        return self.val <= instance.val
 
 
 
@@ -21,7 +17,12 @@ class Tests(ProblemModel):
 
     name: ClassVar[str] = "Tests"
     min_size: ClassVar[int] = 5
-    Solution = Solution
+
+    class Solution(SolutionModel):
+        val: int
+
+        def check_semantics(self, size: int, instance: "Tests") -> bool:
+            return self.val <= instance.val
 
     val: int
     solution: Solution = Field(hidden=True)
