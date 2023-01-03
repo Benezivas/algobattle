@@ -4,12 +4,16 @@ import importlib.util
 import logging
 import sys
 from pathlib import Path
-from typing import Any, ClassVar, Literal, SupportsFloat, Self, Generic, TypeVar
+from typing import Any, ClassVar, Literal, SupportsFloat, Self, Generic, TypeAlias, TypeVar
 from pydantic import Field
 from pydantic.generics import GenericModel
 from algobattle.util import CustomEncodable, EncodableModel, Role, inherit_docs
 
 logger = logging.getLogger("algobattle.problem")
+
+
+_Problem: TypeAlias = Any
+_Solution: TypeAlias = Any
 
 
 class ProblemError(Exception):
@@ -60,12 +64,12 @@ class Problem(CustomEncodable, ABC):
             """Encodes the solution into files that can be passed to docker containers."""
             raise NotImplementedError
 
-        def check_semantics(self, size: int, instance: Any) -> bool:
+        def check_semantics(self, size: int, instance: _Problem) -> bool:
             """Validates that the parsed solution is semantically correct."""
             return True
 
     @abstractmethod
-    def calculate_score(self, solution: Any, size: int) -> SupportsFloat:
+    def calculate_score(self, solution: _Solution, size: int) -> SupportsFloat:
         """Calculates how well a solution solves this problem instance.
         
         Return values are clamped to fall inside [0, 1].
@@ -137,7 +141,7 @@ class Optimization(ProblemModel, ABC):
     solution: "Solution"
 
     @inherit_docs
-    def calculate_score(self, solution: Any, size: int) -> SupportsFloat:
+    def calculate_score(self, solution: _Solution, size: int) -> SupportsFloat:
         assert isinstance(solution, self.Solution)
         gen_score = self.solution.score(size, self)
         if gen_score == 0:
@@ -157,7 +161,7 @@ class Optimization(ProblemModel, ABC):
         direction: ClassVar[Literal["minimize", "maximize"]] = "maximize"
 
         @abstractmethod
-        def score(self, size: int, instance: Any) -> float:
+        def score(self, size: int, instance: _Problem) -> float:
             """Calculate the score of this solution for the given problem instance."""
             raise NotImplementedError        
 
