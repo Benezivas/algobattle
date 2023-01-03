@@ -160,18 +160,18 @@ class Execution(TestCase):
 
     def test_basic(self):
         team = TeamInfo("team0", self.generator, self.solver)
-        with TeamHandler.build([team], self.problem, self.docker_config) as teams:
+        with TeamHandler.build([team], self.problem, self.docker_config, safe_build=True) as teams:
             Match.run(self.config, self.iter_config, TestProblem, teams)
 
     def test_multi_team(self):
         team0 = TeamInfo("team0", self.generator, self.solver)
         team1 = TeamInfo("team1", self.generator, self.solver)
-        with TeamHandler.build([team0, team1], self.problem, self.docker_config) as teams:
+        with TeamHandler.build([team0, team1], self.problem, self.docker_config, safe_build=True) as teams:
             Match.run(self.config, self.iter_config, TestProblem, teams)
 
     def test_averaged(self):
         team = TeamInfo("team0", self.generator, self.solver)
-        with TeamHandler.build([team], self.problem, self.docker_config) as teams:
+        with TeamHandler.build([team], self.problem, self.docker_config, safe_build=True) as teams:
             config = MatchConfig(rounds=2, battle_type=Averaged)
             Match.run(config, self.avg_config, TestProblem, teams)
 
