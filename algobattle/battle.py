@@ -100,7 +100,8 @@ def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, MatchConfig, BattleW
     parser.add_argument("--timeout_solver", type=float, help="Time limit for the solver execution.")
     parser.add_argument("--space_generator", type=int, help="Memory limit for the generator execution, in MB.")
     parser.add_argument("--space_solver", type=int, help="Memory limit the solver execution, in MB.")
-    parser.add_argument("--cpus", type=int, help="Number of cpu cores used for each docker container execution.")
+    parser.add_argument("--cpus_generator", type=int, help="Number of cpu cores used for generator container execution.")
+    parser.add_argument("--cpus_solver", type=int, help="Number of cpu cores used for solver container execution.")
 
     # battle wrappers have their configs automatically added to the CLI args
     for wrapper_name, wrapper in BattleWrapper.all().items():
