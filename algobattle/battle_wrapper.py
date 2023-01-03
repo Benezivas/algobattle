@@ -9,13 +9,16 @@ from dataclasses import dataclass
 from importlib.metadata import entry_points
 import logging
 from abc import abstractmethod, ABC
-from typing import Any, ClassVar, Mapping
+from typing import Any, ClassVar, Mapping, TypeAlias
 from algobattle.docker_util import DockerError, Generator, Result, Solver
 from algobattle.observer import Subject
 from algobattle.problem import Problem
 from algobattle.util import CLIParsable, Encodable, Role
 
 logger = logging.getLogger("algobattle.battle_wrapper")
+
+
+_Config: TypeAlias = Any
 
 
 @dataclass
@@ -72,7 +75,7 @@ class BattleWrapper(Subject, ABC):
         return cls.__name__
 
     @abstractmethod
-    def run_battle(self, generator: Generator, solver: Solver, config: Any, min_size: int) -> None:
+    def run_battle(self, generator: Generator, solver: Solver, config: _Config, min_size: int) -> None:
         """Calculates the next instance size that should be fought over"""
         raise NotImplementedError
 
