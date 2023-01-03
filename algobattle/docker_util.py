@@ -448,7 +448,7 @@ class Program(ABC):
                 raise
 
             try:
-                output_data = self.data_type.decode(output / "instance", size)
+                output_data = self.data_type.decode(output / self.data_role, size)
             except Exception as e:
                 logger.warning(f"{self.role.capitalize()} of team {self.team_name} output a syntactically incorrect {self.data_role}!")
                 raise EncodingError from e
@@ -523,7 +523,7 @@ class Generator(Program):
 class Solver(Program):
     """A higher level interface for a team's solver."""
 
-    role = "generator"
+    role = "solver"
 
     def run(
         self,
