@@ -155,6 +155,14 @@ def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, DockerConfig, MatchC
         generator=docker_params.get("generator", {}),
         solver=docker_params.get("solver", {}),
     )
+    if getattr(parsed, "timeout_build") is not None:
+        docker_config.build_timeout = parsed.timeout_build
+    for role in ("generator", "solver"):
+        role_config = getattr(docker_config, role)
+        for name in vars(role_config):
+            cli_name = f"{name}_{role}"
+            if getattr(parsed, cli_name) is not None:
+                setattr(role_config, name, getattr(parsed, cli_name))
 
     wrapper_config = match_config.battle_type.Config(**config.get(match_config.battle_type.name().lower(), {}))
     for name in vars(wrapper_config):
