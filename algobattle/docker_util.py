@@ -348,19 +348,23 @@ class Program(ABC):
     @classmethod
     def build(
         cls,
-        path: Path,
+        image: Path | Image | ArchivedImage,
         team_name: str,
         problem_type: type[Problem],
         config: Config,
         timeout: float | None = None,
     ) -> type[Self]:
         """Creates a program by building the specified docker image."""
-        image = Image.build(
-            path=path,
-            image_name=f"{cls.role}-{team_name}",
-            description=f"{cls.role} for team {team_name}",
-            timeout=timeout,
-        )
+        if isinstance(image, Path):
+            image = Image.build(
+                path=image,
+                image_name=f"{cls.role}-{team_name}",
+                description=f"{cls.role} for team {team_name}",
+                timeout=timeout,
+            )
+        elif isinstance(image, ArchivedImage):
+            image = image.restore()
+
         if cls.role == "generator":
             data_type = problem_type
         else:
