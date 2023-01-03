@@ -3,8 +3,8 @@ from __future__ import annotations
 import logging
 
 from algobattle.battle_wrapper import BattleWrapper
-from algobattle.fight_handler import FightHandler
 from algobattle.util import CLIParsable, inherit_docs, argspec
+from algobattle.docker_util import Generator, Solver
 
 logger = logging.getLogger("algobattle.battle_wrappers.iterated")
 
@@ -18,7 +18,7 @@ class Iterated(BattleWrapper):
         exponent: int = argspec(default=2, help="Determines how quickly the instance size grows.")
         approximation_ratio: float = argspec(default=1, help="Approximation ratio that a solver needs to achieve to pass.")
 
-    def run_battle(self, config: Config, fight_handler: FightHandler, min_size: int) -> None:
+    def run_battle(self, generator: Generator, solver: Solver, config: Config, min_size: int) -> None:
         """Execute one iterative battle between a generating and a solving team.
 
         Incrementally try to search for the highest n for which the solver is
@@ -44,7 +44,7 @@ class Iterated(BattleWrapper):
         self.current = min_size
 
         while alive:
-            result = fight_handler.fight(self.current)
+            result = self.run_programs(generator, solver, self.current)
             score = result.score
             if score < config.approximation_ratio:
                 logger.info(f"Solver does not meet the required solution quality at instance size "

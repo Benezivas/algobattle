@@ -2,7 +2,7 @@
 import logging
 
 from algobattle.battle_wrapper import BattleWrapper
-from algobattle.fight_handler import FightHandler
+from algobattle.docker_util import Generator, Solver
 from algobattle.util import CLIParsable, inherit_docs, argspec
 
 logger = logging.getLogger("algobattle.battle_wrappers.averaged")
@@ -16,8 +16,7 @@ class Averaged(BattleWrapper):
         instance_size: int = argspec(default=10, help="Instance size that will be fought at.")
         iterations: int = argspec(default=10, help="Number of iterations in each round.")
 
-
-    def run_battle(self, config: Config, fight_handler: FightHandler, min_size: int) -> None:
+    def run_battle(self, generator: Generator, solver: Solver, config: Config, min_size: int) -> None:
         """Execute one averaged battle between a generating and a solving team.
 
         Execute several fights between two teams on a fixed instance size
@@ -29,7 +28,7 @@ class Averaged(BattleWrapper):
         self.scores: list[float] = []
         for i in range(config.iterations):
             self.curr_iter = i + 1
-            result = fight_handler.fight(config.instance_size)
+            result = self.run_programs(generator, solver, config.instance_size)
             self.scores.append(result.score)
 
     @inherit_docs
