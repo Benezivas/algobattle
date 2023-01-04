@@ -66,7 +66,10 @@ class Problem(CustomEncodable, ABC):
 
     def check_semantics(self, size: int) -> bool:
         """Validates that the parsed instance is semantically correct."""
-        return True
+        if self.solution is not None:
+            return self.solution.check_semantics(size, self)
+        else:
+            return True
 
     def calculate_score(self, solution: _Solution, size: int) -> SupportsFloat:
         """Calculates how well a solution solves this problem instance.
