@@ -65,12 +65,6 @@ class Problem(CustomEncodable, ABC):
         """Validates that the parsed instance is semantically correct."""
         return True
 
-    @overload
-    def calculate_score(self, solution: _Solution, size: int) -> SupportsFloat: ...
-
-    @overload
-    def calculate_score(self, solution: _Solution, size: int, *, generator_solution: _Solution) -> SupportsFloat: ...
-
     def calculate_score(self, solution: _Solution, size: int, *, generator_solution: _Solution | None = None) -> SupportsFloat:
         """Calculates how well a solution solves this problem instance.
         
