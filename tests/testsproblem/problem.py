@@ -29,5 +29,5 @@ class Tests(ProblemModel):
     def check_semantics(self, size: int) -> bool:
         return self.semantics
 
-    def calculate_score(self, solution: Solution, size: int, *, generator_solution: Solution | None = None) -> SupportsFloat:
+    def calculate_score(self, solution: Solution, generator_solution: Solution | None, size: int) -> SupportsFloat:
         return solution.quality

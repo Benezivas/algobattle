@@ -122,7 +122,7 @@ class BattleWrapper(Subject, ABC):
         except DockerError as e:
             return CombinedResults(score=0, generator=gen_result, solver=e)
 
-        score = gen_result.problem.calculate_score(sol_result.solution, size, generator_solution=gen_result.solution)
+        score = gen_result.problem.calculate_score(solution=sol_result.solution, generator_solution=gen_result.solution, size=size)
         score = max(0, min(1, float(score)))
         logger.info(f"Solver of group {solver.team_name} yields a valid solution with a score of {score}.")
         return CombinedResults(score, gen_result, sol_result)
