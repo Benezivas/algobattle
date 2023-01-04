@@ -455,6 +455,15 @@ class Program(ABC):
             except Exception as e:
                 logger.warning(f"{self.role.capitalize()} of team {self.team_name} output a syntactically incorrect {self.data_role}!")
                 raise EncodingError from e
+            if isinstance(output_data, Problem):
+                if output_data.with_solution:
+                    try:
+                        output_data.solution = output_data.Solution.decode(output / "solution", size)
+                    except Exception as e:
+                        logger.warning(f"{self.role.capitalize()} of team {self.team_name} output a syntactically incorrect solution!")
+                        raise EncodingError from e
+                else:
+                    output_data.solution = None
 
             if battle_output:
                 decoded_battle_output = decode(battle_output, output / "battle_data", size)
@@ -471,7 +480,12 @@ class Program(ABC):
         if not correct_semantics:
             logger.warning(f"{self.role.capitalize()} of team {self.team_name} output a semantically incorrect {self.data_role}!")
             raise SemanticsError
-        
+
+        if isinstance(output_data, Problem) and output_data.solution is not None:
+            correct_semantics = output_data.solution.check_semantics(size, output_data)
+            if not correct_semantics:
+                logger.warning(f"{self.role.capitalize()} of team {self.team_name} output a semantically incorrect solution!")
+                raise SemanticsError
 
         logger.info(f"{self.role.capitalize()} of team {self.team_name} output a valid {self.data_role}.")
         return Result(data=output_data, runtime=runtime, battle_data=decoded_battle_output)
