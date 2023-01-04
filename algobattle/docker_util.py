@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 from time import sleep
 from timeit import default_timer
-from typing import Any, Generic, Iterator, Literal, Mapping, Self, TypeVar, cast
+from typing import Any, Iterator, Literal, Mapping, Self, cast
 from uuid import uuid1
 import json
 from dataclasses import dataclass
@@ -15,7 +15,7 @@ from docker.models.images import Image as DockerImage
 from docker.models.containers import Container as DockerContainer
 from docker.types import Mount
 from requests import Timeout
-from algobattle.util import Encodable, CustomEncodable, Role, TempDir, encode, decode, inherit_docs
+from algobattle.util import Encodable, Role, TempDir, encode, decode, inherit_docs
 from algobattle.problem import Problem
 
 

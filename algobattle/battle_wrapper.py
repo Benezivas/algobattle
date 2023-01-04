@@ -12,7 +12,6 @@ from abc import abstractmethod, ABC
 from typing import Any, ClassVar, Mapping, TypeAlias
 from algobattle.docker_util import DockerError, Generator, Solver, GeneratorResult, SolverResult
 from algobattle.observer import Subject
-from algobattle.problem import Problem
 from algobattle.util import CLIParsable, Encodable, Role
 
 logger = logging.getLogger("algobattle.battle_wrapper")
