@@ -146,13 +146,16 @@ class OptimiztionSolution(SolutionModel, ABC):
         raise NotImplementedError    
 
 
-Solution: TypeAlias
+Solution: TypeAlias = OptimiztionSolution
 
 
 class Optimization(ProblemModel, ABC):
     """A problem mixin where each instance comes with a solution and the goal is to provide a better scoring solution."""
 
     solution: "Solution" = Field(hidden="solver")
+
+    def check_semantics(self, size: int) -> bool:
+        return self.solution.check_semantics(size, self)
 
     @inherit_docs
     def calculate_score(self, solution: _Solution, size: int) -> SupportsFloat:
