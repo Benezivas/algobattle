@@ -483,14 +483,14 @@ class Program(ABC):
             correct_semantics = output_data.check_semantics(size)
         else:
             assert isinstance(output_data, Problem.Solution)
-            correct_semantics = output_data.check_semantics(size, input_instance)
+            correct_semantics = output_data.check_semantics(input_instance, size)
         
         if not correct_semantics:
             logger.warning(f"{self.role.capitalize()} of team {self.team_name} output a semantically incorrect {self.data_role}!")
             raise SemanticsError
 
         if generator_solution is not None:
-            correct_semantics = generator_solution.check_semantics(size, output_data)
+            correct_semantics = generator_solution.check_semantics(output_data, size)
             if not correct_semantics:
                 logger.warning(f"{self.role.capitalize()} of team {self.team_name} output a semantically incorrect solution!")
                 raise SemanticsError

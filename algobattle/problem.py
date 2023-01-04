@@ -33,7 +33,7 @@ class Scored(Protocol):
     direction: ClassVar[Literal["minimize", "maximize"]]
 
     @abstractmethod
-    def score(self, size: int, instance: _Problem) -> float:
+    def score(self, instance: _Problem, size: int) -> float:
         """Calculate the score of this solution for the given problem instance."""
         raise NotImplementedError  
 
@@ -77,10 +77,10 @@ class Problem(CustomEncodable, ABC):
             # we can't check data protocol subclass relationships at runtime so we need to check if the solution is an instance instead
             # we know that the generator's and solver's solutions are of the same type so we don't need to check both
             assert isinstance(solution, Scored)
-            gen_score = generator_solution.score(size, self)
+            gen_score = generator_solution.score(self, size)
             if gen_score == 0:
                 return 1
-            sol_score = solution.score(size, self)
+            sol_score = solution.score(self, size)
             if sol_score == 0:
                 return 0
 
@@ -136,7 +136,7 @@ class Problem(CustomEncodable, ABC):
             """Encodes the solution into files that can be passed to docker containers."""
             raise NotImplementedError
 
-        def check_semantics(self, size: int, instance: _Problem) -> bool:
+        def check_semantics(self, instance: _Problem, size: int) -> bool:
             """Validates that the parsed solution is semantically correct."""
             return True
 

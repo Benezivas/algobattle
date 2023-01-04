@@ -21,7 +21,7 @@ class Tests(ProblemModel):
         semantics: bool
         quality: bool
 
-        def check_semantics(self, size: int, instance: "Tests") -> bool:
+        def check_semantics(self, instance: "Tests", size: int) -> bool:
             return self.semantics
 
     semantics: bool
