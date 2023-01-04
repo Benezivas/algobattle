@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, ClassVar, Literal, Protocol, SupportsFloat, Self, Generic, TypeAlias, TypeVar, runtime_checkable
 from pydantic import Field
 from pydantic.generics import GenericModel
-from algobattle.util import CustomEncodable, EncodableModel, Role
+from algobattle.util import CustomEncodable, EncodableModel, Role, inherit_docs
 
 logger = logging.getLogger("algobattle.problem")
 
@@ -149,6 +149,8 @@ class ProblemModel(EncodableModel, Problem, ABC):
 
     filename: ClassVar[str] = "instance.json"
 
+    solution: "Solution | None"
+
     class Config:
         fields = {
             "filename": {"exclude": True},
@@ -158,6 +160,12 @@ class ProblemModel(EncodableModel, Problem, ABC):
             "has_solution": {"exclude": True},
             "solution": {"exclude": True},
         }
+        
+        @staticmethod
+        def schema_extra(schema):
+            del schema["properties"]["solution"]
+
+    Solution = Problem.Solution
 
 
 class SolutionModel(EncodableModel, Problem.Solution, ABC):
