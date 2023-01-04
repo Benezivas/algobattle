@@ -15,6 +15,7 @@ class Tests(ProblemModel):
     """Artificial problem used for tests."""
 
     name: ClassVar[str] = "Tests"
+    with_solution: ClassVar[bool] = False
 
     class Solution(SolutionModel):
         semantics: bool

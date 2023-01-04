@@ -47,7 +47,7 @@ class Problem(CustomEncodable, ABC):
     min_size: ClassVar[int] = 0
     """Minimum size of valid instances of this problem."""
 
-    with_solution: ClassVar[bool] = False
+    with_solution: ClassVar[bool] = True
     """Whether an instance of this problem also comes with a solution."""
 
     solution: "Solution | None"
