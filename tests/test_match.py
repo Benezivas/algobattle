@@ -50,7 +50,7 @@ class Matchtests(TestCase):
 
     def test_calculate_points_iterated_no_successful_round(self):
         """Two teams should get an equal amount of points if nobody solved anything."""
-        match = Match(MatchConfig(rounds=2), Iterated.Config, TestProblem, self.teams)
+        match = Match(MatchConfig(rounds=2), Iterated.Config(), TestProblem, self.teams)
         battle = Iterated()
         battle.reached = 0
         match.results[self.matchup0] = [battle, battle]
@@ -81,7 +81,7 @@ class Matchtests(TestCase):
 
     def test_calculate_points_iterated_one_team_better(self):
         """One team should get more points than the other if it performed better."""
-        match = Match(MatchConfig(rounds=2), Iterated.Config, TestProblem, self.teams)
+        match = Match(MatchConfig(rounds=2), Iterated.Config(), TestProblem, self.teams)
         battle = Iterated()
         battle.reached = 10
         battle2 = Iterated()
@@ -92,7 +92,7 @@ class Matchtests(TestCase):
 
     def test_calculate_points_averaged_no_successful_round(self):
         """Two teams should get an equal amount of points if nobody solved anything."""
-        match = Match(MatchConfig(rounds=2, battle_type=Averaged), Averaged.Config, TestProblem, self.teams)
+        match = Match(MatchConfig(rounds=2, battle_type=Averaged), Averaged.Config(), TestProblem, self.teams)
         battle = Averaged()
         battle.scores = [0, 0, 0]
         match.results[self.matchup0] = [battle, battle]
@@ -101,7 +101,7 @@ class Matchtests(TestCase):
 
     def test_calculate_points_averaged_draw(self):
         """Two teams should get an equal amount of points if both solved a problem equally well."""
-        match = Match(MatchConfig(rounds=2, battle_type=Averaged), Averaged.Config, TestProblem, self.teams)
+        match = Match(MatchConfig(rounds=2, battle_type=Averaged), Averaged.Config(), TestProblem, self.teams)
         battle = Averaged()
         battle.scores = [.5, .5, .5]
         match.results[self.matchup0] = [battle, battle]

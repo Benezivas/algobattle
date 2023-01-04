@@ -51,7 +51,7 @@ def argspec(*, default: T, help: str = "", parser: Callable[[str], T] | None = N
 
 
 @dataclass_transform(field_specifiers=(argspec,))
-class CLIParsable(Protocol):
+class CLIParsable:
     """Protocol for dataclass-like objects that can be parsed from the CLI."""
 
     def __init_subclass__(cls) -> None:
