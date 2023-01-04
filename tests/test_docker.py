@@ -126,7 +126,7 @@ class ProgramTests(TestCase):
 
     def test_sol_timeout(self):
         """The solver times out."""
-        with Solver.build(*self.dockerfile("solver_timeout"), TestProblem, self.params) as sol:
+        with Solver.build(*self.dockerfile("solver_timeout"), TestProblem, self.params_short) as sol:
             with self.assertRaises(EncodingError):
                 sol.run(self.instance, 5)
 
