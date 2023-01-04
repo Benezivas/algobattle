@@ -152,7 +152,7 @@ class ProblemModel(EncodableModel, Problem, ABC):
             "name": {"exclude": True},
             "min_size": {"exclude": True},
             "has_solution": {"exclude": True},
-            "solution": {"exclude": True},
+            "Solution": {"exclude": True},
         }
 
 
