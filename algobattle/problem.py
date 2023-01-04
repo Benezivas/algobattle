@@ -14,7 +14,6 @@ logger = logging.getLogger("algobattle.problem")
 
 _Problem: TypeAlias = Any
 _Solution: TypeAlias = Any
-Solution: TypeAlias
 
 
 class ProblemError(Exception):
