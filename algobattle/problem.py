@@ -135,6 +135,20 @@ class SolutionModel(EncodableModel, Problem.Solution, ABC):
         }
 
 
+class OptimiztionSolution(SolutionModel, ABC):
+    """A solution with an associated score."""
+
+    direction: ClassVar[Literal["minimize", "maximize"]] = "maximize"
+
+    @abstractmethod
+    def score(self, size: int, instance: _Problem) -> float:
+        """Calculate the score of this solution for the given problem instance."""
+        raise NotImplementedError    
+
+
+Solution: TypeAlias
+
+
 class Optimization(ProblemModel, ABC):
     """A problem mixin where each instance comes with a solution and the goal is to provide a better scoring solution."""
 
@@ -142,6 +156,7 @@ class Optimization(ProblemModel, ABC):
 
     @inherit_docs
     def calculate_score(self, solution: _Solution, size: int) -> SupportsFloat:
+        assert issubclass(self.Solution, OptimiztionSolution)
         assert isinstance(solution, self.Solution)
         gen_score = self.solution.score(size, self)
         if gen_score == 0:
@@ -153,17 +168,7 @@ class Optimization(ProblemModel, ABC):
         if self.Solution.direction == "minimize":
             return gen_score / sol_score
         else:
-            return sol_score / gen_score
-
-    class Solution(SolutionModel):
-        """A solution with an associated score."""
-
-        direction: ClassVar[Literal["minimize", "maximize"]] = "maximize"
-
-        @abstractmethod
-        def score(self, size: int, instance: _Problem) -> float:
-            """Calculate the score of this solution for the given problem instance."""
-            raise NotImplementedError        
+            return sol_score / gen_score    
 
 
 class DirectedGraph(ProblemModel):
