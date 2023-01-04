@@ -344,7 +344,7 @@ class Program(ABC):
         cls.data_role = "instance" if cls.role == "generator" else "solution"
         return super().__init_subclass__()
 
-    def __init__(self, image: Image, config: RunParameters, team_name: str, data_type: type[CustomEncodable]) -> None:
+    def __init__(self, image: Image, config: RunParameters, team_name: str, data_type: type[Problem]  | type[Problem.Solution]) -> None:
         self.image = image
         self.config = config
         self.team_name = team_name  # we can't take a ref to the Team object here since it won't be created til after the Programs
