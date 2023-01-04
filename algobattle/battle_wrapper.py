@@ -55,7 +55,7 @@ class BattleWrapper(Subject, ABC):
 
     @abstractmethod
     def score(self) -> float:
-        """The score achieved by the solver of this battle."""
+        """The score achieved by the scored team during this battle."""
         raise NotImplementedError
 
     @staticmethod
