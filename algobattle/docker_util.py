@@ -437,6 +437,8 @@ class Program(ABC):
                 }, f)
             
             (output / self.data_role).mkdir()
+            if issubclass(self.data_type, Problem) and self.data_type.with_solution:
+                (output / "solution").mkdir()
             if battle_output:
                 (output / "battle_data").mkdir()
 
