@@ -15,7 +15,7 @@ from docker.models.images import Image as DockerImage
 from docker.models.containers import Container as DockerContainer
 from docker.types import Mount
 from requests import Timeout
-from algobattle.util import Encodable, CustomEncodable, Role, TempDir, encode, decode
+from algobattle.util import Encodable, CustomEncodable, Role, TempDir, encode, decode, inherit_docs
 from algobattle.problem import Problem
 
 
@@ -490,18 +490,8 @@ class Program(ABC):
         logger.info(f"{self.role.capitalize()} of team {self.team_name} output a valid {self.data_role}.")
         return Result(data=output_data, runtime=runtime, battle_data=decoded_battle_output)
 
+    @inherit_docs
     def remove(self) -> None:
-        """Removes the underlying image from the docker daemon.
-
-        **This will not cause the python object to be deleted.** Attempting to run the image after it has been removed will
-        cause runtime errors.
-        Will not throw an error if the image has been removed already.
-
-        Raises
-        ------
-        DockerError
-            When removing the image fails
-        """
         self.image.remove()
 
     def __enter__(self):
