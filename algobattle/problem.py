@@ -4,7 +4,7 @@ import importlib.util
 import logging
 import sys
 from pathlib import Path
-from typing import Any, ClassVar, Literal, Protocol, SupportsFloat, Self, Generic, TypeAlias, TypeVar, runtime_checkable
+from typing import Any, ClassVar, Literal, Protocol, SupportsFloat, Self, Generic, TypeAlias, TypeVar, overload, runtime_checkable
 from pydantic import Field
 from pydantic.generics import GenericModel
 from algobattle.util import CustomEncodable, EncodableModel, Role, inherit_docs
@@ -65,7 +65,13 @@ class Problem(CustomEncodable, ABC):
         """Validates that the parsed instance is semantically correct."""
         return True
 
-    def calculate_score(self, solution: _Solution, size: int, *, generator_solution: _Solution | None) -> SupportsFloat:
+    @overload
+    def calculate_score(self, solution: _Solution, size: int) -> SupportsFloat: ...
+
+    @overload
+    def calculate_score(self, solution: _Solution, size: int, *, generator_solution: _Solution) -> SupportsFloat: ...
+
+    def calculate_score(self, solution: _Solution, size: int, *, generator_solution: _Solution | None = None) -> SupportsFloat:
         """Calculates how well a solution solves this problem instance.
         
         Return values are should be inside [0, 1].
