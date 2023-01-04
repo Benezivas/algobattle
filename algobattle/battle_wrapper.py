@@ -10,7 +10,7 @@ from importlib.metadata import entry_points
 import logging
 from abc import abstractmethod, ABC
 from typing import Any, ClassVar, Mapping, TypeAlias
-from algobattle.docker_util import DockerError, Generator, Result, Solver
+from algobattle.docker_util import DockerError, Generator, Solver, GeneratorResult, SolverResult
 from algobattle.observer import Subject
 from algobattle.problem import Problem
 from algobattle.util import CLIParsable, Encodable, Role
@@ -26,8 +26,8 @@ class CombinedResults:
     """The result of one execution of the generator and the solver with the generated instance."""
 
     score: float
-    generator: Result[Problem] | DockerError
-    solver: Result[Problem.Solution] | DockerError | None
+    generator: GeneratorResult | DockerError
+    solver: SolverResult | DockerError | None
 
 
 class BattleWrapper(Subject, ABC):
@@ -111,7 +111,7 @@ class BattleWrapper(Subject, ABC):
 
         try:
             sol_result = solver.run(
-                gen_result.data,
+                gen_result.problem,
                 size=size,
                 timeout=timeout_solver,
                 space=space_solver,
@@ -122,7 +122,7 @@ class BattleWrapper(Subject, ABC):
         except DockerError as e:
             return CombinedResults(score=0, generator=gen_result, solver=e)
 
-        score = gen_result.data.calculate_score(sol_result.data, size)
+        score = gen_result.problem.calculate_score(sol_result.solution, size, generator_solution=gen_result.solution)
         score = max(0, min(1, float(score)))
         logger.info(f"Solver of group {solver.team_name} yields a valid solution with a score of {score}.")
         return CombinedResults(score, gen_result, sol_result)

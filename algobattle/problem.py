@@ -50,9 +50,6 @@ class Problem(CustomEncodable, ABC):
     with_solution: ClassVar[bool] = True
     """Whether an instance of this problem also comes with a solution."""
 
-    solution: "Solution | None"
-    """The generator's solution for this instance."""
-
     @classmethod
     @abstractmethod
     def decode(cls: type[Self], source_dir: Path, size: int) -> Self:
@@ -68,26 +65,26 @@ class Problem(CustomEncodable, ABC):
         """Validates that the parsed instance is semantically correct."""
         return True
 
-    def calculate_score(self, solution: _Solution, size: int) -> SupportsFloat:
+    def calculate_score(self, solution: _Solution, size: int, *, generator_solution: _Solution | None) -> SupportsFloat:
         """Calculates how well a solution solves this problem instance.
         
         Return values are should be inside [0, 1].
         With a value of 0 indicating that the solver failed completely
         and 1 that it solved the instance perfectly.
         """
-        if isinstance(self.solution, self.Solution) and isinstance(self.solution, Scored):
+        if isinstance(generator_solution, self.Solution) and isinstance(generator_solution, Scored):
             # we have a default impl if the problem comes with a generator solution and the solution type implements the ScoredSolution protocol
             # we can't check data protocol subclass relationships at runtime so we need to check if the solution is an instance instead
             # we know that the generator's and solver's solutions are of the same type so we don't need to check both
             assert isinstance(solution, Scored)
-            gen_score = self.solution.score(size, self)
+            gen_score = generator_solution.score(size, self)
             if gen_score == 0:
                 return 1
             sol_score = solution.score(size, self)
             if sol_score == 0:
                 return 0
 
-            if self.solution.direction == "minimize":
+            if generator_solution.direction == "minimize":
                 return gen_score / sol_score
             else:
                 return sol_score / gen_score 
@@ -149,23 +146,14 @@ class ProblemModel(EncodableModel, Problem, ABC):
 
     filename: ClassVar[str] = "instance.json"
 
-    solution: "Solution | None"
-
     class Config:
         fields = {
             "filename": {"exclude": True},
             "name": {"exclude": True},
             "min_size": {"exclude": True},
-            "Solution": {"exclude": True},
             "has_solution": {"exclude": True},
             "solution": {"exclude": True},
         }
-        
-        @staticmethod
-        def schema_extra(schema):
-            del schema["properties"]["solution"]
-
-    Solution = Problem.Solution
 
 
 class SolutionModel(EncodableModel, Problem.Solution, ABC):

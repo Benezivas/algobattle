@@ -122,7 +122,7 @@ class ProgramTests(TestCase):
         with Generator.build(*self.dockerfile("generator"), TestProblem, self.params) as gen:
             res = gen.run(5)
             correct = TestProblem(semantics=True)
-            self.assertEqual(res.data, correct)
+            self.assertEqual(res.problem, correct)
 
     def test_sol_timeout(self):
         """The solver times out."""
@@ -153,7 +153,7 @@ class ProgramTests(TestCase):
         with Solver.build(*self.dockerfile("solver"), TestProblem, self.params) as sol:
             res = sol.run(self.instance, 5)
             correct = TestProblem.Solution(semantics=True, quality=True)
-            self.assertEqual(res.data, correct)
+            self.assertEqual(res.solution, correct)
 
 if __name__ == "__main__":
     run_tests()

@@ -322,16 +322,23 @@ class Image:
         return ArchivedImage(path, self.name, self.id, self.description)
 
 
-T = TypeVar("T", bound=Encodable)
+@dataclass
+class GeneratorResult:
+    """Result of a single generator or solver execution."""
+
+    problem: Problem
+    runtime: float
+    solution: Problem.Solution | None = None
+    battle_data: dict[str, Encodable] | None = None
 
 
 @dataclass
-class Result(Generic[T]):
+class SolverResult:
     """Result of a single generator or solver execution."""
 
-    data: T
+    solution: Problem.Solution
     runtime: float
-    battle_data: dict[str, Encodable] | None
+    battle_data: dict[str, Encodable] | None = None
 
 
 class Program(ABC):
@@ -386,7 +393,7 @@ class Program(ABC):
         cpus: int = ...,
         battle_input: Mapping[str, Encodable] = {},
         battle_output: Mapping[str, type[Encodable]] = {},
-        ) -> Result[Any]:
+        ) -> Any:
         """Execute the program, processing input and output data."""
         set_params: dict[str, Any] = {}
         if timeout is Ellipsis:
@@ -457,15 +464,14 @@ class Program(ABC):
             except Exception as e:
                 logger.warning(f"{self.role.capitalize()} of team {self.team_name} output a syntactically incorrect {self.data_role}!")
                 raise EncodingError from e
-            if isinstance(output_data, Problem):
-                if output_data.with_solution:
-                    try:
-                        output_data.solution = output_data.Solution.decode(output / "solution", size)
-                    except Exception as e:
-                        logger.warning(f"{self.role.capitalize()} of team {self.team_name} output a syntactically incorrect solution!")
-                        raise EncodingError from e
-                else:
-                    output_data.solution = None
+            if isinstance(output_data, Problem) and output_data.with_solution:
+                try:
+                    generator_solution = output_data.Solution.decode(output / "solution", size)
+                except Exception as e:
+                    logger.warning(f"{self.role.capitalize()} of team {self.team_name} output a syntactically incorrect solution!")
+                    raise EncodingError from e
+            else:
+                generator_solution = None
 
             if battle_output:
                 decoded_battle_output = decode(battle_output, output / "battle_data", size)
@@ -483,14 +489,17 @@ class Program(ABC):
             logger.warning(f"{self.role.capitalize()} of team {self.team_name} output a semantically incorrect {self.data_role}!")
             raise SemanticsError
 
-        if isinstance(output_data, Problem) and output_data.solution is not None:
-            correct_semantics = output_data.solution.check_semantics(size, output_data)
+        if generator_solution is not None:
+            correct_semantics = generator_solution.check_semantics(size, output_data)
             if not correct_semantics:
                 logger.warning(f"{self.role.capitalize()} of team {self.team_name} output a semantically incorrect solution!")
                 raise SemanticsError
 
         logger.info(f"{self.role.capitalize()} of team {self.team_name} output a valid {self.data_role}.")
-        return Result(data=output_data, runtime=runtime, battle_data=decoded_battle_output)
+        if isinstance(output_data, Problem):
+            return GeneratorResult(output_data, runtime, generator_solution, decoded_battle_output)
+        else:
+            return SolverResult(output_data, runtime, decoded_battle_output)
 
     @inherit_docs
     def remove(self) -> None:
@@ -516,7 +525,7 @@ class Generator(Program):
         cpus: int = ...,
         battle_input: Mapping[str, Encodable] = {},
         battle_output: Mapping[str, type[Encodable]] = {},
-        ) -> Result[Problem]:
+        ) -> GeneratorResult:
         """Execute the generator, passing in the size and processing the created problem instance."""
         return self._run(
             size=size,
@@ -544,7 +553,7 @@ class Solver(Program):
         cpus: int = ...,
         battle_input: Mapping[str, Encodable] = {},
         battle_output: Mapping[str, type[Encodable]] = {},
-        ) -> Result[Problem.Solution]:
+        ) -> SolverResult:
         """Execute the solver, passing in the problem instance and processing the created solution."""
         return self._run(
             size=size,
