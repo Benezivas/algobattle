@@ -50,7 +50,7 @@ class Problem(CustomEncodable, ABC):
     with_solution: ClassVar[bool] = False
     """Whether an instance of this problem also comes with a solution."""
 
-    solution: "Solution" | None
+    solution: "Solution | None"
     """The generator's solution for this instance."""
 
     @classmethod
