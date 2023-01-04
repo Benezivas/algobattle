@@ -152,7 +152,7 @@ Solution: TypeAlias
 class Optimization(ProblemModel, ABC):
     """A problem mixin where each instance comes with a solution and the goal is to provide a better scoring solution."""
 
-    solution: "Solution"
+    solution: "Solution" = Field(hidden="solver")
 
     @inherit_docs
     def calculate_score(self, solution: _Solution, size: int) -> SupportsFloat:
