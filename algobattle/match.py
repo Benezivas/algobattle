@@ -129,7 +129,7 @@ class Match(Subject):
                 raise RuntimeError
             padding = [""] * (self.config.rounds - len(results))
             average = "" if len(results) == 0 else results[0].format_score(sum(r.score() for r in results) / len(results))
-            results = [str(r) for r in results]
+            results = [r.format_score(r.score()) for r in results]
             table.add_row([str(matchup.generator), str(matchup.solver), *results, *padding, average])
 
         return f"Battle Type: {self.config.battle_type.name()}\n{table}"
