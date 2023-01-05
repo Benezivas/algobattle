@@ -128,7 +128,7 @@ def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, DockerConfig, MatchC
         team_specs = config["teams"]
     else:
         team_specs = [{
-            "name": "team 0",
+            "name": "team_0",
             "generator": parsed.problem / "generator",
             "solver": parsed.problem / "solver",
         }]
