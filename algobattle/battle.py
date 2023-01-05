@@ -194,7 +194,7 @@ def main():
             result = Match.run(match_config, wrapper_config, problem, teams, ui)
 
             logger.info('#' * 78)
-            logger.info(str(result))
+            logger.info(result.display())
             if match_config.points > 0:
                 points = result.calculate_points(match_config.points)
                 for team, pts in points.items():
