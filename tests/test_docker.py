@@ -6,7 +6,19 @@ import logging
 import random
 from pathlib import Path
 
-from algobattle.docker_util import DockerError, EncodingError, ExecutionError, Generator, Image, RunParameters, SemanticsError, Solver, client, DockerImage, get_os_type
+from algobattle.docker_util import (
+    DockerError,
+    EncodingError,
+    ExecutionError,
+    Generator,
+    Image,
+    RunParameters,
+    SemanticsError,
+    Solver,
+    client,
+    DockerImage,
+    get_os_type,
+)
 from algobattle.util import TempDir
 from . import testsproblem
 from .testsproblem.problem import Tests as TestProblem
@@ -49,7 +61,7 @@ class ImageTests(TestCase):
         with self.assertRaises(DockerError):
             nonexistent_file = None
             while nonexistent_file is None or nonexistent_file.exists():
-                nonexistent_file = Path(str(random.randint(0, 2**80)))
+                nonexistent_file = Path(str(random.randint(0, 2 ** 80)))
             with Image.build(nonexistent_file, "foo_bar"):
                 pass
 

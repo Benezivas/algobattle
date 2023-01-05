@@ -9,7 +9,18 @@ from dataclasses import dataclass, field as dataclass_field, fields
 from importlib.metadata import entry_points
 import logging
 from abc import abstractmethod, ABC
-from typing import Any, Callable, ClassVar, Literal, Mapping, TypeAlias, TypeVar, dataclass_transform, get_origin, get_type_hints
+from typing import (
+    Any,
+    Callable,
+    ClassVar,
+    Literal,
+    Mapping,
+    TypeAlias,
+    TypeVar,
+    dataclass_transform,
+    get_origin,
+    get_type_hints,
+)
 from algobattle.docker_util import DockerError, Generator, Solver, GeneratorResult, SolverResult
 from algobattle.observer import Subject
 from algobattle.util import Encodable, Role
@@ -23,10 +34,7 @@ T = TypeVar("T")
 
 def argspec(*, default: T, help: str = "", parser: Callable[[str], T] | None = None) -> T:
     """Structure specifying the CLI arg."""
-    metadata = {
-        "help": help,
-        "parser": parser,
-    }
+    metadata = {"help": help, "parser": parser}
     return dataclass_field(default=default, metadata={key: val for key, val in metadata.items() if val is not None})
 
 
@@ -54,7 +62,8 @@ class BattleWrapper(Subject, ABC):
             dataclass(cls)
             super().__init_subclass__()
 
-        def __init__(self, **kwargs) -> None:   # providing a dummy default impl that will be overriden, to get better static analysis
+        # providing a dummy default impl that will be overriden, to get better static analysis
+        def __init__(self, **kwargs) -> None:
             super().__init__()
 
         @classmethod
@@ -159,7 +168,9 @@ class BattleWrapper(Subject, ABC):
         except DockerError as e:
             return CombinedResults(score=0, generator=gen_result, solver=e)
 
-        score = gen_result.problem.calculate_score(solution=sol_result.solution, generator_solution=gen_result.solution, size=size)
+        score = gen_result.problem.calculate_score(
+            solution=sol_result.solution, generator_solution=gen_result.solution, size=size
+        )
         score = max(0, min(1, float(score)))
         logger.info(f"The solver achieved a score of {score}.")
         return CombinedResults(score, gen_result, sol_result)

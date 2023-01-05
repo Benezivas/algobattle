@@ -23,7 +23,9 @@ class Averaged(BattleWrapper):
         and determine the average solution quality.
         """
         if config.instance_size < min_size:
-            raise ValueError(f"The problem specifies a minimum size of {min_size} but the chosen size is only {config.instance_size}!")
+            raise ValueError(
+                f"The problem specifies a minimum size of {min_size} but the chosen size is only {config.instance_size}!"
+            )
         self.iterations = config.iterations
         self.scores: list[float] = []
         for i in range(config.iterations):

@@ -41,7 +41,8 @@ class MatchConfig:
 class Match(Subject):
     """The Result of a whole Match."""
 
-    def __init__(self,
+    def __init__(
+        self,
         config: MatchConfig,
         wrapper_config: BattleWrapper.Config,
         problem: type[Problem],

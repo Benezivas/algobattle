@@ -205,7 +205,14 @@ class Image:
     def __exit__(self, _type, _value_, _traceback):
         self.remove()
 
-    def run(self, input_dir: Path | None = None, output_dir: Path | None = None, timeout: float | None = None, memory: int | None = None, cpus: int | None = None) -> float:
+    def run(
+        self,
+        input_dir: Path | None = None,
+        output_dir: Path | None = None,
+        timeout: float | None = None,
+        memory: int | None = None,
+        cpus: int | None = None
+    ) -> float:
         """Runs a docker image with the provided input and returns its output.
 
         Parameters
@@ -351,7 +358,13 @@ class Program(ABC):
         cls.data_role = "instance" if cls.role == "generator" else "solution"
         return super().__init_subclass__()
 
-    def __init__(self, image: Image, config: RunParameters, team_name: str, data_type: type[Problem] | type[Problem.Solution]) -> None:
+    def __init__(
+        self,
+        image: Image,
+        config: RunParameters,
+        team_name: str,
+        data_type: type[Problem] | type[Problem.Solution]
+    ) -> None:
         # we can't take a ref to the Team object here since it won't be created til after the Programs
         self.image = image
         self.config = config
@@ -385,7 +398,8 @@ class Program(ABC):
             data_type = problem_type.Solution
         return cls(image, config, team_name, data_type)
 
-    def _run(self,
+    def _run(
+        self,
         size: int,
         input_instance: Problem | None = None,
         *,
@@ -465,13 +479,17 @@ class Program(ABC):
             try:
                 output_data = self.data_type.decode(output / self.data_role, size)
             except Exception as e:
-                logger.warning(f"{self.role.capitalize()} of team {self.team_name} output a syntactically incorrect {self.data_role}!")
+                logger.warning(
+                    f"{self.role.capitalize()} of team {self.team_name} output a syntactically incorrect {self.data_role}!"
+                )
                 raise EncodingError from e
             if isinstance(output_data, Problem) and output_data.with_solution:
                 try:
                     generator_solution = output_data.Solution.decode(output / "solution", size)
                 except Exception as e:
-                    logger.warning(f"{self.role.capitalize()} of team {self.team_name} output a syntactically incorrect solution!")
+                    logger.warning(
+                        f"{self.role.capitalize()} of team {self.team_name} output a syntactically incorrect solution!"
+                    )
                     raise EncodingError from e
             else:
                 generator_solution = None
@@ -489,7 +507,9 @@ class Program(ABC):
             correct_semantics = output_data.check_semantics(input_instance, size)
 
         if not correct_semantics:
-            logger.warning(f"{self.role.capitalize()} of team {self.team_name} output a semantically incorrect {self.data_role}!")
+            logger.warning(
+                f"{self.role.capitalize()} of team {self.team_name} output a semantically incorrect {self.data_role}!"
+            )
             raise SemanticsError
 
         if generator_solution is not None:
