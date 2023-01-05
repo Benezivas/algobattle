@@ -191,7 +191,7 @@ class Parsing(TestCase):
         self.assertEqual(program_cfg.display, "logs")
         self.assertEqual(program_cfg.logs, Path.home() / ".algobattle_logs")
         self.assertEqual(
-            program_cfg.teams, [TeamInfo("team 0", self.problem_path / "generator", self.problem_path / "solver")]
+            program_cfg.teams, [TeamInfo("team_0", self.problem_path / "generator", self.problem_path / "solver")]
         )
         self.assertEqual(match_cfg, MatchConfig())
         self.assertEqual(wrapper_cfg, Iterated.Config())
@@ -205,7 +205,7 @@ class Parsing(TestCase):
         self.assertEqual(program_cfg.display, "logs")
         self.assertEqual(program_cfg.logs, Path.home() / ".algobattle_logs")
         self.assertEqual(
-            program_cfg.teams, [TeamInfo("team 0", self.problem_path / "generator", self.problem_path / "solver")]
+            program_cfg.teams, [TeamInfo("team_0", self.problem_path / "generator", self.problem_path / "solver")]
         )
         self.assertEqual(match_cfg, MatchConfig())
         self.assertEqual(wrapper_cfg, Iterated.Config())
@@ -219,7 +219,7 @@ class Parsing(TestCase):
         self.assertEqual(program_cfg.display, "logs")
         self.assertEqual(program_cfg.logs, Path.home() / ".algobattle_logs")
         self.assertEqual(
-            program_cfg.teams, [TeamInfo("team 0", self.problem_path / "generator", self.problem_path / "solver")]
+            program_cfg.teams, [TeamInfo("team_0", self.problem_path / "generator", self.problem_path / "solver")]
         )
         self.assertEqual(match_cfg, MatchConfig(points=10, safe_build=True, battle_type=Averaged))
         self.assertEqual(wrapper_cfg, Averaged.Config(iterations=1))
@@ -240,7 +240,7 @@ class Parsing(TestCase):
         self.assertEqual(program_cfg.display, "logs")
         self.assertEqual(program_cfg.logs, Path.home() / ".algobattle_logs")
         self.assertEqual(
-            program_cfg.teams, [TeamInfo("team 0", self.problem_path / "generator", self.problem_path / "solver")]
+            program_cfg.teams, [TeamInfo("team_0", self.problem_path / "generator", self.problem_path / "solver")]
         )
         self.assertEqual(match_cfg, MatchConfig(points=10, safe_build=True, battle_type=Averaged))
         self.assertEqual(wrapper_cfg, Averaged.Config(iterations=1))
@@ -262,7 +262,7 @@ class Parsing(TestCase):
         self.assertEqual(program_cfg.display, "logs")
         self.assertEqual(program_cfg.logs, Path.home() / ".algobattle_logs")
         self.assertEqual(
-            program_cfg.teams, [TeamInfo("team 0", self.problem_path / "generator", self.problem_path / "solver")]
+            program_cfg.teams, [TeamInfo("team_0", self.problem_path / "generator", self.problem_path / "solver")]
         )
         self.assertEqual(match_cfg, MatchConfig(points=20, safe_build=True, battle_type=Iterated))
         self.assertEqual(wrapper_cfg, Iterated.Config())
