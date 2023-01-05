@@ -92,7 +92,7 @@ class ProgramTests(TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        "Set up the config and problem objects."
+        """Set up the config and problem objects."""
         cls.problem_path = Path(testsproblem.__file__).parent
         cls.params = RunParameters()
         cls.params_short = RunParameters(timeout=2)
@@ -143,7 +143,7 @@ class ProgramTests(TestCase):
                 sol.run(self.instance, 5)
 
     def test_sol_exec_err(self):
-        """The solver doesn't execute properly"""
+        """The solver doesn't execute properly."""
         with Solver.build(*self.dockerfile("solver_execution_error"), TestProblem, self.params) as sol:
             with self.assertRaises(ExecutionError):
                 sol.run(self.instance, 5)

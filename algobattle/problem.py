@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, ClassVar, Literal, Protocol, SupportsFloat, Self, Generic, TypeAlias, TypeVar, runtime_checkable
 from pydantic import Field
 from pydantic.generics import GenericModel
-from algobattle.util import CustomEncodable, EncodableModel, Role
+from algobattle.util import CustomEncodable, EncodableModel, Role, inherit_docs
 
 logger = logging.getLogger("algobattle.problem")
 
@@ -18,11 +18,13 @@ _Solution: TypeAlias = Any
 
 class ProblemError(Exception):
     """Parent class of all exceptions related to the problem module."""
+
     pass
 
 
 class ContainerError(ProblemError):
     """Raised when the container returned malformed data."""
+
     pass
 
 
@@ -148,6 +150,8 @@ class ProblemModel(EncodableModel, Problem, ABC):
     filename: ClassVar[str] = "instance.json"
 
     class Config:
+        """Pydantic config object to hide these fields in the json if someone redeclared them incorrectly."""
+
         fields = {
             "filename": {"exclude": True},
             "name": {"exclude": True},
@@ -163,17 +167,18 @@ class SolutionModel(EncodableModel, Problem.Solution, ABC):
     filename: ClassVar[str] = "solution.json"
 
     class Config:
-        fields = {
-            "filename": {"exclude": True},
-        }
+        """Pydantic config object to hide these fields in the json if someone redeclared them incorrectly."""
+
+        fields = {"filename": {"exclude": True}}
 
 
 class DirectedGraph(ProblemModel):
     """Base class for problems on directed graphs."""
 
-    num_vertices: int = Field(ge=0, le=2**63 - 1)
-    edges: list[tuple[int, int]] = Field(ge=0, le=2**63 - 1)
+    num_vertices: int = Field(ge=0, le=2 ** 63 - 1)
+    edges: list[tuple[int, int]] = Field(ge=0, le=2 ** 63 - 1)
 
+    @inherit_docs
     def check_semantics(self, size: int) -> bool:
         return (
             self.num_vertices <= size
@@ -185,14 +190,12 @@ class DirectedGraph(ProblemModel):
 class UndirectedGraph(DirectedGraph):
     """Base class for problems on undirected graphs."""
 
+    @inherit_docs
     def check_semantics(self, size: int) -> bool:
         if not super().check_semantics(size):
             return False
         edges = set(self.edges)
-        return (
-            all(u != v for u, v in edges)
-            and all((v, u) not in edges for u, v in edges)
-        )
+        return all(u != v for u, v in edges) and all((v, u) not in edges for u, v in edges)
 
 
 Weight = TypeVar("Weight")
@@ -203,6 +206,7 @@ class EdgeWeights(GenericModel, Generic[Weight]):
 
     edge_weights: list[Weight]
 
+    @inherit_docs
     def check_semantics(self, size: int) -> bool:
         assert isinstance(self, DirectedGraph)
         as_parent = super()
@@ -218,6 +222,7 @@ class VertexWeights(GenericModel, Generic[Weight]):
 
     vertex_weights: list[Weight]
 
+    @inherit_docs
     def check_semantics(self, size: int) -> bool:
         assert isinstance(self, DirectedGraph)
         as_parent = super()

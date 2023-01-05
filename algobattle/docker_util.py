@@ -27,6 +27,8 @@ _client_var: DockerClient | None = None
 
 @dataclass(frozen=True)
 class RunParameters:
+    """The parameters determining how a container is run."""
+
     timeout: float | None = 30
     space: int | None = None
     cpus: int = 1
@@ -34,6 +36,8 @@ class RunParameters:
 
 @dataclass(frozen=True)
 class DockerConfig:
+    """Grouped config options that are relevant to the interaction with docker."""
+
     build_timeout: float | None = None
     generator: RunParameters = RunParameters()
     solver: RunParameters = RunParameters()

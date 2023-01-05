@@ -46,6 +46,7 @@ def getattr_set(o: object, *attrs: str) -> dict[str, Any]:
 
 
 class TempDir(TemporaryDirectory[Any]):
+    """A :cls:`TemporaryDirecroty`, but it's enter returns a :cls:`Path`."""
 
     def __enter__(self):
         super().__enter__()

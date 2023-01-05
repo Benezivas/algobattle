@@ -121,7 +121,7 @@ class BattleWrapper(Subject, ABC):
 
     @abstractmethod
     def run_battle(self, generator: Generator, solver: Solver, config: _Config, min_size: int) -> None:
-        """Calculates the next instance size that should be fought over"""
+        """Calculates the next instance size that should be fought over."""
         raise NotImplementedError
 
     def run_programs(
