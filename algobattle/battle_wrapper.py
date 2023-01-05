@@ -5,19 +5,29 @@ responsible for executing specific types of battle. They share the
 characteristic that they are responsible for updating some match data during
 their run, such that it contains the current state of the match.
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, field, fields
 from importlib.metadata import entry_points
 import logging
 from abc import abstractmethod, ABC
-from typing import Any, ClassVar, Mapping, TypeAlias
+from typing import Any, Callable, ClassVar, Literal, Mapping, TypeAlias, TypeVar, dataclass_transform, get_origin, get_type_hints
 from algobattle.docker_util import DockerError, Generator, Solver, GeneratorResult, SolverResult
 from algobattle.observer import Subject
-from algobattle.util import CLIParsable, Encodable, Role
+from algobattle.util import Encodable, Role
 
 logger = logging.getLogger("algobattle.battle_wrapper")
 
 
 _Config: TypeAlias = Any
+T = TypeVar("T")
+
+
+def argspec(*, default: T, help: str = "", parser: Callable[[str], T] | None = None) -> T:
+    """Structure specifying the CLI arg."""
+    metadata = {
+        "help": help,
+        "parser": parser,
+    }
+    return field(default=default, metadata={key: val for key, val in metadata.items() if val is not None})
 
 
 @dataclass
@@ -36,8 +46,35 @@ class BattleWrapper(Subject, ABC):
 
     scoring_team: ClassVar[Role] = "solver"
 
-    Config: ClassVar[type[CLIParsable]]
-    """Object containing the config variables the wrapper will use."""
+    @dataclass_transform(field_specifiers=(argspec,))
+    class Config:
+        """Object containing the config variables the wrapper will use."""
+
+        def __init_subclass__(cls) -> None:
+            dataclass(cls)
+            super().__init_subclass__()
+
+        def __init__(self, **kwargs) -> None:   # providing a dummy default impl that will be overriden, to get better static analysis
+            super().__init__()
+
+        @classmethod
+        def as_argparse_args(cls) -> list[tuple[str, dict[str, Any]]]:
+            """Constructs a list of argument names and `**kwargs` that can be passed to `ArgumentParser.add_argument()`."""
+            arguments: list[tuple[str, dict[str, Any]]] = []
+            resolved_annotations = get_type_hints(cls)
+            for field in fields(cls):
+                kwargs = {
+                    "type": field.metadata.get("parser", resolved_annotations[field.name]),
+                    "help": field.metadata.get("help", "") + f" Default: {field.default}",
+                }
+                if field.type == bool:
+                    kwargs["action"] = "store_const"
+                    kwargs["const"] = not field.default
+                elif get_origin(field.type) == Literal:
+                    kwargs["choices"] = field.type.__args__
+
+                arguments.append((field.name, kwargs))
+            return arguments
 
     @staticmethod
     def all() -> dict[str, type["BattleWrapper"]]:

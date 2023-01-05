@@ -2,8 +2,8 @@
 from __future__ import annotations
 import logging
 
-from algobattle.battle_wrapper import BattleWrapper
-from algobattle.util import CLIParsable, inherit_docs, argspec
+from algobattle.battle_wrapper import BattleWrapper, argspec
+from algobattle.util import inherit_docs
 from algobattle.docker_util import Generator, Solver
 
 logger = logging.getLogger("algobattle.battle_wrappers.iterated")
@@ -13,7 +13,7 @@ class Iterated(BattleWrapper):
     """Class of an iterated battle Wrapper."""
 
     @inherit_docs
-    class Config(CLIParsable):
+    class Config(BattleWrapper.Config):
         iteration_cap: int = argspec(default=50_000, help="Maximum instance size that will be tried.")
         exponent: int = argspec(default=2, help="Determines how quickly the instance size grows.")
         approximation_ratio: float = argspec(default=1, help="Approximation ratio that a solver needs to achieve to pass.")

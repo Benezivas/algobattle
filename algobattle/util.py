@@ -41,46 +41,6 @@ def check_path(path: str, *, type: Literal["file", "dir", "exists"] = "exists") 
         raise ValueError
 
 
-def argspec(*, default: T, help: str = "", parser: Callable[[str], T] | None = None) -> T:
-    """Structure specifying the CLI arg."""
-    metadata = {
-        "help": help,
-        "parser": parser,
-    }
-    return field(default=default, metadata={key: val for key, val in metadata.items() if val is not None})
-
-
-@dataclass_transform(field_specifiers=(argspec,))
-class CLIParsable:
-    """Protocol for dataclass-like objects that can be parsed from the CLI."""
-
-    def __init_subclass__(cls) -> None:
-        dataclass(cls)
-        super().__init_subclass__()
-
-    def __init__(self, **kwargs) -> None:
-        super().__init__()
-
-    @classmethod
-    def as_argparse_args(cls) -> list[tuple[str, dict[str, Any]]]:
-        """Constructs a list of argument names and `**kwargs` that can be passed to `ArgumentParser.add_argument()`."""
-        arguments: list[tuple[str, dict[str, Any]]] = []
-        resolved_annotations = get_type_hints(cls)
-        for field in fields(cls):
-            kwargs = {
-                "type": field.metadata.get("parser", resolved_annotations[field.name]),
-                "help": field.metadata.get("help", "") + f" Default: {field.default}",
-            }
-            if field.type == bool:
-                kwargs["action"] = "store_const"
-                kwargs["const"] = not field.default
-            elif get_origin(field.type) == Literal:
-                kwargs["choices"] = field.type.__args__
-
-            arguments.append((field.name, kwargs))
-        return arguments
-
-
 def getattr_set(o: object, *attrs: str) -> dict[str, Any]:
     """Returns a dict of the given attributes and their values, if they are not `None`."""
     return {a: getattr(o, a) for a in attrs if getattr(o, a, None) is not None}
