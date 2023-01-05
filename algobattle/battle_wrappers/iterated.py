@@ -73,7 +73,6 @@ class Iterated(BattleWrapper):
                     self.current -= base_increment ** config.exponent - 1
                     base_increment = 1
 
-
     @inherit_docs
     def score(self) -> float:
         return self.reached

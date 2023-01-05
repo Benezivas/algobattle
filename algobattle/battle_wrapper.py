@@ -5,7 +5,7 @@ responsible for executing specific types of battle. They share the
 characteristic that they are responsible for updating some match data during
 their run, such that it contains the current state of the match.
 """
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass, field as dataclass_field, fields
 from importlib.metadata import entry_points
 import logging
 from abc import abstractmethod, ABC
@@ -27,7 +27,7 @@ def argspec(*, default: T, help: str = "", parser: Callable[[str], T] | None = N
         "help": help,
         "parser": parser,
     }
-    return field(default=default, metadata={key: val for key, val in metadata.items() if val is not None})
+    return dataclass_field(default=default, metadata={key: val for key, val in metadata.items() if val is not None})
 
 
 @dataclass

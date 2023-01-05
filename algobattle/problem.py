@@ -35,7 +35,7 @@ class Scored(Protocol):
     @abstractmethod
     def score(self, instance: _Problem, size: int) -> float:
         """Calculate the score of this solution for the given problem instance."""
-        raise NotImplementedError  
+        raise NotImplementedError
 
 
 class Problem(CustomEncodable, ABC):
@@ -67,15 +67,16 @@ class Problem(CustomEncodable, ABC):
 
     def calculate_score(self, solution: _Solution, generator_solution: _Solution | None, size: int) -> SupportsFloat:
         """Calculates how well a solution solves this problem instance.
-        
+
         Return values are should be inside [0, 1].
         With a value of 0 indicating that the solver failed completely
         and 1 that it solved the instance perfectly.
         """
         if isinstance(generator_solution, self.Solution) and isinstance(generator_solution, Scored):
-            # we have a default impl if the problem comes with a generator solution and the solution type implements the ScoredSolution protocol
-            # we can't check data protocol subclass relationships at runtime so we need to check if the solution is an instance instead
-            # we know that the generator's and solver's solutions are of the same type so we don't need to check both
+            # we have a default impl if the problem comes with a generator solution and the solution type
+            # implements the Scored protocol. we can't check data protocol subclass relationships at runtime
+            # so we need to check if the solution is an instance instead.
+            # we know that the generator's and solver's solutions are of the same type so we don't need to check both.
             assert isinstance(solution, Scored)
             gen_score = generator_solution.score(self, size)
             if gen_score == 0:
@@ -87,7 +88,7 @@ class Problem(CustomEncodable, ABC):
             if generator_solution.direction == "minimize":
                 return gen_score / sol_score
             else:
-                return sol_score / gen_score 
+                return sol_score / gen_score
         else:
             raise NotImplementedError
 
@@ -170,8 +171,8 @@ class SolutionModel(EncodableModel, Problem.Solution, ABC):
 class DirectedGraph(ProblemModel):
     """Base class for problems on directed graphs."""
 
-    num_vertices: int = Field(ge=0, le=2**63-1)
-    edges: list[tuple[int, int]] = Field(ge=0, le=2**63-1)
+    num_vertices: int = Field(ge=0, le=2**63 - 1)
+    edges: list[tuple[int, int]] = Field(ge=0, le=2**63 - 1)
 
     def check_semantics(self, size: int) -> bool:
         return (

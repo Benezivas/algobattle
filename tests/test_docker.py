@@ -155,5 +155,6 @@ class ProgramTests(TestCase):
             correct = TestProblem.Solution(semantics=True, quality=True)
             self.assertEqual(res.solution, correct)
 
+
 if __name__ == "__main__":
     run_tests()

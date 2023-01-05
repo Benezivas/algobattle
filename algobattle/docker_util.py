@@ -351,10 +351,11 @@ class Program(ABC):
         cls.data_role = "instance" if cls.role == "generator" else "solution"
         return super().__init_subclass__()
 
-    def __init__(self, image: Image, config: RunParameters, team_name: str, data_type: type[Problem]  | type[Problem.Solution]) -> None:
+    def __init__(self, image: Image, config: RunParameters, team_name: str, data_type: type[Problem] | type[Problem.Solution]) -> None:
+        # we can't take a ref to the Team object here since it won't be created til after the Programs
         self.image = image
         self.config = config
-        self.team_name = team_name  # we can't take a ref to the Team object here since it won't be created til after the Programs
+        self.team_name = team_name
         self.data_type = data_type
         super().__init__()
 
@@ -393,7 +394,7 @@ class Program(ABC):
         cpus: int = ...,
         battle_input: Mapping[str, Encodable] = {},
         battle_output: Mapping[str, type[Encodable]] = {},
-        ) -> Any:
+    ) -> Any:
         """Execute the program, processing input and output data."""
         set_params: dict[str, Any] = {}
         if timeout is Ellipsis:
@@ -426,14 +427,14 @@ class Program(ABC):
                 try:
                     input_instance.encode(input / "instance", size, self.role)
                 except Exception as e:
-                    logger.critical(f"Problem instance couldn't be encoded into files!")
+                    logger.critical("Problem instance couldn't be encoded into files!")
                     raise DockerError from e
             if battle_input:
                 (input / "battle_data").mkdir()
                 try:
                     encode(battle_input, input / "battle_data", size, self.role)
                 except Exception as e:
-                    logger.critical(f"Battle data couldn't be encoded into files!")
+                    logger.critical("Battle data couldn't be encoded into files!")
                     raise DockerError from e
             with open(input / "info.json", "w+") as f:
                 json.dump({
@@ -444,7 +445,7 @@ class Program(ABC):
                     "battle_input": {name: obj.__class__.__name__ for name, obj in battle_input.items()},
                     "battle_output": {name: cls.__name__ for name, cls in battle_output.items()},
                 }, f)
-            
+
             (output / self.data_role).mkdir()
             if issubclass(self.data_type, Problem) and self.data_type.with_solution:
                 (output / "solution").mkdir()
@@ -457,7 +458,7 @@ class Program(ABC):
                 logger.warning(f"{self.role.capitalize()} of team {self.team_name} crashed!")
                 logger.info(f"After {e.runtime:.2f}s, with exit code {e.exit_code} and error message:\n{e.error_message}")
                 raise
-            except DockerError as e:
+            except DockerError:
                 logger.warning(f"{self.role.capitalize()} of team {self.team_name} couldn't be executed successfully!")
                 raise
 
@@ -486,7 +487,7 @@ class Program(ABC):
         else:
             assert isinstance(output_data, Problem.Solution)
             correct_semantics = output_data.check_semantics(input_instance, size)
-        
+
         if not correct_semantics:
             logger.warning(f"{self.role.capitalize()} of team {self.team_name} output a semantically incorrect {self.data_role}!")
             raise SemanticsError
@@ -527,7 +528,7 @@ class Generator(Program):
         cpus: int = ...,
         battle_input: Mapping[str, Encodable] = {},
         battle_output: Mapping[str, type[Encodable]] = {},
-        ) -> GeneratorResult:
+    ) -> GeneratorResult:
         """Execute the generator, passing in the size and processing the created problem instance."""
         return self._run(
             size=size,
@@ -555,7 +556,7 @@ class Solver(Program):
         cpus: int = ...,
         battle_input: Mapping[str, Encodable] = {},
         battle_output: Mapping[str, type[Encodable]] = {},
-        ) -> SolverResult:
+    ) -> SolverResult:
         """Execute the solver, passing in the problem instance and processing the created solution."""
         return self._run(
             size=size,

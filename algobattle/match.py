@@ -47,7 +47,7 @@ class Match(Subject):
         problem: type[Problem],
         teams: TeamHandler,
         observer: Observer | None = None,
-        ) -> None:
+    ) -> None:
         self.results: dict[Matchup, list[BattleWrapper]] = {}
         self.config = config
         self.wrapper_config = wrapper_config
@@ -78,7 +78,7 @@ class Match(Subject):
                     logger.critical(f"Unhandeled error during execution of battle wrapper!\n{e}")
                 result.notify()
         return result
-    
+
     def calculate_points(self, achievable_points: int) -> dict[Team, float]:
         """Calculate the number of points each team scored.
 

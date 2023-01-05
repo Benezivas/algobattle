@@ -46,7 +46,7 @@ def getattr_set(o: object, *attrs: str) -> dict[str, Any]:
 
 
 class TempDir(TemporaryDirectory[Any]):
-    
+
     def __enter__(self):
         super().__enter__()
         return Path(self.name)
@@ -72,7 +72,7 @@ Encodable = CustomEncodable | str | bytes | dict[Any, Any] | None
 
 def encode(data: Mapping[str, Encodable], target_dir: Path, size: int, team: Role) -> None:
     """Encodes data into a folder.
-    
+
     Each element will be encoded into a file or folder named after its key. :cls:`CustomEncodables` use their own method,
     strings will be encoded with utf8, bytes are written as is, and dictionaries will be encoded as json.
     """
@@ -94,10 +94,9 @@ def encode(data: Mapping[str, Encodable], target_dir: Path, size: int, team: Rol
             logger.critical(f"Failed to encode {obj} from into files at {target_dir / name}!\nException: {e}")
 
 
-
 def decode(data_spec: Mapping[str, type[Encodable]], source_dir: Path, size: int) -> dict[str, Encodable | None]:
     """Decodes data from a folder.
-    
+
     The output is a dictionary with the same keys as `data_spec` and values that are objects of the specified types.
     :cls:`CustomEncodables` use their own method, strings will be decoded with utf8, bytes are read directly,
     and dictionaries will be decoded from json.
