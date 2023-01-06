@@ -54,7 +54,7 @@ class Problem(CustomEncodable, ABC):
 
     @classmethod
     @abstractmethod
-    def decode(cls: type[Self], source_dir: Path, size: int) -> Self:
+    def decode(cls: type[Self], source_dir: Path, size: int, team: Role) -> Self:
         """Parses the container output into a problem instance."""
         raise NotImplementedError
 
@@ -130,7 +130,7 @@ class Problem(CustomEncodable, ABC):
 
         @classmethod
         @abstractmethod
-        def decode(cls: type[Self], source_dir: Path, size: int) -> Self:
+        def decode(cls: type[Self], source_dir: Path, size: int, team: Role) -> Self:
             """Parses the container output into problem data."""
             raise NotImplementedError
 

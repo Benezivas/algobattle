@@ -481,7 +481,7 @@ class Program(ABC):
                 raise
 
             try:
-                output_data = self.data_type.decode(output / self.data_role, size)
+                output_data = self.data_type.decode(output / self.data_role, size, self.role)
             except Exception as e:
                 logger.warning(
                     f"{self.role.capitalize()} of team {self.team_name} output a syntactically incorrect {self.data_role}!"
@@ -489,7 +489,7 @@ class Program(ABC):
                 raise EncodingError from e
             if isinstance(output_data, Problem) and output_data.with_solution:
                 try:
-                    generator_solution = output_data.Solution.decode(output / "solution", size)
+                    generator_solution = output_data.Solution.decode(output / "solution", size, self.role)
                 except Exception as e:
                     logger.warning(
                         f"{self.role.capitalize()} of team {self.team_name} output a syntactically incorrect solution!"
@@ -499,7 +499,7 @@ class Program(ABC):
                 generator_solution = None
 
             if battle_output:
-                decoded_battle_output = decode(battle_output, output / "battle_data", size)
+                decoded_battle_output = decode(battle_output, output / "battle_data", size, self.role)
             else:
                 decoded_battle_output = None
 

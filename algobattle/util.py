@@ -58,7 +58,7 @@ class CustomEncodable(ABC):
 
     @classmethod
     @abstractmethod
-    def decode(cls: type[Self], source_dir: Path, size: int) -> Self:
+    def decode(cls: type[Self], source_dir: Path, size: int, team: Role) -> Self:
         """Parses the container output into problem data."""
         ...
 
@@ -95,7 +95,7 @@ def encode(data: Mapping[str, Encodable], target_dir: Path, size: int, team: Rol
             logger.critical(f"Failed to encode {obj} from into files at {target_dir / name}!\nException: {e}")
 
 
-def decode(data_spec: Mapping[str, type[Encodable]], source_dir: Path, size: int) -> dict[str, Encodable | None]:
+def decode(data_spec: Mapping[str, type[Encodable]], source_dir: Path, size: int, team: Role) -> dict[str, Encodable | None]:
     """Decodes data from a folder.
 
     The output is a dictionary with the same keys as `data_spec` and values that are objects of the specified types.
@@ -108,7 +108,7 @@ def decode(data_spec: Mapping[str, type[Encodable]], source_dir: Path, size: int
         try:
             if issubclass(cls, CustomEncodable):
                 (source_dir / name).mkdir()
-                out[name] = cls.decode(source_dir / name, size)
+                out[name] = cls.decode(source_dir / name, size, team)
             elif issubclass(cls, str):
                 with open(source_dir / name, "r") as f:
                     out[name] = f.read()
@@ -131,7 +131,7 @@ class EncodableModel(BaseModel, CustomEncodable, ABC):
 
     @inherit_docs
     @classmethod
-    def decode(cls: type[Self], source_dir: Path, size: int) -> Self:
+    def decode(cls: type[Self], source_dir: Path, size: int, team: Role) -> Self:
         return cls.parse_file(source_dir / cls.filename)
 
     @inherit_docs
