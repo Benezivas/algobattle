@@ -433,7 +433,7 @@ class Program(ABC):
             param_msg = ""
         if set_params:
             param_msg += " with parameters " + ", ".join(f"{k}: {v}" for k, v in set_params.items())
-        logger.debug(f"Running {self.role} of team {self.team_name}{param_msg}.")
+        logger.info(f"Running {self.role} of team {self.team_name}{param_msg}.")
 
         with TempDir() as input, TempDir() as output:
             if self.role == "generator":
