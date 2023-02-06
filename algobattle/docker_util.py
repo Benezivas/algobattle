@@ -484,15 +484,15 @@ class Program(ABC):
                 output_data = self.data_type.decode(output / self.data_role, size, self.role)
             except Exception as e:
                 logger.warning(
-                    f"{self.role.capitalize()} of team {self.team_name} output a syntactically incorrect {self.data_role}!"
+                    f"The {self.data_role} output of team {self.team_name}'s {self.role} can not be decoded properly!"
                 )
                 raise EncodingError from e
-            if isinstance(output_data, Problem) and output_data.with_solution:
+            if self.role == "generator" and isinstance(output_data, Problem) and output_data.with_solution:
                 try:
                     generator_solution = output_data.Solution.decode(output / "solution", size, self.role)
                 except Exception as e:
                     logger.warning(
-                        f"{self.role.capitalize()} of team {self.team_name} output a syntactically incorrect solution!"
+                        f"The solution output of team {self.team_name}'s generator can not be decoded properly!"
                     )
                     raise EncodingError from e
             else:
@@ -505,21 +505,21 @@ class Program(ABC):
 
         if self.role == "generator":
             assert isinstance(output_data, Problem)
-            correct_semantics = output_data.check_semantics(size)
+            is_valid = output_data.is_valid(size)
         else:
             assert isinstance(output_data, Problem.Solution)
-            correct_semantics = output_data.check_semantics(input_instance, size)
+            is_valid = output_data.is_valid(input_instance, size)
 
-        if not correct_semantics:
+        if not is_valid:
             logger.warning(
-                f"{self.role.capitalize()} of team {self.team_name} output a semantically incorrect {self.data_role}!"
+                f"{self.role.capitalize()} of team {self.team_name} output an invalid {self.data_role}!"
             )
             raise SemanticsError
 
         if generator_solution is not None:
-            correct_semantics = generator_solution.check_semantics(output_data, size)
-            if not correct_semantics:
-                logger.warning(f"{self.role.capitalize()} of team {self.team_name} output a semantically incorrect solution!")
+            is_valid = generator_solution.is_valid(output_data, size)
+            if not is_valid:
+                logger.warning(f"The generator of team {self.team_name} output an invalid solution!")
                 raise SemanticsError
 
         logger.info(f"{self.role.capitalize()} of team {self.team_name} output a valid {self.data_role}.")

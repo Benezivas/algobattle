@@ -63,7 +63,7 @@ class Problem(CustomEncodable, ABC):
         """Encodes the problem instance into files that can be passed to docker containers."""
         raise NotImplementedError
 
-    def check_semantics(self, size: int) -> bool:
+    def is_valid(self, size: int) -> bool:
         """Validates that the parsed instance is semantically correct."""
         return True
 
@@ -139,7 +139,7 @@ class Problem(CustomEncodable, ABC):
             """Encodes the solution into files that can be passed to docker containers."""
             raise NotImplementedError
 
-        def check_semantics(self, instance: _Problem, size: int) -> bool:
+        def is_valid(self, instance: _Problem, size: int) -> bool:
             """Validates that the parsed solution is semantically correct."""
             return True
 
@@ -179,7 +179,7 @@ class DirectedGraph(ProblemModel):
     edges: list[tuple[int, int]] = Field(ge=0, le=2 ** 63 - 1)
 
     @inherit_docs
-    def check_semantics(self, size: int) -> bool:
+    def is_valid(self, size: int) -> bool:
         return (
             self.num_vertices <= size
             and all(u < self.num_vertices and v < self.num_vertices for u, v in self.edges)
@@ -191,8 +191,8 @@ class UndirectedGraph(DirectedGraph):
     """Base class for problems on undirected graphs."""
 
     @inherit_docs
-    def check_semantics(self, size: int) -> bool:
-        if not super().check_semantics(size):
+    def is_valid(self, size: int) -> bool:
+        if not super().is_valid(size):
             return False
         edges = set(self.edges)
         return all(u != v for u, v in edges) and all((v, u) not in edges for u, v in edges)
@@ -211,7 +211,7 @@ class EdgeWeights(GenericModel, Generic[Weight]):
         assert isinstance(self, DirectedGraph)
         as_parent = super()
         if isinstance(as_parent, Problem):
-            if not as_parent.check_semantics(size):
+            if not as_parent.is_valid(size):
                 return False
 
         return len(self.edge_weights) == len(self.edges)
@@ -227,7 +227,7 @@ class VertexWeights(GenericModel, Generic[Weight]):
         assert isinstance(self, DirectedGraph)
         as_parent = super()
         if isinstance(as_parent, Problem):
-            if not as_parent.check_semantics(size):
+            if not as_parent.is_valid(size):
                 return False
 
         return len(self.vertex_weights) == self.num_vertices

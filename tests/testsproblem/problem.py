@@ -21,12 +21,12 @@ class Tests(ProblemModel):
         semantics: bool
         quality: bool
 
-        def check_semantics(self, instance: "Tests", size: int) -> bool:
+        def is_valid(self, instance: "Tests", size: int) -> bool:
             return self.semantics
 
     semantics: bool
 
-    def check_semantics(self, size: int) -> bool:
+    def is_valid(self, size: int) -> bool:
         return self.semantics
 
     def calculate_score(self, solution: Solution, generator_solution: Solution | None, size: int) -> SupportsFloat:
