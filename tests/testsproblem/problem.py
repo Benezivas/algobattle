@@ -1,18 +1,33 @@
 """Problem class built for tests."""
 import logging
+from typing import ClassVar, SupportsFloat
 
-from algobattle.problem import Problem
-from .parser import TestsParser
-from .verifier import TestsVerifier
+from algobattle.problem import ProblemModel, SolutionModel
 
 logger = logging.getLogger('algobattle.problems.testsproblem')
 
 
-class Tests(Problem):
+
+
+
+
+class Tests(ProblemModel):
     """Artificial problem used for tests."""
 
-    name = 'Tests'
-    n_start = 1
-    parser = TestsParser()
-    verifier = TestsVerifier()
-    approximable = True
+    name: ClassVar[str] = "Tests"
+    with_solution: ClassVar[bool] = False
+
+    class Solution(SolutionModel):
+        semantics: bool
+        quality: bool
+
+        def is_valid(self, instance: "Tests", size: int) -> bool:
+            return self.semantics
+
+    semantics: bool
+
+    def is_valid(self, size: int) -> bool:
+        return self.semantics
+
+    def calculate_score(self, solution: Solution, generator_solution: Solution | None, size: int) -> SupportsFloat:
+        return solution.quality

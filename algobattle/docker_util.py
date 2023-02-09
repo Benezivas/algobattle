@@ -1,25 +1,46 @@
 """Leightweight wrapper around docker functionality."""
 from __future__ import annotations
+from abc import ABC
 import logging
 from pathlib import Path
 from time import sleep
 from timeit import default_timer
-from typing import Any, Iterator, Literal, cast
+from typing import Any, Iterator, Literal, Mapping, Self, cast
 from uuid import uuid1
+import json
 from dataclasses import dataclass
 from docker import DockerClient
 from docker.errors import APIError, BuildError, DockerException, ImageNotFound
 from docker.models.images import Image as DockerImage
 from docker.models.containers import Container as DockerContainer
+from docker.types import Mount
 from requests import Timeout
-
-from algobattle.util import archive, extract
+from algobattle.util import Encodable, Role, TempDir, encode, decode, inherit_docs
+from algobattle.problem import Problem
 
 
 logger = logging.getLogger("algobattle.docker")
 
 
 _client_var: DockerClient | None = None
+
+
+@dataclass(frozen=True)
+class RunParameters:
+    """The parameters determining how a container is run."""
+
+    timeout: float | None = 30
+    space: int | None = None
+    cpus: int = 1
+
+
+@dataclass(frozen=True)
+class DockerConfig:
+    """Grouped config options that are relevant to the interaction with docker."""
+
+    build_timeout: float | None = None
+    generator: RunParameters = RunParameters()
+    solver: RunParameters = RunParameters()
 
 
 def client() -> DockerClient:
@@ -45,13 +66,31 @@ def get_os_type() -> Literal["linux", "windows"]:
 class DockerError(Exception):
     """Error type for any issue during the execution of a docker command.
 
-    The only error raised by any function in the docker module.
+    Parent class of all exceptions raised by functions in the docker module.
     """
 
-    def __init__(self, message: str = "", level: int = logging.WARNING, *args: object) -> None:
-        logger.log(level=level, msg=message)
-        super().__init__(message, *args)
+    pass
 
+class ExecutionError(DockerError):
+    """Exception raised when the execution of a container fails."""
+
+    def __init__(self, *args: object, runtime: float, exit_code: int, error_message: str) -> None:
+        self.runtime = runtime
+        self.exit_code = exit_code
+        self.error_message = error_message
+        super().__init__(runtime, *args)
+
+
+class EncodingError(DockerError):
+    """Indicates that the given data couldn't be encoded or decoded properly."""
+
+    pass
+
+
+class SemanticsError(DockerError):
+    """Indicates that the parsed data is semantically incorrect."""
+
+    pass
 
 @dataclass
 class ArchivedImage:
@@ -72,7 +111,8 @@ class ArchivedImage:
                 raise KeyError
             self.path.unlink()
         except APIError as e:
-            raise DockerError(f"Docker APIError thrown while restoring '{self.name}'") from e
+            logger.warning(f"Docker APIError thrown while restoring '{self.name}'")
+            raise DockerError from e
         return Image(self.name, self.id, self.description, path=self.path)
 
 
@@ -119,12 +159,12 @@ class Image:
             OS errors, and errors thrown by the docker daemon.
         """
         if not path.exists():
-            raise DockerError(f"Error when building {image_name}: '{path}' does not exist on the file system.")
+            logger.warning(f"Error when building {image_name}: '{path}' does not exist on the file system.")
+            raise DockerError
         if path.is_file():
             if dockerfile is not None:
-                raise DockerError(
-                    f"Error when building {image_name}: '{path}' refers to a file and 'dockerfile' is specified."
-                )
+                logger.warning(f"Error when building {image_name}: '{path}' refers to a file and 'dockerfile' is specified.")
+                raise DockerError
             dockerfile = path.name
             path = path.parent
         logger.debug(f"Building docker image with options: {path = !s}, {image_name = }, {timeout = }")
@@ -152,11 +192,14 @@ class Image:
                     old_image.remove(force=True)
 
         except Timeout as e:
-            raise DockerError(f"Build process for '{path}' ran into a timeout!") from e
+            logger.warning(f"Build process for '{path}' ran into a timeout!")
+            raise DockerError from e
         except BuildError as e:
-            raise DockerError(f"Building '{path}' did not complete successfully:\n{e.msg}") from e
+            logger.warning(f"Building '{path}' did not complete successfully:\n{e.msg}")
+            raise DockerError from e
         except APIError as e:
-            raise DockerError(f"Docker APIError thrown while building '{path}':\n{e}") from e
+            logger.warning(f"Docker APIError thrown while building '{path}':\n{e}")
+            raise DockerError from e
 
         return cls(image_name, cast(str, image.id), description if description is not None else image_name, path=path)
 
@@ -166,13 +209,22 @@ class Image:
     def __exit__(self, _type, _value_, _traceback):
         self.remove()
 
-    def run(self, input: str = "", timeout: float | None = None, memory: int | None = None, cpus: int | None = None) -> str:
+    def run(
+        self,
+        input_dir: Path | None = None,
+        output_dir: Path | None = None,
+        timeout: float | None = None,
+        memory: int | None = None,
+        cpus: int | None = None
+    ) -> float:
         """Runs a docker image with the provided input and returns its output.
 
         Parameters
         ----------
-        input
-            The input string the container will be provided with.
+        input_dir
+            The input folder provided to the docker container.
+        input_dir
+            The folder where the container places its output.
         timeout
             Timeout in seconds.
         memory
@@ -197,7 +249,14 @@ class Image:
         if cpus is not None:
             cpus = int(cpus * 1000000000)
 
+        mounts = []
+        if input_dir is not None:
+            mounts.append(Mount(target="/input", source=str(input_dir), type="bind", read_only=True))
+        if output_dir is not None:
+            mounts.append(Mount(target="/output", source=str(output_dir), type="bind"))
+
         container: DockerContainer | None = None
+        elapsed_time = 0
         try:
             container = cast(
                 DockerContainer,
@@ -208,11 +267,9 @@ class Image:
                     nano_cpus=cpus,
                     detach=True,
                     network_mode="none",
+                    mounts=mounts,
                 ),
             )
-            ok = container.put_archive("/", archive(input, "input"))
-            if not ok:
-                raise DockerError(f"Copying input into container {self.name} failed")
 
             container.start()
             start_time = default_timer()
@@ -225,19 +282,14 @@ class Image:
             elapsed_time = round(default_timer() - start_time, 2)
 
             if (exit_code := cast(dict[str, Any], container.attrs)["State"]["ExitCode"]) != 0:
-                raise DockerError(
-                    f"{self.description} exited with error code {exit_code} "
-                    f"and error message '{container.logs().decode()}'"
-                )
-            output_iter, _stat = container.get_archive("output")
-            output = extract(b"".join(output_iter), "output")
+                raise ExecutionError(runtime=elapsed_time, exit_code=exit_code, error_message=container.logs().decode())
 
         except ImageNotFound as e:
-            raise DockerError(f"Image {self.name} (id={self.id}) does not exist") from e
+            logger.warning(f"Image {self.name} (id={self.id}) does not exist")
+            raise DockerError from e
         except APIError as e:
-            if cast(str, e.explanation).startswith("Could not find the file output in container"):
-                return ""
-            raise DockerError(f"Docker API Error thrown while running {self.name}") from e
+            logger.warning(f"Docker API Error thrown while running {self.name}")
+            raise DockerError from e
         finally:
             if container is not None:
                 try:
@@ -246,7 +298,7 @@ class Image:
                     raise DockerError(f"Couldn't remove {name}") from e
 
         logger.debug(f"Approximate elapsed runtime: {elapsed_time}/{timeout} seconds.")
-        return output
+        return elapsed_time
 
     def remove(self) -> None:
         """Removes the image from the docker daemon.
@@ -267,13 +319,9 @@ class Image:
         except APIError as e:
             raise DockerError(f"Docker APIError thrown while removing '{self.name}'") from e
 
-    def archive(self) -> ArchivedImage:
+    def archive(self, dir: Path) -> ArchivedImage:
         """Archives the image into a .tar file at the targeted directory."""
-        if self.path.is_dir():
-            path = self.path
-        else:
-            path = self.path.parent
-        path = path / f"{self.name}-archive.tar"
+        path = dir / f"{self.name}-archive.tar"
         try:
             image = cast(DockerImage, client().images.get(self.name))
             with open(path, "wb") as file:
@@ -283,3 +331,263 @@ class Image:
         except APIError as e:
             raise DockerError(f"Docker APIError thrown while archiving '{self.name}'") from e
         return ArchivedImage(path, self.name, self.id, self.description)
+
+
+@dataclass
+class GeneratorResult:
+    """Result of a single generator or solver execution."""
+
+    problem: Problem
+    runtime: float
+    solution: Problem.Solution | None = None
+    battle_data: dict[str, Encodable] | None = None
+
+
+@dataclass
+class SolverResult:
+    """Result of a single generator or solver execution."""
+
+    solution: Problem.Solution
+    runtime: float
+    battle_data: dict[str, Encodable] | None = None
+
+
+class Program(ABC):
+    """A higher level interface for a team's programs."""
+
+    role: Role
+    data_role: Literal["instance", "solution"]
+
+    def __init_subclass__(cls) -> None:
+        cls.data_role = "instance" if cls.role == "generator" else "solution"
+        return super().__init_subclass__()
+
+    def __init__(
+        self,
+        image: Image,
+        config: RunParameters,
+        team_name: str,
+        data_type: type[Problem] | type[Problem.Solution]
+    ) -> None:
+        # we can't take a ref to the Team object here since it won't be created til after the Programs
+        self.image = image
+        self.config = config
+        self.team_name = team_name
+        self.data_type = data_type
+        super().__init__()
+
+    @classmethod
+    def build(
+        cls,
+        image: Path | Image | ArchivedImage,
+        team_name: str,
+        problem_type: type[Problem],
+        config: RunParameters,
+        timeout: float | None = None,
+    ) -> Self:
+        """Creates a program by building the specified docker image."""
+        if isinstance(image, Path):
+            image = Image.build(
+                path=image,
+                image_name=f"{cls.role}-{team_name}",
+                description=f"{cls.role} for team {team_name}",
+                timeout=timeout,
+            )
+        elif isinstance(image, ArchivedImage):
+            image = image.restore()
+
+        if cls.role == "generator":
+            data_type = problem_type
+        else:
+            data_type = problem_type.Solution
+        return cls(image, config, team_name, data_type)
+
+    def _run(
+        self,
+        size: int,
+        input_instance: Problem | None = None,
+        *,
+        timeout: float | None = ...,
+        space: int | None = ...,
+        cpus: int = ...,
+        battle_input: Mapping[str, Encodable] = {},
+        battle_output: Mapping[str, type[Encodable]] = {},
+    ) -> Any:
+        """Execute the program, processing input and output data."""
+        set_params: dict[str, Any] = {}
+        if timeout is Ellipsis:
+            timeout = self.config.timeout
+        else:
+            set_params["timeout"] = timeout
+        if space is Ellipsis:
+            space = self.config.space
+        else:
+            set_params["space"] = space
+        if cpus is Ellipsis:
+            cpus = self.config.cpus
+        else:
+            set_params["cpus"] = cpus
+        if self.role == "generator":
+            param_msg = f" at size {size}"
+        else:
+            param_msg = ""
+        if set_params:
+            param_msg += " with parameters " + ", ".join(f"{k}: {v}" for k, v in set_params.items())
+        logger.info(f"Running {self.role} of team {self.team_name}{param_msg}.")
+
+        with TempDir() as input, TempDir() as output:
+            if self.role == "generator":
+                with open(input / "size", "w+") as f:
+                    f.write(str(size))
+            else:
+                assert input_instance is not None
+                (input / "instance").mkdir()
+                try:
+                    input_instance.encode(input / "instance", size, self.role)
+                except Exception as e:
+                    logger.critical("Problem instance couldn't be encoded into files!")
+                    raise DockerError from e
+            if battle_input:
+                (input / "battle_data").mkdir()
+                try:
+                    encode(battle_input, input / "battle_data", size, self.role)
+                except Exception as e:
+                    logger.critical("Battle data couldn't be encoded into files!")
+                    raise DockerError from e
+            with open(input / "info.json", "w+") as f:
+                json.dump({
+                    "size": size,
+                    "timeout": timeout,
+                    "space": space,
+                    "cpus": cpus,
+                    "battle_input": {name: obj.__class__.__name__ for name, obj in battle_input.items()},
+                    "battle_output": {name: cls.__name__ for name, cls in battle_output.items()},
+                }, f)
+
+            (output / self.data_role).mkdir()
+            if issubclass(self.data_type, Problem) and self.data_type.with_solution:
+                (output / "solution").mkdir()
+            if battle_output:
+                (output / "battle_data").mkdir()
+
+            try:
+                runtime = self.image.run(input, output, timeout=timeout, memory=space, cpus=cpus)
+            except ExecutionError as e:
+                logger.warning(f"{self.role.capitalize()} of team {self.team_name} crashed!")
+                logger.info(f"After {e.runtime:.2f}s, with exit code {e.exit_code} and error message:\n{e.error_message}")
+                raise
+            except DockerError:
+                logger.warning(f"{self.role.capitalize()} of team {self.team_name} couldn't be executed successfully!")
+                raise
+
+            try:
+                output_data = self.data_type.decode(output / self.data_role, size, self.role)
+            except Exception as e:
+                logger.warning(
+                    f"The {self.data_role} output of team {self.team_name}'s {self.role} can not be decoded properly!"
+                )
+                raise EncodingError from e
+            if self.role == "generator" and isinstance(output_data, Problem) and output_data.with_solution:
+                try:
+                    generator_solution = output_data.Solution.decode(output / "solution", size, self.role)
+                except Exception as e:
+                    logger.warning(
+                        f"The solution output of team {self.team_name}'s generator can not be decoded properly!"
+                    )
+                    raise EncodingError from e
+            else:
+                generator_solution = None
+
+            if battle_output:
+                decoded_battle_output = decode(battle_output, output / "battle_data", size, self.role)
+            else:
+                decoded_battle_output = None
+
+        if self.role == "generator":
+            assert isinstance(output_data, Problem)
+            is_valid = output_data.is_valid(size)
+        else:
+            assert isinstance(output_data, Problem.Solution)
+            is_valid = output_data.is_valid(input_instance, size)
+
+        if not is_valid:
+            logger.warning(
+                f"{self.role.capitalize()} of team {self.team_name} output an invalid {self.data_role}!"
+            )
+            raise SemanticsError
+
+        if generator_solution is not None:
+            is_valid = generator_solution.is_valid(output_data, size)
+            if not is_valid:
+                logger.warning(f"The generator of team {self.team_name} output an invalid solution!")
+                raise SemanticsError
+
+        logger.info(f"{self.role.capitalize()} of team {self.team_name} output a valid {self.data_role}.")
+        if isinstance(output_data, Problem):
+            return GeneratorResult(output_data, runtime, generator_solution, decoded_battle_output)
+        else:
+            return SolverResult(output_data, runtime, decoded_battle_output)
+
+    @inherit_docs
+    def remove(self) -> None:
+        self.image.remove()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, _type, _value_, _traceback):
+        self.remove()
+
+class Generator(Program):
+    """A higher level interface for a team's generator."""
+
+    role = "generator"
+
+    def run(
+        self,
+        size: int,
+        *,
+        timeout: float | None = ...,
+        space: int | None = ...,
+        cpus: int = ...,
+        battle_input: Mapping[str, Encodable] = {},
+        battle_output: Mapping[str, type[Encodable]] = {},
+    ) -> GeneratorResult:
+        """Execute the generator, passing in the size and processing the created problem instance."""
+        return self._run(
+            size=size,
+            input_instance=None,
+            timeout=timeout,
+            space=space,
+            cpus=cpus,
+            battle_input=battle_input,
+            battle_output=battle_output
+        )
+
+
+class Solver(Program):
+    """A higher level interface for a team's solver."""
+
+    role = "solver"
+
+    def run(
+        self,
+        instance: Problem,
+        size: int,
+        *,
+        timeout: float | None = ...,
+        space: int | None = ...,
+        cpus: int = ...,
+        battle_input: Mapping[str, Encodable] = {},
+        battle_output: Mapping[str, type[Encodable]] = {},
+    ) -> SolverResult:
+        """Execute the solver, passing in the problem instance and processing the created solution."""
+        return self._run(
+            size=size,
+            input_instance=instance,
+            timeout=timeout,
+            space=space,
+            cpus=cpus,
+            battle_input=battle_input,
+            battle_output=battle_output
+        )

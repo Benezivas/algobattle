@@ -8,7 +8,7 @@ from importlib.metadata import version as pkg_version
 from algobattle.battle_wrapper import BattleWrapper
 
 from algobattle.observer import Observer, Subject
-from algobattle.match import MatchResult
+from algobattle.match import Match
 
 logger = logging.getLogger("algobattle.ui")
 
@@ -36,8 +36,8 @@ class Ui(Observer):
     @check_for_terminal
     def __init__(self) -> None:
         super().__init__()
-        self.match_result: MatchResult | None = None
-        self.battle_info: BattleWrapper.Result | None = None
+        self.match_result: Match | None = None
+        self.battle_info: BattleWrapper | None = None
         self.stdscr = curses.initscr()
         curses.cbreak()
         curses.noecho()
@@ -60,12 +60,27 @@ class Ui(Observer):
     @check_for_terminal
     def update(self, subject: Subject, event: str) -> None:
         """Receive updates to the match data and displays them."""
-        if isinstance(subject, MatchResult):
+        if isinstance(subject, Match):
             self.match_result = subject
-        elif isinstance(subject, BattleWrapper.Result):
+        elif isinstance(subject, BattleWrapper):
             self.battle_info = subject
         else:
             return
+
+        if self.match_result is not None:
+            try:
+                match_display = self.match_result.display()
+            except Exception:
+                match_display = ""
+        else:
+            match_display = ""
+        if self.battle_info is not None:
+            try:
+                battle_display = self.battle_info.display()
+            except Exception:
+                battle_display = ""
+        else:
+            battle_display = ""
 
         out = [
             r"              _    _             _           _   _   _       ",
@@ -75,9 +90,9 @@ class Ui(Observer):
             r"          /_/   \_\_|\__, |\___/|_.__/ \__,_|\__|\__|_|\___| ",
             r"                      |___/                                  ",
             f"Algobattle version {pkg_version(__package__)}",
-            self.match_result.display() if self.match_result is not None else "",
+            match_display,
             "",
-            self.battle_info.display() if self.battle_info is not None else "",
+            battle_display,
         ]
 
         self.stdscr.clear()

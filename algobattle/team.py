@@ -7,7 +7,9 @@ from pathlib import Path
 from typing import Iterator
 import logging
 
-from algobattle.docker_util import DockerError, Image, ArchivedImage
+from algobattle.docker_util import DockerConfig, DockerError, ArchivedImage, Generator, Solver
+from algobattle.problem import Problem
+from algobattle.util import TempDir
 
 logger = logging.getLogger("algobattle.team")
 
@@ -17,13 +19,13 @@ _team_names: set[str] = set()
 
 @dataclass
 class TeamInfo:
-    """Object containing all the info needed to build a team."""
+    """The config parameters defining a team."""
 
     name: str
     generator: Path
     solver: Path
 
-    def build(self, timeout: float | None = None, *, auto_cleanup=True) -> Team:
+    def build(self, problem: type[Problem], config: DockerConfig, *, auto_cleanup=True) -> Team:
         """Builds the specified docker files into images and return the corresponding team.
 
         Raises
@@ -35,10 +37,10 @@ class TeamInfo:
         """
         name = self.name.replace(" ", "_").lower()  # Lower case needed for docker tag created from name
         if name in _team_names:
-            raise
-        generator = Image.build(self.generator, f"generator-{name}", f"generator for team {self}", timeout=timeout)
+            raise ValueError
+        generator = Generator.build(self.generator, self.name, problem, config.generator, config.build_timeout)
         try:
-            solver = Image.build(self.solver, f"solver-{name}", f"solver for team {self}", timeout)
+            solver = Solver.build(self.solver, self.name, problem, config.solver, config.build_timeout)
         except DockerError:
             generator.remove()
             raise
@@ -50,8 +52,8 @@ class Team:
     """Team class responsible for holding basic information of a specific team."""
 
     name: str
-    generator: Image
-    solver: Image
+    generator: Generator
+    solver: Solver
     _cleanup_generator: bool = False
     _cleanup_solver: bool = False
 
@@ -95,45 +97,26 @@ class Team:
             self.solver.remove()
         _team_names.remove(self.name)
 
-    def archive(self) -> ArchivedTeam:
+    def archive(self, dir: Path) -> _ArchivedTeam:
         """Archives the images this team uses."""
-        gen = self.generator.archive()
-        sol = self.solver.archive()
-        _team_names.discard(self.name)
-        return ArchivedTeam(self.name, gen, sol, _cleanup_generator=self._cleanup_generator,
-                            _cleanup_solver=self._cleanup_solver)
+        gen = self.generator.image.archive(dir)
+        sol = self.solver.image.archive(dir)
+        return _ArchivedTeam(gen, sol, self)
 
 
 @dataclass
-class ArchivedTeam:
+class _ArchivedTeam:
     """A team whose images have been archived."""
 
-    name: str
     generator: ArchivedImage
     solver: ArchivedImage
-    _cleanup_generator: bool = False
-    _cleanup_solver: bool = False
-
-    def __post_init__(self) -> None:
-        """Creates a team object.
-
-        Raises
-        ------
-        ValueError
-            If the team name is already in use.
-        """
-        super().__init__()
-        self.name = self.name.replace(" ", "_").lower()  # Lower case needed for docker tag created from name
-        if self.name in _team_names:
-            raise ValueError
-        _team_names.add(self.name)
+    team: Team
 
     def restore(self) -> Team:
         """Restores the archived docker images."""
-        gen = self.generator.restore()
-        sol = self.solver.restore()
-        _team_names.discard(self.name)
-        return Team(self.name, gen, sol, _cleanup_generator=self._cleanup_generator, _cleanup_solver=self._cleanup_solver)
+        self.generator.restore()
+        self.solver.restore()
+        return self.team
 
 
 @dataclass(frozen=True)
@@ -152,19 +135,28 @@ class TeamHandler(list[Team]):
     """Handles building teams and cleaning them up."""
 
     @staticmethod
-    def build(infos: list[TeamInfo], timeout: float | None = None, safe_build: bool = False) -> TeamHandler:
+    def build(infos: list[TeamInfo], problem: type[Problem], config: DockerConfig, safe_build: bool = False) -> TeamHandler:
         """Builds the specified team objects."""
-        teams: list[Team | ArchivedTeam] = []
-        for info in infos:
-            try:
-                team = info.build(timeout, auto_cleanup=safe_build)
-                if safe_build:
-                    team = team.archive()
-                teams.append(team)
-            except (ValueError, DockerError):
-                logger.warning(f"Building generators and solvers for team {info.name} failed, they will be excluded!")
-        restored_teams = [team.restore() if isinstance(team, ArchivedTeam) else team for team in teams]
-        return TeamHandler(restored_teams)
+        if safe_build:
+            with TempDir() as folder:
+                archives: list[_ArchivedTeam] = []
+                for info in infos:
+                    try:
+                        team = info.build(problem, config, auto_cleanup=True)
+                        team = team.archive(folder)
+                        archives.append(team)
+                    except Exception:
+                        logger.warning(f"Building generators and solvers for team {info.name} failed, they will be excluded!")
+                return TeamHandler([team.restore() for team in archives])
+        else:
+            teams: list[Team] = []
+            for info in infos:
+                try:
+                    team = info.build(problem, config, auto_cleanup=safe_build)
+                    teams.append(team)
+                except (ValueError, DockerError):
+                    logger.warning(f"Building generators and solvers for team {info.name} failed, they will be excluded!")
+            return TeamHandler(teams)
 
     def __enter__(self):
         return self

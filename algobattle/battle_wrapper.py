@@ -5,88 +5,113 @@ responsible for executing specific types of battle. They share the
 characteristic that they are responsible for updating some match data during
 their run, such that it contains the current state of the match.
 """
-from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, field as dataclass_field, fields
 from importlib.metadata import entry_points
 import logging
 from abc import abstractmethod, ABC
-from importlib import import_module
-from typing import Type
+from typing import (
+    Any,
+    Callable,
+    ClassVar,
+    Literal,
+    Mapping,
+    TypeAlias,
+    TypeVar,
+    dataclass_transform,
+    get_origin,
+    get_type_hints,
+)
+from algobattle.docker_util import DockerError, Generator, Solver, GeneratorResult, SolverResult
+from algobattle.observer import Subject
+from algobattle.util import Encodable, Role
 
-from algobattle.fight_handler import FightHandler
-from algobattle.team import Matchup
-from algobattle.observer import Observer, Subject
-from algobattle.util import CLIParsable
-
-logger = logging.getLogger('algobattle.battle_wrapper')
+logger = logging.getLogger("algobattle.battle_wrapper")
 
 
-class BattleWrapper(ABC):
+_Config: TypeAlias = Any
+T = TypeVar("T")
+
+
+def argspec(*, default: T, help: str = "", parser: Callable[[str], T] | None = None) -> T:
+    """Structure specifying the CLI arg."""
+    metadata = {"help": help, "parser": parser}
+    return dataclass_field(default=default, metadata={key: val for key, val in metadata.items() if val is not None})
+
+
+@dataclass
+class CombinedResults:
+    """The result of one execution of the generator and the solver with the generated instance."""
+
+    score: float
+    generator: GeneratorResult | DockerError
+    solver: SolverResult | DockerError | None
+
+
+class BattleWrapper(Subject, ABC):
     """Abstract Base class for wrappers that execute a specific kind of battle."""
 
-    @dataclass
-    class Config(CLIParsable):
+    _wrappers: ClassVar[dict[str, type["BattleWrapper"]]] = {}
+
+    scoring_team: ClassVar[Role] = "solver"
+
+    @dataclass_transform(field_specifiers=(argspec,))
+    class Config:
         """Object containing the config variables the wrapper will use."""
 
-        pass
+        def __init_subclass__(cls) -> None:
+            dataclass(cls)
+            super().__init_subclass__()
 
-    _wrappers: dict[str, Type[BattleWrapper]] = {}
+        # providing a dummy default impl that will be overriden, to get better static analysis
+        def __init__(self, **kwargs) -> None:
+            super().__init__()
+
+        @classmethod
+        def as_argparse_args(cls) -> list[tuple[str, dict[str, Any]]]:
+            """Constructs a list of argument names and `**kwargs` that can be passed to `ArgumentParser.add_argument()`."""
+            arguments: list[tuple[str, dict[str, Any]]] = []
+            resolved_annotations = get_type_hints(cls)
+            for field in fields(cls):
+                kwargs = {
+                    "type": field.metadata.get("parser", resolved_annotations[field.name]),
+                    "help": field.metadata.get("help", "") + f" Default: {field.default}",
+                }
+                if field.type == bool:
+                    kwargs["action"] = "store_const"
+                    kwargs["const"] = not field.default
+                elif get_origin(field.type) == Literal:
+                    kwargs["choices"] = field.type.__args__
+
+                arguments.append((field.name, kwargs))
+            return arguments
 
     @staticmethod
-    def all() -> dict[str, Type[BattleWrapper]]:
+    def all() -> dict[str, type["BattleWrapper"]]:
         """Returns a list of all registered wrappers."""
         for entrypoint in entry_points(group="algobattle.wrappers"):
             if entrypoint.name not in BattleWrapper._wrappers:
-                wrapper: Type[BattleWrapper] = entrypoint.load()
-                BattleWrapper._wrappers[wrapper.name()] = wrapper
+                wrapper: type[BattleWrapper] = entrypoint.load()
+                BattleWrapper._wrappers[wrapper.name().lower()] = wrapper
         return BattleWrapper._wrappers
 
-    def __init_subclass__(cls) -> None:
+    def __init_subclass__(cls, notify_var_changes: bool = False) -> None:
         if cls.name() not in BattleWrapper._wrappers:
-            BattleWrapper._wrappers[cls.name()] = cls
-        return super().__init_subclass__()
-
-    @staticmethod
-    def get_wrapper(wrapper_name: str) -> Type[BattleWrapper]:
-        """Try to import a Battle Wrapper from a given name.
-
-        For this to work, a BattleWrapper module with the same name as the argument
-        needs to be present in the algobattle/battle_wrappers folder.
-
-        Parameters
-        ----------
-        wrapper_name : str
-            Name of a battle wrapper module in algobattle/battle_wrappers.
-
-        Returns
-        -------
-        BattleWrapper
-            A BattleWrapper of the given wrapper_name.
-
-        Raises
-        ------
-        ValueError
-            If the wrapper does not exist in the battle_wrappers folder.
-        """
-        try:
-            wrapper_module = import_module("algobattle.battle_wrappers." + wrapper_name)
-            return getattr(wrapper_module, wrapper_name.capitalize())
-        except ImportError as e:
-            logger.critical(f"Importing a wrapper from the given path failed with the following exception: {e}")
-            raise ValueError from e
-
-    def __init__(self, fight_handler: FightHandler, config: BattleWrapper.Config) -> None:
-        super().__init__()
-        self.fight_handler = fight_handler
-        self.config = config
+            BattleWrapper._wrappers[cls.name().lower()] = cls
+        return super().__init_subclass__(notify_var_changes)
 
     @abstractmethod
-    def run_round(self, matchup: Matchup, observer: Observer | None = None) -> BattleWrapper.Result:
-        """Execute a full round of fights between two teams configured in the fight_handler.
+    def score(self) -> float:
+        """The score achieved by the scored team during this battle."""
+        raise NotImplementedError
 
-        During execution, the concrete BattleWrapper should update the round_data dict
-        to which Observers can subscribe in order to react to new intermediate results.
-        """
+    @staticmethod
+    def format_score(score: float) -> str:
+        """Formats a score nicely."""
+        return f"{score:.2f}"
+
+    @abstractmethod
+    def display(self) -> str:
+        """Nicely formats the object."""
         raise NotImplementedError
 
     @classmethod
@@ -94,25 +119,58 @@ class BattleWrapper(ABC):
         """Name of the type of this battle wrapper."""
         return cls.__name__
 
-    class Result(Subject):
-        """Result of a single battle."""
+    @abstractmethod
+    def run_battle(self, generator: Generator, solver: Solver, config: _Config, min_size: int) -> None:
+        """Calculates the next instance size that should be fought over."""
+        raise NotImplementedError
 
-        @property
-        @abstractmethod
-        def score(self) -> float:
-            """The score achieved by the solver of this battle."""
-            raise NotImplementedError
+    def run_programs(
+        self,
+        generator: Generator,
+        solver: Solver,
+        size: int,
+        *,
+        timeout_generator: float | None = ...,
+        space_generator: int | None = ...,
+        cpus_generator: int = ...,
+        timeout_solver: float | None = ...,
+        space_solver: int | None = ...,
+        cpus_solver: int = ...,
+        generator_battle_input: Mapping[str, Encodable] = {},
+        solver_battle_input: Mapping[str, Encodable] = {},
+        generator_battle_output: Mapping[str, type[Encodable]] = {},
+        solver_battle_output: Mapping[str, type[Encodable]] = {},
+    ) -> CombinedResults:
+        """Execute a single fight of a battle, running the generator and solver and handling any errors gracefully."""
+        self.notify()
+        try:
+            gen_result = generator.run(
+                size=size,
+                timeout=timeout_generator,
+                space=space_generator,
+                cpus=cpus_generator,
+                battle_input=generator_battle_input,
+                battle_output=generator_battle_output,
+            )
+        except DockerError as e:
+            return CombinedResults(score=1, generator=e, solver=None)
 
-        @staticmethod
-        @abstractmethod
-        def format_score(score: float) -> str:
-            """Formats a score nicely."""
-            raise NotImplementedError
+        try:
+            sol_result = solver.run(
+                gen_result.problem,
+                size=size,
+                timeout=timeout_solver,
+                space=space_solver,
+                cpus=cpus_solver,
+                battle_input=solver_battle_input,
+                battle_output=solver_battle_output,
+            )
+        except DockerError as e:
+            return CombinedResults(score=0, generator=gen_result, solver=e)
 
-        def __str__(self) -> str:
-            return self.format_score(self.score)
-
-        @abstractmethod
-        def display(self) -> str:
-            """Nicely formats the object."""
-            raise NotImplementedError
+        score = gen_result.problem.calculate_score(
+            solution=sol_result.solution, generator_solution=gen_result.solution, size=size
+        )
+        score = max(0, min(1, float(score)))
+        logger.info(f"The solver achieved a score of {score}.")
+        return CombinedResults(score, gen_result, sol_result)

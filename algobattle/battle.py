@@ -15,11 +15,13 @@ from algobattle.battle_wrapper import BattleWrapper
 # for now we need to manually import the default wrappers to make sure they're initialized
 from algobattle.battle_wrappers.iterated import Iterated    # type: ignore # noqa: F401
 from algobattle.battle_wrappers.averaged import Averaged    # type: ignore # noqa: F401
+from algobattle.docker_util import DockerConfig, RunParameters
 
-from algobattle.match import MatchConfig, run_match
+from algobattle.match import MatchConfig, Match
+from algobattle.problem import Problem
 from algobattle.team import TeamHandler, TeamInfo
 from algobattle.ui import Ui
-from algobattle.util import check_path, getattr_set, import_problem_from_path
+from algobattle.util import check_path, getattr_set
 
 
 def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
@@ -79,7 +81,7 @@ class ProgramConfig:
     logs: Path = Path.home() / ".algobattle_logs"
 
 
-def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, MatchConfig, BattleWrapper.Config]:
+def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, DockerConfig, MatchConfig, BattleWrapper.Config]:
     """Parse a given CLI arg list into config objects."""
     parser = ArgumentParser()
     parser.add_argument("problem", type=check_path, help="Path to a folder with the problem file.")
@@ -99,7 +101,8 @@ def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, MatchConfig, BattleW
     parser.add_argument("--timeout_solver", type=float, help="Time limit for the solver execution.")
     parser.add_argument("--space_generator", type=int, help="Memory limit for the generator execution, in MB.")
     parser.add_argument("--space_solver", type=int, help="Memory limit the solver execution, in MB.")
-    parser.add_argument("--cpus", type=int, help="Number of cpu cores used for each docker container execution.")
+    parser.add_argument("--cpus_generator", type=int, help="Number of cpu cores used for generator container execution.")
+    parser.add_argument("--cpus_solver", type=int, help="Number of cpu cores used for solver container execution.")
 
     # battle wrappers have their configs automatically added to the CLI args
     for wrapper_name, wrapper in BattleWrapper.all().items():
@@ -110,7 +113,7 @@ def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, MatchConfig, BattleW
     parsed = parser.parse_args(args)
 
     if parsed.battle_type is not None:
-        parsed.battle_type = BattleWrapper.get_wrapper(parsed.battle_type)
+        parsed.battle_type = BattleWrapper.all()[parsed.battle_type]
     cfg_path = parsed.config if parsed.config is not None else parsed.problem / "config.toml"
     if cfg_path.is_file():
         with open(cfg_path, "rb") as file:
@@ -125,7 +128,7 @@ def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, MatchConfig, BattleW
         team_specs = config["teams"]
     else:
         team_specs = [{
-            "name": "team 0",
+            "name": "team_0",
             "generator": parsed.problem / "generator",
             "solver": parsed.problem / "solver",
         }]
@@ -141,10 +144,25 @@ def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, MatchConfig, BattleW
 
     program_config = ProgramConfig(teams=teams, **getattr_set(parsed, "problem", "display", "logs"))
 
-    match_config = MatchConfig.from_dict(config.get("algobattle", {}))
+    match_config = MatchConfig.from_dict(config.get("match", {}))
     for name in vars(match_config):
         if getattr(parsed, name) is not None:
             setattr(match_config, name, getattr(parsed, name))
+
+    docker_params = config.get("docker", {})
+    docker_config = DockerConfig(
+        build_timeout=docker_params.get("build_timeout"),
+        generator=RunParameters(**docker_params.get("generator", {})),
+        solver=RunParameters(**docker_params.get("solver", {})),
+    )
+    if getattr(parsed, "timeout_build") is not None:
+        object.__setattr__(docker_config, "build_timeout", parsed.timeout_build)
+    for role in ("generator", "solver"):
+        role_config = getattr(docker_config, role)
+        for name in vars(role_config):
+            cli_name = f"{name}_{role}"
+            if getattr(parsed, cli_name) is not None:
+                object.__setattr__(role_config, name, getattr(parsed, cli_name))
 
     wrapper_config = match_config.battle_type.Config(**config.get(match_config.battle_type.name().lower(), {}))
     for name in vars(wrapper_config):
@@ -152,31 +170,31 @@ def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, MatchConfig, BattleW
         if getattr(parsed, cli_name) is not None:
             setattr(wrapper_config, name, getattr(parsed, cli_name))
 
-    return program_config, match_config, wrapper_config
+    return program_config, docker_config, match_config, wrapper_config
 
 
 def main():
     """Entrypoint of `algobattle` CLI."""
     try:
-        program_config, match_config, wrapper_config = parse_cli_args(sys.argv[1:])
+        program_config, docker_config, match_config, wrapper_config = parse_cli_args(sys.argv[1:])
         logger = setup_logging(program_config.logs, match_config.verbose, program_config.display != "logs")
 
     except KeyboardInterrupt:
         raise SystemExit("Received keyboard interrupt, terminating execution.")
 
     try:
-        problem = import_problem_from_path(program_config.problem)
-        with TeamHandler.build(program_config.teams) as teams, ExitStack() as stack:
+        problem = Problem.import_from_path(program_config.problem)
+        with TeamHandler.build(program_config.teams, problem, docker_config) as teams, ExitStack() as stack:
             if program_config.display == "ui":
                 ui = Ui()
                 stack.enter_context(ui)
             else:
                 ui = None
 
-            result = run_match(match_config, wrapper_config, problem, teams, ui)
+            result = Match.run(match_config, wrapper_config, problem, teams, ui)
 
             logger.info('#' * 78)
-            logger.info(str(result))
+            logger.info(result.display())
             if match_config.points > 0:
                 points = result.calculate_points(match_config.points)
                 for team, pts in points.items():

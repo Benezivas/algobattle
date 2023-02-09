@@ -16,20 +16,16 @@ class Observer(ABC):
 class Subject(ABC):
     """The Subject interface declares an easy way to update observers."""
 
-    notify_vars = False
-    """If True, the subject will automatically notify if an attribute gets changed.
-
-    Gets set automatically if the subject is a dataclass."""
+    def __init_subclass__(cls, notify_var_changes: bool = False) -> None:
+        if notify_var_changes:
+            cls.__setattr__ = cls.__notifying_setattr__
+        return super().__init_subclass__()
 
     def __init__(self, observer: Observer | None = None) -> None:
         super().__init__()
         self.observers: list[Observer] = []
         if observer is not None:
             self.attach(observer)
-
-    def __post_init__(self, observer: Observer, *args, **kwargs):
-        Subject.__init__(self, observer)
-        self.notify_vars = True
 
     def attach(self, observer: Observer):
         """Subscribes an observer to the updates of this subject."""
@@ -46,10 +42,9 @@ class Subject(ABC):
         for observer in self.observers:
             observer.update(self, event)
 
-    def __setattr__(self, name: str, value: Any) -> None:
+    def __notifying_setattr__(self, name: str, value: Any) -> None:
         super().__setattr__(name, value)
-        if self.notify_vars:
-            self.notify(name)
+        self.notify(name)
 
     def display(self) -> str:
         """Nicely formats the object."""

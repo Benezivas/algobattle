@@ -1,73 +1,16 @@
 """Collection of utility functions."""
-from __future__ import annotations
-from abc import ABC
-from dataclasses import KW_ONLY, dataclass, fields
-from io import BytesIO
+from abc import ABC, abstractmethod
+import json
 import logging
-import importlib.util
-import sys
 from pathlib import Path
-import tarfile
-from typing import Any, Callable, Generic, Literal, TypeVar, cast, get_type_hints
+from tempfile import TemporaryDirectory
+from typing import Any, ClassVar, Literal, Mapping, TypeVar, Self
+from pydantic import BaseModel
 
-from algobattle.problem import Problem
+
+Role = Literal["generator", "solver"]
 
 logger = logging.getLogger("algobattle.util")
-
-
-def import_problem_from_path(problem_path: Path) -> Problem:
-    """Try to import and initialize a Problem object from a given path.
-
-    Parameters
-    ----------
-    problem_path : Path
-        Path in the file system to a problem folder.
-
-    Returns
-    -------
-    Problem
-        Returns an object of the problem.
-
-    Raises
-    ------
-    ValueError
-        If the path doesn't point to a file containing a valid problem.
-    """
-    if not (problem_path / "__init__.py").is_file():
-        raise ValueError
-
-    try:
-        spec = importlib.util.spec_from_file_location("problem", problem_path / "__init__.py")
-        assert spec is not None
-        assert spec.loader is not None
-        Problem = importlib.util.module_from_spec(spec)
-        sys.modules[spec.name] = Problem
-        spec.loader.exec_module(Problem)
-        return Problem.Problem()
-    except ImportError as e:
-        logger.critical(f"Importing the given problem failed with the following exception: {e}")
-        raise ValueError from e
-
-
-def archive(input: str, filename: str) -> bytes:
-    """Compresses a string into a tar archive."""
-    encoded = input.encode()
-    with BytesIO() as fh:
-        with BytesIO(initial_bytes=encoded) as source, tarfile.open(fileobj=fh, mode="w") as tar:
-            info = tarfile.TarInfo(filename)
-            info.size = len(encoded)
-            tar.addfile(info, source)
-        fh.seek(0)
-        return fh.getvalue()
-
-
-def extract(archive: bytes, filename: str) -> str:
-    """Retrieves the contents of a file from a tar archive."""
-    with BytesIO(initial_bytes=archive) as fh, tarfile.open(fileobj=fh, mode="r") as tar:
-        file = tar.extractfile(filename)
-        assert file is not None
-        with file as f:
-            return f.read().decode()
 
 
 T = TypeVar("T")
@@ -97,75 +40,111 @@ def check_path(path: str, *, type: Literal["file", "dir", "exists"] = "exists") 
         raise ValueError
 
 
-@dataclass
-class _ArgSpec(Generic[T]):
-    """Further details of an CLI argument."""
-
-    default: T
-    _: KW_ONLY
-    alias: str | None = None
-    parser: Callable[[str], T] | None = None
-    help: str | None = None
-
-
-def ArgSpec(default: T, *, alias: str | None = None, parser: Callable[[str], T] | None = None, help: str | None = None) -> T:
-    """Structure specifying the CLI arg."""
-    return cast(T, _ArgSpec(default=default, alias=alias, parser=parser, help=help))
-
-
-class CLIParsable(ABC):
-    """Protocol for dataclass-like objects that can be parsed from the CLI."""
-
-    __args__: dict[str, _ArgSpec[Any]]
-
-    def __init_subclass__(cls) -> None:
-        args = {}
-        for name, _type in get_type_hints(cls).items():
-            if (name.startswith("__") and name.endswith("__")) or not hasattr(cls, name):
-                continue
-            default_val = getattr(cls, name)
-            if isinstance(default_val, _ArgSpec):
-                if default_val.parser is None:
-                    default_val.parser = _type
-                if default_val.alias is None:
-                    default_val.alias = name
-                args[name] = default_val
-                setattr(cls, name, default_val.default)
-        cls.__args__ = args
-        return super().__init_subclass__()
-
-    @classmethod
-    def _argspec(cls, name: str) -> _ArgSpec[Any] | None:
-        for c in cls.__mro__:
-            if name in getattr(c, "__args__", {}):
-                return getattr(c, "__args__")[name]
-        return None
-
-    @classmethod
-    def as_argparse_args(cls) -> list[tuple[list[str], dict[str, Any]]]:
-        """Constructs a list of `*args` and `**kwargs` that can be passed to `ArgumentParser.add_argument()`."""
-        arguments = []
-        for field in fields(cls):
-            arg_spec = cls._argspec(field.name)
-            if arg_spec is None:
-                continue
-
-            kwargs: dict[str, Any] = {
-                "type": arg_spec.parser,
-                "help": f"{arg_spec.help} Default: {arg_spec.default}"
-                if arg_spec.help is not None
-                else f"Default: {arg_spec.default}",
-            }
-            if field.type == bool:
-                kwargs["action"] = "store_const"
-                kwargs["const"] = not arg_spec.default
-            elif field.type == Literal:
-                kwargs["choices"] = cls.__annotations__[field.name].__args__
-
-            arguments.append((arg_spec.alias, kwargs))
-        return arguments
-
-
 def getattr_set(o: object, *attrs: str) -> dict[str, Any]:
     """Returns a dict of the given attributes and their values, if they are not `None`."""
     return {a: getattr(o, a) for a in attrs if getattr(o, a, None) is not None}
+
+
+class TempDir(TemporaryDirectory[Any]):
+    """A :cls:`TemporaryDirecroty`, but it's enter returns a :cls:`Path`."""
+
+    def __enter__(self):
+        super().__enter__()
+        return Path(self.name)
+
+
+class CustomEncodable(ABC):
+    """Represents problem data that docker containers can interact with."""
+
+    @classmethod
+    @abstractmethod
+    def decode(cls: type[Self], source_dir: Path, size: int, team: Role) -> Self:
+        """Parses the container output into problem data."""
+        ...
+
+    @abstractmethod
+    def encode(self, target_dir: Path, size: int, team: Role) -> None:
+        """Encodes the data into files that can be passed to docker containers."""
+        ...
+
+
+Encodable = CustomEncodable | str | bytes | dict[Any, Any] | None
+
+
+def encode(data: Mapping[str, Encodable], target_dir: Path, size: int, team: Role) -> None:
+    """Encodes data into a folder.
+
+    Each element will be encoded into a file or folder named after its key. :cls:`CustomEncodables` use their own method,
+    strings will be encoded with utf8, bytes are written as is, and dictionaries will be encoded as json.
+    """
+    for name, obj in data.items():
+        try:
+            if isinstance(obj, CustomEncodable):
+                (target_dir / name).mkdir()
+                obj.encode(target_dir / name, size, team)
+            elif isinstance(obj, str):
+                with open(target_dir / name, "w+") as f:
+                    f.write(obj)
+            elif isinstance(obj, bytes):
+                with open(target_dir / name, "wb+") as f:
+                    f.write(obj)
+            elif isinstance(obj, dict):
+                with open(target_dir / name, "w+") as f:
+                    json.dump(obj, f)
+        except Exception as e:
+            logger.critical(f"Failed to encode {obj} from into files at {target_dir / name}!\nException: {e}")
+
+
+def decode(data_spec: Mapping[str, type[Encodable]], source_dir: Path, size: int, team: Role) -> dict[str, Encodable | None]:
+    """Decodes data from a folder.
+
+    The output is a dictionary with the same keys as `data_spec` and values that are objects of the specified types.
+    :cls:`CustomEncodables` use their own method, strings will be decoded with utf8, bytes are read directly,
+    and dictionaries will be decoded from json.
+    Any :cls:`Excpeption`s are caught and the corresponding field in the dict be set to `None`.
+    """
+    out = {}
+    for name, cls in data_spec.items():
+        try:
+            if issubclass(cls, CustomEncodable):
+                (source_dir / name).mkdir()
+                out[name] = cls.decode(source_dir / name, size, team)
+            elif issubclass(cls, str):
+                with open(source_dir / name, "r") as f:
+                    out[name] = f.read()
+            elif issubclass(cls, bytes):
+                with open(source_dir / name, "rb") as f:
+                    out[name] = f.read()
+            elif issubclass(cls, dict):
+                with open(source_dir / name, "r") as f:
+                    out[name] = json.load(f)
+        except Exception as e:
+            logger.critical(f"Failed to decode {cls} object from data at {source_dir / name}!\nException: {e}")
+            out[name] = None
+    return out
+
+
+class EncodableModel(BaseModel, CustomEncodable, ABC):
+    """Problem data that can easily be encoded into and decoded from json files."""
+
+    filename: ClassVar[str]
+
+    @inherit_docs
+    @classmethod
+    def decode(cls: type[Self], source_dir: Path, size: int, team: Role) -> Self:
+        return cls.parse_file(source_dir / cls.filename)
+
+    @inherit_docs
+    def encode(self, target_dir: Path, size: int, team: Role) -> None:
+        with open(target_dir / self.filename, "w") as f:
+            f.write(self.json(exclude=self._excludes(team)))
+
+    def _excludes(self, team: Role) -> dict[str | int, Any]:
+        excludes = {}
+        for name, field in self.__fields__.items():
+            hidden = field.field_info.extra.get("hidden", False)
+            if (isinstance(hidden, str) and hidden == team) or (isinstance(hidden, bool) and hidden):
+                excludes[name] = True
+            elif isinstance(getattr(self, name, None), EncodableModel):
+                excludes[name] = getattr(self, name)._excludes(team)
+        return excludes
