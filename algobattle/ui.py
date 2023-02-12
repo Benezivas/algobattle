@@ -6,7 +6,7 @@ import logging
 from sys import stdout
 from typing import Any, Callable, ParamSpec, TypeVar
 from importlib.metadata import version as pkg_version
-from algobattle.battle_wrapper import BattleWrapper
+from algobattle.battle import Battle
 
 import algobattle.match as match
 
@@ -84,7 +84,7 @@ class Ui(Observer):
     def __init__(self) -> None:
         super().__init__()
         self.match_result: match.Match | None = None
-        self.battle_info: BattleWrapper | None = None
+        self.battle_info: Battle | None = None
         self.stdscr = curses.initscr()
         curses.cbreak()
         curses.noecho()
@@ -109,7 +109,7 @@ class Ui(Observer):
         """Receive updates to the match data and displays them."""
         if isinstance(subject, match.Match):
             self.match_result = subject
-        elif isinstance(subject, BattleWrapper):
+        elif isinstance(subject, Battle):
             self.battle_info = subject
         else:
             return

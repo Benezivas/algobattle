@@ -5,7 +5,7 @@ import logging
 from typing import Any, Self
 from prettytable import PrettyTable, DOUBLE_BORDER
 
-from algobattle.battle_wrapper import BattleWrapper, Iterated
+from algobattle.battle import Battle, Iterated
 from algobattle.ui import Observer, Subject
 from algobattle.team import Matchup, Team, TeamHandler
 from algobattle.problem import Problem
@@ -19,7 +19,7 @@ class MatchConfig:
 
     verbose: bool = False
     safe_build: bool = False
-    battle_type: type[BattleWrapper] = Iterated
+    battle_type: type[Battle] = Iterated
     rounds: int = 5
     points: int = 100
 
@@ -28,10 +28,10 @@ class MatchConfig:
         """Parses a :cls:`MatchConfig` from a dict."""
         if "battle_type" in info:
             try:
-                wrapper = BattleWrapper.all()[info["battle_type"]]
+                battle_type = Battle.all()[info["battle_type"]]
             except KeyError:
-                raise ValueError(f"Attempted to use invalid battle wrapper {info['battle_type']}.")
-            update = {"battle_type": wrapper}
+                raise ValueError(f"Attempted to use invalid battle type {info['battle_type']}.")
+            update = {"battle_type": battle_type}
         else:
             update = {}
         return MatchConfig(**(info | update))
@@ -43,14 +43,14 @@ class Match(Subject):
     def __init__(
         self,
         config: MatchConfig,
-        wrapper_config: BattleWrapper.Config,
+        battle_config: Battle.Config,
         problem: type[Problem],
         teams: TeamHandler,
         observer: Observer | None = None,
     ) -> None:
-        self.results: dict[Matchup, list[BattleWrapper]] = {}
+        self.results: dict[Matchup, list[Battle]] = {}
         self.config = config
-        self.wrapper_config = wrapper_config
+        self.battle_config = battle_config
         self.problem = problem
         self.teams = teams
         super().__init__(observer)
@@ -59,23 +59,23 @@ class Match(Subject):
     def run(
         cls,
         config: MatchConfig,
-        wrapper_config: BattleWrapper.Config,
+        battle_config: Battle.Config,
         problem: type[Problem],
         teams: TeamHandler,
         observer: Observer | None = None,
     ) -> Self:
         """Executes the match with the specified parameters."""
-        result = cls(config, wrapper_config, problem, teams, observer)
+        result = cls(config, battle_config, problem, teams, observer)
         for matchup in teams.matchups:
             result.results[matchup] = []
             for i in range(config.rounds):
                 logger.info("#" * 20 + f"  Running Round {i+1}/{config.rounds}  " + "#" * 20)
-                wrapper = config.battle_type(observer=observer)
-                result.results[matchup].append(wrapper)
+                battle = config.battle_type(observer=observer)
+                result.results[matchup].append(battle)
                 try:
-                    wrapper.run_battle(matchup.generator.generator, matchup.solver.solver, wrapper_config, problem.min_size)
+                    battle.run_battle(matchup.generator.generator, matchup.solver.solver, battle_config, problem.min_size)
                 except Exception as e:
-                    logger.critical(f"Unhandeled error during execution of battle wrapper!\n{e}")
+                    logger.critical(f"Unhandeled error during execution of battle!\n{e}")
                 result.notify()
         return result
 

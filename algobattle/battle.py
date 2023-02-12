@@ -1,9 +1,6 @@
-"""Abstract base class for wrappers that execute a specific kind of battle.
+"""Module that handles the execution of each battle.
 
-The battle wrapper class is a base class for specific wrappers, which are
-responsible for executing specific types of battle. They share the
-characteristic that they are responsible for updating some match data during
-their run, such that it contains the current state of the match.
+The battle class is a base class for specific type of battle that can be executed.
 """
 from dataclasses import dataclass, field as dataclass_field, fields
 from importlib.metadata import entry_points
@@ -25,7 +22,7 @@ from algobattle.docker_util import DockerError, Generator, Solver, GeneratorResu
 from algobattle.ui import Subject
 from algobattle.util import Encodable, Role, inherit_docs
 
-logger = logging.getLogger("algobattle.battle_wrapper")
+logger = logging.getLogger("algobattle.battle")
 
 
 _Config: TypeAlias = Any
@@ -47,16 +44,16 @@ class CombinedResults:
     solver: SolverResult | DockerError | None
 
 
-class BattleWrapper(Subject, ABC):
-    """Abstract Base class for wrappers that execute a specific kind of battle."""
+class Battle(Subject, ABC):
+    """Abstract Base class for classes that execute a specific kind of battle."""
 
-    _wrappers: ClassVar[dict[str, type["BattleWrapper"]]] = {}
+    _battle_types: ClassVar[dict[str, type["Battle"]]] = {}
 
     scoring_team: ClassVar[Role] = "solver"
 
     @dataclass_transform(field_specifiers=(argspec,))
     class Config:
-        """Object containing the config variables the wrapper will use."""
+        """Object containing the config variables the battle types use."""
 
         def __init_subclass__(cls) -> None:
             dataclass(cls)
@@ -86,17 +83,17 @@ class BattleWrapper(Subject, ABC):
             return arguments
 
     @staticmethod
-    def all() -> dict[str, type["BattleWrapper"]]:
-        """Returns a list of all registered wrappers."""
-        for entrypoint in entry_points(group="algobattle.wrappers"):
-            if entrypoint.name not in BattleWrapper._wrappers:
-                wrapper: type[BattleWrapper] = entrypoint.load()
-                BattleWrapper._wrappers[wrapper.name().lower()] = wrapper
-        return BattleWrapper._wrappers
+    def all() -> dict[str, type["Battle"]]:
+        """Returns a list of all registered battle types."""
+        for entrypoint in entry_points(group="algobattle.battle"):
+            if entrypoint.name not in Battle._battle_types:
+                battle: type[Battle] = entrypoint.load()
+                Battle._battle_types[battle.name().lower()] = battle
+        return Battle._battle_types
 
     def __init_subclass__(cls, notify_var_changes: bool = False) -> None:
-        if cls.name() not in BattleWrapper._wrappers:
-            BattleWrapper._wrappers[cls.name().lower()] = cls
+        if cls.name() not in Battle._battle_types:
+            Battle._battle_types[cls.name().lower()] = cls
         return super().__init_subclass__(notify_var_changes)
 
     @abstractmethod
@@ -116,7 +113,7 @@ class BattleWrapper(Subject, ABC):
 
     @classmethod
     def name(cls) -> str:
-        """Name of the type of this battle wrapper."""
+        """Name of the type of this battle."""
         return cls.__name__
 
     @abstractmethod
@@ -176,11 +173,11 @@ class BattleWrapper(Subject, ABC):
         return CombinedResults(score, gen_result, sol_result)
 
 
-class Iterated(BattleWrapper):
-    """Class of an iterated battle Wrapper."""
+class Iterated(Battle):
+    """Class that executes an iterated battle."""
 
     @inherit_docs
-    class Config(BattleWrapper.Config):
+    class Config(Battle.Config):
         iteration_cap: int = argspec(default=50_000, help="Maximum instance size that will be tried.")
         exponent: int = argspec(default=2, help="Determines how quickly the instance size grows.")
         approximation_ratio: float = argspec(default=1, help="Approximation ratio that a solver needs to achieve to pass.")
@@ -198,8 +195,8 @@ class Iterated(BattleWrapper):
         size on a second try), we cap the maximum solution size by the last
         value that an algorithm has failed on.
 
-        The wrapper automatically ends the battle and declares the solver as the
-        winner once the iteration cap is reached.
+        The battle automatically ends once the iteration cap is reached with
+        the solver being declared the winner.
 
         During execution, this function updates the self.round_data dict,
         which automatically notifies all observers subscribed to this object.s
@@ -254,11 +251,11 @@ class Iterated(BattleWrapper):
         return f"current cap: {self.cap}\nsolved: {self.reached}\nattempting: {self.current}"
 
 
-class Averaged(BattleWrapper):
-    """Class of an adveraged battle Wrapper."""
+class Averaged(Battle):
+    """Class that executes an averaged battle."""
 
     @inherit_docs
-    class Config(BattleWrapper.Config):
+    class Config(Battle.Config):
         instance_size: int = argspec(default=10, help="Instance size that will be fought at.")
         iterations: int = argspec(default=10, help="Number of iterations in each round.")
 
