@@ -4,7 +4,7 @@ from unittest import TestCase, main
 import logging
 from pathlib import Path
 
-from algobattle.battle import parse_cli_args, setup_logging
+from algobattle.cli import parse_cli_args, setup_logging
 from algobattle.battle_wrapper import Iterated, Averaged
 from algobattle.match import MatchConfig, Match
 from algobattle.team import Team, Matchup, TeamHandler, TeamInfo
