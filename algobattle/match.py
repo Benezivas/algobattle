@@ -5,8 +5,7 @@ import logging
 from typing import Any, Self
 from prettytable import PrettyTable, DOUBLE_BORDER
 
-from algobattle.battle_wrapper import BattleWrapper
-from algobattle.battle_wrappers.iterated import Iterated
+from algobattle.battle_wrapper import BattleWrapper, Iterated
 from algobattle.observer import Observer, Subject
 from algobattle.team import Matchup, Team, TeamHandler
 from algobattle.problem import Problem

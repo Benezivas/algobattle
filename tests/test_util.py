@@ -4,11 +4,9 @@ import logging
 import random
 from pathlib import Path
 
-from algobattle.battle_wrappers.iterated import Iterated
-from algobattle.battle_wrappers.averaged import Averaged
 from algobattle.match import MatchConfig
 from algobattle.problem import Problem
-from algobattle.battle_wrapper import BattleWrapper
+from algobattle.battle_wrapper import BattleWrapper, Iterated, Averaged
 from . import testsproblem
 
 logging.disable(logging.CRITICAL)
