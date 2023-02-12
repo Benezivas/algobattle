@@ -1,20 +1,67 @@
 """UI class, responsible for printing nicely formatted output to STDOUT."""
 from __future__ import annotations
+from abc import ABC, abstractmethod
 import curses
 import logging
 from sys import stdout
-from typing import Callable, ParamSpec, TypeVar
+from typing import Any, Callable, ParamSpec, TypeVar
 from importlib.metadata import version as pkg_version
 from algobattle.battle_wrapper import BattleWrapper
 
-from algobattle.observer import Observer, Subject
-from algobattle.match import Match
+import algobattle.match as match
 
 logger = logging.getLogger("algobattle.ui")
 
 
 P = ParamSpec("P")
 R = TypeVar("R")
+
+
+class Observer(ABC):
+    """The Observer interface declares the methods to receive updates from running matches."""
+
+    @abstractmethod
+    def update(self, subject: Subject, event: str):
+        """Processes an update in the info of the subject."""
+        raise NotImplementedError
+
+
+class Subject(ABC):
+    """The Subject interface declares an easy way to update observers."""
+
+    def __init_subclass__(cls, notify_var_changes: bool = False) -> None:
+        if notify_var_changes:
+            cls.__setattr__ = cls.__notifying_setattr__
+        return super().__init_subclass__()
+
+    def __init__(self, observer: Observer | None = None) -> None:
+        super().__init__()
+        self.observers: list[Observer] = []
+        if observer is not None:
+            self.attach(observer)
+
+    def attach(self, observer: Observer):
+        """Subscribes an observer to the updates of this subject."""
+        if observer not in self.observers:
+            self.observers.append(observer)
+
+    def detach(self, observer: Observer):
+        """Unsubscribes an observer from the updates of this object."""
+        if observer in self.observers:
+            self.observers.remove(observer)
+
+    def notify(self, event: str = ""):
+        """Updates all subscribed observers."""
+        for observer in self.observers:
+            observer.update(self, event)
+
+    def __notifying_setattr__(self, name: str, value: Any) -> None:
+        super().__setattr__(name, value)
+        self.notify(name)
+
+    def display(self) -> str:
+        """Nicely formats the object."""
+        return str(self)
 
 
 def check_for_terminal(function: Callable[P, R]) -> Callable[P, R | None]:
@@ -36,7 +83,7 @@ class Ui(Observer):
     @check_for_terminal
     def __init__(self) -> None:
         super().__init__()
-        self.match_result: Match | None = None
+        self.match_result: match.Match | None = None
         self.battle_info: BattleWrapper | None = None
         self.stdscr = curses.initscr()
         curses.cbreak()
@@ -60,7 +107,7 @@ class Ui(Observer):
     @check_for_terminal
     def update(self, subject: Subject, event: str) -> None:
         """Receive updates to the match data and displays them."""
-        if isinstance(subject, Match):
+        if isinstance(subject, match.Match):
             self.match_result = subject
         elif isinstance(subject, BattleWrapper):
             self.battle_info = subject

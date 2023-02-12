@@ -22,7 +22,7 @@ from typing import (
     get_type_hints,
 )
 from algobattle.docker_util import DockerError, Generator, Solver, GeneratorResult, SolverResult
-from algobattle.observer import Subject
+from algobattle.ui import Subject
 from algobattle.util import Encodable, Role, inherit_docs
 
 logger = logging.getLogger("algobattle.battle_wrapper")
