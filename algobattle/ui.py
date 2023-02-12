@@ -83,8 +83,8 @@ class Ui(Observer):
     @check_for_terminal
     def __init__(self) -> None:
         super().__init__()
-        self.match_result: match.Match | None = None
-        self.battle_info: Battle | None = None
+        self.match_result: Any = None
+        self.battle_info: Any = None
         self.stdscr = curses.initscr()
         curses.cbreak()
         curses.noecho()
@@ -107,9 +107,9 @@ class Ui(Observer):
     @check_for_terminal
     def update(self, subject: Subject, event: str) -> None:
         """Receive updates to the match data and displays them."""
-        if isinstance(subject, match.Match):
+        if event == "match":
             self.match_result = subject
-        elif isinstance(subject, Battle):
+        elif event == "battle":
             self.battle_info = subject
         else:
             return

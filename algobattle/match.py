@@ -76,7 +76,7 @@ class Match(Subject):
                     battle.run_battle(matchup.generator.generator, matchup.solver.solver, battle_config, problem.min_size)
                 except Exception as e:
                     logger.critical(f"Unhandeled error during execution of battle!\n{e}")
-                result.notify()
+                result.notify("match")
         return result
 
     def calculate_points(self, achievable_points: int) -> dict[Team, float]:
