@@ -6,9 +6,6 @@ import logging
 from sys import stdout
 from typing import Any, Callable, ParamSpec, TypeVar
 from importlib.metadata import version as pkg_version
-from algobattle.battle import Battle
-
-import algobattle.match as match
 
 logger = logging.getLogger("algobattle.ui")
 
