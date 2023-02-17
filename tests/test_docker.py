@@ -36,10 +36,7 @@ class ImageTests(TestCase):
 
     @classmethod
     def dockerfile(cls, name: str) -> tuple[Path, str]:
-        if get_os_type() == "windows":
-            return cls.problem_path / name / "Dockerfile_windows", name
-        else:
-            return cls.problem_path / name, name
+        return cls.problem_path / name, name
 
     def test_build_timeout(self):
         """Raises an error if building a container runs into a timeout."""

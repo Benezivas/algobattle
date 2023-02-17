@@ -4,11 +4,9 @@ import logging
 import random
 from pathlib import Path
 
-from algobattle.battle_wrappers.iterated import Iterated
-from algobattle.battle_wrappers.averaged import Averaged
 from algobattle.match import MatchConfig
 from algobattle.problem import Problem
-from algobattle.battle_wrapper import BattleWrapper
+from algobattle.battle import Battle, Iterated, Averaged
 from . import testsproblem
 
 logging.disable(logging.CRITICAL)
@@ -35,10 +33,10 @@ class Utiltests(unittest.TestCase):
         with self.assertRaises(ValueError):
             Problem.import_from_path(Path(self.rand_file_name))
 
-    def test_default_wrappers(self):
-        """Initializing an existing wrapper works as expected."""
-        self.assertEqual(BattleWrapper.all()["iterated"], Iterated)
-        self.assertEqual(BattleWrapper.all()["averaged"], Averaged)
+    def test_default_battle_types(self):
+        """Initializing an existing battle type works as expected."""
+        self.assertEqual(Battle.all()["iterated"], Iterated)
+        self.assertEqual(Battle.all()["averaged"], Averaged)
 
 
 if __name__ == '__main__':

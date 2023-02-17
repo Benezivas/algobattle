@@ -1,4 +1,0 @@
-FROM windows-base
-
-# causes an error on container execution
-ENTRYPOINT thisisnotavalidcommand
