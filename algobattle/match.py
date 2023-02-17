@@ -7,7 +7,7 @@ from prettytable import PrettyTable, DOUBLE_BORDER
 
 from algobattle.battle import Battle, Iterated
 from algobattle.ui import Observer, Subject
-from algobattle.team import Matchup, TeamHandler
+from algobattle.team import Matchup, Team, TeamHandler
 from algobattle.problem import Problem
 
 logger = logging.getLogger("algobattle.match")
@@ -99,8 +99,8 @@ class Match(Subject):
         points_per_battle = round(achievable_points / ((len(self.teams.active) - 1) * self.config.rounds), 1)
 
         for home_matchup, away_matchup in self.teams.grouped_matchups:
-            home_team = getattr(home_matchup, self.config.battle_type.scoring_team)
-            away_team = getattr(away_matchup, self.config.battle_type.scoring_team)
+            home_team: Team = getattr(home_matchup, self.config.battle_type.scoring_team)
+            away_team: Team = getattr(away_matchup, self.config.battle_type.scoring_team)
             for home_res, away_res in zip(self.results[home_matchup], self.results[away_matchup]):
                 total_score = home_res.score() + away_res.score()
                 if total_score == 0:
@@ -111,8 +111,8 @@ class Match(Subject):
                     home_ratio = home_res.score() / total_score
                     away_ratio = away_res.score() / total_score
 
-                points[home_team] += round(points_per_battle * home_ratio, 1)
-                points[away_team] += round(points_per_battle * away_ratio, 1)
+                points[home_team.name] += round(points_per_battle * home_ratio, 1)
+                points[away_team.name] += round(points_per_battle * away_ratio, 1)
 
         # we need to also add the points each team would have gotten fighting the excluded teams
         # each active team would have had one set of battles against each excluded team
