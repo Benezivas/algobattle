@@ -96,7 +96,7 @@ class Match(Subject):
         points = {team.name: 0.0 for team in self.teams.active + self.teams.excluded}
         if self.config.rounds == 0:
             return points
-        points_per_round = round(achievable_points / ((len(self.teams.active) - 1) * self.config.rounds), 1)
+        points_per_battle = round(achievable_points / ((len(self.teams.active) - 1) * self.config.rounds), 1)
 
         for home_matchup, away_matchup in self.teams.grouped_matchups:
             home_team = getattr(home_matchup, self.config.battle_type.scoring_team)
@@ -111,12 +111,12 @@ class Match(Subject):
                     home_ratio = home_res.score() / total_score
                     away_ratio = away_res.score() / total_score
 
-                points[home_team] += round(points_per_round * home_ratio, 1)
-                points[away_team] += round(points_per_round * away_ratio, 1)
+                points[home_team] += round(points_per_battle * home_ratio, 1)
+                points[away_team] += round(points_per_battle * away_ratio, 1)
 
         # we need to also add the points each team would have gotten fighting the excluded teams
         for team in self.teams.active:
-            points[team.name] += points_per_round * len(self.teams.excluded)
+            points[team.name] += points_per_battle * len(self.teams.excluded)
 
         return points
 
