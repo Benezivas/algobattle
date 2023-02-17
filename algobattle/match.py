@@ -79,28 +79,28 @@ class Match(Subject):
                 result.notify("match")
         return result
 
-    def calculate_points(self, achievable_points: int) -> dict[Team, float]:
+    def calculate_points(self, achievable_points: int) -> dict[str, float]:
         """Calculate the number of points each team scored.
 
         Each pair of teams fights for the achievable points among one another.
         These achievable points are split over all rounds.
         """
-        if len(self.teams) == 0:
+        if len(self.teams.active) == 0:
             return {}
-        if len(self.teams) == 1:
-            return {self.teams[0]: achievable_points}
+        if len(self.teams.active) == 1:
+            return {self.teams.active[0].name: achievable_points}
 
         if any(not 0 <= len(results) <= self.config.rounds for results in self.results.values()):
             raise ValueError
 
-        points = {team: 0.0 for team in self.teams}
+        points = {team.name: 0.0 for team in self.teams.active + self.teams.excluded}
         if self.config.rounds == 0:
             return points
-        points_per_round = round(achievable_points / ((len(self.teams) - 1) * self.config.rounds), 1)
+        points_per_battle = round(achievable_points / ((len(self.teams.active) - 1) * self.config.rounds), 1)
 
         for home_matchup, away_matchup in self.teams.grouped_matchups:
-            home_team = getattr(home_matchup, self.config.battle_type.scoring_team)
-            away_team = getattr(away_matchup, self.config.battle_type.scoring_team)
+            home_team: Team = getattr(home_matchup, self.config.battle_type.scoring_team)
+            away_team: Team = getattr(away_matchup, self.config.battle_type.scoring_team)
             for home_res, away_res in zip(self.results[home_matchup], self.results[away_matchup]):
                 total_score = home_res.score() + away_res.score()
                 if total_score == 0:
@@ -111,8 +111,13 @@ class Match(Subject):
                     home_ratio = home_res.score() / total_score
                     away_ratio = away_res.score() / total_score
 
-                points[home_team] += round(points_per_round * home_ratio, 1)
-                points[away_team] += round(points_per_round * away_ratio, 1)
+                points[home_team.name] += round(points_per_battle * home_ratio, 1)
+                points[away_team.name] += round(points_per_battle * away_ratio, 1)
+
+        # we need to also add the points each team would have gotten fighting the excluded teams
+        # each active team would have had one set of battles against each excluded team
+        for team in self.teams.active:
+            points[team.name] += points_per_battle * len(self.teams.excluded) * self.config.rounds
 
         return points
 

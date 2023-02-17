@@ -45,7 +45,7 @@ class Matchtests(TestCase):
     def test_calculate_points_zero_rounds(self):
         """All teams get 0 points if no rounds have been fought."""
         match = Match(MatchConfig(rounds=0), Iterated.Config(), TestProblem, self.teams)
-        self.assertEqual(match.calculate_points(100), {self.team0: 0, self.team1: 0})
+        self.assertEqual(match.calculate_points(100), {self.team0.name: 0, self.team1.name: 0})
 
     def test_calculate_points_iterated_no_successful_round(self):
         """Two teams should get an equal amount of points if nobody solved anything."""
@@ -54,7 +54,7 @@ class Matchtests(TestCase):
         battle.reached = 0
         match.results[self.matchup0] = [battle, battle]
         match.results[self.matchup1] = [battle, battle]
-        self.assertEqual(match.calculate_points(100), {self.team0: 50, self.team1: 50})
+        self.assertEqual(match.calculate_points(100), {self.team0.name: 50, self.team1.name: 50})
 
     def test_calculate_points_iterated_draw(self):
         """Two teams should get an equal amount of points if both solved a problem equally well."""
@@ -65,7 +65,7 @@ class Matchtests(TestCase):
         battle2.reached = 10
         match.results[self.matchup0] = [battle, battle2]
         match.results[self.matchup1] = [battle2, battle]
-        self.assertEqual(match.calculate_points(100), {self.team0: 50, self.team1: 50})
+        self.assertEqual(match.calculate_points(100), {self.team0.name: 50, self.team1.name: 50})
 
     def test_calculate_points_iterated_domination(self):
         """One team should get all points if it solved anything and the other team nothing."""
@@ -76,7 +76,7 @@ class Matchtests(TestCase):
         battle2.reached = 0
         match.results[self.matchup0] = [battle, battle]
         match.results[self.matchup1] = [battle2, battle2]
-        self.assertEqual(match.calculate_points(100), {self.team0: 0, self.team1: 100})
+        self.assertEqual(match.calculate_points(100), {self.team0.name: 0, self.team1.name: 100})
 
     def test_calculate_points_iterated_one_team_better(self):
         """One team should get more points than the other if it performed better."""
@@ -87,7 +87,7 @@ class Matchtests(TestCase):
         battle2.reached = 20
         match.results[self.matchup0] = [battle, battle]
         match.results[self.matchup1] = [battle2, battle2]
-        self.assertEqual(match.calculate_points(100), {self.team0: 66.6, self.team1: 33.4})
+        self.assertEqual(match.calculate_points(100), {self.team0.name: 66.6, self.team1.name: 33.4})
 
     def test_calculate_points_averaged_no_successful_round(self):
         """Two teams should get an equal amount of points if nobody solved anything."""
@@ -96,7 +96,7 @@ class Matchtests(TestCase):
         battle.scores = [0, 0, 0]
         match.results[self.matchup0] = [battle, battle]
         match.results[self.matchup1] = [battle, battle]
-        self.assertEqual(match.calculate_points(100), {self.team0: 50, self.team1: 50})
+        self.assertEqual(match.calculate_points(100), {self.team0.name: 50, self.team1.name: 50})
 
     def test_calculate_points_averaged_draw(self):
         """Two teams should get an equal amount of points if both solved a problem equally well."""
@@ -105,7 +105,7 @@ class Matchtests(TestCase):
         battle.scores = [.5, .5, .5]
         match.results[self.matchup0] = [battle, battle]
         match.results[self.matchup1] = [battle, battle]
-        self.assertEqual(match.calculate_points(100), {self.team0: 50, self.team1: 50})
+        self.assertEqual(match.calculate_points(100), {self.team0.name: 50, self.team1.name: 50})
 
     def test_calculate_points_averaged_domination(self):
         """One team should get all points if it solved anything and the other team nothing."""
@@ -116,7 +116,7 @@ class Matchtests(TestCase):
         battle2.scores = [1, 1, 1]
         match.results[self.matchup0] = [battle, battle]
         match.results[self.matchup1] = [battle2, battle2]
-        self.assertEqual(match.calculate_points(100), {self.team0: 100, self.team1: 0})
+        self.assertEqual(match.calculate_points(100), {self.team0.name: 100, self.team1.name: 0})
 
     def test_calculate_points_averaged_one_team_better(self):
         """One team should get more points than the other if it performed better."""
@@ -127,7 +127,7 @@ class Matchtests(TestCase):
         battle2.scores = [.4, .4, .4]
         match.results[self.matchup0] = [battle, battle]
         match.results[self.matchup1] = [battle2, battle2]
-        self.assertEqual(match.calculate_points(100), {self.team0: 60, self.team1: 40})
+        self.assertEqual(match.calculate_points(100), {self.team0.name: 60, self.team1.name: 40})
 
     # TODO: Add tests for remaining functions
 
