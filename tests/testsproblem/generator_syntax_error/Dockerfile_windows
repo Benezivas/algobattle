@@ -1,5 +1,0 @@
-FROM windows-base
-
-# outputs a static, artificially malformed solution.
-COPY instance.json /instance.json
-ENTRYPOINT move \instance.json \output\instance\instance.json

@@ -1,5 +1,0 @@
-FROM windows-base
-
-# outputs a static instance and certificate
-COPY instance.json /instance.json
-ENTRYPOINT move \instance.json \output\instance\instance.json
