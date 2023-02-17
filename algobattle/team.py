@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from itertools import combinations
 from pathlib import Path
-from typing import Iterable, Iterator, Self, overload
+from typing import Iterable, Iterator, Self
 import logging
 
 from algobattle.docker_util import DockerConfig, DockerError, ArchivedImage, Generator, Solver
@@ -134,7 +134,7 @@ class Matchup:
 class TeamHandler:
     """Handles building teams and cleaning them up."""
 
-    def __init__(self, teams: Iterable[Team] | None = None, /, *, excluded: Iterable[Team] | None = None) -> None:
+    def __init__(self, teams: Iterable[Team] | None = None, excluded: Iterable[TeamInfo] | None = None) -> None:
         if teams is not None:
             self.active = list(teams)
         else:
@@ -148,6 +148,7 @@ class TeamHandler:
     @staticmethod
     def build(infos: list[TeamInfo], problem: type[Problem], config: DockerConfig, safe_build: bool = False) -> TeamHandler:
         """Builds the specified team objects."""
+        excluded: list[TeamInfo] = []
         if safe_build:
             with TempDir() as folder:
                 archives: list[_ArchivedTeam] = []
@@ -158,7 +159,9 @@ class TeamHandler:
                         archives.append(team)
                     except Exception:
                         logger.warning(f"Building generators and solvers for team {info.name} failed, they will be excluded!")
-                return TeamHandler([team.restore() for team in archives])
+                        excluded.append(info)
+
+                return TeamHandler([team.restore() for team in archives], excluded)
         else:
             teams: list[Team] = []
             for info in infos:
@@ -167,7 +170,8 @@ class TeamHandler:
                     teams.append(team)
                 except (ValueError, DockerError):
                     logger.warning(f"Building generators and solvers for team {info.name} failed, they will be excluded!")
-            return TeamHandler(teams)
+                    excluded.append(info)
+            return TeamHandler(teams, excluded)
 
     def __enter__(self) -> Self:
         return self
