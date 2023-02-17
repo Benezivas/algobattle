@@ -115,8 +115,9 @@ class Match(Subject):
                 points[away_team] += round(points_per_battle * away_ratio, 1)
 
         # we need to also add the points each team would have gotten fighting the excluded teams
+        # each active team would have had one set of battles against each excluded team
         for team in self.teams.active:
-            points[team.name] += points_per_battle * len(self.teams.excluded)
+            points[team.name] += points_per_battle * len(self.teams.excluded) * self.config.rounds
 
         return points
 
