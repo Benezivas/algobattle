@@ -85,18 +85,18 @@ class Match(Subject):
         Each pair of teams fights for the achievable points among one another.
         These achievable points are split over all rounds.
         """
-        if len(self.teams) == 0:
+        if len(self.teams.active) == 0:
             return {}
-        if len(self.teams) == 1:
-            return {self.teams[0]: achievable_points}
+        if len(self.teams.active) == 1:
+            return {self.teams.active[0]: achievable_points}
 
         if any(not 0 <= len(results) <= self.config.rounds for results in self.results.values()):
             raise ValueError
 
-        points = {team: 0.0 for team in self.teams}
+        points = {team: 0.0 for team in self.teams.active}
         if self.config.rounds == 0:
             return points
-        points_per_round = round(achievable_points / ((len(self.teams) - 1) * self.config.rounds), 1)
+        points_per_round = round(achievable_points / ((len(self.teams.active) - 1) * self.config.rounds), 1)
 
         for home_matchup, away_matchup in self.teams.grouped_matchups:
             home_team = getattr(home_matchup, self.config.battle_type.scoring_team)

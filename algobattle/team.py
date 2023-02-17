@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from itertools import combinations
 from pathlib import Path
-from typing import Iterator
+from typing import Iterable, Iterator, Self, overload
 import logging
 
 from algobattle.docker_util import DockerConfig, DockerError, ArchivedImage, Generator, Solver
@@ -131,8 +131,19 @@ class Matchup:
         yield self.solver
 
 
-class TeamHandler(list[Team]):
+class TeamHandler:
     """Handles building teams and cleaning them up."""
+
+    def __init__(self, teams: Iterable[Team] | None = None, /, *, excluded: Iterable[Team] | None = None) -> None:
+        if teams is not None:
+            self.active = list(teams)
+        else:
+            self.active = []
+        if excluded is not None:
+            self.excluded = list(excluded)
+        else:
+            self.excluded = []
+        super().__init__()
 
     @staticmethod
     def build(infos: list[TeamInfo], problem: type[Problem], config: DockerConfig, safe_build: bool = False) -> TeamHandler:
@@ -158,11 +169,11 @@ class TeamHandler(list[Team]):
                     logger.warning(f"Building generators and solvers for team {info.name} failed, they will be excluded!")
             return TeamHandler(teams)
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, _type, _value_, _traceback):
-        for team in self:
+        for team in self.active:
             team.cleanup()
 
     @property
@@ -171,12 +182,12 @@ class TeamHandler(list[Team]):
 
         Each tuple's first matchup has the first team in the group generating, the second has it solving.
         """
-        return [(Matchup(*g), Matchup(*g[::-1])) for g in combinations(self, 2)]
+        return [(Matchup(*g), Matchup(*g[::-1])) for g in combinations(self.active, 2)]
 
     @property
     def matchups(self) -> list[Matchup]:
         """All matchups that will be fought."""
-        if len(self) == 1:
-            return [Matchup(self[0], self[0])]
+        if len(self.active) == 1:
+            return [Matchup(self.active[0], self.active[0])]
         else:
             return [m for pair in self.grouped_matchups for m in pair]
