@@ -79,7 +79,7 @@ class Match(Subject):
                 result.notify("match")
         return result
 
-    def calculate_points(self, achievable_points: int) -> dict[Team, float]:
+    def calculate_points(self, achievable_points: int) -> dict[str, float]:
         """Calculate the number of points each team scored.
 
         Each pair of teams fights for the achievable points among one another.
@@ -88,12 +88,12 @@ class Match(Subject):
         if len(self.teams.active) == 0:
             return {}
         if len(self.teams.active) == 1:
-            return {self.teams.active[0]: achievable_points}
+            return {self.teams.active[0].name: achievable_points}
 
         if any(not 0 <= len(results) <= self.config.rounds for results in self.results.values()):
             raise ValueError
 
-        points = {team: 0.0 for team in self.teams.active}
+        points = {team.name: 0.0 for team in self.teams.active + self.teams.excluded}
         if self.config.rounds == 0:
             return points
         points_per_round = round(achievable_points / ((len(self.teams.active) - 1) * self.config.rounds), 1)
@@ -113,6 +113,10 @@ class Match(Subject):
 
                 points[home_team] += round(points_per_round * home_ratio, 1)
                 points[away_team] += round(points_per_round * away_ratio, 1)
+
+        # we need to also add the points each team would have gotten fighting the excluded teams
+        for team in self.teams.active:
+            points[team.name] += points_per_round * len(self.teams.excluded)
 
         return points
 
