@@ -118,20 +118,26 @@ class Problem(CustomEncodable, ABC):
             raise ValueError(f"'{path}' does not point to a python file or a proper parent folder of one.")
 
         try:
-            spec = importlib.util.spec_from_file_location("problem", path)
+            spec = importlib.util.spec_from_file_location("__problem", path)
             assert spec is not None
             assert spec.loader is not None
             problem_module = importlib.util.module_from_spec(spec)
             sys.modules[spec.name] = problem_module
             spec.loader.exec_module(problem_module)
-            problem_cls = problem_module.Problem
-            if not issubclass(problem_cls, Problem):
-                raise ValueError(f"Variable 'Problem' in {path} is not a Problem class.")
+
+            problem_classes = [val for val in vars(problem_module).values() if issubclass(val, Problem)]
+            if len(problem_classes) == 0:
+                raise ValueError(f"'{path}' contains no Problem classes.")
+            elif len(problem_classes) >= 2:
+                raise ValueError(f"'{path}' contains {len(problem_classes)} different problem classes!")
+            problem_cls = problem_classes[0]
+
             if issubclass(problem_cls, EncodableModel):
                 problem_cls.update_forward_refs(Solution=problem_cls.Solution)
             if issubclass(problem_cls.Solution, EncodableModel):
                 problem_cls.Solution.update_forward_refs()
             return problem_cls
+
         except Exception as e:
             logger.critical(f"Importing the given problem failed with the following exception: {e}")
             raise ValueError from e
