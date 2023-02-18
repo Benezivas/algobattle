@@ -94,6 +94,11 @@ class Problem(CustomEncodable, ABC):
         else:
             raise NotImplementedError
 
+    @classmethod
+    def io_schema(cls) -> str | None:
+        """Generates a schema specifying the I/O for this problem."""
+        return None
+
     @staticmethod
     def import_from_path(path: Path) -> type["Problem"]:
         """Try to import a Problem class object from a given path.
@@ -143,11 +148,21 @@ class Problem(CustomEncodable, ABC):
             """Validates that the parsed solution is semantically correct."""
             return True
 
+        @classmethod
+        def io_schema(cls) -> str | None:
+            """Generates a schema specifying the I/O for this solution."""
+            return None
+
 
 class ProblemModel(EncodableModel, Problem, ABC):
     """A Problem that can easily be parsed to/from a json file."""
 
     filename: ClassVar[str] = "instance.json"
+
+    @classmethod
+    def io_schema(cls) -> str | None:
+        """Generates the default json schema specifying the I/O for this problem."""
+        return cls.schema_json()
 
     class Config:
         """Pydantic config object to hide these fields in the json if someone redeclared them incorrectly."""
@@ -165,6 +180,11 @@ class SolutionModel(EncodableModel, Problem.Solution, ABC):
     """A solution that can easily be parsed to/from a json file."""
 
     filename: ClassVar[str] = "solution.json"
+
+    @classmethod
+    def io_schema(cls) -> str | None:
+        """Generates the default json schema specifying the I/O for this solution."""
+        return cls.schema_json()
 
     class Config:
         """Pydantic config object to hide these fields in the json if someone redeclared them incorrectly."""
