@@ -162,7 +162,7 @@ class ProblemModel(EncodableModel, Problem, ABC):
     @classmethod
     def io_schema(cls) -> str | None:
         """Generates the default json schema specifying the I/O for this problem."""
-        return cls.schema_json()
+        return cls.schema_json(indent=4)
 
     class Config:
         """Pydantic config object to hide these fields in the json if someone redeclared them incorrectly."""
@@ -184,7 +184,7 @@ class SolutionModel(EncodableModel, Problem.Solution, ABC):
     @classmethod
     def io_schema(cls) -> str | None:
         """Generates the default json schema specifying the I/O for this solution."""
-        return cls.schema_json()
+        return cls.schema_json(indent=4)
 
     class Config:
         """Pydantic config object to hide these fields in the json if someone redeclared them incorrectly."""
