@@ -128,9 +128,12 @@ class Problem(CustomEncodable, ABC):
             problem_classes = [val for val in vars(problem_module).values() if issubclass(val, Problem)]
             if len(problem_classes) == 0:
                 raise ValueError(f"'{path}' contains no Problem classes.")
-            elif len(problem_classes) >= 2:
+            elif len(problem_classes) == 1:
+                problem_cls = problem_classes[0]
+            elif hasattr(problem_classes, "Problem") and issubclass(getattr(problem_classes, "Problem"), Problem):
+                problem_cls: type[Problem] = problem_module.Problem
+            else:
                 raise ValueError(f"'{path}' contains {len(problem_classes)} different problem classes!")
-            problem_cls = problem_classes[0]
 
             if issubclass(problem_cls, EncodableModel):
                 problem_cls.update_forward_refs(Solution=problem_cls.Solution)
