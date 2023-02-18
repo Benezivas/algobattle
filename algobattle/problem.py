@@ -1,6 +1,7 @@
 """Abstract base class for problem classes used in concrete problem implementations."""
 from abc import ABC, abstractmethod
 import importlib.util
+from inspect import isclass
 import logging
 import sys
 from pathlib import Path
@@ -110,7 +111,7 @@ class Problem(CustomEncodable, ABC):
         """
         if path.is_file():
             pass
-        if (path / "__init__.py").is_file():
+        elif (path / "__init__.py").is_file():
             path /= "__init__.py"
         elif (path / "problem.py").is_file():
             path /= "problem.py"
@@ -118,14 +119,18 @@ class Problem(CustomEncodable, ABC):
             raise ValueError(f"'{path}' does not point to a python file or a proper parent folder of one.")
 
         try:
-            spec = importlib.util.spec_from_file_location("__problem", path)
+            spec = importlib.util.spec_from_file_location("_problem", path)
             assert spec is not None
             assert spec.loader is not None
             problem_module = importlib.util.module_from_spec(spec)
             sys.modules[spec.name] = problem_module
             spec.loader.exec_module(problem_module)
+        except Exception as e:
+            logger.critical(f"Importing the given problem failed with the following exception: {e}")
+            raise ValueError from e
 
-            problem_classes = [val for val in vars(problem_module).values() if issubclass(val, Problem)]
+        try:
+            problem_classes = [val for val in vars(problem_module).values() if isclass(val) and issubclass(val, Problem)]
             if len(problem_classes) == 0:
                 raise ValueError(f"'{path}' contains no Problem classes.")
             elif len(problem_classes) == 1:
@@ -142,6 +147,7 @@ class Problem(CustomEncodable, ABC):
             return problem_cls
 
         except Exception as e:
+            sys.modules.pop("_problem")
             logger.critical(f"Importing the given problem failed with the following exception: {e}")
             raise ValueError from e
 
