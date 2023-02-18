@@ -108,11 +108,17 @@ class Problem(CustomEncodable, ABC):
         ValueError
             If the path doesn't point to a file containing a valid problem.
         """
-        if not (path / "__init__.py").is_file():
-            raise ValueError
+        if path.is_file():
+            pass
+        if (path / "__init__.py").is_file():
+            path /= "__init__.py"
+        elif (path / "problem.py").is_file():
+            path /= "problem.py"
+        else:
+            raise ValueError(f"'{path}' does not point to a python file or a proper parent folder of one.")
 
         try:
-            spec = importlib.util.spec_from_file_location("problem", path / "__init__.py")
+            spec = importlib.util.spec_from_file_location("problem", path)
             assert spec is not None
             assert spec.loader is not None
             problem_module = importlib.util.module_from_spec(spec)
@@ -120,7 +126,7 @@ class Problem(CustomEncodable, ABC):
             spec.loader.exec_module(problem_module)
             problem_cls = problem_module.Problem
             if not issubclass(problem_cls, Problem):
-                raise ValueError(f"Variable 'Problem' in {path / '__init__.py'} is not a Problem class.")
+                raise ValueError(f"Variable 'Problem' in {path} is not a Problem class.")
             if issubclass(problem_cls, EncodableModel):
                 problem_cls.update_forward_refs(Solution=problem_cls.Solution)
             if issubclass(problem_cls.Solution, EncodableModel):
