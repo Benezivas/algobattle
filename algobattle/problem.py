@@ -53,6 +53,16 @@ class Problem(CustomEncodable, ABC):
     with_solution: ClassVar[bool] = True
     """Whether an instance of this problem also comes with a solution."""
 
+    export: ClassVar[bool] = False
+    """Wether the class should be exported.
+    
+    Helps with uniquely specifying a class to be executed in a problem file. For more details view the documentation.
+    """
+
+    def __init_subclass__(cls, export: bool = True) -> None:
+        cls.export = export
+        return super().__init_subclass__()
+
     @classmethod
     @abstractmethod
     def decode(cls: type[Self], source_dir: Path, size: int, team: Role) -> Self:
@@ -101,7 +111,11 @@ class Problem(CustomEncodable, ABC):
         return None
 
     @staticmethod
-    def import_from_path(path: Path) -> type["Problem"]:
+    def _is_importable(val: Any):
+        return isclass(val) and issubclass(val, Problem) and val.export
+
+    @classmethod
+    def import_from_path(cls, path: Path) -> type["Problem"]:
         """Try to import a Problem class object from a given path.
 
         Raises
@@ -130,7 +144,7 @@ class Problem(CustomEncodable, ABC):
             raise ValueError from e
 
         try:
-            problem_classes = [val for val in vars(problem_module).values() if isclass(val) and issubclass(val, Problem)]
+            problem_classes = [val for val in vars(problem_module).values() if cls._is_importable(val)]
             if len(problem_classes) == 0:
                 raise ValueError(f"'{path}' contains no Problem classes.")
             elif len(problem_classes) == 1:
@@ -147,9 +161,11 @@ class Problem(CustomEncodable, ABC):
             return problem_cls
 
         except Exception as e:
-            sys.modules.pop("_problem")
             logger.critical(f"Importing the given problem failed with the following exception: {e}")
             raise ValueError from e
+        finally:
+            sys.modules.pop("_problem")
+
 
     class Solution(CustomEncodable, ABC):
         """A proposed solution for an instance of this problem."""
@@ -175,7 +191,7 @@ class Problem(CustomEncodable, ABC):
             return None
 
 
-class ProblemModel(EncodableModel, Problem, ABC):
+class ProblemModel(EncodableModel, Problem, ABC, export=False):
     """A Problem that can easily be parsed to/from a json file."""
 
     filename: ClassVar[str] = "instance.json"
@@ -194,6 +210,7 @@ class ProblemModel(EncodableModel, Problem, ABC):
             "min_size": {"exclude": True},
             "has_solution": {"exclude": True},
             "Solution": {"exclude": True},
+            "export": {"exclude": True},
         }
 
 
@@ -213,7 +230,7 @@ class SolutionModel(EncodableModel, Problem.Solution, ABC):
         fields = {"filename": {"exclude": True}}
 
 
-class DirectedGraph(ProblemModel):
+class DirectedGraph(ProblemModel, export=False):
     """Base class for problems on directed graphs."""
 
     num_vertices: int = Field(ge=0, le=2 ** 63 - 1)
@@ -228,7 +245,7 @@ class DirectedGraph(ProblemModel):
         )
 
 
-class UndirectedGraph(DirectedGraph):
+class UndirectedGraph(DirectedGraph, export=False):
     """Base class for problems on undirected graphs."""
 
     @inherit_docs
