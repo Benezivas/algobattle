@@ -27,7 +27,7 @@ dependencies = [
 ]
 
 [project.scripts]
-algobattle = "algobattle.battle:main"
+algobattle = "algobattle.cli:main"
 
 [tool.pyright]
 diagnosticMode = "workspace"
