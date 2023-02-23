@@ -8,7 +8,7 @@ from pydantic import BaseModel, validator
 
 from algobattle.battle import Battle, Iterated
 from algobattle.ui import Observer, Subject
-from algobattle.team import Matchup, TeamHandler
+from algobattle.team import Matchup, TeamHandler, Team
 from algobattle.problem import Problem
 
 logger = logging.getLogger("algobattle.match")
