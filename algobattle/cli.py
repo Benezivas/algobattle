@@ -206,12 +206,15 @@ def parse_cli_args(args: list[str]) -> tuple[Path, Config]:
 
     if parsed.battle_type is not None:
         parsed.battle_type = Battle.all()[parsed.battle_type]
-    cfg_path = parsed.config if parsed.config is not None else parsed.problem / "config.toml"
+    cfg_path: Path = parsed.config or parsed.problem / "config.toml"
 
-    try:
-        config = Config.from_file(cfg_path)
-    except Exception as e:
-        raise ValueError(f"Invalid config file, terminating execution.\n{e}")
+    if cfg_path.is_file():
+        try:
+            config = Config.from_file(cfg_path)
+        except Exception as e:
+            raise ValueError(f"Invalid config file, terminating execution.\n{e}")
+    else:
+        config = Config()
     config.include_cli(parsed)
 
     if not config.teams:
