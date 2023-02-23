@@ -224,9 +224,9 @@ def main():
             logger.info("#" * 78)
             logger.info(result.display())
             if config.match.points > 0:
-                points = result.calculate_points(config.match.points)
+                points = result.calculate_points()
                 for team, pts in points.items():
-                    logger.info(f"Group {team} gained {pts:.1f} points.")
+                    logger.info(f"Team {team} gained {pts:.1f} points.")
 
     except KeyboardInterrupt:
         logger.critical("Received keyboard interrupt, terminating execution.")

@@ -78,12 +78,13 @@ class Match(Subject):
                 result.notify("match")
         return result
 
-    def calculate_points(self, achievable_points: int) -> dict[str, float]:
+    def calculate_points(self) -> dict[str, float]:
         """Calculate the number of points each team scored.
 
         Each pair of teams fights for the achievable points among one another.
         These achievable points are split over all rounds.
         """
+        achievable_points = self.config.points
         if len(self.teams.active) == 0:
             return {}
         if len(self.teams.active) == 1:
