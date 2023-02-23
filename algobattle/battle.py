@@ -2,22 +2,23 @@
 
 The battle class is a base class for specific type of battle that can be executed.
 """
-from dataclasses import dataclass, field as dataclass_field, fields
+from dataclasses import dataclass
 from importlib.metadata import entry_points
 import logging
 from abc import abstractmethod, ABC
 from typing import (
     Any,
-    Callable,
     ClassVar,
     Literal,
     Mapping,
     TypeAlias,
     TypeVar,
-    dataclass_transform,
     get_origin,
     get_type_hints,
 )
+
+from pydantic import BaseModel, Field
+
 from algobattle.docker_util import DockerError, Generator, Solver, GeneratorResult, SolverResult
 from algobattle.ui import Subject
 from algobattle.util import Encodable, Role, inherit_docs
@@ -27,12 +28,6 @@ logger = logging.getLogger("algobattle.battle")
 
 _Config: TypeAlias = Any
 T = TypeVar("T")
-
-
-def argspec(*, default: T, help: str = "", parser: Callable[[str], T] | None = None) -> T:
-    """Structure specifying the CLI arg."""
-    metadata = {"help": help, "parser": parser}
-    return dataclass_field(default=default, metadata={key: val for key, val in metadata.items() if val is not None})
 
 
 @dataclass
@@ -51,13 +46,8 @@ class Battle(Subject, ABC):
 
     scoring_team: ClassVar[Role] = "solver"
 
-    @dataclass_transform(field_specifiers=(argspec,))
-    class Config:
+    class Config(BaseModel):
         """Object containing the config variables the battle types use."""
-
-        def __init_subclass__(cls) -> None:
-            dataclass(cls)
-            super().__init_subclass__()
 
         # providing a dummy default impl that will be overriden, to get better static analysis
         def __init__(self, **kwargs) -> None:
@@ -68,16 +58,14 @@ class Battle(Subject, ABC):
             """Constructs a list of argument names and `**kwargs` that can be passed to `ArgumentParser.add_argument()`."""
             arguments: list[tuple[str, dict[str, Any]]] = []
             resolved_annotations = get_type_hints(cls)
-            for field in fields(cls):
-                kwargs = {
-                    "type": field.metadata.get("parser", resolved_annotations[field.name]),
-                    "help": field.metadata.get("help", "") + f" Default: {field.default}",
-                }
-                if field.type == bool:
+            for name, field in cls.__fields__.items():
+                kwargs = field.field_info.extra
+                kwargs["help"] = kwargs.get("help", "") + f" Default: {field.default}"
+                if resolved_annotations[name] == bool and "action" not in kwargs and "const" not in kwargs:
                     kwargs["action"] = "store_const"
                     kwargs["const"] = not field.default
-                elif get_origin(field.type) == Literal:
-                    kwargs["choices"] = field.type.__args__
+                elif get_origin(resolved_annotations[name]) == Literal and "choices" not in kwargs:
+                    kwargs["choices"] = resolved_annotations[name].__args__
 
                 arguments.append((field.name, kwargs))
             return arguments
@@ -178,9 +166,9 @@ class Iterated(Battle):
 
     @inherit_docs
     class Config(Battle.Config):
-        iteration_cap: int = argspec(default=50_000, help="Maximum instance size that will be tried.")
-        exponent: int = argspec(default=2, help="Determines how quickly the instance size grows.")
-        approximation_ratio: float = argspec(default=1, help="Approximation ratio that a solver needs to achieve to pass.")
+        iteration_cap: int = Field(default=50_000, help="Maximum instance size that will be tried.")
+        exponent: int = Field(default=2, help="Determines how quickly the instance size grows.")
+        approximation_ratio: float = Field(default=1, help="Approximation ratio that a solver needs to achieve to pass.")
 
     def run_battle(self, generator: Generator, solver: Solver, config: Config, min_size: int) -> None:
         """Execute one iterative battle between a generating and a solving team.
@@ -256,8 +244,8 @@ class Averaged(Battle):
 
     @inherit_docs
     class Config(Battle.Config):
-        instance_size: int = argspec(default=10, help="Instance size that will be fought at.")
-        iterations: int = argspec(default=10, help="Number of iterations in each round.")
+        instance_size: int = Field(default=10, help="Instance size that will be fought at.")
+        iterations: int = Field(default=10, help="Number of iterations in each round.")
 
     def run_battle(self, generator: Generator, solver: Solver, config: Config, min_size: int) -> None:
         """Execute one averaged battle between a generating and a solving team.
