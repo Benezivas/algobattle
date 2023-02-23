@@ -7,10 +7,10 @@ import sys
 import logging
 import datetime as dt
 from pathlib import Path
-from typing import Any, ClassVar, Literal
+from typing import Any, ClassVar, Literal, Mapping, Self
 import tomllib
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ValidationError, validator
 
 from algobattle.battle import Battle
 from algobattle.docker_util import DockerConfig
@@ -86,6 +86,20 @@ class Config(BaseModel):
     execution: ExecutionConfig = ExecutionConfig()
     match: MatchConfig = MatchConfig()
     docker: DockerConfig = DockerConfig()
+    battle: dict[str, Battle.Config] = {n: b.Config() for n, b in Battle.all().items()}
+
+    @validator("battle")
+    def val_battle_configs(cls, vals):
+        battle_types = Battle.all()
+        if not isinstance(vals, Mapping):
+            raise TypeError
+        out = {}
+        for name, data in vals.items():
+            if name in battle_types:
+                out[name] = battle_types[name].Config.parse_obj(data)
+            else:
+                raise ValueError
+        return out
 
     _cli_mapping: ClassVar[dict[str, Any]] = {
         "teams": None,
@@ -112,8 +126,20 @@ class Config(BaseModel):
                 if cli_val is not None:
                     setattr(model, name, cli_val)
 
+    @classmethod
+    def from_file(cls, file: Path) -> Self:
+        """Parses a config object from a toml file."""
+        if not file.is_file():
+            raise ValueError("Path doesn't point to a file.")
+        with open(file, "rb") as f:
+            try:
+                config_dict = tomllib.load(f)
+            except tomllib.TOMLDecodeError as e:
+                raise ValueError(f"The config file at {file} is not a properly formatted TOML file!\n{e}")
+        return cls.parse_obj(config_dict)
 
-def parse_cli_args(args: list[str]) -> tuple[Path, Config, Battle.Config]:
+
+def parse_cli_args(args: list[str]) -> tuple[Path, Config]:
     """Parse a given CLI arg list into config objects."""
     parser = ArgumentParser()
     parser.add_argument("problem", type=check_path, help="Path to a folder with the problem file.")
@@ -169,19 +195,11 @@ def parse_cli_args(args: list[str]) -> tuple[Path, Config, Battle.Config]:
     if parsed.battle_type is not None:
         parsed.battle_type = Battle.all()[parsed.battle_type]
     cfg_path = parsed.config if parsed.config is not None else parsed.problem / "config.toml"
-    if cfg_path.is_file():
-        with open(cfg_path, "rb") as file:
-            try:
-                config_dict = tomllib.load(file)
-            except tomllib.TOMLDecodeError as e:
-                raise ValueError(f"The config file at {cfg_path} is not a properly formatted TOML file!\n{e}")
-    else:
-        config_dict = {}
-
     try:
-        config = Config.parse_obj(config_dict)
-    except ValidationError as e:
-        raise SystemExit(f"Invalid config file, terminating execution.\n{e}")
+        config = Config.from_file(cfg_path)
+    except Exception as e:
+        raise ValueError(f"Invalid config file, terminating execution.\n{e}")
+
     config.include_cli(parsed)
 
     if not config.teams:
