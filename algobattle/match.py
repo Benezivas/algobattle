@@ -4,7 +4,7 @@ import logging
 from typing import Any, Self
 
 from prettytable import PrettyTable, DOUBLE_BORDER
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 
 from algobattle.battle import Battle, Iterated
 from algobattle.ui import Observer, Subject
@@ -22,6 +22,20 @@ class MatchConfig(BaseModel):
     battle_type: type[Battle] = Iterated
     rounds: int = 5
     points: int = 100
+
+    @validator("battle_type")
+    def parse_battle_type(cls, value):
+        """Parses the battle type class object from its name."""
+        if issubclass(value, Battle):
+            return value
+        elif isinstance(value, str):
+            all = Battle.all()
+            if value in all:
+                return all[value]
+            else:
+                raise ValueError
+        else:
+            raise TypeError
 
     @staticmethod
     def from_dict(info: dict[str, Any]) -> MatchConfig:
