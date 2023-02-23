@@ -13,12 +13,12 @@ import tomllib
 from pydantic import BaseModel, Field
 
 from algobattle.battle import Battle
-from algobattle.docker_util import DockerConfig, RunParameters
+from algobattle.docker_util import DockerConfig
 from algobattle.match import MatchConfig, Match
 from algobattle.problem import Problem
 from algobattle.team import TeamHandler, TeamInfo
 from algobattle.ui import Ui
-from algobattle.util import check_path, getattr_set
+from algobattle.util import check_path
 
 
 def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
