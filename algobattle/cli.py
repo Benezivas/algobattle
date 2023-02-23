@@ -103,6 +103,7 @@ class Config(BaseModel):
 
     _cli_mapping: ClassVar[dict[str, Any]] = {
         "teams": None,
+        "battle": None,
         "docker": {
             "generator": {"timeout": "generator_timeout", "space": "generator_space", "cpus": "generator_cpus"},
             "solver": {"timeout": "solver_timeout", "space": "solver_space", "cpus": "solver_cpus"},
@@ -112,6 +113,11 @@ class Config(BaseModel):
     def include_cli(self, cli: Namespace) -> None:
         """Updates itself using the data in the passed argparse namespace."""
         Config._include_cli(self, cli, self._cli_mapping)
+        for battle_name, config in self.battle.items():
+            for name in config.__fields__:
+                cli_name = f"{battle_name}_{name}"
+                if getattr(cli, cli_name) is not None:
+                    setattr(config, name, getattr(cli, cli_name))
 
     @staticmethod
     def _include_cli(model: BaseModel, cli: Namespace, mapping: dict[str, Any]) -> None:
@@ -195,35 +201,23 @@ def parse_cli_args(args: list[str]) -> tuple[Path, Config]:
     if parsed.battle_type is not None:
         parsed.battle_type = Battle.all()[parsed.battle_type]
     cfg_path = parsed.config if parsed.config is not None else parsed.problem / "config.toml"
+
     try:
         config = Config.from_file(cfg_path)
     except Exception as e:
         raise ValueError(f"Invalid config file, terminating execution.\n{e}")
-
     config.include_cli(parsed)
 
     if not config.teams:
         config.teams.append(TeamInfo(name="team_0", generator=problem / "generator", solver=problem / "solver"))
 
-    battle_type = config.match.battle_type
-    battle_name = battle_type.name().lower()
-    battle_config_dict = config_dict.get(battle_name, {})
-    try:
-        battle_config = battle_type.Config.parse_obj(battle_config_dict)
-    except ValidationError as e:
-        raise SystemExit(f"Config file contains invalid config for the {battle_name} battle, terminating execution.\n{e}")
-    for name in battle_config.__fields__:
-        cli_name = f"{battle_name}_{name}"
-        if getattr(parsed, cli_name) is not None:
-            setattr(battle_config, name, getattr(parsed, cli_name))
-
-    return problem, config, battle_config
+    return problem, config
 
 
 def main():
     """Entrypoint of `algobattle` CLI."""
     try:
-        problem, config, battle_config = parse_cli_args(sys.argv[1:])
+        problem, config = parse_cli_args(sys.argv[1:])
         logger = setup_logging(config.execution.logging_path, config.execution.verbose, config.execution.display != "logs")
 
     except KeyboardInterrupt:
@@ -238,7 +232,7 @@ def main():
             else:
                 ui = None
 
-            result = Match.run(config.match, battle_config, problem, teams, ui)
+            result = Match.run(config.match, config.battle[config.match.battle_type.name().lower()], problem, teams, ui)
 
             logger.info("#" * 78)
             logger.info(result.display())
