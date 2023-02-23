@@ -18,7 +18,7 @@ from requests import Timeout
 from algobattle.util import Encodable, Role, TempDir, encode, decode, inherit_docs
 from algobattle.problem import Problem
 
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger("algobattle.docker")
 
@@ -26,22 +26,20 @@ logger = logging.getLogger("algobattle.docker")
 _client_var: DockerClient | None = None
 
 
-@dataclass(frozen=True)
-class RunParameters:
+class RunParameters(BaseModel):
     """The parameters determining how a container is run."""
 
-    timeout: float | None = Field(30, cli_alias="timeout")
-    space: int | None = Field(None, cli_alias="space")
-    cpus: int = Field(1, cli_alias="cpus")
+    timeout: float | None = Field(default=30, cli_alias="timeout")
+    space: int | None = Field(default=None, cli_alias="space")
+    cpus: int = Field(default=1, cli_alias="cpus")
 
 
-@dataclass(frozen=True)
-class DockerConfig:
+class DockerConfig(BaseModel):
     """Grouped config options that are relevant to the interaction with docker."""
 
-    build_timeout: float | None = Field(None, cli_alias="build_timeout")
-    generator: RunParameters = Field(RunParameters(), cli_alias="generator")
-    solver: RunParameters = Field(RunParameters(), cli_alias="solver")
+    build_timeout: float | None = Field(default=None, cli_alias="build_timeout")
+    generator: RunParameters = Field(default=RunParameters(), cli_alias="generator")
+    solver: RunParameters = Field(default=RunParameters(), cli_alias="solver")
 
 
 def client() -> DockerClient:

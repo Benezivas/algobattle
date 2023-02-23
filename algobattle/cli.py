@@ -74,7 +74,7 @@ class Config(BaseModel):
     problem: Path
     teams: list[TeamInfo] = []
     display: Literal["silent", "logs", "ui"] = "logs"
-    logs: Path = Field(Path.home() / ".algobattle_logs", cli_alias="logging_path")
+    logs: Path = Field(default=Path.home() / ".algobattle_logs", cli_alias="logging_path")
     match: MatchConfig
     docker: DockerConfig
 

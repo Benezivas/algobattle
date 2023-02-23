@@ -1,9 +1,10 @@
 """Central managing module for an algorithmic battle."""
 from __future__ import annotations
-from dataclasses import dataclass
 import logging
 from typing import Any, Self
+
 from prettytable import PrettyTable, DOUBLE_BORDER
+from pydantic import BaseModel
 
 from algobattle.battle import Battle, Iterated
 from algobattle.ui import Observer, Subject
@@ -13,8 +14,7 @@ from algobattle.problem import Problem
 logger = logging.getLogger("algobattle.match")
 
 
-@dataclass(kw_only=True)
-class MatchConfig:
+class MatchConfig(BaseModel):
     """Parameters determining the match execution."""
 
     verbose: bool = False
