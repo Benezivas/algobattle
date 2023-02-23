@@ -2,16 +2,15 @@
 from __future__ import annotations
 from argparse import ArgumentParser
 from contextlib import ExitStack
-from dataclasses import dataclass
 from functools import partial
 import sys
 import logging
 import datetime as dt
 from pathlib import Path
-from typing import Literal
+from typing import Any, ClassVar, Literal
+import tomllib
 
-import tomli
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from algobattle.battle import Battle
 from algobattle.docker_util import DockerConfig, RunParameters
@@ -73,21 +72,11 @@ class Config(BaseModel):
     """Pydantic model to parse the config file."""
 
     problem: Path
-    teams: list[TeamInfo]
+    teams: list[TeamInfo] = []
     display: Literal["silent", "logs", "ui"] = "logs"
-    logs: Path = Path.home() / ".algobattle_logs"
+    logs: Path = Field(Path.home() / ".algobattle_logs", cli_alias="logging_path")
     match: MatchConfig
     docker: DockerConfig
-
-
-@dataclass
-class ProgramConfig:
-    """CLI parameters for program execution."""
-
-    problem: Path
-    teams: list[TeamInfo]
-    display: Literal["silent", "logs", "ui"] = "logs"
-    logs: Path = Path.home() / ".algobattle_logs"
 
 
 def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, DockerConfig, MatchConfig, Battle.Config]:
@@ -127,38 +116,29 @@ def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, DockerConfig, MatchC
     if cfg_path.is_file():
         with open(cfg_path, "rb") as file:
             try:
-                config = tomli.load(file)
-            except tomli.TOMLDecodeError as e:
+                config_dict = tomllib.load(file)
+            except tomllib.TOMLDecodeError as e:
                 raise ValueError(f"The config file at {cfg_path} is not a properly formatted TOML file!\n{e}")
     else:
-        config = {}
+        config_dict = {}
 
-    if "teams" in config:
-        team_specs = config["teams"]
-    else:
-        team_specs = [{
-            "name": "team_0",
-            "generator": parsed.problem / "generator",
-            "solver": parsed.problem / "solver",
-        }]
-    teams = []
-    for spec in team_specs:
-        try:
-            name = spec["name"]
-            gen = check_path(spec["generator"], type="dir")
-            sol = check_path(spec["solver"], type="dir")
-            teams.append(TeamInfo(name=name, generator=gen, solver=sol))
-        except KeyError:
-            raise ValueError(f"The config file at {cfg_path} is incorrectly formatted!")
+    config = Config.parse_obj(config_dict)
+    config.problem = parsed.problem
+    if not config.teams:
+        config.teams.append(TeamInfo(
+            name="team_0",
+            generator=config.problem / "generator",
+            solver=config.problem / "solver",
+        ))
 
     program_config = ProgramConfig(teams=teams, **getattr_set(parsed, "problem", "display", "logs"))
 
-    match_config = MatchConfig.from_dict(config.get("match", {}))
+    match_config = MatchConfig.from_dict(config_dict.get("match", {}))
     for name in vars(match_config):
         if getattr(parsed, name) is not None:
             setattr(match_config, name, getattr(parsed, name))
 
-    docker_params = config.get("docker", {})
+    docker_params = config_dict.get("docker", {})
     docker_config = DockerConfig(
         build_timeout=docker_params.get("build_timeout"),
         generator=RunParameters(**docker_params.get("generator", {})),
@@ -173,7 +153,7 @@ def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, DockerConfig, MatchC
             if getattr(parsed, cli_name) is not None:
                 object.__setattr__(role_config, name, getattr(parsed, cli_name))
 
-    battle_config = match_config.battle_type.Config(**config.get(match_config.battle_type.name().lower(), {}))
+    battle_config = match_config.battle_type.Config(**config_dict.get(match_config.battle_type.name().lower(), {}))
     for name in vars(battle_config):
         cli_name = f"{match_config.battle_type.name().lower()}_{name}"
         if getattr(parsed, cli_name) is not None:

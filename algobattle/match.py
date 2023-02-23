@@ -7,7 +7,7 @@ from prettytable import PrettyTable, DOUBLE_BORDER
 
 from algobattle.battle import Battle, Iterated
 from algobattle.ui import Observer, Subject
-from algobattle.team import Matchup, Team, TeamHandler
+from algobattle.team import Matchup, TeamHandler
 from algobattle.problem import Problem
 
 logger = logging.getLogger("algobattle.match")
