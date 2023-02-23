@@ -93,18 +93,16 @@ class Config(BaseModel):
         """The config object for the used battle type."""
         return self.battle[self.match.battle_type.name().lower()]
 
-    @validator("battle")
+    @validator("battle", pre=True)
     def val_battle_configs(cls, vals):
         """Parses the dict of battle configs into their corresponding config objects."""
         battle_types = Battle.all()
         if not isinstance(vals, Mapping):
             raise TypeError
         out = {}
-        for name, data in vals.items():
-            if name in battle_types:
-                out[name] = battle_types[name].Config.parse_obj(data)
-            else:
-                raise ValueError
+        for name, battle_cls in battle_types.items():
+            data = vals.get(name, {})
+            out[name] = battle_cls.Config.parse_obj(data)
         return out
 
     _cli_mapping: ClassVar[dict[str, Any]] = {
