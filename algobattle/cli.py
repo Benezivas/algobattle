@@ -9,10 +9,12 @@ import logging
 import datetime as dt
 from pathlib import Path
 from typing import Literal
+
 import tomli
+from pydantic import BaseModel
+
 from algobattle.battle import Battle
 from algobattle.docker_util import DockerConfig, RunParameters
-
 from algobattle.match import MatchConfig, Match
 from algobattle.problem import Problem
 from algobattle.team import TeamHandler, TeamInfo
@@ -65,6 +67,17 @@ def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
 
     logger.info(f"You can find the log files for this run in {logging_path}")
     return logger
+
+
+class Config(BaseModel):
+    """Pydantic model to parse the config file."""
+
+    problem: Path
+    teams: list[TeamInfo]
+    display: Literal["silent", "logs", "ui"] = "logs"
+    logs: Path = Path.home() / ".algobattle_logs"
+    match: MatchConfig
+    docker: DockerConfig
 
 
 @dataclass
