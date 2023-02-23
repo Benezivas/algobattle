@@ -23,17 +23,17 @@ class MatchConfig(BaseModel):
     rounds: int = 5
     points: int = 100
 
-    @validator("battle_type")
+    @validator("battle_type", pre=True)
     def parse_battle_type(cls, value):
         """Parses the battle type class object from its name."""
-        if issubclass(value, Battle):
-            return value
-        elif isinstance(value, str):
+        if isinstance(value, str):
             all = Battle.all()
             if value in all:
                 return all[value]
             else:
                 raise ValueError
+        elif issubclass(value, Battle):
+            return value
         else:
             raise TypeError
 

@@ -71,7 +71,7 @@ def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
 class Config(BaseModel):
     """Pydantic model to parse the config file."""
 
-    problem: Path
+    problem: Path = Path()
     teams: list[TeamInfo] = []
     display: Literal["silent", "logs", "ui"] = "logs"
     logging_path: Path = Field(default=Path.home() / ".algobattle_logs", cli_alias="logging_path")
@@ -83,13 +83,13 @@ class Config(BaseModel):
         "docker": {
             "generator": {
                 "timeout": "generator_timeout",
-                "spcace": "generator_space",
+                "space": "generator_space",
                 "cpus": "generator_cpus",
             },
             "solver": {
-                "timeout": "space_timeout",
-                "spcace": "space_space",
-                "cpus": "space_cpus",
+                "timeout": "solver_timeout",
+                "space": "solver_space",
+                "cpus": "solver_cpus",
             },
         },
     }
