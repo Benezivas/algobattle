@@ -4,7 +4,7 @@ from unittest import TestCase, main
 import logging
 from pathlib import Path
 
-from algobattle.cli import Config, parse_cli_args, setup_logging
+from algobattle.cli import Config, ExecutionConfig, parse_cli_args, setup_logging
 from algobattle.battle import Iterated, Averaged
 from algobattle.match import MatchConfig, Match
 from algobattle.team import Team, Matchup, TeamHandler, TeamInfo
@@ -211,10 +211,10 @@ class Parsing(TestCase):
         self.assertEqual(cfg, Config(
             match=MatchConfig(
                 points=10,
-                safe_build=True,
                 battle_type=Averaged,
             ),
             teams=self.teams,
+            execution=ExecutionConfig(safe_build=True),
             docker=DockerConfig(generator=RunParameters(space=10)),
         ))
         self.assertEqual(battle_cfg, Averaged.Config(iterations=1))
@@ -234,10 +234,10 @@ class Parsing(TestCase):
         self.assertEqual(cfg, Config(
             match=MatchConfig(
                 points=10,
-                safe_build=True,
                 battle_type=Averaged,
             ),
             teams=self.teams,
+            execution=ExecutionConfig(safe_build=True),
             docker=DockerConfig(generator=RunParameters(space=10)),
         ))
         self.assertEqual(battle_cfg, Averaged.Config(iterations=1))
@@ -257,10 +257,10 @@ class Parsing(TestCase):
         self.assertEqual(cfg, Config(
             match=MatchConfig(
                 points=20,
-                safe_build=True,
                 battle_type=Iterated,
             ),
             teams=self.teams,
+            execution=ExecutionConfig(safe_build=True),
             docker=DockerConfig(generator=RunParameters(space=10)),
         ))
         self.assertEqual(battle_cfg, Iterated.Config())

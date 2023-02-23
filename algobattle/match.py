@@ -17,8 +17,6 @@ logger = logging.getLogger("algobattle.match")
 class MatchConfig(BaseModel):
     """Parameters determining the match execution."""
 
-    verbose: bool = False
-    safe_build: bool = False
     battle_type: type[Battle] = Iterated
     rounds: int = 5
     points: int = 100

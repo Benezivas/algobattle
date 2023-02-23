@@ -70,12 +70,19 @@ def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
     return logger
 
 
+class ExecutionConfig(BaseModel):
+    """Config data regarding program execution."""
+    display: Literal["silent", "logs", "ui"] = "logs"
+    logging_path: Path = Path.home() / ".algobattle_logs"
+    verbose: bool = False
+    safe_build: bool = False
+
+
 class Config(BaseModel):
     """Pydantic model to parse the config file."""
 
     teams: list[TeamInfo] = []
-    display: Literal["silent", "logs", "ui"] = "logs"
-    logging_path: Path = Path.home() / ".algobattle_logs"
+    execution: ExecutionConfig = ExecutionConfig()
     match: MatchConfig = MatchConfig()
     docker: DockerConfig = DockerConfig()
 
@@ -198,7 +205,7 @@ def main():
     """Entrypoint of `algobattle` CLI."""
     try:
         problem, config, battle_config = parse_cli_args(sys.argv[1:])
-        logger = setup_logging(config.logging_path, config.match.verbose, config.display != "logs")
+        logger = setup_logging(config.execution.logging_path, config.execution.verbose, config.execution.display != "logs")
 
     except KeyboardInterrupt:
         raise SystemExit("Received keyboard interrupt, terminating execution.")
@@ -206,7 +213,7 @@ def main():
     try:
         problem = Problem.import_from_path(problem)
         with TeamHandler.build(config.teams, problem, config.docker) as teams, ExitStack() as stack:
-            if config.display == "ui":
+            if config.execution.display == "ui":
                 ui = Ui()
                 stack.enter_context(ui)
             else:
