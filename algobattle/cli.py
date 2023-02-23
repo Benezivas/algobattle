@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, ClassVar, Literal
 import tomllib
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from algobattle.battle import Battle
 from algobattle.docker_util import DockerConfig
@@ -155,7 +155,10 @@ def parse_cli_args(args: list[str]) -> tuple[Config, Battle.Config]:
     else:
         config_dict = {}
 
-    config = Config.parse_obj(config_dict)
+    try:
+        config = Config.parse_obj(config_dict)
+    except ValidationError as e:
+        raise SystemExit(f"Invalid config file, terminating execution.\n{e}")
     config.include_cli(parsed)
 
     if not config.teams:
@@ -168,7 +171,10 @@ def parse_cli_args(args: list[str]) -> tuple[Config, Battle.Config]:
     battle_type = config.match.battle_type
     battle_name = battle_type.name().lower()
     battle_config_dict = config_dict.get(battle_name, {})
-    battle_config = battle_type.Config.parse_obj(battle_config_dict)
+    try:
+        battle_config = battle_type.Config.parse_obj(battle_config_dict)
+    except ValidationError as e:
+        raise SystemExit(f"Config file contains invalid config for the {battle_name} battle, terminating execution.\n{e}")
     for name in battle_config.__fields__:
         cli_name = f"{battle_name}_{name}"
         if getattr(parsed, cli_name) is not None:
