@@ -75,8 +75,8 @@ class Config(BaseModel):
     teams: list[TeamInfo] = []
     display: Literal["silent", "logs", "ui"] = "logs"
     logging_path: Path = Field(default=Path.home() / ".algobattle_logs", cli_alias="logging_path")
-    match: MatchConfig
-    docker: DockerConfig
+    match: MatchConfig = MatchConfig()
+    docker: DockerConfig = DockerConfig()
 
     _cli_mapping: ClassVar[dict[str, Any]] = {
         "teams": None,
