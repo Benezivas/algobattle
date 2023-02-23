@@ -1,7 +1,7 @@
 """Central managing module for an algorithmic battle."""
 from __future__ import annotations
 import logging
-from typing import Any, Self
+from typing import Self
 
 from prettytable import PrettyTable, DOUBLE_BORDER
 from pydantic import BaseModel, validator
@@ -36,19 +36,6 @@ class MatchConfig(BaseModel):
             return value
         else:
             raise TypeError
-
-    @staticmethod
-    def from_dict(info: dict[str, Any]) -> MatchConfig:
-        """Parses a :cls:`MatchConfig` from a dict."""
-        if "battle_type" in info:
-            try:
-                battle_type = Battle.all()[info["battle_type"]]
-            except KeyError:
-                raise ValueError(f"Attempted to use invalid battle type {info['battle_type']}.")
-            update = {"battle_type": battle_type}
-        else:
-            update = {}
-        return MatchConfig(**(info | update))
 
 
 class Match(Subject):
