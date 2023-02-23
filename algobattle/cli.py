@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, ClassVar, Literal, Mapping, Self
 import tomllib
 
-from pydantic import BaseModel, ValidationError, validator
+from pydantic import BaseModel, validator
 
 from algobattle.battle import Battle
 from algobattle.docker_util import DockerConfig
@@ -90,10 +90,12 @@ class Config(BaseModel):
 
     @property
     def battle_config(self) -> Battle.Config:
+        """The config object for the used battle type."""
         return self.battle[self.match.battle_type.name().lower()]
 
     @validator("battle")
     def val_battle_configs(cls, vals):
+        """Parses the dict of battle configs into their corresponding config objects."""
         battle_types = Battle.all()
         if not isinstance(vals, Mapping):
             raise TypeError
