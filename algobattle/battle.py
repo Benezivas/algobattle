@@ -17,7 +17,7 @@ from typing import (
     get_type_hints,
 )
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, BaseConfig
 
 from algobattle.docker_util import DockerError, Generator, Solver, GeneratorResult, SolverResult
 from algobattle.ui import Subject
@@ -65,6 +65,9 @@ class Battle(Subject, ABC):
 
                 arguments.append((field.name, kwargs))
             return arguments
+
+        class Config(BaseConfig):
+            validate_assignment = True
 
     @staticmethod
     def all() -> dict[str, type["Battle"]]:

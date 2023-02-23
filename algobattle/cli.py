@@ -71,10 +71,9 @@ def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
 class Config(BaseModel):
     """Pydantic model to parse the config file."""
 
-    problem: Path = Path()
     teams: list[TeamInfo] = []
     display: Literal["silent", "logs", "ui"] = "logs"
-    logging_path: Path = Field(default=Path.home() / ".algobattle_logs", cli_alias="logging_path")
+    logging_path: Path = Path.home() / ".algobattle_logs"
     match: MatchConfig = MatchConfig()
     docker: DockerConfig = DockerConfig()
 
@@ -112,7 +111,7 @@ class Config(BaseModel):
                     setattr(model, name, cli_val)
 
 
-def parse_cli_args(args: list[str]) -> tuple[Config, Battle.Config]:
+def parse_cli_args(args: list[str]) -> tuple[Path, Config, Battle.Config]:
     """Parse a given CLI arg list into config objects."""
     parser = ArgumentParser()
     parser.add_argument("problem", type=check_path, help="Path to a folder with the problem file.")
@@ -142,6 +141,7 @@ def parse_cli_args(args: list[str]) -> tuple[Config, Battle.Config]:
             group.add_argument(f"--{battle_name.lower()}_{name}", **kwargs)
 
     parsed = parser.parse_args(args)
+    problem: Path = parsed.problem
 
     if parsed.battle_type is not None:
         parsed.battle_type = Battle.all()[parsed.battle_type]
@@ -164,8 +164,8 @@ def parse_cli_args(args: list[str]) -> tuple[Config, Battle.Config]:
     if not config.teams:
         config.teams.append(TeamInfo(
             name="team_0",
-            generator=config.problem / "generator",
-            solver=config.problem / "solver",
+            generator=problem / "generator",
+            solver=problem / "solver",
         ))
 
     battle_type = config.match.battle_type
@@ -180,20 +180,20 @@ def parse_cli_args(args: list[str]) -> tuple[Config, Battle.Config]:
         if getattr(parsed, cli_name) is not None:
             setattr(battle_config, name, getattr(parsed, cli_name))
 
-    return config, battle_config
+    return problem, config, battle_config
 
 
 def main():
     """Entrypoint of `algobattle` CLI."""
     try:
-        config, battle_config = parse_cli_args(sys.argv[1:])
+        problem, config, battle_config = parse_cli_args(sys.argv[1:])
         logger = setup_logging(config.logging_path, config.match.verbose, config.display != "logs")
 
     except KeyboardInterrupt:
         raise SystemExit("Received keyboard interrupt, terminating execution.")
 
     try:
-        problem = Problem.import_from_path(config.problem)
+        problem = Problem.import_from_path(problem)
         with TeamHandler.build(config.teams, problem, config.docker) as teams, ExitStack() as stack:
             if config.display == "ui":
                 ui = Ui()
