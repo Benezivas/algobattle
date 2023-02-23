@@ -4,8 +4,6 @@ from unittest import TestCase, main
 import logging
 from pathlib import Path
 
-from pydantic import ValidationError
-
 from algobattle.cli import Config, parse_cli_args, setup_logging
 from algobattle.battle import Iterated, Averaged
 from algobattle.match import MatchConfig, Match

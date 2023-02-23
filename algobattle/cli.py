@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, ClassVar, Literal
 import tomllib
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, ValidationError
 
 from algobattle.battle import Battle
 from algobattle.docker_util import DockerConfig
@@ -47,20 +47,22 @@ def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
 
     t = dt.datetime.now()
     current_timestamp = f"{t.year:04d}-{t.month:02d}-{t.day:02d}_{t.hour:02d}-{t.minute:02d}-{t.second:02d}"
-    logging_path = Path(logging_path, current_timestamp + '.log')
+    logging_path = Path(logging_path, current_timestamp + ".log")
 
-    logging.basicConfig(handlers=[logging.FileHandler(logging_path, 'w', 'utf-8')],
-                        level=common_logging_level,
-                        format='%(asctime)s %(levelname)s: %(message)s',
-                        datefmt='%H:%M:%S')
-    logger = logging.getLogger('algobattle')
+    logging.basicConfig(
+        handlers=[logging.FileHandler(logging_path, "w", "utf-8")],
+        level=common_logging_level,
+        format="%(asctime)s %(levelname)s: %(message)s",
+        datefmt="%H:%M:%S",
+    )
+    logger = logging.getLogger("algobattle")
 
     if not silent:
         # Pipe logging out to console
         _consolehandler = logging.StreamHandler(stream=sys.stderr)
         _consolehandler.setLevel(common_logging_level)
 
-        _consolehandler.setFormatter(logging.Formatter('%(message)s'))
+        _consolehandler.setFormatter(logging.Formatter("%(message)s"))
 
         logger.addHandler(_consolehandler)
 
@@ -80,16 +82,8 @@ class Config(BaseModel):
     _cli_mapping: ClassVar[dict[str, Any]] = {
         "teams": None,
         "docker": {
-            "generator": {
-                "timeout": "generator_timeout",
-                "space": "generator_space",
-                "cpus": "generator_cpus",
-            },
-            "solver": {
-                "timeout": "solver_timeout",
-                "space": "solver_space",
-                "cpus": "solver_cpus",
-            },
+            "generator": {"timeout": "generator_timeout", "space": "generator_space", "cpus": "generator_cpus"},
+            "solver": {"timeout": "solver_timeout", "space": "solver_space", "cpus": "solver_cpus"},
         },
     }
 
@@ -115,15 +109,36 @@ def parse_cli_args(args: list[str]) -> tuple[Path, Config, Battle.Config]:
     """Parse a given CLI arg list into config objects."""
     parser = ArgumentParser()
     parser.add_argument("problem", type=check_path, help="Path to a folder with the problem file.")
-    parser.add_argument("--config", type=partial(check_path, type="file"), help="Path to a config file, defaults to '{problem} / config.toml'.")
-    parser.add_argument("--logging_path", type=partial(check_path, type="dir"), help="Folder that logs are written into, defaults to '~/.algobattle_logs'.")
-    parser.add_argument("--display", choices=["silent", "logs", "ui"], help="Choose output mode, silent disables all output, logs displays the battle logs on STDERR, ui displays a small GUI showing the progress of the battle. Default: logs.")
+    parser.add_argument(
+        "--config", type=partial(check_path, type="file"), help="Path to a config file, defaults to '{problem} / config.toml'."
+    )
+    parser.add_argument(
+        "--logging_path",
+        type=partial(check_path, type="dir"),
+        help="Folder that logs are written into, defaults to '~/.algobattle_logs'.",
+    )
+    parser.add_argument(
+        "--display",
+        choices=["silent", "logs", "ui"],
+        help="Choose output mode, silent disables all output, logs displays the battle logs on STDERR,"
+        " ui displays a small GUI showing the progress of the battle. Default: logs.",
+    )
 
     parser.add_argument("--verbose", "-v", dest="verbose", action="store_const", const=True, help="More detailed log output.")
-    parser.add_argument("--safe_build", action="store_const", const=True, help="Isolate docker image builds from each other. Significantly slows down battle setup but closes prevents images from interfering with each other.")
+    parser.add_argument(
+        "--safe_build",
+        action="store_const",
+        const=True,
+        help="Isolate docker image builds from each other. Significantly slows down battle setup"
+        " but prevents images from interfering with each other.",
+    )
 
     parser.add_argument("--battle_type", choices=[name.lower() for name in Battle.all()], help="Type of battle to be used.")
-    parser.add_argument("--rounds", type=int, help="Number of rounds that are to be fought in the battle (points are split between all rounds).")
+    parser.add_argument(
+        "--rounds",
+        type=int,
+        help="Number of rounds that are to be fought in the battle (points are split between all rounds).",
+    )
     parser.add_argument("--points", type=int, help="number of points distributed between teams.")
 
     parser.add_argument("--build_timeout", type=float, help="Timeout for the build step of each docker image.")
@@ -162,11 +177,7 @@ def parse_cli_args(args: list[str]) -> tuple[Path, Config, Battle.Config]:
     config.include_cli(parsed)
 
     if not config.teams:
-        config.teams.append(TeamInfo(
-            name="team_0",
-            generator=problem / "generator",
-            solver=problem / "solver",
-        ))
+        config.teams.append(TeamInfo(name="team_0", generator=problem / "generator", solver=problem / "solver"))
 
     battle_type = config.match.battle_type
     battle_name = battle_type.name().lower()
@@ -203,7 +214,7 @@ def main():
 
             result = Match.run(config.match, battle_config, problem, teams, ui)
 
-            logger.info('#' * 78)
+            logger.info("#" * 78)
             logger.info(result.display())
             if config.match.points > 0:
                 points = result.calculate_points(config.match.points)

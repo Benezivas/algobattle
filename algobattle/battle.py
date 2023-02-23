@@ -67,6 +67,8 @@ class Battle(Subject, ABC):
             return arguments
 
         class Config(BaseConfig):
+            """Pydandtic config."""
+
             validate_assignment = True
 
     @staticmethod
