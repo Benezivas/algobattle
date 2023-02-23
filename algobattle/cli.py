@@ -88,6 +88,10 @@ class Config(BaseModel):
     docker: DockerConfig = DockerConfig()
     battle: dict[str, Battle.Config] = {n: b.Config() for n, b in Battle.all().items()}
 
+    @property
+    def battle_config(self) -> Battle.Config:
+        return self.battle[self.match.battle_type.name().lower()]
+
     @validator("battle")
     def val_battle_configs(cls, vals):
         battle_types = Battle.all()
@@ -232,7 +236,7 @@ def main():
             else:
                 ui = None
 
-            result = Match.run(config.match, config.battle[config.match.battle_type.name().lower()], problem, teams, ui)
+            result = Match.run(config.match, config.battle_config, problem, teams, ui)
 
             logger.info("#" * 78)
             logger.info(result.display())
