@@ -231,7 +231,7 @@ def main():
 
     try:
         problem = Problem.import_from_path(problem)
-        with TeamHandler.build(config.teams, problem, config.docker) as teams, ExitStack() as stack:
+        with TeamHandler.build(config.teams, problem, config.docker, config.execution.safe_build) as teams, ExitStack() as stack:
             if config.execution.display == "ui":
                 ui = Ui()
                 stack.enter_context(ui)
