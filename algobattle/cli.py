@@ -168,8 +168,8 @@ def parse_cli_args(args: list[str]) -> tuple[Config, Battle.Config]:
     battle_type = config.match.battle_type
     battle_name = battle_type.name().lower()
     battle_config_dict = config_dict.get(battle_name, {})
-    battle_config = battle_type.Config(**battle_config_dict)
-    for name in vars(battle_config):
+    battle_config = battle_type.Config.parse_obj(battle_config_dict)
+    for name in battle_config.__fields__:
         cli_name = f"{battle_name}_{name}"
         if getattr(parsed, cli_name) is not None:
             setattr(battle_config, name, getattr(parsed, cli_name))

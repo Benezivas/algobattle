@@ -49,10 +49,6 @@ class Battle(Subject, ABC):
     class Config(BaseModel):
         """Object containing the config variables the battle types use."""
 
-        # providing a dummy default impl that will be overriden, to get better static analysis
-        def __init__(self, **kwargs) -> None:
-            super().__init__()
-
         @classmethod
         def as_argparse_args(cls) -> list[tuple[str, dict[str, Any]]]:
             """Constructs a list of argument names and `**kwargs` that can be passed to `ArgumentParser.add_argument()`."""
