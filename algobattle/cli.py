@@ -1,6 +1,6 @@
 """Main battle script. Executes all possible types of battles, see battle --help for all options."""
 from __future__ import annotations
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 from contextlib import ExitStack
 from functools import partial
 import sys
@@ -74,12 +74,45 @@ class Config(BaseModel):
     problem: Path
     teams: list[TeamInfo] = []
     display: Literal["silent", "logs", "ui"] = "logs"
-    logs: Path = Field(default=Path.home() / ".algobattle_logs", cli_alias="logging_path")
+    logging_path: Path = Field(default=Path.home() / ".algobattle_logs", cli_alias="logging_path")
     match: MatchConfig
     docker: DockerConfig
 
+    _cli_mapping: ClassVar[dict[str, Any]] = {
+        "teams": None,
+        "docker": {
+            "generator": {
+                "timeout": "generator_timeout",
+                "spcace": "generator_space",
+                "cpus": "generator_cpus",
+            },
+            "solver": {
+                "timeout": "space_timeout",
+                "spcace": "space_space",
+                "cpus": "space_cpus",
+            },
+        },
+    }
 
-def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, DockerConfig, MatchConfig, Battle.Config]:
+    def include_cli(self, cli: Namespace) -> None:
+        """Updates itself using the data in the passed argparse namespace."""
+        Config._include_cli(self, cli, self._cli_mapping)
+
+    @staticmethod
+    def _include_cli(model: BaseModel, cli: Namespace, mapping: dict[str, Any]) -> None:
+        for name in model.__fields__:
+            if name in mapping and mapping[name] is None:
+                continue
+            value = getattr(model, name)
+            if isinstance(value, BaseModel):
+                Config._include_cli(value, cli, mapping.get(name, {}))
+            else:
+                cli_val = getattr(cli, mapping.get(name, name))
+                if cli_val is not None:
+                    setattr(model, name, cli_val)
+
+
+def parse_cli_args(args: list[str]) -> tuple[Config, Battle.Config]:
     """Parse a given CLI arg list into config objects."""
     parser = ArgumentParser()
     parser.add_argument("problem", type=check_path, help="Path to a folder with the problem file.")
@@ -94,13 +127,13 @@ def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, DockerConfig, MatchC
     parser.add_argument("--rounds", type=int, help="Number of rounds that are to be fought in the battle (points are split between all rounds).")
     parser.add_argument("--points", type=int, help="number of points distributed between teams.")
 
-    parser.add_argument("--timeout_build", type=float, help="Timeout for the build step of each docker image.")
-    parser.add_argument("--timeout_generator", type=float, help="Time limit for the generator execution.")
-    parser.add_argument("--timeout_solver", type=float, help="Time limit for the solver execution.")
-    parser.add_argument("--space_generator", type=int, help="Memory limit for the generator execution, in MB.")
-    parser.add_argument("--space_solver", type=int, help="Memory limit the solver execution, in MB.")
-    parser.add_argument("--cpus_generator", type=int, help="Number of cpu cores used for generator container execution.")
-    parser.add_argument("--cpus_solver", type=int, help="Number of cpu cores used for solver container execution.")
+    parser.add_argument("--build_timeout", type=float, help="Timeout for the build step of each docker image.")
+    parser.add_argument("--generator_timeout", type=float, help="Time limit for the generator execution.")
+    parser.add_argument("--solver_timeout", type=float, help="Time limit for the solver execution.")
+    parser.add_argument("--generator_space", type=int, help="Memory limit for the generator execution, in MB.")
+    parser.add_argument("--solver_space", type=int, help="Memory limit the solver execution, in MB.")
+    parser.add_argument("--generator_cpus", type=int, help="Number of cpu cores used for generator container execution.")
+    parser.add_argument("--solver_cpus", type=int, help="Number of cpu cores used for solver container execution.")
 
     # battle types have their configs automatically added to the CLI args
     for battle_name, battle in Battle.all().items():
@@ -123,7 +156,8 @@ def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, DockerConfig, MatchC
         config_dict = {}
 
     config = Config.parse_obj(config_dict)
-    config.problem = parsed.problem
+    config.include_cli(parsed)
+
     if not config.teams:
         config.teams.append(TeamInfo(
             name="team_0",
@@ -131,61 +165,42 @@ def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, DockerConfig, MatchC
             solver=config.problem / "solver",
         ))
 
-    program_config = ProgramConfig(teams=teams, **getattr_set(parsed, "problem", "display", "logs"))
-
-    match_config = MatchConfig.from_dict(config_dict.get("match", {}))
-    for name in vars(match_config):
-        if getattr(parsed, name) is not None:
-            setattr(match_config, name, getattr(parsed, name))
-
-    docker_params = config_dict.get("docker", {})
-    docker_config = DockerConfig(
-        build_timeout=docker_params.get("build_timeout"),
-        generator=RunParameters(**docker_params.get("generator", {})),
-        solver=RunParameters(**docker_params.get("solver", {})),
-    )
-    if getattr(parsed, "timeout_build") is not None:
-        object.__setattr__(docker_config, "build_timeout", parsed.timeout_build)
-    for role in ("generator", "solver"):
-        role_config = getattr(docker_config, role)
-        for name in vars(role_config):
-            cli_name = f"{name}_{role}"
-            if getattr(parsed, cli_name) is not None:
-                object.__setattr__(role_config, name, getattr(parsed, cli_name))
-
-    battle_config = match_config.battle_type.Config(**config_dict.get(match_config.battle_type.name().lower(), {}))
+    battle_type = config.match.battle_type
+    battle_name = battle_type.name().lower()
+    battle_config_dict = config_dict.get(battle_name, {})
+    battle_config = battle_type.Config(**battle_config_dict)
     for name in vars(battle_config):
-        cli_name = f"{match_config.battle_type.name().lower()}_{name}"
+        cli_name = f"{battle_name}_{name}"
         if getattr(parsed, cli_name) is not None:
             setattr(battle_config, name, getattr(parsed, cli_name))
 
-    return program_config, docker_config, match_config, battle_config
+    return config, battle_config
 
 
 def main():
     """Entrypoint of `algobattle` CLI."""
     try:
-        program_config, docker_config, match_config, battle_config = parse_cli_args(sys.argv[1:])
-        logger = setup_logging(program_config.logs, match_config.verbose, program_config.display != "logs")
+        config, battle_config = parse_cli_args(sys.argv[1:])
+        logger = setup_logging(config.logging_path, config.match.verbose, config.display != "logs")
 
     except KeyboardInterrupt:
         raise SystemExit("Received keyboard interrupt, terminating execution.")
 
     try:
-        problem = Problem.import_from_path(program_config.problem)
-        with TeamHandler.build(program_config.teams, problem, docker_config) as teams, ExitStack() as stack:
-            if program_config.display == "ui":
+        problem = Problem.import_from_path(config.problem)
+        with TeamHandler.build(config.teams, problem, config.docker) as teams, ExitStack() as stack:
+            if config.display == "ui":
                 ui = Ui()
                 stack.enter_context(ui)
             else:
                 ui = None
 
-            result = Match.run(match_config, battle_config, problem, teams, ui)
+            result = Match.run(config.match, battle_config, problem, teams, ui)
 
             logger.info('#' * 78)
             logger.info(result.display())
-            if match_config.points > 0:
-                points = result.calculate_points(match_config.points)
+            if config.match.points > 0:
+                points = result.calculate_points(config.match.points)
                 for team, pts in points.items():
                     logger.info(f"Group {team} gained {pts:.1f} points.")
 
