@@ -190,21 +190,21 @@ class Parsing(TestCase):
         )]
 
     def test_no_cfg_default(self):
-        problem, cfg, battle_cfg = parse_cli_args([str(self.problem_path)])
+        problem, cfg = parse_cli_args([str(self.problem_path)])
         self.assertEqual(problem, self.problem_path)
         self.assertEqual(cfg, Config(teams=self.teams))
-        self.assertEqual(battle_cfg, Iterated.Config())
+        self.assertEqual(cfg.battle_config, Iterated.Config())
 
     def test_empty_cfg(self):
-        problem, cfg, battle_cfg = parse_cli_args(
+        problem, cfg = parse_cli_args(
             [str(self.problem_path), "--config", str(self.configs_path / "empty.toml")]
         )
         self.assertEqual(problem, self.problem_path)
         self.assertEqual(cfg, Config(teams=self.teams))
-        self.assertEqual(battle_cfg, Iterated.Config())
+        self.assertEqual(cfg.battle_config, Iterated.Config())
 
     def test_cfg(self):
-        problem, cfg, battle_cfg = parse_cli_args(
+        problem, cfg = parse_cli_args(
             [str(self.problem_path), "--config", str(self.configs_path / "test.toml")]
         )
         self.assertEqual(problem, self.problem_path)
@@ -217,10 +217,10 @@ class Parsing(TestCase):
             execution=ExecutionConfig(safe_build=True),
             docker=DockerConfig(generator=RunParameters(space=10)),
         ))
-        self.assertEqual(battle_cfg, Averaged.Config(iterations=1))
+        self.assertEqual(cfg.battle_config, Averaged.Config(iterations=1))
 
     def test_cli(self):
-        problem, cfg, battle_cfg = parse_cli_args(
+        problem, cfg = parse_cli_args(
             [
                 str(self.problem_path),
                 "--points=10",
@@ -240,10 +240,10 @@ class Parsing(TestCase):
             execution=ExecutionConfig(safe_build=True),
             docker=DockerConfig(generator=RunParameters(space=10)),
         ))
-        self.assertEqual(battle_cfg, Averaged.Config(iterations=1))
+        self.assertEqual(cfg.battle_config, Averaged.Config(iterations=1))
 
     def test_cli_overwrite_cfg(self):
-        problem, cfg, battle_cfg = parse_cli_args(
+        problem, cfg = parse_cli_args(
             [
                 str(self.problem_path),
                 "--points=20",
@@ -263,7 +263,7 @@ class Parsing(TestCase):
             execution=ExecutionConfig(safe_build=True),
             docker=DockerConfig(generator=RunParameters(space=10)),
         ))
-        self.assertEqual(battle_cfg, Iterated.Config())
+        self.assertEqual(cfg.battle_config, Iterated.Config())
 
     def test_cli_no_problem_path(self):
         with self.assertRaises(SystemExit):
@@ -274,7 +274,7 @@ class Parsing(TestCase):
             parse_cli_args([str(self.problem_path), "--battle_type=NotABattleType"])
 
     def test_cfg_team(self):
-        _, cfg, _ = parse_cli_args([str(self.problem_path), f"--config={self.configs_path / 'teams.toml'}"])
+        _, cfg = parse_cli_args([str(self.problem_path), f"--config={self.configs_path / 'teams.toml'}"])
         self.assertEqual(cfg, Config(
             teams=[TeamInfo("team 1", Path(), Path()), TeamInfo("team 2", Path(), Path())]
         ))

@@ -8,5 +8,5 @@ battle_type = "averaged"
 [docker.generator]
 space = 10
 
-[averaged]
+[battle.averaged]
 iterations = 1
