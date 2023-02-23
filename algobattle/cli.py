@@ -72,6 +72,7 @@ def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
 
 class ExecutionConfig(BaseModel):
     """Config data regarding program execution."""
+
     display: Literal["silent", "logs", "ui"] = "logs"
     logging_path: Path = Path.home() / ".algobattle_logs"
     verbose: bool = False
