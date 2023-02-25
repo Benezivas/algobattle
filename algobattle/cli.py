@@ -1,23 +1,24 @@
 """Main battle script. Executes all possible types of battles, see battle --help for all options."""
 from __future__ import annotations
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 from contextlib import ExitStack
-from dataclasses import dataclass
 from functools import partial
 import sys
 import logging
 import datetime as dt
 from pathlib import Path
-from typing import Literal
-import tomli
-from algobattle.battle import Battle
-from algobattle.docker_util import DockerConfig, RunParameters
+from typing import Any, ClassVar, Literal, Mapping, Self
+import tomllib
 
+from pydantic import BaseModel, validator
+
+from algobattle.battle import Battle
+from algobattle.docker_util import DockerConfig
 from algobattle.match import MatchConfig, Match
 from algobattle.problem import Problem
 from algobattle.team import TeamHandler, TeamInfo
 from algobattle.ui import Ui
-from algobattle.util import check_path, getattr_set
+from algobattle.util import check_path
 
 
 def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
@@ -46,20 +47,22 @@ def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
 
     t = dt.datetime.now()
     current_timestamp = f"{t.year:04d}-{t.month:02d}-{t.day:02d}_{t.hour:02d}-{t.minute:02d}-{t.second:02d}"
-    logging_path = Path(logging_path, current_timestamp + '.log')
+    logging_path = Path(logging_path, current_timestamp + ".log")
 
-    logging.basicConfig(handlers=[logging.FileHandler(logging_path, 'w', 'utf-8')],
-                        level=common_logging_level,
-                        format='%(asctime)s %(levelname)s: %(message)s',
-                        datefmt='%H:%M:%S')
-    logger = logging.getLogger('algobattle')
+    logging.basicConfig(
+        handlers=[logging.FileHandler(logging_path, "w", "utf-8")],
+        level=common_logging_level,
+        format="%(asctime)s %(levelname)s: %(message)s",
+        datefmt="%H:%M:%S",
+    )
+    logger = logging.getLogger("algobattle")
 
     if not silent:
         # Pipe logging out to console
         _consolehandler = logging.StreamHandler(stream=sys.stderr)
         _consolehandler.setLevel(common_logging_level)
 
-        _consolehandler.setFormatter(logging.Formatter('%(message)s'))
+        _consolehandler.setFormatter(logging.Formatter("%(message)s"))
 
         logger.addHandler(_consolehandler)
 
@@ -67,38 +70,128 @@ def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
     return logger
 
 
-@dataclass
-class ProgramConfig:
-    """CLI parameters for program execution."""
+class ExecutionConfig(BaseModel):
+    """Config data regarding program execution."""
 
-    problem: Path
-    teams: list[TeamInfo]
     display: Literal["silent", "logs", "ui"] = "logs"
-    logs: Path = Path.home() / ".algobattle_logs"
+    logging_path: Path = Path.home() / ".algobattle_logs"
+    verbose: bool = False
+    safe_build: bool = False
 
 
-def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, DockerConfig, MatchConfig, Battle.Config]:
+class Config(BaseModel):
+    """Pydantic model to parse the config file."""
+
+    teams: list[TeamInfo] = []
+    execution: ExecutionConfig = ExecutionConfig()
+    match: MatchConfig = MatchConfig()
+    docker: DockerConfig = DockerConfig()
+    battle: dict[str, Battle.Config] = {n: b.Config() for n, b in Battle.all().items()}
+
+    @property
+    def battle_config(self) -> Battle.Config:
+        """The config object for the used battle type."""
+        return self.battle[self.match.battle_type.name().lower()]
+
+    @validator("battle", pre=True)
+    def val_battle_configs(cls, vals):
+        """Parses the dict of battle configs into their corresponding config objects."""
+        battle_types = Battle.all()
+        if not isinstance(vals, Mapping):
+            raise TypeError
+        out = {}
+        for name, battle_cls in battle_types.items():
+            data = vals.get(name, {})
+            out[name] = battle_cls.Config.parse_obj(data)
+        return out
+
+    _cli_mapping: ClassVar[dict[str, Any]] = {
+        "teams": None,
+        "battle": None,
+        "docker": {
+            "generator": {"timeout": "generator_timeout", "space": "generator_space", "cpus": "generator_cpus"},
+            "solver": {"timeout": "solver_timeout", "space": "solver_space", "cpus": "solver_cpus"},
+        },
+    }
+
+    def include_cli(self, cli: Namespace) -> None:
+        """Updates itself using the data in the passed argparse namespace."""
+        Config._include_cli(self, cli, self._cli_mapping)
+        for battle_name, config in self.battle.items():
+            for name in config.__fields__:
+                cli_name = f"{battle_name}_{name}"
+                if getattr(cli, cli_name) is not None:
+                    setattr(config, name, getattr(cli, cli_name))
+
+    @staticmethod
+    def _include_cli(model: BaseModel, cli: Namespace, mapping: dict[str, Any]) -> None:
+        for name in model.__fields__:
+            if name in mapping and mapping[name] is None:
+                continue
+            value = getattr(model, name)
+            if isinstance(value, BaseModel):
+                Config._include_cli(value, cli, mapping.get(name, {}))
+            else:
+                cli_val = getattr(cli, mapping.get(name, name))
+                if cli_val is not None:
+                    setattr(model, name, cli_val)
+
+    @classmethod
+    def from_file(cls, file: Path) -> Self:
+        """Parses a config object from a toml file."""
+        if not file.is_file():
+            raise ValueError("Path doesn't point to a file.")
+        with open(file, "rb") as f:
+            try:
+                config_dict = tomllib.load(f)
+            except tomllib.TOMLDecodeError as e:
+                raise ValueError(f"The config file at {file} is not a properly formatted TOML file!\n{e}")
+        return cls.parse_obj(config_dict)
+
+
+def parse_cli_args(args: list[str]) -> tuple[Path, Config]:
     """Parse a given CLI arg list into config objects."""
     parser = ArgumentParser()
     parser.add_argument("problem", type=check_path, help="Path to a folder with the problem file.")
-    parser.add_argument("--config", type=partial(check_path, type="file"), help="Path to a config file, defaults to '{problem} / config.toml'.")
-    parser.add_argument("--logging_path", type=partial(check_path, type="dir"), help="Folder that logs are written into, defaults to '~/.algobattle_logs'.")
-    parser.add_argument("--display", choices=["silent", "logs", "ui"], help="Choose output mode, silent disables all output, logs displays the battle logs on STDERR, ui displays a small GUI showing the progress of the battle. Default: logs.")
+    parser.add_argument(
+        "--config", type=partial(check_path, type="file"), help="Path to a config file, defaults to '{problem} / config.toml'."
+    )
+    parser.add_argument(
+        "--logging_path",
+        type=partial(check_path, type="dir"),
+        help="Folder that logs are written into, defaults to '~/.algobattle_logs'.",
+    )
+    parser.add_argument(
+        "--display",
+        choices=["silent", "logs", "ui"],
+        help="Choose output mode, silent disables all output, logs displays the battle logs on STDERR,"
+        " ui displays a small GUI showing the progress of the battle. Default: logs.",
+    )
 
     parser.add_argument("--verbose", "-v", dest="verbose", action="store_const", const=True, help="More detailed log output.")
-    parser.add_argument("--safe_build", action="store_const", const=True, help="Isolate docker image builds from each other. Significantly slows down battle setup but closes prevents images from interfering with each other.")
+    parser.add_argument(
+        "--safe_build",
+        action="store_const",
+        const=True,
+        help="Isolate docker image builds from each other. Significantly slows down battle setup"
+        " but prevents images from interfering with each other.",
+    )
 
     parser.add_argument("--battle_type", choices=[name.lower() for name in Battle.all()], help="Type of battle to be used.")
-    parser.add_argument("--rounds", type=int, help="Number of rounds that are to be fought in the battle (points are split between all rounds).")
+    parser.add_argument(
+        "--rounds",
+        type=int,
+        help="Number of rounds that are to be fought in the battle (points are split between all rounds).",
+    )
     parser.add_argument("--points", type=int, help="number of points distributed between teams.")
 
-    parser.add_argument("--timeout_build", type=float, help="Timeout for the build step of each docker image.")
-    parser.add_argument("--timeout_generator", type=float, help="Time limit for the generator execution.")
-    parser.add_argument("--timeout_solver", type=float, help="Time limit for the solver execution.")
-    parser.add_argument("--space_generator", type=int, help="Memory limit for the generator execution, in MB.")
-    parser.add_argument("--space_solver", type=int, help="Memory limit the solver execution, in MB.")
-    parser.add_argument("--cpus_generator", type=int, help="Number of cpu cores used for generator container execution.")
-    parser.add_argument("--cpus_solver", type=int, help="Number of cpu cores used for solver container execution.")
+    parser.add_argument("--build_timeout", type=float, help="Timeout for the build step of each docker image.")
+    parser.add_argument("--generator_timeout", type=float, help="Time limit for the generator execution.")
+    parser.add_argument("--solver_timeout", type=float, help="Time limit for the solver execution.")
+    parser.add_argument("--generator_space", type=int, help="Memory limit for the generator execution, in MB.")
+    parser.add_argument("--solver_space", type=int, help="Memory limit the solver execution, in MB.")
+    parser.add_argument("--generator_cpus", type=int, help="Number of cpu cores used for generator container execution.")
+    parser.add_argument("--solver_cpus", type=int, help="Number of cpu cores used for solver container execution.")
 
     # battle types have their configs automatically added to the CLI args
     for battle_name, battle in Battle.all().items():
@@ -107,94 +200,53 @@ def parse_cli_args(args: list[str]) -> tuple[ProgramConfig, DockerConfig, MatchC
             group.add_argument(f"--{battle_name.lower()}_{name}", **kwargs)
 
     parsed = parser.parse_args(args)
+    problem: Path = parsed.problem
 
     if parsed.battle_type is not None:
         parsed.battle_type = Battle.all()[parsed.battle_type]
-    cfg_path = parsed.config if parsed.config is not None else parsed.problem / "config.toml"
+    cfg_path: Path = parsed.config or parsed.problem / "config.toml"
+
     if cfg_path.is_file():
-        with open(cfg_path, "rb") as file:
-            try:
-                config = tomli.load(file)
-            except tomli.TOMLDecodeError as e:
-                raise ValueError(f"The config file at {cfg_path} is not a properly formatted TOML file!\n{e}")
-    else:
-        config = {}
-
-    if "teams" in config:
-        team_specs = config["teams"]
-    else:
-        team_specs = [{
-            "name": "team_0",
-            "generator": parsed.problem / "generator",
-            "solver": parsed.problem / "solver",
-        }]
-    teams = []
-    for spec in team_specs:
         try:
-            name = spec["name"]
-            gen = check_path(spec["generator"], type="dir")
-            sol = check_path(spec["solver"], type="dir")
-            teams.append(TeamInfo(name=name, generator=gen, solver=sol))
-        except KeyError:
-            raise ValueError(f"The config file at {cfg_path} is incorrectly formatted!")
+            config = Config.from_file(cfg_path)
+        except Exception as e:
+            raise ValueError(f"Invalid config file, terminating execution.\n{e}")
+    else:
+        config = Config()
+    config.include_cli(parsed)
 
-    program_config = ProgramConfig(teams=teams, **getattr_set(parsed, "problem", "display", "logs"))
+    if not config.teams:
+        config.teams.append(TeamInfo(name="team_0", generator=problem / "generator", solver=problem / "solver"))
 
-    match_config = MatchConfig.from_dict(config.get("match", {}))
-    for name in vars(match_config):
-        if getattr(parsed, name) is not None:
-            setattr(match_config, name, getattr(parsed, name))
-
-    docker_params = config.get("docker", {})
-    docker_config = DockerConfig(
-        build_timeout=docker_params.get("build_timeout"),
-        generator=RunParameters(**docker_params.get("generator", {})),
-        solver=RunParameters(**docker_params.get("solver", {})),
-    )
-    if getattr(parsed, "timeout_build") is not None:
-        object.__setattr__(docker_config, "build_timeout", parsed.timeout_build)
-    for role in ("generator", "solver"):
-        role_config = getattr(docker_config, role)
-        for name in vars(role_config):
-            cli_name = f"{name}_{role}"
-            if getattr(parsed, cli_name) is not None:
-                object.__setattr__(role_config, name, getattr(parsed, cli_name))
-
-    battle_config = match_config.battle_type.Config(**config.get(match_config.battle_type.name().lower(), {}))
-    for name in vars(battle_config):
-        cli_name = f"{match_config.battle_type.name().lower()}_{name}"
-        if getattr(parsed, cli_name) is not None:
-            setattr(battle_config, name, getattr(parsed, cli_name))
-
-    return program_config, docker_config, match_config, battle_config
+    return problem, config
 
 
 def main():
     """Entrypoint of `algobattle` CLI."""
     try:
-        program_config, docker_config, match_config, battle_config = parse_cli_args(sys.argv[1:])
-        logger = setup_logging(program_config.logs, match_config.verbose, program_config.display != "logs")
+        problem, config = parse_cli_args(sys.argv[1:])
+        logger = setup_logging(config.execution.logging_path, config.execution.verbose, config.execution.display != "logs")
 
     except KeyboardInterrupt:
         raise SystemExit("Received keyboard interrupt, terminating execution.")
 
     try:
-        problem = Problem.import_from_path(program_config.problem)
-        with TeamHandler.build(program_config.teams, problem, docker_config) as teams, ExitStack() as stack:
-            if program_config.display == "ui":
+        problem = Problem.import_from_path(problem)
+        with TeamHandler.build(config.teams, problem, config.docker, config.execution.safe_build) as teams, ExitStack() as stack:
+            if config.execution.display == "ui":
                 ui = Ui()
                 stack.enter_context(ui)
             else:
                 ui = None
 
-            result = Match.run(match_config, battle_config, problem, teams, ui)
+            result = Match.run(config.match, config.battle_config, problem, teams, ui)
 
-            logger.info('#' * 78)
+            logger.info("#" * 78)
             logger.info(result.display())
-            if match_config.points > 0:
-                points = result.calculate_points(match_config.points)
+            if config.match.points > 0:
+                points = result.calculate_points()
                 for team, pts in points.items():
-                    logger.info(f"Group {team} gained {pts:.1f} points.")
+                    logger.info(f"Team {team} gained {pts:.1f} points.")
 
     except KeyboardInterrupt:
         logger.critical("Received keyboard interrupt, terminating execution.")

@@ -1,40 +1,39 @@
 """Central managing module for an algorithmic battle."""
 from __future__ import annotations
-from dataclasses import dataclass
 import logging
-from typing import Any, Self
+from typing import Self
+
 from prettytable import PrettyTable, DOUBLE_BORDER
+from pydantic import BaseModel, validator
 
 from algobattle.battle import Battle, Iterated
 from algobattle.ui import Observer, Subject
-from algobattle.team import Matchup, Team, TeamHandler
+from algobattle.team import Matchup, TeamHandler, Team
 from algobattle.problem import Problem
 
 logger = logging.getLogger("algobattle.match")
 
 
-@dataclass(kw_only=True)
-class MatchConfig:
+class MatchConfig(BaseModel):
     """Parameters determining the match execution."""
 
-    verbose: bool = False
-    safe_build: bool = False
     battle_type: type[Battle] = Iterated
     rounds: int = 5
     points: int = 100
 
-    @staticmethod
-    def from_dict(info: dict[str, Any]) -> MatchConfig:
-        """Parses a :cls:`MatchConfig` from a dict."""
-        if "battle_type" in info:
-            try:
-                battle_type = Battle.all()[info["battle_type"]]
-            except KeyError:
-                raise ValueError(f"Attempted to use invalid battle type {info['battle_type']}.")
-            update = {"battle_type": battle_type}
+    @validator("battle_type", pre=True)
+    def parse_battle_type(cls, value):
+        """Parses the battle type class object from its name."""
+        if isinstance(value, str):
+            all = Battle.all()
+            if value in all:
+                return all[value]
+            else:
+                raise ValueError
+        elif issubclass(value, Battle):
+            return value
         else:
-            update = {}
-        return MatchConfig(**(info | update))
+            raise TypeError
 
 
 class Match(Subject):
@@ -79,12 +78,13 @@ class Match(Subject):
                 result.notify("match")
         return result
 
-    def calculate_points(self, achievable_points: int) -> dict[str, float]:
+    def calculate_points(self) -> dict[str, float]:
         """Calculate the number of points each team scored.
 
         Each pair of teams fights for the achievable points among one another.
         These achievable points are split over all rounds.
         """
+        achievable_points = self.config.points
         if len(self.teams.active) == 0:
             return {}
         if len(self.teams.active) == 1:

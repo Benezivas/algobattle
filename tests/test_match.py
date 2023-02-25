@@ -4,7 +4,7 @@ from unittest import TestCase, main
 import logging
 from pathlib import Path
 
-from algobattle.cli import parse_cli_args, setup_logging
+from algobattle.cli import Config, ExecutionConfig, parse_cli_args, setup_logging
 from algobattle.battle import Iterated, Averaged
 from algobattle.match import MatchConfig, Match
 from algobattle.team import Team, Matchup, TeamHandler, TeamInfo
@@ -45,7 +45,7 @@ class Matchtests(TestCase):
     def test_calculate_points_zero_rounds(self):
         """All teams get 0 points if no rounds have been fought."""
         match = Match(MatchConfig(rounds=0), Iterated.Config(), TestProblem, self.teams)
-        self.assertEqual(match.calculate_points(100), {self.team0.name: 0, self.team1.name: 0})
+        self.assertEqual(match.calculate_points(), {self.team0.name: 0, self.team1.name: 0})
 
     def test_calculate_points_iterated_no_successful_round(self):
         """Two teams should get an equal amount of points if nobody solved anything."""
@@ -54,7 +54,7 @@ class Matchtests(TestCase):
         battle.reached = 0
         match.results[self.matchup0] = [battle, battle]
         match.results[self.matchup1] = [battle, battle]
-        self.assertEqual(match.calculate_points(100), {self.team0.name: 50, self.team1.name: 50})
+        self.assertEqual(match.calculate_points(), {self.team0.name: 50, self.team1.name: 50})
 
     def test_calculate_points_iterated_draw(self):
         """Two teams should get an equal amount of points if both solved a problem equally well."""
@@ -65,7 +65,7 @@ class Matchtests(TestCase):
         battle2.reached = 10
         match.results[self.matchup0] = [battle, battle2]
         match.results[self.matchup1] = [battle2, battle]
-        self.assertEqual(match.calculate_points(100), {self.team0.name: 50, self.team1.name: 50})
+        self.assertEqual(match.calculate_points(), {self.team0.name: 50, self.team1.name: 50})
 
     def test_calculate_points_iterated_domination(self):
         """One team should get all points if it solved anything and the other team nothing."""
@@ -76,7 +76,7 @@ class Matchtests(TestCase):
         battle2.reached = 0
         match.results[self.matchup0] = [battle, battle]
         match.results[self.matchup1] = [battle2, battle2]
-        self.assertEqual(match.calculate_points(100), {self.team0.name: 0, self.team1.name: 100})
+        self.assertEqual(match.calculate_points(), {self.team0.name: 0, self.team1.name: 100})
 
     def test_calculate_points_iterated_one_team_better(self):
         """One team should get more points than the other if it performed better."""
@@ -87,7 +87,7 @@ class Matchtests(TestCase):
         battle2.reached = 20
         match.results[self.matchup0] = [battle, battle]
         match.results[self.matchup1] = [battle2, battle2]
-        self.assertEqual(match.calculate_points(100), {self.team0.name: 66.6, self.team1.name: 33.4})
+        self.assertEqual(match.calculate_points(), {self.team0.name: 66.6, self.team1.name: 33.4})
 
     def test_calculate_points_averaged_no_successful_round(self):
         """Two teams should get an equal amount of points if nobody solved anything."""
@@ -96,7 +96,7 @@ class Matchtests(TestCase):
         battle.scores = [0, 0, 0]
         match.results[self.matchup0] = [battle, battle]
         match.results[self.matchup1] = [battle, battle]
-        self.assertEqual(match.calculate_points(100), {self.team0.name: 50, self.team1.name: 50})
+        self.assertEqual(match.calculate_points(), {self.team0.name: 50, self.team1.name: 50})
 
     def test_calculate_points_averaged_draw(self):
         """Two teams should get an equal amount of points if both solved a problem equally well."""
@@ -105,7 +105,7 @@ class Matchtests(TestCase):
         battle.scores = [.5, .5, .5]
         match.results[self.matchup0] = [battle, battle]
         match.results[self.matchup1] = [battle, battle]
-        self.assertEqual(match.calculate_points(100), {self.team0.name: 50, self.team1.name: 50})
+        self.assertEqual(match.calculate_points(), {self.team0.name: 50, self.team1.name: 50})
 
     def test_calculate_points_averaged_domination(self):
         """One team should get all points if it solved anything and the other team nothing."""
@@ -116,7 +116,7 @@ class Matchtests(TestCase):
         battle2.scores = [1, 1, 1]
         match.results[self.matchup0] = [battle, battle]
         match.results[self.matchup1] = [battle2, battle2]
-        self.assertEqual(match.calculate_points(100), {self.team0.name: 100, self.team1.name: 0})
+        self.assertEqual(match.calculate_points(), {self.team0.name: 100, self.team1.name: 0})
 
     def test_calculate_points_averaged_one_team_better(self):
         """One team should get more points than the other if it performed better."""
@@ -127,7 +127,7 @@ class Matchtests(TestCase):
         battle2.scores = [.4, .4, .4]
         match.results[self.matchup0] = [battle, battle]
         match.results[self.matchup1] = [battle2, battle2]
-        self.assertEqual(match.calculate_points(100), {self.team0.name: 60, self.team1.name: 40})
+        self.assertEqual(match.calculate_points(), {self.team0.name: 60, self.team1.name: 40})
 
     # TODO: Add tests for remaining functions
 
@@ -183,70 +183,71 @@ class Parsing(TestCase):
         path = Path(__file__).parent
         cls.problem_path = path / "testsproblem"
         cls.configs_path = path / "configs"
+        cls.teams = [TeamInfo(
+            name="team_0",
+            generator=cls.problem_path / "generator",
+            solver=cls.problem_path / "solver",
+        )]
 
     def test_no_cfg_default(self):
-        program_cfg, docker_cfg, match_cfg, battle_cfg = parse_cli_args([str(self.problem_path)])
-        self.assertEqual(program_cfg.problem, self.problem_path)
-        self.assertEqual(program_cfg.display, "logs")
-        self.assertEqual(program_cfg.logs, Path.home() / ".algobattle_logs")
-        self.assertEqual(
-            program_cfg.teams, [TeamInfo("team_0", self.problem_path / "generator", self.problem_path / "solver")]
-        )
-        self.assertEqual(match_cfg, MatchConfig())
-        self.assertEqual(battle_cfg, Iterated.Config())
-        self.assertEqual(docker_cfg, DockerConfig())
+        problem, cfg = parse_cli_args([str(self.problem_path)])
+        self.assertEqual(problem, self.problem_path)
+        self.assertEqual(cfg, Config(teams=self.teams))
+        self.assertEqual(cfg.battle_config, Iterated.Config())
 
     def test_empty_cfg(self):
-        program_cfg, docker_cfg, match_cfg, battle_cfg = parse_cli_args(
+        problem, cfg = parse_cli_args(
             [str(self.problem_path), "--config", str(self.configs_path / "empty.toml")]
         )
-        self.assertEqual(program_cfg.problem, self.problem_path)
-        self.assertEqual(program_cfg.display, "logs")
-        self.assertEqual(program_cfg.logs, Path.home() / ".algobattle_logs")
-        self.assertEqual(
-            program_cfg.teams, [TeamInfo("team_0", self.problem_path / "generator", self.problem_path / "solver")]
-        )
-        self.assertEqual(match_cfg, MatchConfig())
-        self.assertEqual(battle_cfg, Iterated.Config())
-        self.assertEqual(docker_cfg, DockerConfig())
+        self.assertEqual(problem, self.problem_path)
+        self.assertEqual(cfg, Config(teams=self.teams))
+        self.assertEqual(cfg.battle_config, Iterated.Config())
 
     def test_cfg(self):
-        program_cfg, docker_cfg, match_cfg, battle_cfg = parse_cli_args(
+        problem, cfg = parse_cli_args(
             [str(self.problem_path), "--config", str(self.configs_path / "test.toml")]
         )
-        self.assertEqual(program_cfg.problem, self.problem_path)
-        self.assertEqual(program_cfg.display, "logs")
-        self.assertEqual(program_cfg.logs, Path.home() / ".algobattle_logs")
-        self.assertEqual(
-            program_cfg.teams, [TeamInfo("team_0", self.problem_path / "generator", self.problem_path / "solver")]
-        )
-        self.assertEqual(match_cfg, MatchConfig(points=10, safe_build=True, battle_type=Averaged))
-        self.assertEqual(battle_cfg, Averaged.Config(iterations=1))
-        self.assertEqual(docker_cfg, DockerConfig(generator=RunParameters(space=10)))
+        self.assertEqual(problem, self.problem_path)
+        self.assertEqual(cfg, Config(
+            match=MatchConfig(
+                points=10,
+                battle_type=Averaged,
+            ),
+            teams=self.teams,
+            execution=ExecutionConfig(safe_build=True),
+            docker=DockerConfig(generator=RunParameters(space=10)),
+            battle={
+                "averaged": Averaged.Config(iterations=1),
+            }
+        ))
 
     def test_cli(self):
-        program_cfg, docker_cfg, match_cfg, battle_cfg = parse_cli_args(
+        problem, cfg = parse_cli_args(
             [
                 str(self.problem_path),
                 "--points=10",
-                "--space_generator=10",
+                "--generator_space=10",
                 "--safe_build",
                 "--battle_type=averaged",
                 "--averaged_iterations=1",
             ]
         )
-        self.assertEqual(program_cfg.problem, self.problem_path)
-        self.assertEqual(program_cfg.display, "logs")
-        self.assertEqual(program_cfg.logs, Path.home() / ".algobattle_logs")
-        self.assertEqual(
-            program_cfg.teams, [TeamInfo("team_0", self.problem_path / "generator", self.problem_path / "solver")]
-        )
-        self.assertEqual(match_cfg, MatchConfig(points=10, safe_build=True, battle_type=Averaged))
-        self.assertEqual(battle_cfg, Averaged.Config(iterations=1))
-        self.assertEqual(docker_cfg, DockerConfig(generator=RunParameters(space=10)))
+        self.assertEqual(problem, self.problem_path)
+        self.assertEqual(cfg, Config(
+            match=MatchConfig(
+                points=10,
+                battle_type=Averaged,
+            ),
+            teams=self.teams,
+            execution=ExecutionConfig(safe_build=True),
+            docker=DockerConfig(generator=RunParameters(space=10)),
+            battle={
+                "averaged": Averaged.Config(iterations=1),
+            },
+        ))
 
     def test_cli_overwrite_cfg(self):
-        program_cfg, docker_cfg, match_cfg, battle_cfg = parse_cli_args(
+        problem, cfg = parse_cli_args(
             [
                 str(self.problem_path),
                 "--points=20",
@@ -256,15 +257,19 @@ class Parsing(TestCase):
                 f"--config={self.configs_path / 'test.toml'}",
             ]
         )
-        self.assertEqual(program_cfg.problem, self.problem_path)
-        self.assertEqual(program_cfg.display, "logs")
-        self.assertEqual(program_cfg.logs, Path.home() / ".algobattle_logs")
-        self.assertEqual(
-            program_cfg.teams, [TeamInfo("team_0", self.problem_path / "generator", self.problem_path / "solver")]
-        )
-        self.assertEqual(match_cfg, MatchConfig(points=20, safe_build=True, battle_type=Iterated))
-        self.assertEqual(battle_cfg, Iterated.Config())
-        self.assertEqual(docker_cfg, DockerConfig(generator=RunParameters(space=10)))
+        self.assertEqual(problem, self.problem_path)
+        self.assertEqual(cfg, Config(
+            match=MatchConfig(
+                points=20,
+                battle_type=Iterated,
+            ),
+            teams=self.teams,
+            execution=ExecutionConfig(safe_build=True),
+            docker=DockerConfig(generator=RunParameters(space=10)),
+            battle={
+                "averaged": Averaged.Config(iterations=1),
+            },
+        ))
 
     def test_cli_no_problem_path(self):
         with self.assertRaises(SystemExit):
@@ -275,8 +280,10 @@ class Parsing(TestCase):
             parse_cli_args([str(self.problem_path), "--battle_type=NotABattleType"])
 
     def test_cfg_team(self):
-        program_cfg, _, _, _ = parse_cli_args([str(self.problem_path), f"--config={self.configs_path / 'teams.toml'}"])
-        self.assertEqual(program_cfg.teams, [TeamInfo("team 1", Path(), Path()), TeamInfo("team 2", Path(), Path())])
+        _, cfg = parse_cli_args([str(self.problem_path), f"--config={self.configs_path / 'teams.toml'}"])
+        self.assertEqual(cfg, Config(
+            teams=[TeamInfo("team 1", Path(), Path()), TeamInfo("team 2", Path(), Path())]
+        ))
 
     def test_cfg_team_no_name(self):
         with self.assertRaises(ValueError):

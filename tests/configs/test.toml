@@ -1,10 +1,12 @@
+[execution]
+safe_build = true
+
 [match]
 points = 10
-safe_build = true
 battle_type = "averaged"
 
 [docker.generator]
 space = 10
 
-[averaged]
+[battle.averaged]
 iterations = 1

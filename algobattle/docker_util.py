@@ -18,6 +18,7 @@ from requests import Timeout
 from algobattle.util import Encodable, Role, TempDir, encode, decode, inherit_docs
 from algobattle.problem import Problem
 
+from pydantic import BaseModel
 
 logger = logging.getLogger("algobattle.docker")
 
@@ -25,8 +26,7 @@ logger = logging.getLogger("algobattle.docker")
 _client_var: DockerClient | None = None
 
 
-@dataclass(frozen=True)
-class RunParameters:
+class RunParameters(BaseModel):
     """The parameters determining how a container is run."""
 
     timeout: float | None = 30
@@ -34,8 +34,7 @@ class RunParameters:
     cpus: int = 1
 
 
-@dataclass(frozen=True)
-class DockerConfig:
+class DockerConfig(BaseModel):
     """Grouped config options that are relevant to the interaction with docker."""
 
     build_timeout: float | None = None
