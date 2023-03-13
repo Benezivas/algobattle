@@ -60,7 +60,8 @@ class Problem(CustomEncodable, ABC):
     """
 
     def __init_subclass__(cls, export: bool = True) -> None:
-        cls.export = export
+        if "export" not in cls.__dict__:
+            cls.export = export
         return super().__init_subclass__()
 
     @classmethod
@@ -191,10 +192,11 @@ class Problem(CustomEncodable, ABC):
             return None
 
 
-class ProblemModel(EncodableModel, Problem, ABC, export=False):
+class ProblemModel(EncodableModel, Problem, ABC):
     """A Problem that can easily be parsed to/from a json file."""
 
     filename: ClassVar[str] = "instance.json"
+    export: ClassVar[bool] = False
 
     @classmethod
     def io_schema(cls) -> str | None:
@@ -230,8 +232,10 @@ class SolutionModel(EncodableModel, Problem.Solution, ABC):
         fields = {"filename": {"exclude": True}}
 
 
-class DirectedGraph(ProblemModel, export=False):
+class DirectedGraph(ProblemModel):
     """Base class for problems on directed graphs."""
+
+    export: ClassVar[bool] = False
 
     num_vertices: int = Field(ge=0, le=2 ** 63 - 1)
     edges: list[tuple[int, int]] = Field(ge=0, le=2 ** 63 - 1)
@@ -245,8 +249,10 @@ class DirectedGraph(ProblemModel, export=False):
         )
 
 
-class UndirectedGraph(DirectedGraph, export=False):
+class UndirectedGraph(DirectedGraph):
     """Base class for problems on undirected graphs."""
+
+    export: ClassVar[bool] = False
 
     @inherit_docs
     def is_valid(self, size: int) -> bool:
