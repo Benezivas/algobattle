@@ -19,7 +19,7 @@ class Utiltests(unittest.TestCase):
     def setUpClass(cls) -> None:
         """Set up a problem, default config, fight handler and get a file name not existing on the file system."""
         cls.config = MatchConfig()
-        cls.problem_path = Path(testsproblem.__file__).parent
+        cls.problem_path = Path(testsproblem.__file__).parent / "problem.py"
         cls.rand_file_name = str(random.randint(0, 2 ** 80))
         while Path(cls.rand_file_name).exists():
             cls.rand_file_name = str(random.randint(0, 2 ** 80))
