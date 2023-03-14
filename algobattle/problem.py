@@ -238,14 +238,13 @@ class DirectedGraph(ProblemModel):
     export: ClassVar[bool] = False
 
     num_vertices: int = Field(ge=0, le=2 ** 63 - 1)
-    edges: list[tuple[int, int]] = Field(ge=0, le=2 ** 63 - 1)
+    edges: list[tuple[int, int]] = Field(ge=0, le=2 ** 63 - 1, unique_items=True)
 
     @inherit_docs
     def is_valid(self, size: int) -> bool:
         return (
             self.num_vertices <= size
             and all(u < self.num_vertices and v < self.num_vertices for u, v in self.edges)
-            and len(self.edges) == len(set(self.edges))
         )
 
 
