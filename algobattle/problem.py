@@ -55,7 +55,7 @@ class Problem(CustomEncodable, ABC):
 
     export: ClassVar[bool] = False
     """Wether the class should be exported.
-    
+
     Helps with uniquely specifying a class to be executed in a problem file. For more details view the documentation.
     """
 
@@ -166,7 +166,6 @@ class Problem(CustomEncodable, ABC):
             raise ValueError from e
         finally:
             sys.modules.pop("_problem")
-
 
     class Solution(CustomEncodable, ABC):
         """A proposed solution for an instance of this problem."""
