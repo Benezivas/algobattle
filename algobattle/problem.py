@@ -1,6 +1,7 @@
 """Abstract base class for problem classes used in concrete problem implementations."""
 from abc import ABC, abstractmethod
 import importlib.util
+from inspect import isclass
 import logging
 import sys
 from pathlib import Path
@@ -52,6 +53,17 @@ class Problem(CustomEncodable, ABC):
     with_solution: ClassVar[bool] = True
     """Whether an instance of this problem also comes with a solution."""
 
+    export: ClassVar[bool] = False
+    """Wether the class should be exported.
+
+    Helps with uniquely specifying a class to be executed in a problem file. For more details view the documentation.
+    """
+
+    def __init_subclass__(cls, export: bool = True) -> None:
+        if "export" not in cls.__dict__:
+            cls.export = export
+        return super().__init_subclass__()
+
     @classmethod
     @abstractmethod
     def decode(cls: type[Self], source_dir: Path, size: int, team: Role) -> Self:
@@ -94,8 +106,17 @@ class Problem(CustomEncodable, ABC):
         else:
             raise NotImplementedError
 
+    @classmethod
+    def io_schema(cls) -> str | None:
+        """Generates a schema specifying the I/O for this problem."""
+        return None
+
     @staticmethod
-    def import_from_path(path: Path) -> type["Problem"]:
+    def _is_importable(val: Any):
+        return isclass(val) and issubclass(val, Problem) and val.export
+
+    @classmethod
+    def import_from_path(cls, path: Path) -> type["Problem"]:
         """Try to import a Problem class object from a given path.
 
         Raises
@@ -103,27 +124,48 @@ class Problem(CustomEncodable, ABC):
         ValueError
             If the path doesn't point to a file containing a valid problem.
         """
-        if not (path / "__init__.py").is_file():
-            raise ValueError
+        if path.is_file():
+            pass
+        elif (path / "__init__.py").is_file():
+            path /= "__init__.py"
+        elif (path / "problem.py").is_file():
+            path /= "problem.py"
+        else:
+            raise ValueError(f"'{path}' does not point to a python file or a proper parent folder of one.")
 
         try:
-            spec = importlib.util.spec_from_file_location("problem", path / "__init__.py")
+            spec = importlib.util.spec_from_file_location("_problem", path)
             assert spec is not None
             assert spec.loader is not None
             problem_module = importlib.util.module_from_spec(spec)
             sys.modules[spec.name] = problem_module
             spec.loader.exec_module(problem_module)
-            problem_cls = problem_module.Problem
-            if not issubclass(problem_cls, Problem):
-                raise ValueError(f"Variable 'Problem' in {path / '__init__.py'} is not a Problem class.")
+        except Exception as e:
+            logger.critical(f"Importing the given problem failed with the following exception: {e}")
+            raise ValueError from e
+
+        try:
+            problem_classes = [val for val in vars(problem_module).values() if cls._is_importable(val)]
+            if len(problem_classes) == 0:
+                raise ValueError(f"'{path}' contains no Problem classes.")
+            elif len(problem_classes) == 1:
+                problem_cls = problem_classes[0]
+            elif hasattr(problem_classes, "Problem") and issubclass(getattr(problem_classes, "Problem"), Problem):
+                problem_cls: type[Problem] = problem_module.Problem
+            else:
+                raise ValueError(f"'{path}' contains {len(problem_classes)} different problem classes!")
+
             if issubclass(problem_cls, EncodableModel):
                 problem_cls.update_forward_refs(Solution=problem_cls.Solution)
             if issubclass(problem_cls.Solution, EncodableModel):
                 problem_cls.Solution.update_forward_refs()
             return problem_cls
+
         except Exception as e:
             logger.critical(f"Importing the given problem failed with the following exception: {e}")
             raise ValueError from e
+        finally:
+            sys.modules.pop("_problem")
 
     class Solution(CustomEncodable, ABC):
         """A proposed solution for an instance of this problem."""
@@ -143,11 +185,22 @@ class Problem(CustomEncodable, ABC):
             """Validates that the parsed solution is semantically correct."""
             return True
 
+        @classmethod
+        def io_schema(cls) -> str | None:
+            """Generates a schema specifying the I/O for this solution."""
+            return None
+
 
 class ProblemModel(EncodableModel, Problem, ABC):
     """A Problem that can easily be parsed to/from a json file."""
 
     filename: ClassVar[str] = "instance.json"
+    export: ClassVar[bool] = False
+
+    @classmethod
+    def io_schema(cls) -> str | None:
+        """Generates the default json schema specifying the I/O for this problem."""
+        return cls.schema_json(indent=4)
 
     class Config:
         """Pydantic config object to hide these fields in the json if someone redeclared them incorrectly."""
@@ -158,6 +211,7 @@ class ProblemModel(EncodableModel, Problem, ABC):
             "min_size": {"exclude": True},
             "has_solution": {"exclude": True},
             "Solution": {"exclude": True},
+            "export": {"exclude": True},
         }
 
 
@@ -165,6 +219,11 @@ class SolutionModel(EncodableModel, Problem.Solution, ABC):
     """A solution that can easily be parsed to/from a json file."""
 
     filename: ClassVar[str] = "solution.json"
+
+    @classmethod
+    def io_schema(cls) -> str | None:
+        """Generates the default json schema specifying the I/O for this solution."""
+        return cls.schema_json(indent=4)
 
     class Config:
         """Pydantic config object to hide these fields in the json if someone redeclared them incorrectly."""
@@ -175,20 +234,23 @@ class SolutionModel(EncodableModel, Problem.Solution, ABC):
 class DirectedGraph(ProblemModel):
     """Base class for problems on directed graphs."""
 
+    export: ClassVar[bool] = False
+
     num_vertices: int = Field(ge=0, le=2 ** 63 - 1)
-    edges: list[tuple[int, int]] = Field(ge=0, le=2 ** 63 - 1)
+    edges: list[tuple[int, int]] = Field(ge=0, le=2 ** 63 - 1, unique_items=True)
 
     @inherit_docs
     def is_valid(self, size: int) -> bool:
         return (
             self.num_vertices <= size
             and all(u < self.num_vertices and v < self.num_vertices for u, v in self.edges)
-            and len(self.edges) == len(set(self.edges))
         )
 
 
 class UndirectedGraph(DirectedGraph):
     """Base class for problems on undirected graphs."""
+
+    export: ClassVar[bool] = False
 
     @inherit_docs
     def is_valid(self, size: int) -> bool:
