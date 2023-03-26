@@ -2,7 +2,7 @@
 
 The battle class is a base class for specific type of battle that can be executed.
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from importlib.metadata import entry_points
 import logging
 from abc import abstractmethod, ABC
@@ -127,7 +127,7 @@ class Battle(ABC):
         solver_battle_output: Mapping[str, type[Encodable]] = {},
     ) -> CombinedResults:
         """Execute a single fight of a battle, running the generator and solver and handling any errors gracefully."""
-        self.notify()
+        cls.notify()
         gen_result = await generator.run(
             size=size,
             timeout=timeout_generator,
@@ -139,7 +139,7 @@ class Battle(ABC):
         if isinstance(gen_result.result, ProgramError):
             return CombinedResults(score=1, generator=gen_result.result, solver=None)
 
-        self.notify()
+        cls.notify()
         sol_result = await solver.run(
             gen_result.result.problem,
             size=size,
@@ -160,13 +160,11 @@ class Battle(ABC):
         return CombinedResults(score, gen_result, sol_result)
 
 
+@dataclass
 class Iterated(Battle):
     """Class that executes an iterated battle."""
 
-    def __init__(self) -> None:
-        self.running = False
-        self.results = []
-        super().__init__()
+    results: list[int] = field(default_factory=list)
 
     @inherit_docs
     class Config(Battle.Config):
@@ -194,49 +192,47 @@ class Iterated(Battle):
         During execution, this function updates the self.round_data dict,
         which automatically notifies all observers subscribed to this object.s
         """
-        self.running = True
+        results = []
         for _ in range(config.rounds):
             base_increment = 0
             alive = True
-            self.reached = 0
-            self.cap = config.iteration_cap
-            self.current = min_size
+            reached = 0
+            cap = config.iteration_cap
+            current = min_size
             while alive:
-                result = await self.run_programs(generator, solver, self.current)
+                result = await self.run_programs(generator, solver, current)
                 score = result.score
                 if score < config.approximation_ratio:
                     logger.info(f"Solver does not meet the required solution quality at instance size "
-                                f"{self.current}. ({score}/{config.approximation_ratio})")
+                                f"{current}. ({score}/{config.approximation_ratio})")
                     alive = False
 
                 if not alive and base_increment > 1:
                     # The step size increase was too aggressive, take it back and reset the base_increment
-                    logger.info(f"Setting the solution cap to {self.current}...")
-                    self.cap = self.current
-                    self.current -= base_increment ** config.exponent
+                    logger.info(f"Setting the solution cap to {current}...")
+                    cap = current
+                    current -= base_increment ** config.exponent
                     base_increment = 0
                     alive = True
-                elif self.current > self.reached and alive:
+                elif current > reached and alive:
                     # We solved an instance of bigger size than before
-                    self.reached = self.current
+                    reached = current
 
-                if self.current + 1 > self.cap:
+                if current + 1 > cap:
                     alive = False
                 else:
                     base_increment += 1
-                    self.current += base_increment ** config.exponent
+                    current += base_increment ** config.exponent
 
-                    if self.current >= self.cap:
+                    if current >= cap:
                         # We have failed at this value of n already, reset the step size!
-                        self.current -= base_increment ** config.exponent - 1
+                        current -= base_increment ** config.exponent - 1
                         base_increment = 1
-            self.results.append(self.reached)
-        self.running = False
+            results.append(reached)
 
     @inherit_docs
     def score(self) -> float:
-        results = self.results[::-1] if self.running else self.results
-        return 0 if len(results) == 0 else sum(results) / len(results)
+        return 0 if len(self.results) == 0 else sum(self.results) / len(self.results)
 
     @inherit_docs
     @staticmethod
@@ -245,11 +241,14 @@ class Iterated(Battle):
 
     @inherit_docs
     def display(self) -> str:
-        return f"current cap: {self.cap}\nsolved: {self.reached}\nattempting: {self.current}"
+        return ""
 
 
+@dataclass
 class Averaged(Battle):
     """Class that executes an averaged battle."""
+
+    results: list[float] = field(default_factory=list)
 
     @inherit_docs
     class Config(Battle.Config):
@@ -266,19 +265,17 @@ class Averaged(Battle):
             raise ValueError(
                 f"The problem specifies a minimum size of {min_size} but the chosen size is only {config.instance_size}!"
             )
-        self.iterations = config.iterations
-        self.scores: list[float] = []
-        for i in range(config.iterations):
-            self.curr_iter = i + 1
+        scores: list[float] = []
+        for _ in range(config.iterations):
             result = await self.run_programs(generator, solver, config.instance_size)
-            self.scores.append(result.score)
+            scores.append(result.score)
 
     @inherit_docs
     def score(self) -> float:
-        if len(self.scores) == 0:
+        if len(self.results) == 0:
             return 0
         else:
-            return sum(1 / x if x != 0 else 0 for x in self.scores) / len(self.scores)
+            return sum(1 / x if x != 0 else 0 for x in self.results) / len(self.results)
 
     @inherit_docs
     @staticmethod
@@ -287,4 +284,4 @@ class Averaged(Battle):
 
     @inherit_docs
     def display(self) -> str:
-        return (f"iteration: {self.curr_iter}/{self.iterations}\nscores: {self.scores}")
+        return ""
