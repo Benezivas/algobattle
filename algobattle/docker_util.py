@@ -342,7 +342,11 @@ class Image:
             print(f"B current time: {round(default_timer() - start_time, 2)}\n")
             elapsed_time = round(default_timer() - start_time, 2)
             if response["StatusCode"] != 0:
-                raise ExecutionError(runtime=elapsed_time, exit_code=response["StatusCode"], error_message=container.logs().decode())
+                raise ExecutionError(
+                    runtime=elapsed_time,
+                    exit_code=response["StatusCode"],
+                    error_message=container.logs().decode(),
+                )
         except (Timeout, ConnectionError) as e:
             print(f"C current time: {round(default_timer() - start_time, 2)}\n")
             container.kill()

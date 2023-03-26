@@ -69,7 +69,12 @@ class Match(Subject):
         async with limiter:
             task_status.started()
             try:
-                await battle.run_battle(matchup.generator.generator, matchup.solver.solver, self.battle_config, self.problem.min_size)
+                await battle.run_battle(
+                    matchup.generator.generator,
+                    matchup.solver.solver,
+                    self.battle_config,
+                    self.problem.min_size,
+                )
             except Exception as e:
                 logger.critical(f"Unhandeled error during execution of battle!\n{e}")
 
