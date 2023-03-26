@@ -9,7 +9,7 @@ import json
 from dataclasses import dataclass
 
 from docker import DockerClient
-from docker.errors import APIError, BuildError, DockerException, ImageNotFound
+from docker.errors import APIError, BuildError as DockerBuildError, DockerException, ImageNotFound
 from docker.models.images import Image as DockerImage
 from docker.models.containers import Container as DockerContainer
 from docker.types import Mount, LogConfig, Ulimit
@@ -65,34 +65,42 @@ def get_os_type() -> Literal["linux", "windows"]:
     return client().info()["OSType"]
 
 
-class DockerError(Exception):
-    """Error type for any issue during the execution of a docker command.
+class BuildError(Exception):
+    """Indicates that the build process could not be completed successfully."""
 
-    Parent class of all exceptions raised by functions in the docker module.
-    """
 
-    pass
+class ProgramError(Exception):
+    """Parent class for exceptions raised during the execution of a program."""
 
-class ExecutionError(DockerError):
-    """Exception raised when the execution of a container fails."""
+    def __init__(self, message: str, *args: object) -> None:
+        self.message = message
+        super().__init__(*args)
 
-    def __init__(self, *args: object, runtime: float, exit_code: int, error_message: str) -> None:
+    def __str__(self) -> str:
+        return f"{self.__class__.__name__}: {self.message}"
+
+
+class ExecutionError(ProgramError):
+    """Indicates that the program could not be executed successfully."""
+
+    def __init__(self, message: str, runtime: float, *args: object) -> None:
         self.runtime = runtime
-        self.exit_code = exit_code
-        self.error_message = error_message
-        super().__init__(runtime, *args)
+        super().__init__(message, *args)
 
 
-class EncodingError(DockerError):
-    """Indicates that the given data couldn't be encoded or decoded properly."""
-
-    pass
+class ExecutionTimeout(ExecutionError):
+    """Indicates that the program ran into the timeout."""
 
 
-class SemanticsError(DockerError):
-    """Indicates that the parsed data is semantically incorrect."""
+class EncodingError(ProgramError):
+    """Indicates that the given data could not be encoded or decoded properly."""
 
-    pass
+    def __init__(self, message: str = "", *args: object) -> None:
+        super().__init__(message, *args)
+
+
+class DockerError(ProgramError, BuildError):
+    """Indicates that an issue with the docker daemon occured."""
 
 
 @dataclass
@@ -115,7 +123,7 @@ class ArchivedImage:
             self.path.unlink()
         except APIError as e:
             logger.warning(f"Docker APIError thrown while restoring '{self.name}'")
-            raise DockerError from e
+            raise DockerError(f"Docker APIError thrown while restoring '{self.name}'") from e
         return Image(self.name, self.id, self.description, path=self.path)
 
 
@@ -173,11 +181,11 @@ class Image:
         """
         if not path.exists():
             logger.warning(f"Error when building {image_name}: '{path}' does not exist on the file system.")
-            raise DockerError
+            raise RuntimeError
         if path.is_file():
             if dockerfile is not None:
                 logger.warning(f"Error when building {image_name}: '{path}' refers to a file and 'dockerfile' is specified.")
-                raise DockerError
+                raise RuntimeError
             dockerfile = path.name
             path = path.parent
         logger.debug(f"Building docker image with options: {path = !s}, {image_name = }, {timeout = }")
@@ -203,13 +211,13 @@ class Image:
 
         except Timeout as e:
             logger.warning(f"Build process for '{path}' ran into a timeout!")
-            raise DockerError from e
-        except BuildError as e:
+            raise BuildError(f"Build process for '{path}' ran into a timeout!") from e
+        except DockerBuildError as e:
             logger.warning(f"Building '{path}' did not complete successfully:\n{e.msg}")
-            raise DockerError from e
+            raise BuildError(f"Building '{path}' did not complete successfully:\n{e.msg}") from e
         except APIError as e:
             logger.warning(f"Docker APIError thrown while building '{path}':\n{e}")
-            raise DockerError from e
+            raise DockerError(f"Docker APIError thrown while building '{path}':\n{e}") from e
 
         return cls(image_name, cast(str, image.id), description if description is not None else image_name, path=path)
 
@@ -285,10 +293,10 @@ class Image:
 
         except ImageNotFound as e:
             logger.warning(f"Image {self.name} (id={self.id}) does not exist")
-            raise DockerError from e
+            raise RuntimeError(f"Image {self.name} (id={self.id}) does not exist") from e
         except APIError as e:
             logger.warning(f"Docker API Error thrown while running {self.name}")
-            raise DockerError from e
+            raise DockerError(str(e)) from e
         finally:
             if container is not None:
                 try:
@@ -338,19 +346,17 @@ class Image:
         try:
             response = container.wait(timeout=timeout)
             elapsed_time = round(default_timer() - start_time, 2)
-            if response["StatusCode"] != 0:
-                raise ExecutionError(
-                    runtime=elapsed_time,
-                    exit_code=response["StatusCode"],
-                    error_message=container.logs().decode(),
-                )
+            if response["StatusCode"] == 0:
+                return elapsed_time
+            else:
+                message = f"Program crashed with exit code {response['StatusCode']} and error message:\n{container.logs.decode()}"
+                raise ExecutionError(message, elapsed_time)
         except (Timeout, ConnectionError) as e:
             container.kill()
             elapsed_time = round(default_timer() - start_time, 2)
-            if len(e.args) == 0 or isinstance(e.args[0], Timeout):
+            if len(e.args) != 1 or not isinstance(e.args[0], Timeout):
                 raise
-            logger.warning(f"{self.description} exceeded time limit!")
-        return elapsed_time
+            raise ExecutionTimeout(f"{self.description} exceeded the time limit", elapsed_time)
 
 
 @dataclass
@@ -373,14 +379,14 @@ class GeneratorResult(ProgramResult):
         problem: Problem
         solution: Problem.Solution | None = None
 
-    result: Data | DockerError
+    result: Data | ProgramError
 
 
 @dataclass
 class SolverResult(ProgramResult):
     """Result of a single solver execution."""
 
-    result: Problem.Solution | DockerError
+    result: Problem.Solution | ProgramError
 
 
 class Program(ABC):
@@ -479,14 +485,14 @@ class Program(ABC):
                     input_instance.encode(input / "instance", size, self.role)
                 except Exception as e:
                     logger.critical("Problem instance couldn't be encoded into files!")
-                    return result_class(DockerError(), 0, size, run_params)
+                    return result_class(EncodingError("Problem instance couldn't be encoded."), 0, size, run_params)
             if battle_input:
                 (input / "battle_data").mkdir()
                 try:
                     encode(battle_input, input / "battle_data", size, self.role)
                 except Exception as e:
                     logger.critical("Battle data couldn't be encoded into files!")
-                    return result_class(DockerError(), 0, size, run_params)
+                    return result_class(EncodingError("Battle data couldn't be encoded."), 0, size, run_params)
             with open(input / "info.json", "w+") as f:
                 json.dump({
                     "size": size,
@@ -505,29 +511,22 @@ class Program(ABC):
 
             try:
                 runtime = await self.image.run(input, output, timeout=timeout, memory=space, cpus=cpus)
-            except ExecutionError as e:
-                logger.warning(f"{self.role.capitalize()} of team {self.team_name} crashed!")
-                logger.info(f"After {e.runtime:.2f}s, with exit code {e.exit_code} and error message:\n{e.error_message}")
-                return result_class(e, 0, size, run_params)
-            except DockerError as e:
-                logger.warning(f"{self.role.capitalize()} of team {self.team_name} couldn't be executed successfully!")
+            except ProgramError as e:
                 return result_class(e, 0, size, run_params)
 
             try:
                 output_data = self.data_type.decode(output / self.data_role, size, self.role)
             except Exception as e:
-                logger.warning(
-                    f"The {self.data_role} output of team {self.team_name}'s {self.role} can not be decoded properly!"
-                )
-                return result_class(EncodingError(), 0, size, run_params)
+                msg = f"The {self.data_role} output of team {self.team_name}'s {self.role} can not be decoded properly!"
+                logger.warning(msg)
+                return result_class(EncodingError(msg), 0, size, run_params)
             if self.role == "generator" and isinstance(output_data, Problem) and output_data.with_solution:
                 try:
                     generator_solution = output_data.Solution.decode(output / "solution", size, self.role)
                 except Exception as e:
-                    logger.warning(
-                        f"The solution output of team {self.team_name}'s generator can not be decoded properly!"
-                    )
-                    return result_class(EncodingError(), 0, size, run_params)
+                    msg = f"The solution output of team {self.team_name}'s generator can not be decoded properly!"
+                    logger.warning(msg)
+                    return result_class(EncodingError(msg), 0, size, run_params)
             else:
                 generator_solution = None
 
@@ -544,16 +543,16 @@ class Program(ABC):
             is_valid = output_data.is_valid(input_instance, size)
 
         if not is_valid:
-            logger.warning(
-                f"{self.role.capitalize()} of team {self.team_name} output an invalid {self.data_role}!"
-            )
-            return result_class(SemanticsError(), runtime, size, run_params, decoded_battle_output)
+            msg = f"{self.role.capitalize()} of team {self.team_name} output an invalid {self.data_role}!"
+            logger.warning(msg)
+            return result_class(EncodingError(msg), runtime, size, run_params, decoded_battle_output)
 
         if generator_solution is not None:
             is_valid = generator_solution.is_valid(output_data, size)
             if not is_valid:
-                logger.warning(f"The generator of team {self.team_name} output an invalid solution!")
-                return result_class(DockerError(), runtime, size, run_params, decoded_battle_output)
+                msg = f"The generator of team {self.team_name} output an invalid solution!"
+                logger.warning(msg)
+                return result_class(EncodingError(msg), runtime, size, run_params, decoded_battle_output)
 
         logger.info(f"{self.role.capitalize()} of team {self.team_name} output a valid {self.data_role}.")
         if isinstance(output_data, Problem):

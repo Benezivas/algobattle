@@ -19,7 +19,7 @@ from typing import (
 
 from pydantic import BaseModel, Field, BaseConfig
 
-from algobattle.docker_util import DockerError, Generator, Solver, GeneratorResult, SolverResult
+from algobattle.docker_util import ProgramError, Generator, Solver, GeneratorResult, SolverResult
 from algobattle.ui import Observer, Subject
 from algobattle.util import Encodable, Role, inherit_docs
 
@@ -35,8 +35,8 @@ class CombinedResults:
     """The result of one execution of the generator and the solver with the generated instance."""
 
     score: float
-    generator: GeneratorResult | DockerError
-    solver: SolverResult | DockerError | None
+    generator: GeneratorResult | ProgramError
+    solver: SolverResult | ProgramError | None
 
 
 class Battle(Subject, ABC):
@@ -137,7 +137,7 @@ class Battle(Subject, ABC):
             battle_input=generator_battle_input,
             battle_output=generator_battle_output,
         )
-        if isinstance(gen_result.result, DockerError):
+        if isinstance(gen_result.result, ProgramError):
             return CombinedResults(score=1, generator=gen_result.result, solver=None)
 
         self.notify()
@@ -150,7 +150,7 @@ class Battle(Subject, ABC):
             battle_input=solver_battle_input,
             battle_output=solver_battle_output,
         )
-        if isinstance(sol_result.result, DockerError):
+        if isinstance(sol_result.result, ProgramError):
             return CombinedResults(score=0, generator=gen_result, solver=sol_result)
 
         score = gen_result.result.problem.calculate_score(
