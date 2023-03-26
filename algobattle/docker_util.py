@@ -284,7 +284,11 @@ class Image:
             try:
                 response = container.wait(timeout=timeout)
                 if response["StatusCode"] != 0:
-                    raise ExecutionError(runtime=elapsed_time, exit_code=response["StatusCode"], error_message=container.logs().decode())
+                    raise ExecutionError(
+                        runtime=elapsed_time,
+                        exit_code=response["StatusCode"],
+                        error_message=container.logs().decode(),
+                    )
             except (Timeout, ConnectionError) as e:
                 container.kill()
                 if len(e.args) == 0 or isinstance(e.args[0], Timeout):
@@ -603,8 +607,9 @@ class Solver(Program):
 
 class AdvancedRunArgs(BaseModel):
     """Advanced docker run options.
-    
-    Contains all options exposed on the python docker run api, except `device_requests` and those set by :meth:`Image.run` itself.
+
+    Contains all options exposed on the python docker run api, except `device_requests`
+    and those set by :meth:`Image.run` itself.
     """
 
     class BlockIOWeight(TypedDict):
@@ -635,7 +640,7 @@ class AdvancedRunArgs(BaseModel):
     command: str | list[str] | None = None
     auto_remove: bool | None = None
     blkio_weight_device: list[BlockIOWeight] | None = None
-    blkio_weight: int | None =  Field(default=None, ge=10, le=1000)
+    blkio_weight: int | None = Field(default=None, ge=10, le=1000)
     cap_add: list[str] | None = None
     cap_drop: list[str] | None = None
     cgroup_parent: str | None = None
@@ -692,7 +697,7 @@ class AdvancedRunArgs(BaseModel):
     read_only: bool | None = None
     restart_policy: dict[Any, Any] | None = None
     runtime: str | None = None
-    security_opt: list[str]   | None = None
+    security_opt: list[str] | None = None
     shm_size: str | int | None = None
     stdin_open: bool | None = None
     stdout: bool | None = None
@@ -726,7 +731,7 @@ class AdvancedRunArgs(BaseModel):
 
 class AdvancedBuildArgs(BaseModel):
     """Advanced docker build options.
-    
+
     Contains all options exposed on the python docker build api, except those set by :meth:`Image.build` itself.
     """
 
@@ -741,7 +746,7 @@ class AdvancedBuildArgs(BaseModel):
     rm: bool = True
     encoding: str | None = None
     pull: bool | None = None
-    forcerm: bool  = True
+    forcerm: bool = True
     buildargs: dict[Any, Any] | None = None
     container_limits: ContainerLimits | None = None
     shmsize: int | None = None
