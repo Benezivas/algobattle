@@ -20,7 +20,7 @@ from typing import (
 from pydantic import BaseModel, Field, BaseConfig
 
 from algobattle.docker_util import DockerError, Generator, Solver, GeneratorResult, SolverResult
-from algobattle.ui import Subject
+from algobattle.ui import Observer, Subject
 from algobattle.util import Encodable, Role, inherit_docs
 
 logger = logging.getLogger("algobattle.battle")
@@ -165,6 +165,11 @@ class Battle(Subject, ABC):
 class Iterated(Battle):
     """Class that executes an iterated battle."""
 
+    def __init__(self, observer: Observer | None = None) -> None:
+        self.running = False
+        self.results = []
+        super().__init__(observer)
+
     @inherit_docs
     class Config(Battle.Config):
         rounds: int = Field(default=5, help="Repeats the battle and averages the results.")
@@ -192,7 +197,6 @@ class Iterated(Battle):
         which automatically notifies all observers subscribed to this object.s
         """
         self.running = True
-        self.results = []
         for _ in range(config.rounds):
             base_increment = 0
             alive = True
