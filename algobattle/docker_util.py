@@ -394,24 +394,19 @@ class Program(ABC):
     """A higher level interface for a team's programs."""
 
     role: ClassVar[Role]
-    data_role: Literal["instance", "solution"]
-
-    def __init_subclass__(cls) -> None:
-        cls.data_role = "instance" if cls.role == "generator" else "solution"
-        return super().__init_subclass__()
 
     def __init__(
         self,
         image: Image,
         config: RunParameters,
         team_name: str,
-        data_type: type[Problem] | type[Problem.Solution]
+        problem_class: type[Problem]
     ) -> None:
         # we can't take a ref to the Team object here since it won't be created til after the Programs
         self.image = image
         self.config = config
         self.team_name = team_name
-        self.data_type = data_type
+        self.problem_class = problem_class
         super().__init__()
 
     @classmethod
@@ -419,7 +414,7 @@ class Program(ABC):
         cls,
         image: Path | Image | ArchivedImage,
         team_name: str,
-        problem_type: type[Problem],
+        problem_class: type[Problem],
         config: RunParameters,
         timeout: float | None = None,
     ) -> Self:
@@ -434,11 +429,7 @@ class Program(ABC):
         elif isinstance(image, ArchivedImage):
             image = image.restore()
 
-        if cls.role == "generator":
-            data_type = problem_type
-        else:
-            data_type = problem_type.Solution
-        return cls(image, config, team_name, data_type)
+        return cls(image, config, team_name, problem_class)
 
     def _setup_folders(self, input: Path, output: Path, size: int, instance: Problem | None) -> None:
         raise NotImplementedError
@@ -522,7 +513,6 @@ class Program(ABC):
             else:
                 decoded_battle_output = None
 
-        logger.info(f"{self.role.capitalize()} of team {self.team_name} output a valid {self.data_role}.")
         return result_class(output_data, runtime, size, run_params, decoded_battle_output)      # type: ignore
 
     @inherit_docs
@@ -539,28 +529,27 @@ class Generator(Program):
     """A higher level interface for a team's generator."""
 
     role: ClassVar[Role] = "generator"
-    data_type: type[Problem]
 
     def _setup_folders(self, input: Path, output: Path, size: int, instance: Problem | None) -> None:
         assert instance is None
         with open(input / "size", "w+") as f:
             f.write(str(size))
         (output / "instance").mkdir()
-        if self.data_type.with_solution:
+        if self.problem_class.with_solution:
             (output / "solution").mkdir()
 
     def _parse_output(self, output: Path, size: int, instance: Problem | None) -> GeneratorResult.Data:
         assert instance is None
         try:
-            problem = self.data_type.decode(output / self.data_role, size, self.role)
+            problem = self.problem_class.decode(output / "instance", size, self.role)
         except EncodingError:
             raise
         except Exception as e:
-            msg = f"The {self.data_role} output of team {self.team_name}'s {self.role} can not be decoded properly!\n{e}"
+            msg = f"The output of team {self.team_name}'s {self.role} can not be decoded properly!\n{e}"
             logger.warning(msg)
             raise EncodingError(msg) from e
         if not problem.is_valid(size):
-            msg = f"{self.role.capitalize()} of team {self.team_name} output an invalid {self.data_role}!"
+            msg = f"{self.role.capitalize()} of team {self.team_name} output an invalid instance!"
             logger.warning(msg)
             raise EncodingError(msg)
 
@@ -607,7 +596,6 @@ class Solver(Program):
     """A higher level interface for a team's solver."""
 
     role: ClassVar[Role] = "solver"
-    data_type: type[Problem.Solution]
 
     def _setup_folders(self, input: Path, output: Path, size: int, instance: Problem | None) -> None:
         assert instance is not None
@@ -618,15 +606,15 @@ class Solver(Program):
     def _parse_output(self, output: Path, size: int, instance: Problem | None) -> Problem.Solution:
         assert instance is not None
         try:
-            solution = self.data_type.decode(output / self.data_role, size, self.role)
+            solution = self.problem_class.Solution.decode(output / "solution", size, self.role)
         except EncodingError:
             raise
         except Exception as e:
-            msg = f"The {self.data_role} output of team {self.team_name}'s {self.role} can not be decoded properly!\n{e}"
+            msg = f"The output of team {self.team_name}'s {self.role} can not be decoded properly!\n{e}"
             logger.warning(msg)
             raise EncodingError(msg) from e
         if not solution.is_valid(instance, size):
-            msg = f"{self.role.capitalize()} of team {self.team_name} output an invalid {self.data_role}!"
+            msg = f"{self.role.capitalize()} of team {self.team_name} output an invalid solution!"
             logger.warning(msg)
             raise EncodingError(msg)
         return solution
