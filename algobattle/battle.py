@@ -250,8 +250,6 @@ class Iterated(Battle):
 class Averaged(Battle):
     """Class that executes an averaged battle."""
 
-    results: list[float] = field(default_factory=list)
-
     @inherit_docs
     class Config(Battle.Config):
         instance_size: int = Field(default=10, help="Instance size that will be fought at.")
@@ -267,17 +265,15 @@ class Averaged(Battle):
             raise ValueError(
                 f"The problem specifies a minimum size of {min_size} but the chosen size is only {config.instance_size}!"
             )
-        scores: list[float] = []
         for _ in range(config.iterations):
-            result = await self.run_fight(generator, solver, config.instance_size)
-            scores.append(result.score)
+            await self.run_fight(generator, solver, config.instance_size)
 
     @inherit_docs
     def score(self) -> float:
-        if len(self.results) == 0:
+        if len(self.fight_results) == 0:
             return 0
         else:
-            return sum(1 / x if x != 0 else 0 for x in self.results) / len(self.results)
+            return sum(f.score for f in self.fight_results) / len(self.fight_results)
 
     @inherit_docs
     @staticmethod
