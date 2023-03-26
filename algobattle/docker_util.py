@@ -393,7 +393,7 @@ class SolverResult(ProgramResult):
 class Program(ABC):
     """A higher level interface for a team's programs."""
 
-    role: Role
+    role: ClassVar[Role]
     data_role: Literal["instance", "solution"]
 
     def __init_subclass__(cls) -> None:
@@ -440,6 +440,12 @@ class Program(ABC):
             data_type = problem_type.Solution
         return cls(image, config, team_name, data_type)
 
+    def _setup_folders(self, input: Path, output: Path, size: int, instance: Problem | None) -> None:
+        raise NotImplementedError
+
+    def _parse_output(self, output: Path, size: int, instance: Problem | None) -> GeneratorResult.Data | Problem.Solution:
+        raise NotImplementedError
+
     async def _run(
         self,
         size: int,
@@ -476,24 +482,10 @@ class Program(ABC):
         result_class = GeneratorResult if self.role == "generator" else SolverResult
 
         with TempDir() as input, TempDir() as output:
-            if self.role == "generator":
-                with open(input / "size", "w+") as f:
-                    f.write(str(size))
-            else:
-                assert input_instance is not None
-                (input / "instance").mkdir()
-                try:
-                    input_instance.encode(input / "instance", size, self.role)
-                except Exception as e:
-                    logger.critical("Problem instance couldn't be encoded into files!")
-                    return result_class(EncodingError("Problem instance couldn't be encoded."), 0, size, run_params)
-            if battle_input:
-                (input / "battle_data").mkdir()
-                try:
-                    encode(battle_input, input / "battle_data", size, self.role)
-                except Exception as e:
-                    logger.critical("Battle data couldn't be encoded into files!")
-                    return result_class(EncodingError("Battle data couldn't be encoded."), 0, size, run_params)
+            try:
+                self._setup_folders(input, output, size, input_instance)
+            except ProgramError as e:
+                return result_class(e, 0, size, run_params)
             with open(input / "info.json", "w+") as f:
                 json.dump({
                     "size": size,
@@ -503,63 +495,35 @@ class Program(ABC):
                     "battle_input": {name: obj.__class__.__name__ for name, obj in battle_input.items()},
                     "battle_output": {name: cls.__name__ for name, cls in battle_output.items()},
                 }, f)
-
-            (output / self.data_role).mkdir()
-            if issubclass(self.data_type, Problem) and self.data_type.with_solution:
-                (output / "solution").mkdir()
+            if battle_input:
+                (input / "battle_data").mkdir()
+                try:
+                    encode(battle_input, input / "battle_data", size, self.role)
+                except Exception as e:
+                    logger.critical("Battle data couldn't be encoded into files!")
+                    return result_class(EncodingError("Battle data couldn't be encoded:\n{e}"), 0, size, run_params)
             if battle_output:
                 (output / "battle_data").mkdir()
 
             try:
                 runtime = await self.image.run(input, output, timeout=timeout, memory=space, cpus=cpus)
+            except ExecutionError as e:
+                return result_class(e, e.runtime, size, run_params)
             except ProgramError as e:
                 return result_class(e, 0, size, run_params)
 
             try:
-                output_data = self.data_type.decode(output / self.data_role, size, self.role)
-            except Exception as e:
-                msg = f"The {self.data_role} output of team {self.team_name}'s {self.role} can not be decoded properly!"
-                logger.warning(msg)
-                return result_class(EncodingError(msg), 0, size, run_params)
-            if self.role == "generator" and isinstance(output_data, Problem) and output_data.with_solution:
-                try:
-                    generator_solution = output_data.Solution.decode(output / "solution", size, self.role)
-                except Exception as e:
-                    msg = f"The solution output of team {self.team_name}'s generator can not be decoded properly!"
-                    logger.warning(msg)
-                    return result_class(EncodingError(msg), 0, size, run_params)
-            else:
-                generator_solution = None
+                output_data = self._parse_output(output, size, input_instance)
+            except ProgramError as e:
+                return result_class(e, runtime, size, run_params)
 
             if battle_output:
                 decoded_battle_output = decode(battle_output, output / "battle_data", size, self.role)
             else:
                 decoded_battle_output = None
 
-        if self.role == "generator":
-            assert isinstance(output_data, Problem)
-            is_valid = output_data.is_valid(size)
-        else:
-            assert isinstance(output_data, Problem.Solution)
-            is_valid = output_data.is_valid(input_instance, size)
-
-        if not is_valid:
-            msg = f"{self.role.capitalize()} of team {self.team_name} output an invalid {self.data_role}!"
-            logger.warning(msg)
-            return result_class(EncodingError(msg), runtime, size, run_params, decoded_battle_output)
-
-        if generator_solution is not None:
-            is_valid = generator_solution.is_valid(output_data, size)
-            if not is_valid:
-                msg = f"The generator of team {self.team_name} output an invalid solution!"
-                logger.warning(msg)
-                return result_class(EncodingError(msg), runtime, size, run_params, decoded_battle_output)
-
         logger.info(f"{self.role.capitalize()} of team {self.team_name} output a valid {self.data_role}.")
-        if isinstance(output_data, Problem):
-            return GeneratorResult(GeneratorResult.Data(output_data, generator_solution), runtime, size, run_params, decoded_battle_output)
-        else:
-            return SolverResult(output_data, runtime, size, run_params, decoded_battle_output)
+        return result_class(output_data, runtime, size, run_params, decoded_battle_output)      # type: ignore
 
     @inherit_docs
     def remove(self) -> None:
@@ -574,7 +538,48 @@ class Program(ABC):
 class Generator(Program):
     """A higher level interface for a team's generator."""
 
-    role = "generator"
+    role: ClassVar[Role] = "generator"
+    data_type: type[Problem]
+
+    def _setup_folders(self, input: Path, output: Path, size: int, instance: Problem | None) -> None:
+        assert instance is None
+        with open(input / "size", "w+") as f:
+            f.write(str(size))
+        (output / "instance").mkdir()
+        if self.data_type.with_solution:
+            (output / "solution").mkdir()
+
+    def _parse_output(self, output: Path, size: int, instance: Problem | None) -> GeneratorResult.Data:
+        assert instance is None
+        try:
+            problem = self.data_type.decode(output / self.data_role, size, self.role)
+        except EncodingError:
+            raise
+        except Exception as e:
+            msg = f"The {self.data_role} output of team {self.team_name}'s {self.role} can not be decoded properly!\n{e}"
+            logger.warning(msg)
+            raise EncodingError(msg) from e
+        if not problem.is_valid(size):
+            msg = f"{self.role.capitalize()} of team {self.team_name} output an invalid {self.data_role}!"
+            logger.warning(msg)
+            raise EncodingError(msg)
+
+        if problem.with_solution:
+            try:
+                solution = problem.Solution.decode(output / "solution", size, self.role)
+            except EncodingError:
+                raise
+            except Exception as e:
+                msg = f"The solution output of team {self.team_name}'s generator can not be decoded properly!\n{e}"
+                logger.warning(msg)
+                raise EncodingError(msg) from e
+            if not solution.is_valid(problem, size):
+                msg = f"The generator of team {self.team_name} output an invalid solution!"
+                logger.warning(msg)
+                raise EncodingError(msg)
+        else:
+            solution = None
+        return GeneratorResult.Data(problem, solution)
 
     async def run(
         self,
@@ -601,7 +606,30 @@ class Generator(Program):
 class Solver(Program):
     """A higher level interface for a team's solver."""
 
-    role = "solver"
+    role: ClassVar[Role] = "solver"
+    data_type: type[Problem.Solution]
+
+    def _setup_folders(self, input: Path, output: Path, size: int, instance: Problem | None) -> None:
+        assert instance is not None
+        (input / "instance").mkdir()
+        instance.encode(input / "instance", size, self.role)
+        (output / "solution").mkdir()
+
+    def _parse_output(self, output: Path, size: int, instance: Problem | None) -> Problem.Solution:
+        assert instance is not None
+        try:
+            solution = self.data_type.decode(output / self.data_role, size, self.role)
+        except EncodingError:
+            raise
+        except Exception as e:
+            msg = f"The {self.data_role} output of team {self.team_name}'s {self.role} can not be decoded properly!\n{e}"
+            logger.warning(msg)
+            raise EncodingError(msg) from e
+        if not solution.is_valid(instance, size):
+            msg = f"{self.role.capitalize()} of team {self.team_name} output an invalid {self.data_role}!"
+            logger.warning(msg)
+            raise EncodingError(msg)
+        return solution
 
     async def run(
         self,
