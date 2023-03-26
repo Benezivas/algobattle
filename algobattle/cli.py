@@ -211,6 +211,8 @@ def parse_cli_args(args: list[str]) -> tuple[Path, Config]:
     config.include_cli(parsed)
     if config.docker.advanced_run_params is not None:
         Image.run_kwargs = config.docker.advanced_run_params.to_docker_args()
+    if config.docker.advanced_build_params is not None:
+        Image.run_kwargs = config.docker.advanced_build_params.to_docker_args()
 
     if not config.teams:
         config.teams.append(TeamInfo(name="team_0", generator=problem / "generator", solver=problem / "solver"))

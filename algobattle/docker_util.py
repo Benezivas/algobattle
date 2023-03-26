@@ -42,6 +42,7 @@ class DockerConfig(BaseModel):
     generator: RunParameters = RunParameters()
     solver: RunParameters = RunParameters()
     advanced_run_params: "AdvancedRunArgs | None" = None
+    advanced_build_params: "AdvancedBuildArgs | None" = None
 
 
 def client() -> DockerClient:
@@ -133,6 +134,12 @@ class Image:
     run_kwargs: ClassVar[dict[str, Any]] = {
         "network_mode": "none",
     }
+    build_kwargs: ClassVar[dict[str, Any]] = {
+        "rm": True,
+        "forcerm": True,
+        "quiet": True,
+        "network_mode": "host",
+    }
 
     @classmethod
     def build(
@@ -184,11 +191,8 @@ class Image:
                     path=str(path),
                     tag=image_name,
                     timeout=timeout,
-                    rm=True,
-                    forcerm=True,
-                    quiet=True,
-                    network_mode="host",
                     dockerfile=dockerfile,
+                    **cls.build_kwargs,
                 ),
             )
             if old_image is not None:
@@ -719,6 +723,42 @@ class AdvancedRunArgs(BaseModel):
         if "ulimits" in kwargs:
             kwargs["ulimits"] = Ulimit(**kwargs["ulimits"])
         return kwargs
+
+
+class AdvancedBuildArgs(BaseModel):
+    """Advanced docker build options.
+    
+    Contains all options exposed on the python docker build api, except those set by :meth:`Image.build` itself.
+    """
+
+    class ContainerLimits(TypedDict):
+        memory: int
+        memswap: int
+        cpushares: int
+        cpusetcpus: str
+
+    quiet: bool = True
+    nocache: bool | None = None
+    rm: bool = True
+    encoding: str | None = None
+    pull: bool | None = None
+    forcerm: bool  = True
+    buildargs: dict[Any, Any] | None = None
+    container_limits: ContainerLimits | None = None
+    shmsize: int | None = None
+    labels: dict[Any, Any] | None = None
+    cache_from: list[Any] | None = None
+    target: str | None = None
+    network_mode: str = "host"
+    squash: bool | None = None
+    extra_hosts: dict[Any, Any] | None = None
+    platform: str | None = None
+    isolation: str | None = None
+    use_config_proxy: bool | None = None
+
+    def to_docker_args(self) -> dict[str, Any]:
+        """Transforms the object into :meth:`client.images.build` kwargs."""
+        return self.dict(exclude_none=True)
 
 
 DockerConfig.update_forward_refs()
