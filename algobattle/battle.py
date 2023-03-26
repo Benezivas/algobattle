@@ -167,6 +167,7 @@ class Iterated(Battle):
 
     @inherit_docs
     class Config(Battle.Config):
+        rounds: int = Field(default=5, help="Repeats the battle and averages the results.")
         iteration_cap: int = Field(default=50_000, help="Maximum instance size that will be tried.")
         exponent: int = Field(default=2, help="Determines how quickly the instance size grows.")
         approximation_ratio: float = Field(default=1, help="Approximation ratio that a solver needs to achieve to pass.")
@@ -190,45 +191,50 @@ class Iterated(Battle):
         During execution, this function updates the self.round_data dict,
         which automatically notifies all observers subscribed to this object.s
         """
-        base_increment = 0
-        alive = True
-        self.reached = 0
-        self.cap = config.iteration_cap
-        self.current = min_size
+        self.running = True
+        self.results = []
+        for _ in range(config.rounds):
+            base_increment = 0
+            alive = True
+            self.reached = 0
+            self.cap = config.iteration_cap
+            self.current = min_size
+            while alive:
+                result = self.run_programs(generator, solver, self.current)
+                score = result.score
+                if score < config.approximation_ratio:
+                    logger.info(f"Solver does not meet the required solution quality at instance size "
+                                f"{self.current}. ({score}/{config.approximation_ratio})")
+                    alive = False
 
-        while alive:
-            result = self.run_programs(generator, solver, self.current)
-            score = result.score
-            if score < config.approximation_ratio:
-                logger.info(f"Solver does not meet the required solution quality at instance size "
-                            f"{self.current}. ({score}/{config.approximation_ratio})")
-                alive = False
+                if not alive and base_increment > 1:
+                    # The step size increase was too aggressive, take it back and reset the base_increment
+                    logger.info(f"Setting the solution cap to {self.current}...")
+                    self.cap = self.current
+                    self.current -= base_increment ** config.exponent
+                    base_increment = 0
+                    alive = True
+                elif self.current > self.reached and alive:
+                    # We solved an instance of bigger size than before
+                    self.reached = self.current
 
-            if not alive and base_increment > 1:
-                # The step size increase was too aggressive, take it back and reset the base_increment
-                logger.info(f"Setting the solution cap to {self.current}...")
-                self.cap = self.current
-                self.current -= base_increment ** config.exponent
-                base_increment = 0
-                alive = True
-            elif self.current > self.reached and alive:
-                # We solved an instance of bigger size than before
-                self.reached = self.current
+                if self.current + 1 > self.cap:
+                    alive = False
+                else:
+                    base_increment += 1
+                    self.current += base_increment ** config.exponent
 
-            if self.current + 1 > self.cap:
-                alive = False
-            else:
-                base_increment += 1
-                self.current += base_increment ** config.exponent
-
-                if self.current >= self.cap:
-                    # We have failed at this value of n already, reset the step size!
-                    self.current -= base_increment ** config.exponent - 1
-                    base_increment = 1
+                    if self.current >= self.cap:
+                        # We have failed at this value of n already, reset the step size!
+                        self.current -= base_increment ** config.exponent - 1
+                        base_increment = 1
+            self.results.append(self.reached)
+        self.running = False
 
     @inherit_docs
     def score(self) -> float:
-        return self.reached
+        results = self.results[::-1] if self.running else self.results
+        return sum(results) / len(results)
 
     @inherit_docs
     @staticmethod
