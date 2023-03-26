@@ -91,7 +91,7 @@ class Match(Subject):
         current_default_thread_limiter().total_tokens = config.parallel_battles
         async with create_task_group() as tg:
             for matchup in teams.matchups:
-                battle = config.battle_type(observer=observer)
+                battle = config.battle_type(observer=observer)      # type: ignore
                 result.results[matchup] = battle
                 await tg.start(cls._run_battle, battle, matchup, battle_config, problem.min_size, limiter)
             return result
