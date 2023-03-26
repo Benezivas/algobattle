@@ -11,6 +11,7 @@ from algobattle.docker_util import (
     EncodingError,
     ExecutionError,
     Generator,
+    GeneratorResult,
     Image,
     RunParameters,
     SemanticsError,
@@ -131,7 +132,8 @@ class ProgramTests(IsolatedAsyncioTestCase):
         with Generator.build(*self.dockerfile("generator"), TestProblem, self.params) as gen:
             res = await gen.run(5)
             correct = TestProblem(semantics=True)
-            self.assertEqual(res.problem, correct)
+            assert isinstance(res.result, GeneratorResult.Data)
+            self.assertEqual(res.result.problem, correct)
 
     async def test_sol_timeout(self):
         """The solver times out."""
@@ -162,7 +164,7 @@ class ProgramTests(IsolatedAsyncioTestCase):
         with Solver.build(*self.dockerfile("solver"), TestProblem, self.params) as sol:
             res = await sol.run(self.instance, 5)
             correct = TestProblem.Solution(semantics=True, quality=True)
-            self.assertEqual(res.solution, correct)
+            self.assertEqual(res.result, correct)
 
 
 if __name__ == "__main__":
