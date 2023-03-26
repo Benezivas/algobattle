@@ -16,6 +16,7 @@ from docker.types import Mount, LogConfig, Ulimit
 from requests import Timeout, ConnectionError
 from pydantic import BaseModel, Field
 from anyio.to_thread import run_sync
+from urllib3.exceptions import ReadTimeoutError
 
 from algobattle.util import Encodable, Role, TempDir, encode, decode, inherit_docs
 from algobattle.problem import Problem
@@ -349,12 +350,12 @@ class Image:
             if response["StatusCode"] == 0:
                 return elapsed_time
             else:
-                message = f"Program crashed with exit code {response['StatusCode']} and error message:\n{container.logs.decode()}"
+                message = f"Program crashed with exit code {response['StatusCode']} and error message:\n{container.logs().decode()}"
                 raise ExecutionError(message, elapsed_time)
         except (Timeout, ConnectionError) as e:
             container.kill()
             elapsed_time = round(default_timer() - start_time, 2)
-            if len(e.args) != 1 or not isinstance(e.args[0], Timeout):
+            if len(e.args) != 1 or not isinstance(e.args[0], ReadTimeoutError):
                 raise
             raise ExecutionTimeout(f"{self.description} exceeded the time limit", elapsed_time)
 
