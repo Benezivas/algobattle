@@ -2,7 +2,6 @@
 from abc import ABC
 import logging
 from pathlib import Path
-from time import sleep
 from timeit import default_timer
 from typing import Any, ClassVar, Iterator, Literal, Mapping, Self, TypedDict, cast
 from uuid import uuid1
@@ -14,7 +13,7 @@ from docker.errors import APIError, BuildError, DockerException, ImageNotFound
 from docker.models.images import Image as DockerImage
 from docker.models.containers import Container as DockerContainer
 from docker.types import Mount, LogConfig, Ulimit
-from requests import Timeout
+from requests import Timeout, ConnectionError
 from pydantic import BaseModel, Field
 
 from algobattle.util import Encodable, Role, TempDir, encode, decode, inherit_docs
@@ -282,16 +281,16 @@ class Image:
 
             container.start()
             start_time = default_timer()
-            while container.reload() or container.status == "running":
-                if timeout is not None and default_timer() - start_time > timeout:
-                    logger.warning(f"{self.description} exceeded time limit!")
-                    container.kill()
-                    break
-                sleep(0.01)
+            try:
+                response = container.wait(timeout=timeout)
+                if response["StatusCode"] != 0:
+                    raise ExecutionError(runtime=elapsed_time, exit_code=response["StatusCode"], error_message=container.logs().decode())
+            except (Timeout, ConnectionError) as e:
+                container.kill()
+                if len(e.args) == 0 or isinstance(e.args[0], Timeout):
+                    raise
+                logger.warning(f"{self.description} exceeded time limit!")
             elapsed_time = round(default_timer() - start_time, 2)
-
-            if (exit_code := cast(dict[str, Any], container.attrs)["State"]["ExitCode"]) != 0:
-                raise ExecutionError(runtime=elapsed_time, exit_code=exit_code, error_message=container.logs().decode())
 
         except ImageNotFound as e:
             logger.warning(f"Image {self.name} (id={self.id}) does not exist")
