@@ -14,7 +14,6 @@ from algobattle.docker_util import (
     GeneratorResult,
     Image,
     RunParameters,
-    SemanticsError,
     Solver,
     client,
     DockerImage,
@@ -124,7 +123,7 @@ class ProgramTests(IsolatedAsyncioTestCase):
     async def test_gen_sem_err(self):
         """The generator outputs a semantically incorrect solution."""
         with Generator.build(*self.dockerfile("generator_semantics_error"), TestProblem, self.params) as gen:
-            with self.assertRaises(SemanticsError):
+            with self.assertRaises(EncodingError):
                 await gen.run(5)
 
     async def test_gen_succ(self):
@@ -156,7 +155,7 @@ class ProgramTests(IsolatedAsyncioTestCase):
     async def test_sol_sem_err(self):
         """The solver outputs a semantically incorrect solution."""
         with Solver.build(*self.dockerfile("solver_semantics_error"), TestProblem, self.params) as sol:
-            with self.assertRaises(SemanticsError):
+            with self.assertRaises(EncodingError):
                 await sol.run(self.instance, 5)
 
     async def test_sol_succ(self):
