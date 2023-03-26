@@ -5,7 +5,7 @@ from typing import Self
 
 from prettytable import PrettyTable, DOUBLE_BORDER
 from pydantic import BaseModel, validator
-from anyio import run, create_task_group, CapacityLimiter, TASK_STATUS_IGNORED
+from anyio import create_task_group, CapacityLimiter, TASK_STATUS_IGNORED
 from anyio.to_thread import current_default_thread_limiter
 from anyio.abc import TaskStatus
 
@@ -95,18 +95,6 @@ class Match(Subject):
                 result.results[matchup] = battle
                 await tg.start(cls._run_battle, battle, matchup, battle_config, problem.min_size, limiter)
             return result
-
-    @classmethod
-    def run_sync(
-        cls,
-        config: MatchConfig,
-        battle_config: Battle.Config,
-        problem: type[Problem],
-        teams: TeamHandler,
-        observer: Observer | None = None,
-    ) -> Self:
-        """Executes the match with the specified parameters in a new event loop."""
-        return run(cls.run, config, battle_config, problem, teams, observer)
 
     def calculate_points(self) -> dict[str, float]:
         """Calculate the number of points each team scored.
