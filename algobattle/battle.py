@@ -238,7 +238,7 @@ class Iterated(Battle):
     @inherit_docs
     def score(self) -> float:
         results = self.results[::-1] if self.running else self.results
-        return sum(results) / len(results)
+        return 0 if len(results) == 0 else sum(results) / len(results)
 
     @inherit_docs
     @staticmethod
