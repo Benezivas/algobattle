@@ -30,7 +30,7 @@ T = TypeVar("T")
 
 
 @dataclass
-class CombinedResults:
+class FightResult:
     """The result of one execution of the generator and the solver with the generated instance."""
 
     score: float
@@ -38,12 +38,14 @@ class CombinedResults:
     solver: SolverResult | ProgramError | None
 
 
+@dataclass
 class Battle(ABC):
     """Abstract Base class for classes that execute a specific kind of battle."""
 
-    _battle_types: ClassVar[dict[str, type["Battle"]]] = {}
+    fight_results: list[FightResult] = field(default_factory=list)
 
     scoring_team: ClassVar[Role] = "solver"
+    _battle_types: ClassVar[dict[str, type["Battle"]]] = {}
 
     class Config(BaseModel):
         """Object containing the config variables the battle types use."""
@@ -109,7 +111,7 @@ class Battle(ABC):
         """Calculates the next instance size that should be fought over."""
         raise NotImplementedError
 
-    async def run_programs(
+    async def run_fight(
         self,
         generator: Generator,
         solver: Solver,
@@ -125,7 +127,7 @@ class Battle(ABC):
         solver_battle_input: Mapping[str, Encodable] = {},
         generator_battle_output: Mapping[str, type[Encodable]] = {},
         solver_battle_output: Mapping[str, type[Encodable]] = {},
-    ) -> CombinedResults:
+    ) -> FightResult:
         """Execute a single fight of a battle, running the generator and solver and handling any errors gracefully."""
         cls.notify()
         gen_result = await generator.run(
@@ -137,7 +139,7 @@ class Battle(ABC):
             battle_output=generator_battle_output,
         )
         if isinstance(gen_result.result, ProgramError):
-            return CombinedResults(score=1, generator=gen_result.result, solver=None)
+            return FightResult(score=1, generator=gen_result.result, solver=None)
 
         cls.notify()
         sol_result = await solver.run(
@@ -150,14 +152,14 @@ class Battle(ABC):
             battle_output=solver_battle_output,
         )
         if isinstance(sol_result.result, ProgramError):
-            return CombinedResults(score=0, generator=gen_result, solver=sol_result)
+            return FightResult(score=0, generator=gen_result, solver=sol_result)
 
         score = gen_result.result.problem.calculate_score(
             solution=sol_result.result, generator_solution=gen_result.result.solution, size=size
         )
         score = max(0, min(1, float(score)))
         logger.info(f"The solver achieved a score of {score}.")
-        return CombinedResults(score, gen_result, sol_result)
+        return FightResult(score, gen_result, sol_result)
 
 
 @dataclass
@@ -200,7 +202,7 @@ class Iterated(Battle):
             cap = config.iteration_cap
             current = min_size
             while alive:
-                result = await self.run_programs(generator, solver, current)
+                result = await self.run_fight(generator, solver, current)
                 score = result.score
                 if score < config.approximation_ratio:
                     logger.info(f"Solver does not meet the required solution quality at instance size "
@@ -267,7 +269,7 @@ class Averaged(Battle):
             )
         scores: list[float] = []
         for _ in range(config.iterations):
-            result = await self.run_programs(generator, solver, config.instance_size)
+            result = await self.run_fight(generator, solver, config.instance_size)
             scores.append(result.score)
 
     @inherit_docs
