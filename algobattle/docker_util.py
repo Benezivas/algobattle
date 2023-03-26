@@ -1,5 +1,5 @@
 """Leightweight wrapper around docker functionality."""
-from abc import ABC
+from abc import ABC, abstractmethod
 import logging
 from pathlib import Path
 from timeit import default_timer
@@ -390,24 +390,16 @@ class SolverResult(ProgramResult):
     result: Problem.Solution | ProgramError
 
 
+@dataclass
 class Program(ABC):
     """A higher level interface for a team's programs."""
 
-    role: ClassVar[Role]
+    image: Image
+    config: RunParameters
+    team_name: str  
+    problem_class: type[Problem]
 
-    def __init__(
-        self,
-        image: Image,
-        config: RunParameters,
-        team_name: str,
-        problem_class: type[Problem]
-    ) -> None:
-        # we can't take a ref to the Team object here since it won't be created til after the Programs
-        self.image = image
-        self.config = config
-        self.team_name = team_name
-        self.problem_class = problem_class
-        super().__init__()
+    role: ClassVar[Role]
 
     @classmethod
     def build(
@@ -431,9 +423,11 @@ class Program(ABC):
 
         return cls(image, config, team_name, problem_class)
 
+    @abstractmethod
     def _setup_folders(self, input: Path, output: Path, size: int, instance: Problem | None) -> None:
         raise NotImplementedError
 
+    @abstractmethod
     def _parse_output(self, output: Path, size: int, instance: Problem | None) -> GeneratorResult.Data | Problem.Solution:
         raise NotImplementedError
 
