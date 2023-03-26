@@ -357,23 +357,35 @@ class Image:
             logger.warning(f"{self.description} exceeded time limit!")
         return elapsed_time
 
-@dataclass
-class GeneratorResult:
-    """Result of a single generator or solver execution."""
 
-    problem: Problem
+@dataclass
+class ProgramResult:
+    """Result of a program execution."""
+
+    result: Any
     runtime: float
-    solution: Problem.Solution | None = None
+    size: int
+    params: RunParameters
     battle_data: dict[str, Encodable] | None = None
 
 
 @dataclass
-class SolverResult:
-    """Result of a single generator or solver execution."""
+class GeneratorResult(ProgramResult):
+    """Result of a single generator execution."""
 
-    solution: Problem.Solution
-    runtime: float
-    battle_data: dict[str, Encodable] | None = None
+    @dataclass
+    class Data:
+        problem: Problem
+        solution: Problem.Solution | None = None
+
+    result: Data | DockerError
+
+
+@dataclass
+class SolverResult(ProgramResult):
+    """Result of a single solver execution."""
+
+    result: Problem.Solution | DockerError
 
 
 class Program(ABC):
@@ -436,7 +448,7 @@ class Program(ABC):
         cpus: int = ...,
         battle_input: Mapping[str, Encodable] = {},
         battle_output: Mapping[str, type[Encodable]] = {},
-    ) -> Any:
+    ) -> GeneratorResult | SolverResult:
         """Execute the program, processing input and output data."""
         set_params: dict[str, Any] = {}
         if timeout is Ellipsis:
@@ -458,6 +470,8 @@ class Program(ABC):
         if set_params:
             param_msg += " with parameters " + ", ".join(f"{k}: {v}" for k, v in set_params.items())
         logger.info(f"Running {self.role} of team {self.team_name}{param_msg}.")
+        run_params = RunParameters(timeout=timeout, space=space, cpus=cpus)
+        result_class = GeneratorResult if self.role == "generator" else SolverResult
 
         with TempDir() as input, TempDir() as output:
             if self.role == "generator":
@@ -470,14 +484,14 @@ class Program(ABC):
                     input_instance.encode(input / "instance", size, self.role)
                 except Exception as e:
                     logger.critical("Problem instance couldn't be encoded into files!")
-                    raise DockerError from e
+                    return result_class(DockerError(), 0, size, run_params)
             if battle_input:
                 (input / "battle_data").mkdir()
                 try:
                     encode(battle_input, input / "battle_data", size, self.role)
                 except Exception as e:
                     logger.critical("Battle data couldn't be encoded into files!")
-                    raise DockerError from e
+                    return result_class(DockerError(), 0, size, run_params)
             with open(input / "info.json", "w+") as f:
                 json.dump({
                     "size": size,
@@ -499,10 +513,10 @@ class Program(ABC):
             except ExecutionError as e:
                 logger.warning(f"{self.role.capitalize()} of team {self.team_name} crashed!")
                 logger.info(f"After {e.runtime:.2f}s, with exit code {e.exit_code} and error message:\n{e.error_message}")
-                raise
-            except DockerError:
+                return result_class(e, 0, size, run_params)
+            except DockerError as e:
                 logger.warning(f"{self.role.capitalize()} of team {self.team_name} couldn't be executed successfully!")
-                raise
+                return result_class(e, 0, size, run_params)
 
             try:
                 output_data = self.data_type.decode(output / self.data_role, size, self.role)
@@ -510,7 +524,7 @@ class Program(ABC):
                 logger.warning(
                     f"The {self.data_role} output of team {self.team_name}'s {self.role} can not be decoded properly!"
                 )
-                raise EncodingError from e
+                return result_class(EncodingError(), 0, size, run_params)
             if self.role == "generator" and isinstance(output_data, Problem) and output_data.with_solution:
                 try:
                     generator_solution = output_data.Solution.decode(output / "solution", size, self.role)
@@ -518,7 +532,7 @@ class Program(ABC):
                     logger.warning(
                         f"The solution output of team {self.team_name}'s generator can not be decoded properly!"
                     )
-                    raise EncodingError from e
+                    return result_class(EncodingError(), 0, size, run_params)
             else:
                 generator_solution = None
 
@@ -538,19 +552,19 @@ class Program(ABC):
             logger.warning(
                 f"{self.role.capitalize()} of team {self.team_name} output an invalid {self.data_role}!"
             )
-            raise SemanticsError
+            return result_class(SemanticsError(), runtime, size, run_params, decoded_battle_output)
 
         if generator_solution is not None:
             is_valid = generator_solution.is_valid(output_data, size)
             if not is_valid:
                 logger.warning(f"The generator of team {self.team_name} output an invalid solution!")
-                raise SemanticsError
+                return result_class(DockerError(), runtime, size, run_params, decoded_battle_output)
 
         logger.info(f"{self.role.capitalize()} of team {self.team_name} output a valid {self.data_role}.")
         if isinstance(output_data, Problem):
-            return GeneratorResult(output_data, runtime, generator_solution, decoded_battle_output)
+            return GeneratorResult(GeneratorResult.Data(output_data, generator_solution), runtime, size, run_params, decoded_battle_output)
         else:
-            return SolverResult(output_data, runtime, decoded_battle_output)
+            return SolverResult(output_data, runtime, size, run_params, decoded_battle_output)
 
     @inherit_docs
     def remove(self) -> None:
@@ -578,7 +592,7 @@ class Generator(Program):
         battle_output: Mapping[str, type[Encodable]] = {},
     ) -> GeneratorResult:
         """Execute the generator, passing in the size and processing the created problem instance."""
-        return await self._run(
+        return cast(GeneratorResult, await self._run(
             size=size,
             input_instance=None,
             timeout=timeout,
@@ -586,7 +600,7 @@ class Generator(Program):
             cpus=cpus,
             battle_input=battle_input,
             battle_output=battle_output
-        )
+        ))
 
 
 class Solver(Program):
@@ -606,7 +620,7 @@ class Solver(Program):
         battle_output: Mapping[str, type[Encodable]] = {},
     ) -> SolverResult:
         """Execute the solver, passing in the problem instance and processing the created solution."""
-        return await self._run(
+        return cast(SolverResult, await self._run(
             size=size,
             input_instance=instance,
             timeout=timeout,
@@ -614,7 +628,7 @@ class Solver(Program):
             cpus=cpus,
             battle_input=battle_input,
             battle_output=battle_output
-        )
+        ))
 
 
 class AdvancedRunArgs(BaseModel):
