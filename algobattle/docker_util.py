@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 from time import sleep
 from timeit import default_timer
-from typing import Any, Iterator, Literal, Mapping, Self, cast
+from typing import Any, Iterator, Literal, Mapping, Self, TypedDict, cast
 from uuid import uuid1
 import json
 from dataclasses import dataclass
@@ -13,12 +13,12 @@ from docker import DockerClient
 from docker.errors import APIError, BuildError, DockerException, ImageNotFound
 from docker.models.images import Image as DockerImage
 from docker.models.containers import Container as DockerContainer
-from docker.types import Mount
+from docker.types import Mount, LogConfig, Ulimit
 from requests import Timeout
 from algobattle.util import Encodable, Role, TempDir, encode, decode, inherit_docs
 from algobattle.problem import Problem
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger("algobattle.docker")
 
@@ -590,3 +590,126 @@ class Solver(Program):
             battle_input=battle_input,
             battle_output=battle_output
         )
+
+
+class RunArgs(BaseModel):
+    """Advanced docker run options.
+    
+    Contains all options exposed on the python docker run api, except `device_requests` and those set by :meth:`Image.run` itself.
+    """
+
+    class BlockIOWeight(TypedDict):
+        Path: str
+        Weight: int
+
+    class DeviceRate(TypedDict):
+        Path: str
+        Rate: int
+
+    class HealthCheck(TypedDict):
+        test: list[str] | str
+        interval: int
+        timeout: int
+        retries: int
+        start_period: int
+
+    class LogConfigArgs(TypedDict):
+        type: str
+        conifg: dict[Any, Any]
+
+    class UlimitArgs(TypedDict):
+        name: str
+        soft: int
+        hard: int
+
+    network_mode: str = "none"
+    command: str | list[str] | None = None
+    auto_remove: bool | None = None
+    blkio_weight_device: list[BlockIOWeight] | None = None
+    blkio_weight: int | None =  Field(default=None, ge=10, le=1000)
+    cap_add: list[str] | None = None
+    cap_drop: list[str] | None = None
+    cgroup_parent: str | None = None
+    cgroupns: str | None = None
+    cpu_count: int | None = None
+    cpu_percent: int | None = None
+    cpu_period: int | None = None
+    cpu_quota: int | None = None
+    cpu_rt_period: int | None = None
+    cpu_rt_runtime: int | None = None
+    cpu_shares: int | None = None
+    cpuset_cpus: str | None = None
+    cpuset_mems: str | None = None
+    device_cgroup_rules: list[str] | None = None
+    device_read_bps: list[DeviceRate] | None = None
+    device_read_iops: list[DeviceRate] | None = None
+    device_write_bps: list[DeviceRate] | None = None
+    device_write_iops: list[DeviceRate] | None = None
+    devices: list[str] | None = None
+    dns: list[str] | None = None
+    dns_opt: list[str] | None = None
+    dns_search: list[str] | None = None
+    domainname: str | list[str] | None = None
+    entrypoint: str | list[str] | None = None
+    environment: dict[str, str] | list[str] | None = None
+    extra_hosts: dict[str, str] | None = None
+    group_add: list[str] | None = None
+    healthcheck: HealthCheck | None = None
+    hostname: str | None = None
+    init: bool | None = None
+    init_path: str | None = None
+    ipc_mode: str | None = None
+    isolation: str | None = None
+    kernel_memory: int | str | None = None
+    labels: dict[str, str] | list[str] | None = None
+    links: dict[str, str] | None = None
+    log_config: LogConfigArgs | None = None
+    lxc_conf: dict[Any, Any] | None = None
+    mac_address: str | None = None
+    mem_limit: int | str | None = None
+    mem_reservation: int | str | None = None
+    mem_swappiness: int | None = None
+    memswap_limit: str | int | None = None
+    network: str | None = None
+    network_disabled: bool | None = None
+    oom_kill_disable: bool | None = None
+    oom_score_adj: int | None = None
+    pid_mode: str | None = None
+    pids_limit: int | None = None
+    platform: str | None = None
+    ports: dict[Any, Any] | None = None
+    privileged: bool | None = None
+    publish_all_ports: bool | None = None
+    read_only: bool | None = None
+    restart_policy: dict[Any, Any] | None = None
+    runtime: str | None = None
+    security_opt: list[str]   | None = None
+    shm_size: str | int | None = None
+    stdin_open: bool | None = None
+    stdout: bool | None = None
+    stderr: bool | None = None
+    stop_signal: str | None = None
+    storage_opt: dict[Any, Any] | None = None
+    stream: bool | None = None
+    sysctls: dict[Any, Any] | None = None
+    tmpfs: dict[Any, Any] | None = None
+    tty: bool | None = None
+    ulimits: list[UlimitArgs] | None = None
+    use_config_proxy: bool | None = None
+    user: str | int | None = None
+    userns_mode: str | None = None
+    uts_mode: str | None = None
+    version: str | None = None
+    volume_driver: str | None = None
+    volumes: dict[Any, Any] | list[Any] | None = None
+    volumes_from: list[Any] | None = None
+    working_dir: str | None = None
+
+    def to_docker_args(self) -> dict[str, Any]:
+        """Transforms the object into :meth:`client.containers.run` kwargs."""
+        kwargs = self.dict(exclude_none=True)
+        if "log_config" in kwargs:
+            kwargs["log_config"] = LogConfig(**kwargs["log_config"])
+        if "ulimits" in kwargs:
+            kwargs["ulimits"] = Ulimit(**kwargs["ulimits"])
+        return kwargs
