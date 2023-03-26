@@ -1,6 +1,8 @@
 """Central managing module for an algorithmic battle."""
+from abc import ABC
+from dataclasses import dataclass, field
 import logging
-from typing import Self
+from typing import Any, Self
 
 from prettytable import PrettyTable, DOUBLE_BORDER
 from pydantic import BaseModel, validator
@@ -59,6 +61,7 @@ class Match:
         battle: Battle,
         matchup: Matchup,
         limiter: CapacityLimiter,
+        ui: "Ui",
         *,
         task_status: TaskStatus = TASK_STATUS_IGNORED,
     ) -> None:
@@ -73,6 +76,8 @@ class Match:
                 )
             except Exception as e:
                 logger.critical(f"Unhandeled error during execution of battle!\n{e}")
+            finally:
+                del ui.battle_data[matchup]
 
     @classmethod
     async def run(
@@ -81,8 +86,11 @@ class Match:
         battle_config: Battle.Config,
         problem: type[Problem],
         teams: TeamHandler,
+        ui: "Ui" | None = None,
     ) -> Self:
         """Executes a match with the specified parameters."""
+        if ui is None:
+            ui = EmptyUi()
         result = cls(config, battle_config, problem, teams)
         limiter = CapacityLimiter(config.parallel_battles)
         current_default_thread_limiter().total_tokens = config.parallel_battles
@@ -90,7 +98,7 @@ class Match:
             for matchup in teams.matchups:
                 battle = config.battle_type(observer=observer)      # type: ignore
                 result.results[matchup] = battle
-                await tg.start(cls._run_battle, battle, matchup, battle_config, problem.min_size, limiter)
+                await tg.start(cls._run_battle, battle, matchup, battle_config, problem.min_size, limiter, ui)
             return result
 
     def calculate_points(self) -> dict[str, float]:
@@ -142,3 +150,14 @@ class Match:
             table.add_row([str(matchup.generator), str(matchup.solver), result.format_score(result.score())])
 
         return f"Battle Type: {self.config.battle_type.name()}\n{table}"
+
+
+@dataclass
+class Ui(ABC):
+    """Base class for a UI that observes a Match and displays its data."""
+
+    battle_data: dict[Matchup, Any] = field(default_factory=dict, init=False)
+
+
+class EmptyUi(Ui):
+    """Ui that does not display anything."""
