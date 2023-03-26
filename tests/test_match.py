@@ -158,22 +158,19 @@ class Execution(IsolatedAsyncioTestCase):
     async def test_basic(self):
         team = TeamInfo("team0", self.generator, self.solver)
         with TeamHandler.build([team], self.problem, self.docker_config, safe_build=True) as teams:
-            match = Match(self.config, self.iter_config, TestProblem, teams)
-            await match.run()
+            await Match.run(self.config, self.iter_config, TestProblem, teams)
 
     async def test_multi_team(self):
         team0 = TeamInfo("team0", self.generator, self.solver)
         team1 = TeamInfo("team1", self.generator, self.solver)
         with TeamHandler.build([team0, team1], self.problem, self.docker_config, safe_build=True) as teams:
-            match = Match(self.config, self.iter_config, TestProblem, teams)
-            await match.run()
+            await Match.run(self.config, self.iter_config, TestProblem, teams)
 
     async def test_averaged(self):
         team = TeamInfo("team0", self.generator, self.solver)
         with TeamHandler.build([team], self.problem, self.docker_config, safe_build=True) as teams:
             config = MatchConfig(battle_type=Averaged)
-            match = Match(config, self.avg_config, TestProblem, teams)
-            await match.run()
+            await Match.run(config, self.avg_config, TestProblem, teams)
 
 
 class Parsing(TestCase):
