@@ -111,6 +111,8 @@ class Config(BaseModel):
         "docker": {
             "generator": {"timeout": "generator_timeout", "space": "generator_space", "cpus": "generator_cpus"},
             "solver": {"timeout": "solver_timeout", "space": "solver_space", "cpus": "solver_cpus"},
+            "advanced_run_params": None,
+            "advanced_build_params": None,
         },
     }
 
