@@ -5,6 +5,7 @@ from typing import Self
 
 from prettytable import PrettyTable, DOUBLE_BORDER
 from pydantic import BaseModel, validator
+from anyio import run, create_task_group
 
 from algobattle.battle import Battle, Iterated
 from algobattle.ui import Observer, Subject
@@ -54,7 +55,7 @@ class Match(Subject):
         super().__init__(observer)
 
     @classmethod
-    def run(
+    async def run(
         cls,
         config: MatchConfig,
         battle_config: Battle.Config,
@@ -62,17 +63,29 @@ class Match(Subject):
         teams: TeamHandler,
         observer: Observer | None = None,
     ) -> Self:
-        """Executes the match with the specified parameters."""
+        """Executes a match with the specified parameters."""
         result = cls(config, battle_config, problem, teams, observer)
         for matchup in teams.matchups:
             battle = config.battle_type(observer=observer)
             result.results[matchup] = battle
             try:
-                battle.run_battle(matchup.generator.generator, matchup.solver.solver, battle_config, problem.min_size)
+                await battle.run_battle(matchup.generator.generator, matchup.solver.solver, battle_config, problem.min_size)
             except Exception as e:
                 logger.critical(f"Unhandeled error during execution of battle!\n{e}")
             result.notify("match")
         return result
+
+    @classmethod
+    def run_sync(
+        cls,
+        config: MatchConfig,
+        battle_config: Battle.Config,
+        problem: type[Problem],
+        teams: TeamHandler,
+        observer: Observer | None = None,
+    ) -> Self:
+        """Executes the match with the specified parameters in a new event loop."""
+        return run(cls.run, config, battle_config, problem, teams, observer)
 
     def calculate_points(self) -> dict[str, float]:
         """Calculate the number of points each team scored.

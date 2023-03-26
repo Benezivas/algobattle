@@ -13,8 +13,9 @@ from docker.errors import APIError, BuildError, DockerException, ImageNotFound
 from docker.models.images import Image as DockerImage
 from docker.models.containers import Container as DockerContainer
 from docker.types import Mount, LogConfig, Ulimit
-from requests import Timeout, ConnectionError
+from requests import Response, Timeout, ConnectionError
 from pydantic import BaseModel, Field
+from anyio.to_thread import run_sync
 
 from algobattle.util import Encodable, Role, TempDir, encode, decode, inherit_docs
 from algobattle.problem import Problem
@@ -92,6 +93,30 @@ class SemanticsError(DockerError):
     """Indicates that the parsed data is semantically incorrect."""
 
     pass
+
+
+async def _docker_stop(container: DockerContainer, timeout: float | None = None):
+    """
+    Asynchronously stops a container. Similar to the ``docker stop`` command.
+
+    Uses a worker thread to provide an async interface.
+    """
+    # Using a worker thread for this is not ideal but the docker daemon api is strange enough that
+    # implementing our own http call with an async lib would be a considerable amount of effort.
+    connection = client().api
+    params: dict[str, Any] = {
+        "signal": "SIGWINCH",
+    }
+    conn_timeout = connection.timeout
+    if timeout is not None:
+        conn_timeout += timeout
+        params["t"] = timeout
+    url = connection._url("/containers/{0}/stop", container.id)
+    def inner() -> Response:
+        return connection.post(url, timeout=conn_timeout, **params)
+    res = await run_sync(inner)
+    connection._raise_for_status(res)
+
 
 @dataclass
 class ArchivedImage:
@@ -217,7 +242,7 @@ class Image:
     def __exit__(self, _type, _value_, _traceback):
         self.remove()
 
-    def run(
+    async def run(
         self,
         input_dir: Path | None = None,
         output_dir: Path | None = None,
@@ -280,6 +305,7 @@ class Image:
             )
 
             container.start()
+            await _docker_stop(container, timeout)
             start_time = default_timer()
             try:
                 response = container.wait(timeout=timeout)
@@ -414,7 +440,7 @@ class Program(ABC):
             data_type = problem_type.Solution
         return cls(image, config, team_name, data_type)
 
-    def _run(
+    async def _run(
         self,
         size: int,
         input_instance: Problem | None = None,
@@ -483,7 +509,7 @@ class Program(ABC):
                 (output / "battle_data").mkdir()
 
             try:
-                runtime = self.image.run(input, output, timeout=timeout, memory=space, cpus=cpus)
+                runtime = await self.image.run(input, output, timeout=timeout, memory=space, cpus=cpus)
             except ExecutionError as e:
                 logger.warning(f"{self.role.capitalize()} of team {self.team_name} crashed!")
                 logger.info(f"After {e.runtime:.2f}s, with exit code {e.exit_code} and error message:\n{e.error_message}")
@@ -555,7 +581,7 @@ class Generator(Program):
 
     role = "generator"
 
-    def run(
+    async def run(
         self,
         size: int,
         *,
@@ -566,7 +592,7 @@ class Generator(Program):
         battle_output: Mapping[str, type[Encodable]] = {},
     ) -> GeneratorResult:
         """Execute the generator, passing in the size and processing the created problem instance."""
-        return self._run(
+        return await self._run(
             size=size,
             input_instance=None,
             timeout=timeout,
@@ -582,7 +608,7 @@ class Solver(Program):
 
     role = "solver"
 
-    def run(
+    async def run(
         self,
         instance: Problem,
         size: int,
@@ -594,7 +620,7 @@ class Solver(Program):
         battle_output: Mapping[str, type[Encodable]] = {},
     ) -> SolverResult:
         """Execute the solver, passing in the problem instance and processing the created solution."""
-        return self._run(
+        return await self._run(
             size=size,
             input_instance=instance,
             timeout=timeout,

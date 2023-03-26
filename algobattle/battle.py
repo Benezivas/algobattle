@@ -106,11 +106,11 @@ class Battle(Subject, ABC):
         return cls.__name__
 
     @abstractmethod
-    def run_battle(self, generator: Generator, solver: Solver, config: _Config, min_size: int) -> None:
+    async def run_battle(self, generator: Generator, solver: Solver, config: _Config, min_size: int) -> None:
         """Calculates the next instance size that should be fought over."""
         raise NotImplementedError
 
-    def run_programs(
+    async def run_programs(
         self,
         generator: Generator,
         solver: Solver,
@@ -130,7 +130,7 @@ class Battle(Subject, ABC):
         """Execute a single fight of a battle, running the generator and solver and handling any errors gracefully."""
         self.notify()
         try:
-            gen_result = generator.run(
+            gen_result = await generator.run(
                 size=size,
                 timeout=timeout_generator,
                 space=space_generator,
@@ -142,7 +142,7 @@ class Battle(Subject, ABC):
             return CombinedResults(score=1, generator=e, solver=None)
 
         try:
-            sol_result = solver.run(
+            sol_result = await solver.run(
                 gen_result.problem,
                 size=size,
                 timeout=timeout_solver,
@@ -177,7 +177,7 @@ class Iterated(Battle):
         exponent: int = Field(default=2, help="Determines how quickly the instance size grows.")
         approximation_ratio: float = Field(default=1, help="Approximation ratio that a solver needs to achieve to pass.")
 
-    def run_battle(self, generator: Generator, solver: Solver, config: Config, min_size: int) -> None:
+    async def run_battle(self, generator: Generator, solver: Solver, config: Config, min_size: int) -> None:
         """Execute one iterative battle between a generating and a solving team.
 
         Incrementally try to search for the highest n for which the solver is
@@ -204,7 +204,7 @@ class Iterated(Battle):
             self.cap = config.iteration_cap
             self.current = min_size
             while alive:
-                result = self.run_programs(generator, solver, self.current)
+                result = await self.run_programs(generator, solver, self.current)
                 score = result.score
                 if score < config.approximation_ratio:
                     logger.info(f"Solver does not meet the required solution quality at instance size "
@@ -258,7 +258,7 @@ class Averaged(Battle):
         instance_size: int = Field(default=10, help="Instance size that will be fought at.")
         iterations: int = Field(default=10, help="Number of iterations in each round.")
 
-    def run_battle(self, generator: Generator, solver: Solver, config: Config, min_size: int) -> None:
+    async def run_battle(self, generator: Generator, solver: Solver, config: Config, min_size: int) -> None:
         """Execute one averaged battle between a generating and a solving team.
 
         Execute several fights between two teams on a fixed instance size
@@ -272,7 +272,7 @@ class Averaged(Battle):
         self.scores: list[float] = []
         for i in range(config.iterations):
             self.curr_iter = i + 1
-            result = self.run_programs(generator, solver, config.instance_size)
+            result = await self.run_programs(generator, solver, config.instance_size)
             self.scores.append(result.score)
 
     @inherit_docs
