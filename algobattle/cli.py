@@ -178,11 +178,6 @@ def parse_cli_args(args: list[str]) -> tuple[Path, Config]:
     )
 
     parser.add_argument("--battle_type", choices=[name.lower() for name in Battle.all()], help="Type of battle to be used.")
-    parser.add_argument(
-        "--rounds",
-        type=int,
-        help="Number of rounds that are to be fought in the battle (points are split between all rounds).",
-    )
     parser.add_argument("--points", type=int, help="number of points distributed between teams.")
 
     parser.add_argument("--build_timeout", type=float, help="Timeout for the build step of each docker image.")
