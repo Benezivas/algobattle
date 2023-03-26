@@ -58,13 +58,10 @@ class Match(Subject):
         self.teams = teams
         super().__init__(observer)
 
-    @classmethod
     async def _run_battle(
-        cls,
+        self,
         battle: Battle,
         matchup: Matchup,
-        config: Battle.Config,
-        min_size: int,
         limiter: CapacityLimiter,
         *,
         task_status: TaskStatus = TASK_STATUS_IGNORED,
@@ -72,7 +69,7 @@ class Match(Subject):
         async with limiter:
             task_status.started()
             try:
-                await battle.run_battle(matchup.generator.generator, matchup.solver.solver, config, min_size)
+                await battle.run_battle(matchup.generator.generator, matchup.solver.solver, self.battle_config, self.problem.min_size)
             except Exception as e:
                 logger.critical(f"Unhandeled error during execution of battle!\n{e}")
 
