@@ -20,7 +20,6 @@ from typing import (
 from pydantic import BaseModel, Field, BaseConfig
 
 from algobattle.docker_util import ProgramError, Generator, Solver, GeneratorResult, SolverResult
-from algobattle.ui import Observer, Subject
 from algobattle.util import Encodable, Role, inherit_docs
 
 logger = logging.getLogger("algobattle.battle")
@@ -39,7 +38,7 @@ class CombinedResults:
     solver: SolverResult | ProgramError | None
 
 
-class Battle(Subject, ABC):
+class Battle(ABC):
     """Abstract Base class for classes that execute a specific kind of battle."""
 
     _battle_types: ClassVar[dict[str, type["Battle"]]] = {}
@@ -80,10 +79,10 @@ class Battle(Subject, ABC):
                 Battle._battle_types[battle.name().lower()] = battle
         return Battle._battle_types
 
-    def __init_subclass__(cls, notify_var_changes: bool = False) -> None:
+    def __init_subclass__(cls) -> None:
         if cls.name() not in Battle._battle_types:
             Battle._battle_types[cls.name().lower()] = cls
-        return super().__init_subclass__(notify_var_changes)
+        return super().__init_subclass__()
 
     @abstractmethod
     def score(self) -> float:
@@ -164,10 +163,10 @@ class Battle(Subject, ABC):
 class Iterated(Battle):
     """Class that executes an iterated battle."""
 
-    def __init__(self, observer: Observer | None = None) -> None:
+    def __init__(self) -> None:
         self.running = False
         self.results = []
-        super().__init__(observer)
+        super().__init__()
 
     @inherit_docs
     class Config(Battle.Config):

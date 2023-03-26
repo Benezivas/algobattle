@@ -9,7 +9,6 @@ from anyio.to_thread import current_default_thread_limiter
 from anyio.abc import TaskStatus
 
 from algobattle.battle import Battle, Iterated
-from algobattle.ui import Observer, Subject
 from algobattle.team import Matchup, TeamHandler, Team
 from algobattle.problem import Problem
 
@@ -38,7 +37,7 @@ class MatchConfig(BaseModel):
             raise TypeError
 
 
-class Match(Subject):
+class Match:
     """The Result of a whole Match."""
 
     def __init__(
@@ -47,14 +46,13 @@ class Match(Subject):
         battle_config: Battle.Config,
         problem: type[Problem],
         teams: TeamHandler,
-        observer: Observer | None = None,
     ) -> None:
         self.results: dict[Matchup, Battle] = {}
         self.config = config
         self.battle_config = battle_config
         self.problem = problem
         self.teams = teams
-        super().__init__(observer)
+        super().__init__()
 
     async def _run_battle(
         self,
@@ -83,10 +81,9 @@ class Match(Subject):
         battle_config: Battle.Config,
         problem: type[Problem],
         teams: TeamHandler,
-        observer: Observer | None = None,
     ) -> Self:
         """Executes a match with the specified parameters."""
-        result = cls(config, battle_config, problem, teams, observer)
+        result = cls(config, battle_config, problem, teams)
         limiter = CapacityLimiter(config.parallel_battles)
         current_default_thread_limiter().total_tokens = config.parallel_battles
         async with create_task_group() as tg:

@@ -14,53 +14,6 @@ P = ParamSpec("P")
 R = TypeVar("R")
 
 
-class Observer(ABC):
-    """The Observer interface declares the methods to receive updates from running matches."""
-
-    @abstractmethod
-    def update(self, subject: Subject, event: str):
-        """Processes an update in the info of the subject."""
-        raise NotImplementedError
-
-
-class Subject(ABC):
-    """The Subject interface declares an easy way to update observers."""
-
-    def __init_subclass__(cls, notify_var_changes: bool = False) -> None:
-        if notify_var_changes:
-            cls.__setattr__ = cls.__notifying_setattr__     # type: ignore
-        return super().__init_subclass__()
-
-    def __init__(self, observer: Observer | None = None) -> None:
-        super().__init__()
-        self.observers: list[Observer] = []
-        if observer is not None:
-            self.attach(observer)
-
-    def attach(self, observer: Observer):
-        """Subscribes an observer to the updates of this subject."""
-        if observer not in self.observers:
-            self.observers.append(observer)
-
-    def detach(self, observer: Observer):
-        """Unsubscribes an observer from the updates of this object."""
-        if observer in self.observers:
-            self.observers.remove(observer)
-
-    def notify(self, event: str = ""):
-        """Updates all subscribed observers."""
-        for observer in self.observers:
-            observer.update(self, event)
-
-    def __notifying_setattr__(self, name: str, value: Any) -> None:
-        super().__setattr__(name, value)
-        self.notify(name)
-
-    def display(self) -> str:
-        """Nicely formats the object."""
-        return str(self)
-
-
 def check_for_terminal(function: Callable[P, R]) -> Callable[P, R | None]:
     """Ensure that we are attached to a terminal."""
 
@@ -74,7 +27,7 @@ def check_for_terminal(function: Callable[P, R]) -> Callable[P, R | None]:
     return wrapper
 
 
-class Ui(Observer):
+class Ui:
     """The UI Class declares methods to output information to STDOUT."""
 
     @check_for_terminal
@@ -102,14 +55,8 @@ class Ui(Observer):
         curses.endwin()
 
     @check_for_terminal
-    def update(self, subject: Subject, event: str) -> None:
+    def update(self, event: str) -> None:
         """Receive updates to the match data and displays them."""
-        if event == "match":
-            self.match_result = subject
-        elif event == "battle":
-            self.battle_info = subject
-        else:
-            return
 
         if self.match_result is not None:
             try:
