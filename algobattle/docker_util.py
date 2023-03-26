@@ -282,7 +282,6 @@ class Image:
             )
 
             elapsed_time = await run_sync(self._run_container, container, timeout)
-            print(f"ELAPSED TIME: {elapsed_time}")
 
         except ImageNotFound as e:
             logger.warning(f"Image {self.name} (id={self.id}) does not exist")
@@ -337,9 +336,7 @@ class Image:
         start_time = default_timer()
         elapsed_time = 0
         try:
-            print(f"A current time: {round(default_timer() - start_time, 2)}\n")
             response = container.wait(timeout=timeout)
-            print(f"B current time: {round(default_timer() - start_time, 2)}\n")
             elapsed_time = round(default_timer() - start_time, 2)
             if response["StatusCode"] != 0:
                 raise ExecutionError(
@@ -348,9 +345,7 @@ class Image:
                     error_message=container.logs().decode(),
                 )
         except (Timeout, ConnectionError) as e:
-            print(f"C current time: {round(default_timer() - start_time, 2)}\n")
             container.kill()
-            print(f"D current time: {round(default_timer() - start_time, 2)}\n")
             elapsed_time = round(default_timer() - start_time, 2)
             if len(e.args) == 0 or isinstance(e.args[0], Timeout):
                 raise
