@@ -1,6 +1,6 @@
 """Tests for the Match class."""
 # pyright: reportMissingSuperCall=false
-from unittest import TestCase, main
+from unittest import IsolatedAsyncioTestCase, TestCase, main
 import logging
 from pathlib import Path
 
@@ -130,7 +130,7 @@ class Matchtests(TestCase):
     # TODO: Add tests for remaining functions
 
 
-class Execution(TestCase):
+class Execution(IsolatedAsyncioTestCase):
     """Some basic tests for the execution of the battles."""
 
     @classmethod
@@ -155,22 +155,25 @@ class Execution(TestCase):
         logging.disable(logging.CRITICAL)
         return super().tearDownClass()
 
-    def test_basic(self):
+    async def test_basic(self):
         team = TeamInfo("team0", self.generator, self.solver)
         with TeamHandler.build([team], self.problem, self.docker_config, safe_build=True) as teams:
-            Match.run(self.config, self.iter_config, TestProblem, teams)
+            match = Match(self.config, self.iter_config, TestProblem, teams)
+            await match.run()
 
-    def test_multi_team(self):
+    async def test_multi_team(self):
         team0 = TeamInfo("team0", self.generator, self.solver)
         team1 = TeamInfo("team1", self.generator, self.solver)
         with TeamHandler.build([team0, team1], self.problem, self.docker_config, safe_build=True) as teams:
-            Match.run(self.config, self.iter_config, TestProblem, teams)
+            match = Match(self.config, self.iter_config, TestProblem, teams)
+            await match.run()
 
-    def test_averaged(self):
+    async def test_averaged(self):
         team = TeamInfo("team0", self.generator, self.solver)
         with TeamHandler.build([team], self.problem, self.docker_config, safe_build=True) as teams:
             config = MatchConfig(battle_type=Averaged)
-            Match.run(config, self.avg_config, TestProblem, teams)
+            match = Match(config, self.avg_config, TestProblem, teams)
+            await match.run()
 
 
 class Parsing(TestCase):
