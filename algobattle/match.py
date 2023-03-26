@@ -1,5 +1,4 @@
 """Central managing module for an algorithmic battle."""
-from __future__ import annotations
 import logging
 from typing import Self
 
@@ -10,7 +9,6 @@ from anyio.to_thread import current_default_thread_limiter
 from anyio.abc import TaskStatus
 
 from algobattle.battle import Battle, Iterated
-from algobattle.docker_util import Generator, Solver
 from algobattle.ui import Observer, Subject
 from algobattle.team import Matchup, TeamHandler, Team
 from algobattle.problem import Problem

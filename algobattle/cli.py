@@ -1,5 +1,4 @@
 """Main battle script. Executes all possible types of battles, see battle --help for all options."""
-from __future__ import annotations
 from argparse import ArgumentParser, Namespace
 from contextlib import ExitStack
 from functools import partial
