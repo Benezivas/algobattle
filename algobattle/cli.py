@@ -11,6 +11,7 @@ from typing import Any, ClassVar, Literal, Mapping, Self
 import tomllib
 
 from pydantic import BaseModel, validator
+from anyio import run
 
 from algobattle.battle import Battle
 from algobattle.docker_util import DockerConfig, Image
@@ -245,7 +246,7 @@ def main():
             else:
                 ui = None
 
-            result = Match.run(config.match, config.battle_config, problem, teams, ui)
+            result = run(Match.run, config.match, config.battle_config, problem, teams, ui)
 
             logger.info("#" * 78)
             logger.info(result.display())
