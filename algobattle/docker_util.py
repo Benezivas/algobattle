@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 from time import sleep
 from timeit import default_timer
-from typing import Any, Iterator, Literal, Mapping, Self, TypedDict, cast
+from typing import Any, ClassVar, Iterator, Literal, Mapping, Self, TypedDict, cast
 from uuid import uuid1
 import json
 from dataclasses import dataclass
@@ -41,6 +41,7 @@ class DockerConfig(BaseModel):
     build_timeout: float | None = None
     generator: RunParameters = RunParameters()
     solver: RunParameters = RunParameters()
+    advanced_run_params: "AdvancedRunArgs | None" = None
 
 
 def client() -> DockerClient:
@@ -129,6 +130,10 @@ class Image:
     description: str
     path: Path
 
+    run_kwargs: ClassVar[dict[str, Any]] = {
+        "network_mode": "none",
+    }
+
     @classmethod
     def build(
         cls,
@@ -215,7 +220,7 @@ class Image:
         output_dir: Path | None = None,
         timeout: float | None = None,
         memory: int | None = None,
-        cpus: int | None = None
+        cpus: int | None = None,
     ) -> float:
         """Runs a docker image with the provided input and returns its output.
 
@@ -266,8 +271,8 @@ class Image:
                     mem_limit=memory,
                     nano_cpus=cpus,
                     detach=True,
-                    network_mode="none",
                     mounts=mounts,
+                    **self.run_kwargs,
                 ),
             )
 
@@ -593,7 +598,7 @@ class Solver(Program):
         )
 
 
-class RunArgs(BaseModel):
+class AdvancedRunArgs(BaseModel):
     """Advanced docker run options.
     
     Contains all options exposed on the python docker run api, except `device_requests` and those set by :meth:`Image.run` itself.
@@ -714,3 +719,6 @@ class RunArgs(BaseModel):
         if "ulimits" in kwargs:
             kwargs["ulimits"] = Ulimit(**kwargs["ulimits"])
         return kwargs
+
+
+DockerConfig.update_forward_refs()

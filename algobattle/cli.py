@@ -13,7 +13,7 @@ import tomllib
 from pydantic import BaseModel, validator
 
 from algobattle.battle import Battle
-from algobattle.docker_util import DockerConfig
+from algobattle.docker_util import DockerConfig, Image
 from algobattle.match import MatchConfig, Match
 from algobattle.problem import Problem
 from algobattle.team import TeamHandler, TeamInfo
@@ -209,6 +209,8 @@ def parse_cli_args(args: list[str]) -> tuple[Path, Config]:
     else:
         config = Config()
     config.include_cli(parsed)
+    if config.docker.advanced_run_params is not None:
+        Image.run_kwargs = config.docker.advanced_run_params.to_docker_args()
 
     if not config.teams:
         config.teams.append(TeamInfo(name="team_0", generator=problem / "generator", solver=problem / "solver"))
