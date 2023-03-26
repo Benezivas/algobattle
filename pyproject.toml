@@ -23,6 +23,7 @@ dependencies = [
 
     "prettytable",
     "pydantic",
+    "anyio",
 ]
 
 [project.scripts]
