@@ -1,5 +1,4 @@
 """Leightweight wrapper around docker functionality."""
-from __future__ import annotations
 from abc import ABC
 import logging
 from pathlib import Path
@@ -9,16 +8,18 @@ from typing import Any, Iterator, Literal, Mapping, Self, TypedDict, cast
 from uuid import uuid1
 import json
 from dataclasses import dataclass
+
 from docker import DockerClient
 from docker.errors import APIError, BuildError, DockerException, ImageNotFound
 from docker.models.images import Image as DockerImage
 from docker.models.containers import Container as DockerContainer
 from docker.types import Mount, LogConfig, Ulimit
 from requests import Timeout
+from pydantic import BaseModel, Field
+
 from algobattle.util import Encodable, Role, TempDir, encode, decode, inherit_docs
 from algobattle.problem import Problem
 
-from pydantic import BaseModel, Field
 
 logger = logging.getLogger("algobattle.docker")
 
@@ -100,7 +101,7 @@ class ArchivedImage:
     id: str
     description: str
 
-    def restore(self) -> Image:
+    def restore(self) -> "Image":
         """Restores a docker image from an archive."""
         try:
             with open(self.path, "rb") as file:
@@ -137,7 +138,7 @@ class Image:
         timeout: float | None = None,
         *,
         dockerfile: str | None = None,
-    ) -> Image:
+    ) -> Self:
         """Constructs the python Image object and uses the docker daemon to build the image.
 
         Parameters
