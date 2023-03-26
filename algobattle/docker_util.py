@@ -13,7 +13,7 @@ from docker.errors import APIError, BuildError, DockerException, ImageNotFound
 from docker.models.images import Image as DockerImage
 from docker.models.containers import Container as DockerContainer
 from docker.types import Mount, LogConfig, Ulimit
-from requests import Response, Timeout, ConnectionError
+from requests import Timeout, ConnectionError
 from pydantic import BaseModel, Field
 from anyio.to_thread import run_sync
 
@@ -93,29 +93,6 @@ class SemanticsError(DockerError):
     """Indicates that the parsed data is semantically incorrect."""
 
     pass
-
-
-async def _docker_stop(container: DockerContainer, timeout: float | None = None):
-    """
-    Asynchronously stops a container. Similar to the ``docker stop`` command.
-
-    Uses a worker thread to provide an async interface.
-    """
-    # Using a worker thread for this is not ideal but the docker daemon api is strange enough that
-    # implementing our own http call with an async lib would be a considerable amount of effort.
-    connection = client().api
-    params: dict[str, Any] = {
-        "signal": "SIGWINCH",
-    }
-    conn_timeout = connection.timeout
-    if timeout is not None:
-        conn_timeout += timeout
-        params["t"] = timeout
-    url = connection._url("/containers/{0}/stop", container.id)
-    def inner() -> Response:
-        return connection.post(url, timeout=conn_timeout, **params)
-    res = await run_sync(inner)
-    connection._raise_for_status(res)
 
 
 @dataclass
@@ -304,23 +281,8 @@ class Image:
                 ),
             )
 
-            container.start()
-            await _docker_stop(container, timeout)
-            start_time = default_timer()
-            try:
-                response = container.wait(timeout=timeout)
-                if response["StatusCode"] != 0:
-                    raise ExecutionError(
-                        runtime=elapsed_time,
-                        exit_code=response["StatusCode"],
-                        error_message=container.logs().decode(),
-                    )
-            except (Timeout, ConnectionError) as e:
-                container.kill()
-                if len(e.args) == 0 or isinstance(e.args[0], Timeout):
-                    raise
-                logger.warning(f"{self.description} exceeded time limit!")
-            elapsed_time = round(default_timer() - start_time, 2)
+            elapsed_time = await run_sync(self._run_container, container, timeout)
+            print(f"ELAPSED TIME: {elapsed_time}")
 
         except ImageNotFound as e:
             logger.warning(f"Image {self.name} (id={self.id}) does not exist")
@@ -370,6 +332,26 @@ class Image:
             raise DockerError(f"Docker APIError thrown while archiving '{self.name}'") from e
         return ArchivedImage(path, self.name, self.id, self.description)
 
+    def _run_container(self, container: DockerContainer, timeout: float | None = None) -> float:
+        container.start()
+        start_time = default_timer()
+        elapsed_time = 0
+        try:
+            print(f"A current time: {round(default_timer() - start_time, 2)}\n")
+            response = container.wait(timeout=timeout)
+            print(f"B current time: {round(default_timer() - start_time, 2)}\n")
+            elapsed_time = round(default_timer() - start_time, 2)
+            if response["StatusCode"] != 0:
+                raise ExecutionError(runtime=elapsed_time, exit_code=response["StatusCode"], error_message=container.logs().decode())
+        except (Timeout, ConnectionError) as e:
+            print(f"C current time: {round(default_timer() - start_time, 2)}\n")
+            container.kill()
+            print(f"D current time: {round(default_timer() - start_time, 2)}\n")
+            elapsed_time = round(default_timer() - start_time, 2)
+            if len(e.args) == 0 or isinstance(e.args[0], Timeout):
+                raise
+            logger.warning(f"{self.description} exceeded time limit!")
+        return elapsed_time
 
 @dataclass
 class GeneratorResult:
