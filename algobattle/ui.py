@@ -28,7 +28,7 @@ class Subject(ABC):
 
     def __init_subclass__(cls, notify_var_changes: bool = False) -> None:
         if notify_var_changes:
-            cls.__setattr__ = cls.__notifying_setattr__ # type: ignore
+            cls.__setattr__ = cls.__notifying_setattr__     # type: ignore
         return super().__init_subclass__()
 
     def __init__(self, observer: Observer | None = None) -> None:
