@@ -142,7 +142,7 @@ class Execution(TestCase):
         cls.config = MatchConfig()
         run_params = RunParameters(timeout=2)
         cls.docker_config = DockerConfig(generator=run_params, solver=run_params)
-        cls.iter_config = Iterated.Config(iteration_cap=10)
+        cls.iter_config = Iterated.Config(iteration_cap=10, rounds=2)
         cls.avg_config = Averaged.Config(instance_size=5, iterations=3)
         cls.generator = problem_path / "generator"
         cls.solver = problem_path / "solver"
