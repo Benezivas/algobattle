@@ -158,11 +158,10 @@ class Ui(ABC):
     """Base class for a UI that observes a Match and displays its data."""
 
     match: Match
-    battle_data: dict[Matchup, Any] = field(default_factory=dict, init=False)
 
     def get_battle_observer(self, matchup: Matchup) -> "BattleObserver":
         """Creates an observer for a specifc battle."""
-        return BattleObserver(self, matchup)
+        return self.BattleObserver(self, matchup)
 
     @abstractmethod
     def battle_completed(self, matchup: Matchup) -> None:
@@ -174,17 +173,25 @@ class Ui(ABC):
         """Notifies the Ui to update the display of fight results for a specific battle."""
         raise NotImplementedError
 
+    @abstractmethod
+    def update_battle_data(self, matchup: Matchup, data: Battle.UiData) -> None:
+        """Passes new custom battle data to the Ui."""
+        raise NotImplementedError
 
-@dataclass
-class BattleObserver(BattleUiProxy):
-    """Tracks updates for a specific battle"""
+    @dataclass
+    class BattleObserver(BattleUiProxy):
+        """Tracks updates for a specific battle"""
 
-    ui: Ui
-    matchup: Matchup
+        ui: "Ui"
+        matchup: Matchup
 
-    @inherit_docs
-    def update_fights(self) -> None:
-        self.ui.update_fights(self.matchup)
+        @inherit_docs
+        def update_fights(self) -> None:
+            self.ui.update_fights(self.matchup)
+
+        @inherit_docs
+        def update_data(self, data: Battle.UiData) -> None:
+            self.ui.update_battle_data(self.matchup, data)
 
 
 class EmptyUi(Ui):
@@ -196,4 +203,8 @@ class EmptyUi(Ui):
 
     @inherit_docs
     def battle_completed(self, matchup: Matchup) -> None:
+        return
+
+    @inherit_docs
+    def update_battle_data(self, matchup: Matchup, data: Battle.UiData) -> None:
         return

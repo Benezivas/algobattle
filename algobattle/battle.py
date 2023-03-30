@@ -43,8 +43,13 @@ class FightResult:
 class BattleUiProxy(Protocol):
     """Provides an interface for :cls:`Battle`s to update the Ui."""
 
+    @abstractmethod
     def update_fights(self) -> None:
         """Notifies the Ui to update the display of fight results for this battle."""
+
+    @abstractmethod
+    def update_data(self, data: "Battle.UiData") -> None:
+        """Passes new custom display data to the Ui."""
 
 
 @dataclass
@@ -81,6 +86,9 @@ class Battle(ABC):
             """Pydandtic config."""
 
             validate_assignment = True
+
+    class UiData(BaseModel):
+        """Object containing custom diplay data."""
 
     @staticmethod
     def all() -> dict[str, type["Battle"]]:
@@ -139,7 +147,6 @@ class Battle(ABC):
         solver_battle_output: Mapping[str, type[Encodable]] = {},
     ) -> FightResult:
         """Execute a single fight of a battle, running the generator and solver and handling any errors gracefully."""
-        cls.notify()
         gen_result = await generator.run(
             size=size,
             timeout=timeout_generator,
@@ -151,7 +158,6 @@ class Battle(ABC):
         if isinstance(gen_result.result, ProgramError):
             return FightResult(score=1, generator=gen_result.result, solver=None)
 
-        cls.notify()
         sol_result = await solver.run(
             gen_result.result.problem,
             size=size,
@@ -188,6 +194,11 @@ class Iterated(Battle):
         exponent: int = Field(default=2, help="Determines how quickly the instance size grows.")
         approximation_ratio: float = Field(default=1, help="Approximation ratio that a solver needs to achieve to pass.")
 
+    @inherit_docs
+    class UiData(Battle.UiData):
+        reached: list[int]
+        cap: int
+
     async def run_battle(self, generator: Generator, solver: Solver, config: Config, min_size: int) -> None:
         """Execute one iterative battle between a generating and a solving team.
 
@@ -215,6 +226,7 @@ class Iterated(Battle):
             cap = config.iteration_cap
             current = min_size
             while alive:
+                self.ui.update_data(self.UiData(reached=results + [reached], cap=cap))
                 result = await self.run_fight(generator, solver, current)
                 score = result.score
                 if score < config.approximation_ratio:
@@ -268,6 +280,10 @@ class Averaged(Battle):
         instance_size: int = Field(default=10, help="Instance size that will be fought at.")
         iterations: int = Field(default=10, help="Number of iterations in each round.")
 
+    @inherit_docs
+    class UiData(Battle.UiData):
+        round: int
+
     async def run_battle(self, generator: Generator, solver: Solver, config: Config, min_size: int) -> None:
         """Execute one averaged battle between a generating and a solving team.
 
@@ -278,7 +294,8 @@ class Averaged(Battle):
             raise ValueError(
                 f"The problem specifies a minimum size of {min_size} but the chosen size is only {config.instance_size}!"
             )
-        for _ in range(config.iterations):
+        for i in range(config.iterations):
+            self.ui.update_data(self.UiData(round=i+1))
             await self.run_fight(generator, solver, config.instance_size)
 
     @inherit_docs
