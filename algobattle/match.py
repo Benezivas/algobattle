@@ -1,5 +1,5 @@
 """Central managing module for an algorithmic battle."""
-from abc import ABC
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 import logging
 from typing import Any, Self
@@ -10,9 +10,10 @@ from anyio import create_task_group, CapacityLimiter, TASK_STATUS_IGNORED
 from anyio.to_thread import current_default_thread_limiter
 from anyio.abc import TaskStatus
 
-from algobattle.battle import Battle, Iterated
+from algobattle.battle import Battle, Iterated, BattleUiProxy
 from algobattle.team import Matchup, TeamHandler, Team
 from algobattle.problem import Problem
+from algobattle.util import inherit_docs
 
 logger = logging.getLogger("algobattle.match")
 
@@ -60,8 +61,8 @@ class Match:
         self,
         battle: Battle,
         matchup: Matchup,
-        limiter: CapacityLimiter,
         ui: "Ui",
+        limiter: CapacityLimiter,
         *,
         task_status: TaskStatus = TASK_STATUS_IGNORED,
     ) -> None:
@@ -77,7 +78,7 @@ class Match:
             except Exception as e:
                 logger.critical(f"Unhandeled error during execution of battle!\n{e}")
             finally:
-                del ui.battle_data[matchup]
+                ui.battle_completed(matchup)
 
     @classmethod
     async def run(
@@ -89,16 +90,16 @@ class Match:
         ui: "Ui" | None = None,
     ) -> Self:
         """Executes a match with the specified parameters."""
-        if ui is None:
-            ui = EmptyUi()
         result = cls(config, battle_config, problem, teams)
+        if ui is None:
+            ui = EmptyUi(result)
         limiter = CapacityLimiter(config.parallel_battles)
         current_default_thread_limiter().total_tokens = config.parallel_battles
         async with create_task_group() as tg:
             for matchup in teams.matchups:
-                battle = config.battle_type(observer=observer)      # type: ignore
+                battle = config.battle_type(ui.get_battle_observer(matchup))
                 result.results[matchup] = battle
-                await tg.start(cls._run_battle, battle, matchup, battle_config, problem.min_size, limiter, ui)
+                await tg.start(result._run_battle, battle, matchup, ui, limiter)
             return result
 
     def calculate_points(self) -> dict[str, float]:
@@ -156,8 +157,43 @@ class Match:
 class Ui(ABC):
     """Base class for a UI that observes a Match and displays its data."""
 
+    match: Match
     battle_data: dict[Matchup, Any] = field(default_factory=dict, init=False)
+
+    def get_battle_observer(self, matchup: Matchup) -> "BattleObserver":
+        """Creates an observer for a specifc battle."""
+        return BattleObserver(self, matchup)
+
+    @abstractmethod
+    def battle_completed(self, matchup: Matchup) -> None:
+        """Notifies the Ui that a specific battle has been completed."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def update_fights(self, matchup: Matchup) -> None:
+        """Notifies the Ui to update the display of fight results for a specific battle."""
+        raise NotImplementedError
+
+
+@dataclass
+class BattleObserver(BattleUiProxy):
+    """Tracks updates for a specific battle"""
+
+    ui: Ui
+    matchup: Matchup
+
+    @inherit_docs
+    def update_fights(self) -> None:
+        self.ui.update_fights(self.matchup)
 
 
 class EmptyUi(Ui):
     """Ui that does not display anything."""
+
+    @inherit_docs
+    def update_fights(self, matchup: Matchup) -> None:
+        return
+
+    @inherit_docs
+    def battle_completed(self, matchup: Matchup) -> None:
+        return

@@ -11,6 +11,7 @@ from typing import (
     ClassVar,
     Literal,
     Mapping,
+    Protocol,
     TypeAlias,
     TypeVar,
     get_origin,
@@ -38,10 +39,19 @@ class FightResult:
     solver: SolverResult | ProgramError | None
 
 
+# We need this to be here to prevent an import cycle between match.py and battle.py
+class BattleUiProxy(Protocol):
+    """Provides an interface for :cls:`Battle`s to update the Ui."""
+
+    def update_fights(self) -> None:
+        """Notifies the Ui to update the display of fight results for this battle."""
+
+
 @dataclass
 class Battle(ABC):
     """Abstract Base class for classes that execute a specific kind of battle."""
 
+    ui: BattleUiProxy
     fight_results: list[FightResult] = field(default_factory=list)
 
     scoring_team: ClassVar[Role] = "solver"
@@ -159,7 +169,10 @@ class Battle(ABC):
         )
         score = max(0, min(1, float(score)))
         logger.info(f"The solver achieved a score of {score}.")
-        return FightResult(score, gen_result, sol_result)
+        res = FightResult(score, gen_result, sol_result)
+        self.fight_results.append(res)
+        self.ui.update_fights()
+        return res
 
 
 @dataclass
