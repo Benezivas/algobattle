@@ -94,7 +94,7 @@ class Match:
         """Executes a match with the specified parameters."""
         result = cls(config, battle_config, problem, teams)
         if ui is None:
-            ui = EmptyUi(result)
+            ui = Ui(result)
         limiter = CapacityLimiter(config.parallel_battles)
         current_default_thread_limiter().total_tokens = config.parallel_battles
         async with create_task_group() as tg:
@@ -156,7 +156,7 @@ class Match:
 
 
 @dataclass
-class Ui(ABC):
+class Ui:
     """Base class for a UI that observes a Match and displays its data."""
 
     match: Match
@@ -165,22 +165,18 @@ class Ui(ABC):
         """Creates an observer for a specifc battle."""
         return self.BattleObserver(self, matchup)
 
-    @abstractmethod
     def battle_completed(self, matchup: Matchup) -> None:
         """Notifies the Ui that a specific battle has been completed."""
-        raise NotImplementedError
+        return
 
-    @abstractmethod
     def update_fights(self, matchup: Matchup) -> None:
         """Notifies the Ui to update the display of fight results for a specific battle."""
-        raise NotImplementedError
+        return
 
-    @abstractmethod
     def update_battle_data(self, matchup: Matchup, data: Battle.UiData) -> None:
         """Passes new custom battle data to the Ui."""
-        raise NotImplementedError
+        return
 
-    @abstractmethod
     def update_curr_fight(
         self,
         matchup: Matchup,
@@ -188,7 +184,7 @@ class Ui(ABC):
         data: ProgramDisplayData | GeneratorResult | SolverResult | None = None,
     ) -> None:
         """Passes new info about the current fight to the Ui."""
-        raise NotImplementedError
+        return
 
     @dataclass
     class BattleObserver(BattleUiProxy):
@@ -244,28 +240,3 @@ class Ui(ABC):
                 raise RuntimeError
             self.data.runtime = runtime
             self.battle.ui.update_curr_fight(self.battle.matchup, self.role, self.data)
-
-
-class EmptyUi(Ui):
-    """Ui that does not display anything."""
-
-    @inherit_docs
-    def update_fights(self, matchup: Matchup) -> None:
-        return
-
-    @inherit_docs
-    def battle_completed(self, matchup: Matchup) -> None:
-        return
-
-    @inherit_docs
-    def update_battle_data(self, matchup: Matchup, data: Battle.UiData) -> None:
-        return
-
-    @inherit_docs
-    def update_curr_fight(
-        self,
-        matchup: Matchup,
-        role: Role | None = None,
-        data: ProgramDisplayData | GeneratorResult | SolverResult | None = None,
-    ) -> None:
-        return
