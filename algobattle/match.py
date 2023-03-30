@@ -1,8 +1,9 @@
 """Central managing module for an algorithmic battle."""
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from datetime import datetime
 import logging
-from typing import Any, Self
+from typing import Self
 
 from prettytable import PrettyTable, DOUBLE_BORDER
 from pydantic import BaseModel, validator
@@ -11,9 +12,10 @@ from anyio.to_thread import current_default_thread_limiter
 from anyio.abc import TaskStatus
 
 from algobattle.battle import Battle, Iterated, BattleUiProxy
+from algobattle.docker_util import GeneratorResult, ProgramDisplayData, ProgramUiProxy, SolverResult
 from algobattle.team import Matchup, TeamHandler, Team
 from algobattle.problem import Problem
-from algobattle.util import inherit_docs
+from algobattle.util import Role, inherit_docs
 
 logger = logging.getLogger("algobattle.match")
 
@@ -178,12 +180,28 @@ class Ui(ABC):
         """Passes new custom battle data to the Ui."""
         raise NotImplementedError
 
+    @abstractmethod
+    def update_curr_fight(
+        self,
+        matchup: Matchup,
+        role: Role | None = None,
+        data: ProgramDisplayData | GeneratorResult | SolverResult | None = None,
+    ) -> None:
+        """Passes new info about the current fight to the Ui."""
+        raise NotImplementedError
+
     @dataclass
     class BattleObserver(BattleUiProxy):
         """Tracks updates for a specific battle"""
 
         ui: "Ui"
         matchup: Matchup
+        generator: "Ui.ProgramObserver" = field(init=False)
+        solver: "Ui.ProgramObserver" = field(init=False)
+
+        def __post_init__(self) -> None:
+            self.generator = Ui.ProgramObserver(self, "generator")
+            self.solver = Ui.ProgramObserver(self, "solver")
 
         @inherit_docs
         def update_fights(self) -> None:
@@ -192,6 +210,40 @@ class Ui(ABC):
         @inherit_docs
         def update_data(self, data: Battle.UiData) -> None:
             self.ui.update_battle_data(self.matchup, data)
+
+        @inherit_docs
+        def update_curr_fight(
+            self,
+            role: Role | None = None,
+            data: ProgramDisplayData | GeneratorResult | SolverResult | None = None,
+        ) -> None:
+            self.ui.update_curr_fight(self.matchup, role, data)
+
+    @dataclass
+    class ProgramObserver(ProgramUiProxy):
+        """Tracks state of a specific program execution."""
+
+        battle: "Ui.BattleObserver"
+        role: Role
+        data: ProgramDisplayData | None = None
+
+        @inherit_docs
+        def start(self, size: int, timeout: float | None, space: int | None, cpus: int) -> None:
+            self.data = ProgramDisplayData(
+                datetime.now(),
+                size,
+                timeout,
+                space,
+                cpus,
+            )
+            self.battle.ui.update_curr_fight(self.battle.matchup, self.role, self.data)
+
+        @inherit_docs
+        def stop(self, runtime: float) -> None:
+            if self.data is None:
+                raise RuntimeError
+            self.data.runtime = runtime
+            self.battle.ui.update_curr_fight(self.battle.matchup, self.role, self.data)
 
 
 class EmptyUi(Ui):
@@ -207,4 +259,13 @@ class EmptyUi(Ui):
 
     @inherit_docs
     def update_battle_data(self, matchup: Matchup, data: Battle.UiData) -> None:
+        return
+
+    @inherit_docs
+    def update_curr_fight(
+        self,
+        matchup: Matchup,
+        role: Role | None = None,
+        data: ProgramDisplayData | GeneratorResult | SolverResult | None = None,
+    ) -> None:
         return

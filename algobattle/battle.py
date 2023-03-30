@@ -16,11 +16,12 @@ from typing import (
     TypeVar,
     get_origin,
     get_type_hints,
+    overload,
 )
 
 from pydantic import BaseModel, Field, BaseConfig
 
-from algobattle.docker_util import ProgramError, Generator, Solver, GeneratorResult, SolverResult
+from algobattle.docker_util import ProgramDisplayData, ProgramError, Generator, ProgramResult, ProgramUiProxy, Solver, GeneratorResult, SolverResult
 from algobattle.util import Encodable, Role, inherit_docs
 
 logger = logging.getLogger("algobattle.battle")
@@ -43,6 +44,9 @@ class FightResult:
 class BattleUiProxy(Protocol):
     """Provides an interface for :cls:`Battle`s to update the Ui."""
 
+    generator: ProgramUiProxy
+    solver: ProgramUiProxy
+
     @abstractmethod
     def update_fights(self) -> None:
         """Notifies the Ui to update the display of fight results for this battle."""
@@ -50,6 +54,32 @@ class BattleUiProxy(Protocol):
     @abstractmethod
     def update_data(self, data: "Battle.UiData") -> None:
         """Passes new custom display data to the Ui."""
+
+    @overload
+    @abstractmethod
+    def update_curr_fight(self, role: Literal["generator"], data: ProgramDisplayData | GeneratorResult | None) -> None:
+        ...
+
+    @overload
+    @abstractmethod
+    def update_curr_fight(self, role: Literal["solver"], data: ProgramDisplayData | SolverResult | None) -> None:
+        ...
+
+    @overload
+    @abstractmethod
+    def update_curr_fight(self, role: None = None, data: None = None) -> None:
+        ...
+
+    @abstractmethod
+    def update_curr_fight(
+        self,
+        role: Role | None = None,
+        data: ProgramDisplayData | ProgramResult | None = None,
+    ) -> None:
+        """Updates the ui with info about the current fight.
+        
+        `data` is either the starting time of the 
+        """
 
 
 @dataclass
@@ -154,7 +184,9 @@ class Battle(ABC):
             cpus=cpus_generator,
             battle_input=generator_battle_input,
             battle_output=generator_battle_output,
+            ui=self.ui.generator,
         )
+        self.ui.update_curr_fight("generator", gen_result)
         if isinstance(gen_result.result, ProgramError):
             return FightResult(score=1, generator=gen_result.result, solver=None)
 
@@ -166,7 +198,9 @@ class Battle(ABC):
             cpus=cpus_solver,
             battle_input=solver_battle_input,
             battle_output=solver_battle_output,
+            ui=self.ui.solver,
         )
+        self.ui.update_curr_fight("solver", sol_result)
         if isinstance(sol_result.result, ProgramError):
             return FightResult(score=0, generator=gen_result, solver=sol_result)
 

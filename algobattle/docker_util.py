@@ -1,9 +1,10 @@
 """Leightweight wrapper around docker functionality."""
 from abc import ABC, abstractmethod
+from datetime import datetime
 import logging
 from pathlib import Path
 from timeit import default_timer
-from typing import Any, ClassVar, Iterator, Literal, Mapping, Self, TypedDict, cast
+from typing import Any, ClassVar, Iterator, Literal, Mapping, Protocol, Self, TypedDict, cast
 from uuid import uuid1
 import json
 from dataclasses import dataclass
@@ -102,6 +103,30 @@ class EncodingError(ProgramError):
 
 class DockerError(ProgramError, BuildError):
     """Indicates that an issue with the docker daemon occured."""
+
+
+class ProgramUiProxy(Protocol):
+    """Provides an interface for :cls:`Program`s to update the Ui."""
+
+    @abstractmethod
+    def start(self, size: int, timeout: float | None, space: int | None, cpus: int) -> None:
+        """Signals that the program execution has been started."""
+
+    @abstractmethod
+    def stop(self, runtime: float) -> None:
+        """Signals that the program execution has been finished."""
+
+
+@dataclass
+class ProgramDisplayData:
+    """Display data for the currently executing program."""
+
+    start_time: datetime
+    size: int
+    timeout: float | None
+    space: int | None
+    cpus: int
+    runtime: float | None = None
 
 
 @dataclass
@@ -234,7 +259,10 @@ class Image:
         output_dir: Path | None = None,
         timeout: float | None = None,
         memory: int | None = None,
-        cpus: int | None = None,
+        cpus: int = 1,
+        *,
+        size: int = 0,
+        ui: ProgramUiProxy | None = None,
     ) -> float:
         """Runs a docker image with the provided input and returns its output.
 
@@ -265,8 +293,7 @@ class Image:
         name = f"algobattle_{uuid1().hex[:8]}"
         if memory is not None:
             memory = int(memory * 1000000)
-        if cpus is not None:
-            cpus = int(cpus * 1000000000)
+        cpus = int(cpus * 1000000000)
 
         mounts = []
         if input_dir is not None:
@@ -290,7 +317,11 @@ class Image:
                 ),
             )
 
+            if ui is not None:
+                ui.start(size, timeout, memory, cpus)
             elapsed_time = await run_sync(self._run_container, container, timeout)
+            if ui is not None:
+                ui.stop(elapsed_time)
 
         except ImageNotFound as e:
             logger.warning(f"Image {self.name} (id={self.id}) does not exist")
@@ -364,7 +395,7 @@ class Image:
 class ProgramResult:
     """Result of a program execution."""
 
-    result: Any
+    result: "GeneratorResult.Data | Problem.Solution | ProgramError"
     runtime: float
     size: int
     params: RunParameters
@@ -441,6 +472,7 @@ class Program(ABC):
         cpus: int = ...,
         battle_input: Mapping[str, Encodable] = {},
         battle_output: Mapping[str, type[Encodable]] = {},
+        ui: ProgramUiProxy | None = None,
     ) -> GeneratorResult | SolverResult:
         """Execute the program, processing input and output data."""
         set_params: dict[str, Any] = {}
@@ -491,7 +523,7 @@ class Program(ABC):
                 (output / "battle_data").mkdir()
 
             try:
-                runtime = await self.image.run(input, output, timeout=timeout, memory=space, cpus=cpus)
+                runtime = await self.image.run(input, output, timeout=timeout, memory=space, cpus=cpus, ui=ui)
             except ExecutionError as e:
                 return result_class(e, e.runtime, size, run_params)
             except ProgramError as e:
@@ -573,6 +605,7 @@ class Generator(Program):
         cpus: int = ...,
         battle_input: Mapping[str, Encodable] = {},
         battle_output: Mapping[str, type[Encodable]] = {},
+        ui: ProgramUiProxy | None = None,
     ) -> GeneratorResult:
         """Execute the generator, passing in the size and processing the created problem instance."""
         return cast(GeneratorResult, await self._run(
@@ -582,7 +615,8 @@ class Generator(Program):
             space=space,
             cpus=cpus,
             battle_input=battle_input,
-            battle_output=battle_output
+            battle_output=battle_output,
+            ui=ui,
         ))
 
 
@@ -623,6 +657,7 @@ class Solver(Program):
         cpus: int = ...,
         battle_input: Mapping[str, Encodable] = {},
         battle_output: Mapping[str, type[Encodable]] = {},
+        ui: ProgramUiProxy | None = None,
     ) -> SolverResult:
         """Execute the solver, passing in the problem instance and processing the created solution."""
         return cast(SolverResult, await self._run(
@@ -632,7 +667,8 @@ class Solver(Program):
             space=space,
             cpus=cpus,
             battle_input=battle_input,
-            battle_output=battle_output
+            battle_output=battle_output,
+            ui=ui,
         ))
 
 
