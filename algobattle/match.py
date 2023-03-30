@@ -94,7 +94,8 @@ class Match:
         """Executes a match with the specified parameters."""
         result = cls(config, battle_config, problem, teams)
         if ui is None:
-            ui = Ui(result)
+            ui = Ui()
+        ui.match = result
         limiter = CapacityLimiter(config.parallel_battles)
         current_default_thread_limiter().total_tokens = config.parallel_battles
         async with create_task_group() as tg:
@@ -159,7 +160,7 @@ class Match:
 class Ui:
     """Base class for a UI that observes a Match and displays its data."""
 
-    match: Match
+    match: Match = field(init=False)
 
     def get_battle_observer(self, matchup: Matchup) -> "BattleObserver":
         """Creates an observer for a specifc battle."""
