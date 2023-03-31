@@ -12,7 +12,7 @@ from anyio.to_thread import current_default_thread_limiter
 from anyio.abc import TaskStatus
 
 from algobattle.battle import Battle, Iterated, BattleUiProxy
-from algobattle.docker_util import GeneratorResult, ProgramDisplayData, ProgramUiProxy, SolverResult
+from algobattle.docker_util import GeneratorResult, ProgramDisplayData, ProgramUiProxy, RunParameters, SolverResult
 from algobattle.team import Matchup, TeamHandler, Team
 from algobattle.problem import Problem
 from algobattle.util import Role, inherit_docs
@@ -69,6 +69,7 @@ class Match:
         task_status: TaskStatus = TASK_STATUS_IGNORED,
     ) -> None:
         async with limiter:
+            ui.start_battle(matchup)
             task_status.started()
             try:
                 await battle.run_battle(
@@ -161,14 +162,19 @@ class Ui:
     """Base class for a UI that observes a Match and displays its data."""
 
     match: Match = field(init=False)
+    active_battles: list[Matchup] = field(default_factory=list, init=False)
 
     def get_battle_observer(self, matchup: Matchup) -> "BattleObserver":
         """Creates an observer for a specifc battle."""
         return self.BattleObserver(self, matchup)
 
+    def start_battle(self, matchup: Matchup) -> None:
+        """Notifies the Ui that a battle has been started."""
+        self.active_battles.append(matchup)
+
     def battle_completed(self, matchup: Matchup) -> None:
         """Notifies the Ui that a specific battle has been completed."""
-        return
+        self.active_battles.remove(matchup)
 
     def update_fights(self, matchup: Matchup) -> None:
         """Notifies the Ui to update the display of fight results for a specific battle."""
@@ -229,9 +235,7 @@ class Ui:
             self.data = ProgramDisplayData(
                 datetime.now(),
                 size,
-                timeout,
-                space,
-                cpus,
+                RunParameters(timeout=timeout, space=space, cpus=cpus),
             )
             self.battle.ui.update_curr_fight(self.battle.matchup, self.role, self.data)
 

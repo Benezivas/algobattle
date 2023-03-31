@@ -36,8 +36,8 @@ class FightResult:
     """The result of one execution of the generator and the solver with the generated instance."""
 
     score: float
-    generator: GeneratorResult | ProgramError
-    solver: SolverResult | ProgramError | None
+    generator: GeneratorResult
+    solver: SolverResult | None
 
 
 # We need this to be here to prevent an import cycle between match.py and battle.py
@@ -80,6 +80,14 @@ class BattleUiProxy(Protocol):
         
         `data` is either the starting time of the 
         """
+
+
+@dataclass
+class FightUiData:
+    """Holds display data about the currently executing fight."""
+
+    generator:  ProgramDisplayData | GeneratorResult | None = None
+    solver:  ProgramDisplayData | SolverResult | None = None
 
 
 @dataclass
@@ -188,7 +196,7 @@ class Battle(ABC):
         )
         self.ui.update_curr_fight("generator", gen_result)
         if isinstance(gen_result.result, ProgramError):
-            return FightResult(score=1, generator=gen_result.result, solver=None)
+            return FightResult(score=1, generator=gen_result, solver=None)
 
         sol_result = await solver.run(
             gen_result.result.problem,

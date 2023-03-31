@@ -1,24 +1,29 @@
 """Main battle script. Executes all possible types of battles, see battle --help for all options."""
 from argparse import ArgumentParser, Namespace
 from contextlib import ExitStack
+import curses
+from dataclasses import dataclass, field
 from functools import partial
 import sys
 import logging
 import datetime as dt
 from pathlib import Path
-from typing import Any, ClassVar, Literal, Mapping, Self
+from typing import Any, Callable, ClassVar, Literal, Mapping, ParamSpec, Self, TypeVar
 import tomllib
+from importlib.metadata import version as pkg_version
+from prettytable import DOUBLE_BORDER, PrettyTable
 
 from pydantic import BaseModel, validator
 from anyio import run
 
-from algobattle.battle import Battle
-from algobattle.docker_util import DockerConfig, Image
-from algobattle.match import MatchConfig, Match
+from algobattle.battle import Battle, FightUiData
+from algobattle.docker_util import DockerConfig, GeneratorResult, Image, ProgramDisplayData, ProgramError, SolverResult
+from algobattle.match import MatchConfig, Match, Ui
 from algobattle.problem import Problem
-from algobattle.team import TeamHandler, TeamInfo
-from algobattle.ui import Ui
-from algobattle.util import check_path
+from algobattle.team import Matchup, TeamHandler, TeamInfo
+from algobattle.util import Role, check_path
+
+logger = logging.getLogger("algobattle.cli")
 
 
 def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
@@ -240,7 +245,7 @@ def main():
         problem = Problem.import_from_path(problem)
         with TeamHandler.build(config.teams, problem, config.docker, config.execution.safe_build) as teams, ExitStack() as stack:
             if config.execution.display == "ui":
-                ui = Ui()
+                ui = CliUi()
                 stack.enter_context(ui)
             else:
                 ui = None
@@ -256,6 +261,190 @@ def main():
 
     except KeyboardInterrupt:
         logger.critical("Received keyboard interrupt, terminating execution.")
+
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+
+def check_for_terminal(function: Callable[P, R]) -> Callable[P, R | None]:
+    """Ensure that we are attached to a terminal."""
+
+    def wrapper(*args: P.args, **kwargs: P.kwargs):
+        if not sys.stdout.isatty():
+            logger.error("Not attached to a terminal.")
+            return None
+        else:
+            return function(*args, **kwargs)
+
+    return wrapper
+
+
+@dataclass
+class CliUi(Ui):
+    """A Ui displaying the data to the cli."""
+
+    battle_data: dict[Matchup, Battle.UiData] = field(default_factory=dict, init=False)
+    fight_data: dict[Matchup, FightUiData] = field(default_factory=dict, init=False)
+
+    @check_for_terminal
+    def __enter__(self) -> Self:
+        self.match_result: Any = None
+        self.battle_info: Any = None
+        self.stdscr = curses.initscr()
+        curses.cbreak()
+        curses.noecho()
+        self.stdscr.keypad(True)
+        return self
+
+    @check_for_terminal
+    def __exit__(self, _type, _value, _traceback):
+        """Restore the console."""
+        curses.nocbreak()
+        self.stdscr.keypad(False)
+        curses.echo()
+        curses.endwin()
+
+    @check_for_terminal
+    def battle_completed(self, matchup: Matchup) -> None:
+        """Notifies the Ui that a specific battle has been completed."""
+        del self.battle_data[matchup]
+        del self.fight_data[matchup]
+        self.update()
+
+    def update_fights(self, matchup: Matchup) -> None:
+        """Notifies the Ui to update the display of fight results for a specific battle."""
+        self.update()
+
+    def update_battle_data(self, matchup: Matchup, data: Battle.UiData) -> None:
+        """Passes new custom battle data to the Ui."""
+        self.battle_data[matchup] = data
+        self.update()
+
+    def update_curr_fight(
+        self,
+        matchup: Matchup,
+        role: Role | None = None,
+        data: ProgramDisplayData | GeneratorResult | SolverResult | None = None,
+    ) -> None:
+        """Passes new info about the current fight to the Ui."""
+        if role == "generator" or role is None:
+            assert not isinstance(data, SolverResult)
+            self.fight_data[matchup].generator = data
+        if role == "solver" or role is None:
+            assert not isinstance(data, GeneratorResult)
+            self.fight_data[matchup].solver = data
+        self.update()
+
+    @check_for_terminal
+    def update(self) -> None:
+        """Disaplys the current status of the match to the cli."""
+        logo = [
+            r"    _    _             _           _   _   _      ",
+            r"   / \  | | __ _  ___ | |__   __ _| |_| |_| | ___ ",
+            r"  / _ \ | |/ _` |/ _ \| |_ \ / _` | __| __| |/ _ ""\\",   # we need this to have the string end with a \
+            r" / ___ \| | (_| | (_) | |_) | (_| | |_| |_| |  __/",
+            r"/_/   \_\_|\__, |\___/|_.__/ \__,_|\__|\__|_|\___|",
+            r"            |___/                                 ",
+        ]
+        _, terminal_width = self.stdscr.getmaxyx()
+        out = [
+            line.center(terminal_width) for line in logo
+        ] + [
+            f"Algobattle version {pkg_version(__package__)}",
+            self.display_match(),
+        ]
+        for matchup in self.active_battles:
+            out += [
+                "",
+                f"{matchup.generator.name} vs {matchup.solver.name}",
+                self.display_battle(matchup),
+            ]
+
+        self.stdscr.clear()
+        self.stdscr.addstr(0, 0, "\n".join(out))
+        self.stdscr.refresh()
+        self.stdscr.nodelay(True)
+
+        # on windows curses swallows the ctrl+C event, we need to manually check for the control sequence
+        c = self.stdscr.getch()
+        if c == 3:
+            raise KeyboardInterrupt
+        else:
+            curses.flushinp()
+
+    def display_match(self) -> str:
+        """Formats the match data into a table that can be printed to the terminal."""
+        table = PrettyTable(field_names=["Generator", "Solver", "Result"], min_width=5)
+        table.set_style(DOUBLE_BORDER)
+        table.align["Result"] = "r"
+
+        for matchup, result in self.match.results.items():
+            table.add_row([str(matchup.generator), str(matchup.solver), result.format_score(result.score())])
+
+        return f"Battle Type: {self.match.config.battle_type.name()}\n{table}"
+
+    def display_battle(self, matchup: Matchup) -> str:
+        """Formats the battle data into a string that can be printed to the terminal."""
+        battle = self.match.results[matchup]
+        fights = battle.fight_results[-3:] if len(battle.fight_results) >= 3 else battle.fight_results
+        out = []
+        for i, fight in enumerate(fights, max(len(battle.fight_results) - 2, 1)):
+            data = [
+                f"Fight {i} at size {fight.generator.size}:",
+                "Generator info:",
+                f"{name}: {val}" for name, val in fight.generator.params.dict().items()
+            ]
+            if isinstance(fight.generator.result, ProgramError):
+                data.append("Generator failed!")
+                data.append(str(fight.generator.result))
+            elif isinstance(fight.solver, ProgramError):
+                data.append("Solver failed!")
+                data.append(str(fight.solver.result))
+            else:
+                data.append("Successful run.")
+            data.append(f"Score: {fight.score}")
+            out.append("\n".join(data))
+
+        if matchup in self.battle_data:
+            data = [f"{key}: {val}" for key, val in self.battle_data[matchup].dict()]
+            out.append("\n".join(data))
+
+        if matchup in self.fight_data:
+            fight = self.fight_data[matchup]
+            data = [
+                "Current fight:",
+            ]
+            if fight.generator is not None:
+                data += [
+                    f"Size: {fight.generator.size}",
+                    f"{key}: {val}" for key, val in fight.generator.params.dict().items()
+                ]
+                if isinstance(fight.generator, ProgramDisplayData):
+                    data.append("Currently running...")
+                else:
+                    data.append(f"Runtime: {fight.generator.runtime}")
+                    if isinstance(fight.generator.result, GeneratorResult.Data):
+                        data.append("Ran successfully.")
+                    else:
+                        data.append(f"Failed!")
+                        data.append(str(fight.generator.result))
+            if fight.solver is not None:
+                data += [
+                    f"Size: {fight.solver.size}",
+                    f"{key}: {val}" for key, val in fight.solver.params.dict().items()
+                ]
+                if isinstance(fight.solver, ProgramDisplayData):
+                    data.append("Currently running...")
+                else:
+                    data.append(f"Runtime: {fight.solver.runtime}")
+                    if isinstance(fight.solver.result, GeneratorResult.Data):
+                        data.append("Ran successfully.")
+                    else:
+                        data.append(f"Failed!")
+                        data.append(str(fight.solver.result))
+
+        return "\n\n".join(out)
 
 
 if __name__ == "__main__":

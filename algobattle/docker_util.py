@@ -123,9 +123,7 @@ class ProgramDisplayData:
 
     start_time: datetime
     size: int
-    timeout: float | None
-    space: int | None
-    cpus: int
+    params: RunParameters
     runtime: float | None = None
 
 
