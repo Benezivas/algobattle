@@ -308,8 +308,8 @@ class CliUi(Ui):
     @check_for_terminal
     def battle_completed(self, matchup: Matchup) -> None:
         """Notifies the Ui that a specific battle has been completed."""
-        del self.battle_data[matchup]
-        del self.fight_data[matchup]
+        self.battle_data.pop(matchup, None)
+        self.fight_data.pop(matchup, None)
         self.update()
 
     def update_fights(self, matchup: Matchup) -> None:
