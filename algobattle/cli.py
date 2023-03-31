@@ -78,7 +78,7 @@ def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
 class ExecutionConfig(BaseModel):
     """Config data regarding program execution."""
 
-    display: Literal["silent", "logs", "ui"] = "logs"
+    display: Literal["silent", "logs", "ui"] = "ui"
     logging_path: Path = Path.home() / ".algobattle_logs"
     verbose: bool = False
     safe_build: bool = False
@@ -172,7 +172,7 @@ def parse_cli_args(args: list[str]) -> tuple[Path, Config]:
         "--display",
         choices=["silent", "logs", "ui"],
         help="Choose output mode, silent disables all output, logs displays the battle logs on STDERR,"
-        " ui displays a small GUI showing the progress of the battle. Default: logs.",
+        " ui displays a small GUI showing the progress of the battle. Default: ui.",
     )
 
     parser.add_argument("--verbose", "-v", dest="verbose", action="store_const", const=True, help="More detailed log output.")
