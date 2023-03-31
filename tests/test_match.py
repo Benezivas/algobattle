@@ -133,7 +133,7 @@ class Matchtests(TestCase):
         battle2.fight_results = dummy_result(.4, .4, .4)
         match.results[self.matchup0] = battle
         match.results[self.matchup1] = battle2
-        self.assertEqual(match.calculate_points(), {self.team0.name: 60, self.team1.name: 40})
+        self.assertEqual(match.calculate_points(), {self.team0.name: 40, self.team1.name: 60})
 
     # TODO: Add tests for remaining functions
 
