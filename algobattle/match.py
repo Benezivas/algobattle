@@ -89,7 +89,7 @@ class Match:
         battle_config: Battle.Config,
         problem: type[Problem],
         teams: TeamHandler,
-        ui: "Ui" | None = None,
+        ui: "Ui | None" = None,
     ) -> Self:
         """Executes a match with the specified parameters."""
         result = cls(config, battle_config, problem, teams)

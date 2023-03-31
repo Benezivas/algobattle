@@ -393,6 +393,7 @@ class CliUi(Ui):
             data = [
                 f"Fight {i} at size {fight.generator.size}:",
                 "Generator info:",
+            ] + [
                 f"{name}: {val}" for name, val in fight.generator.params.dict().items()
             ]
             if isinstance(fight.generator.result, ProgramError):
@@ -416,8 +417,8 @@ class CliUi(Ui):
                 "Current fight:",
             ]
             if fight.generator is not None:
+                data.append(f"Size: {fight.generator.size}")
                 data += [
-                    f"Size: {fight.generator.size}",
                     f"{key}: {val}" for key, val in fight.generator.params.dict().items()
                 ]
                 if isinstance(fight.generator, ProgramDisplayData):
@@ -430,8 +431,8 @@ class CliUi(Ui):
                         data.append(f"Failed!")
                         data.append(str(fight.generator.result))
             if fight.solver is not None:
+                data.append(f"Size: {fight.solver.size}")
                 data += [
-                    f"Size: {fight.solver.size}",
                     f"{key}: {val}" for key, val in fight.solver.params.dict().items()
                 ]
                 if isinstance(fight.solver, ProgramDisplayData):
