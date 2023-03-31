@@ -1,5 +1,4 @@
 """Central managing module for an algorithmic battle."""
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 import logging
