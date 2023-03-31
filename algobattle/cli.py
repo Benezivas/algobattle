@@ -328,6 +328,8 @@ class CliUi(Ui):
         data: ProgramDisplayData | GeneratorResult | SolverResult | None = None,
     ) -> None:
         """Passes new info about the current fight to the Ui."""
+        if matchup not in self.fight_data:
+            self.fight_data[matchup] = FightUiData()
         if role == "generator" or role is None:
             assert not isinstance(data, SolverResult)
             self.fight_data[matchup].generator = data
@@ -348,16 +350,21 @@ class CliUi(Ui):
             r"            |___/                                 ",
         ]
         _, terminal_width = self.stdscr.getmaxyx()
-        out = [
-            line.center(terminal_width) for line in logo
-        ] + [
+        out = []
+        if terminal_width >= 50:
+            out += [
+                line.center(terminal_width - 1) for line in logo
+            ]
+        out += [
             f"Algobattle version {pkg_version(__package__)}",
             self.display_match(),
         ]
         for matchup in self.active_battles:
             out += [
                 "",
+                "",
                 f"{matchup.generator.name} vs {matchup.solver.name}",
+                "",
                 self.display_battle(matchup),
             ]
 
@@ -392,10 +399,13 @@ class CliUi(Ui):
         for i, fight in enumerate(fights, max(len(battle.fight_results) - 2, 1)):
             data = [
                 f"Fight {i} at size {fight.generator.size}:",
-                "Generator info:",
-            ] + [
-                f"{name}: {val}" for name, val in fight.generator.params.dict().items()
+                "Generator params:",
             ]
+            data += [f"    {name}: {val}" for name, val in fight.generator.params.dict().items()]
+            if fight.solver is not None:
+                data += ["Solver params:"]
+                data += [f"    {name}: {val}" for name, val in fight.solver.params.dict().items()]
+
             if isinstance(fight.generator.result, ProgramError):
                 data.append("Generator failed!")
                 data.append(str(fight.generator.result))
@@ -403,12 +413,12 @@ class CliUi(Ui):
                 data.append("Solver failed!")
                 data.append(str(fight.solver.result))
             else:
-                data.append("Successful run.")
+                data.append("Successful fight")
             data.append(f"Score: {fight.score}")
             out.append("\n".join(data))
 
         if matchup in self.battle_data:
-            data = [f"{key}: {val}" for key, val in self.battle_data[matchup].dict()]
+            data = [f"{key}: {val}" for key, val in self.battle_data[matchup].dict().items()]
             out.append("\n".join(data))
 
         if matchup in self.fight_data:
