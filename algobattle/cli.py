@@ -338,6 +338,7 @@ class CliUi(Ui):
         if role == "generator" or role is None:
             assert not isinstance(data, SolverResult)
             self.fight_data[matchup].generator = data
+            self.fight_data[matchup].solver = None
         if role == "solver" or role is None:
             assert not isinstance(data, GeneratorResult)
             self.fight_data[matchup].solver = data
@@ -371,7 +372,6 @@ class CliUi(Ui):
                 "",
                 "",
                 f"{matchup.generator.name} vs {matchup.solver.name}",
-                "",
             ] + self.display_battle(matchup)
 
         if len(out) > terminal_height:
@@ -433,11 +433,11 @@ class CliUi(Ui):
             fight = self.fight_data[matchup]
             out += [
                 "",
-                "Current fight:",
+                "Current fight:" if fight.generator is None else f"Current fight at size {fight.generator.size}",
             ]
             if fight.generator is not None:
-                out.append(f"Size: {fight.generator.size}")
-                out += [f"{key}: {val}" for key, val in fight.generator.params.dict().items()]
+                out.append("Generator:")
+                out += [f"    {key}: {val}" for key, val in fight.generator.params.dict().items()]
                 if isinstance(fight.generator, ProgramDisplayData):
                     out.append("Currently running...")
                 else:
@@ -448,13 +448,13 @@ class CliUi(Ui):
                         out.append(f"Failed!")
                         out.append(str(fight.generator.result))
             if fight.solver is not None:
-                out.append(f"Size: {fight.solver.size}")
-                out += [f"{key}: {val}" for key, val in fight.solver.params.dict().items()]
+                out.append("Solver:")
+                out += [f"    {key}: {val}" for key, val in fight.solver.params.dict().items()]
                 if isinstance(fight.solver, ProgramDisplayData):
                     out.append("Currently running...")
                 else:
                     out.append(f"Runtime: {fight.solver.runtime}")
-                    if isinstance(fight.solver.result, GeneratorResult.Data):
+                    if isinstance(fight.solver.result, Problem.Solution):
                         out.append("Ran successfully.")
                     else:
                         out.append(f"Failed!")
