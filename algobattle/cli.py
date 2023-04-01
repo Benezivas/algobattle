@@ -261,7 +261,7 @@ def main():
             result = run(_run_with_ui, config.match, config.battle_config, problem, teams, ui)
 
             logger.info("#" * 78)
-            logger.info(result.display())
+            logger.info(CliUi.display_match(result))
             if config.match.points > 0:
                 points = result.calculate_points()
                 for team, pts in points.items():
@@ -362,7 +362,7 @@ class CliUi(Ui):
                 line.center(terminal_width - 1) for line in logo
             ]
         out.append(f"Algobattle version {pkg_version(__package__)}")
-        out += self.display_match()
+        out += self.display_match(self.match)
         for matchup in self.active_battles:
             out += [
                 "",
@@ -385,16 +385,17 @@ class CliUi(Ui):
         else:
             curses.flushinp()
 
-    def display_match(self) -> list[str]:
+    @staticmethod
+    def display_match(match) -> list[str]:
         """Formats the match data into a table that can be printed to the terminal."""
         table = PrettyTable(field_names=["Generator", "Solver", "Result"], min_width=5)
         table.set_style(DOUBLE_BORDER)
         table.align["Result"] = "r"
 
-        for matchup, result in self.match.results.items():
+        for matchup, result in match.results.items():
             table.add_row([str(matchup.generator), str(matchup.solver), result.format_score(result.score())])
 
-        return [f"Battle Type: {self.match.config.battle_type.name()}"] + list(str(table).split("\n"))
+        return [f"Battle Type: {match.config.battle_type.name()}"] + list(str(table).split("\n"))
 
     def display_battle(self, matchup: Matchup) -> list[str]:
         """Formats the battle data into a string that can be printed to the terminal."""

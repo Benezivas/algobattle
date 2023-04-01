@@ -152,11 +152,6 @@ class Battle(ABC):
         """Formats a score nicely."""
         return f"{score:.2f}"
 
-    @abstractmethod
-    def display(self) -> str:
-        """Nicely formats the object."""
-        raise NotImplementedError
-
     @classmethod
     def name(cls) -> str:
         """Name of the type of this battle."""
@@ -308,10 +303,6 @@ class Iterated(Battle):
     def format_score(score: float) -> str:
         return str(int(score))
 
-    @inherit_docs
-    def display(self) -> str:
-        return ""
-
 
 @dataclass
 class Averaged(Battle):
@@ -351,7 +342,3 @@ class Averaged(Battle):
     @staticmethod
     def format_score(score: float) -> str:
         return format(score, ".0%")
-
-    @inherit_docs
-    def display(self) -> str:
-        return ""

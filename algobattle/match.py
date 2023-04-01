@@ -147,17 +147,6 @@ class Match:
 
         return points
 
-    def display(self) -> str:
-        """Formats the match data into a table that can be printed to the terminal."""
-        table = PrettyTable(field_names=["Generator", "Solver", "Result"], min_width=5)
-        table.set_style(DOUBLE_BORDER)
-        table.align["Result"] = "r"
-
-        for matchup, result in self.results.items():
-            table.add_row([str(matchup.generator), str(matchup.solver), result.format_score(result.score())])
-
-        return f"Battle Type: {self.config.battle_type.name()}\n{table}"
-
 
 @dataclass
 class Ui:
