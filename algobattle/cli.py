@@ -349,25 +349,24 @@ class CliUi(Ui):
             r"/_/   \_\_|\__, |\___/|_.__/ \__,_|\__|\__|_|\___|",
             r"            |___/                                 ",
         ]
-        _, terminal_width = self.stdscr.getmaxyx()
-        out = []
+        terminal_height, terminal_width = self.stdscr.getmaxyx()
+        out: list[str] = []
         if terminal_width >= 50:
             out += [
                 line.center(terminal_width - 1) for line in logo
             ]
-        out += [
-            f"Algobattle version {pkg_version(__package__)}",
-            self.display_match(),
-        ]
+        out.append(f"Algobattle version {pkg_version(__package__)}")
+        out += self.display_match()
         for matchup in self.active_battles:
             out += [
                 "",
                 "",
                 f"{matchup.generator.name} vs {matchup.solver.name}",
                 "",
-                self.display_battle(matchup),
-            ]
+            ] + self.display_battle(matchup)
 
+        if len(out) > terminal_height:
+            out = out[:terminal_height]
         self.stdscr.clear()
         self.stdscr.addstr(0, 0, "\n".join(out))
         self.stdscr.refresh()
@@ -380,7 +379,7 @@ class CliUi(Ui):
         else:
             curses.flushinp()
 
-    def display_match(self) -> str:
+    def display_match(self) -> list[str]:
         """Formats the match data into a table that can be printed to the terminal."""
         table = PrettyTable(field_names=["Generator", "Solver", "Result"], min_width=5)
         table.set_style(DOUBLE_BORDER)
@@ -389,73 +388,69 @@ class CliUi(Ui):
         for matchup, result in self.match.results.items():
             table.add_row([str(matchup.generator), str(matchup.solver), result.format_score(result.score())])
 
-        return f"Battle Type: {self.match.config.battle_type.name()}\n{table}"
+        return [f"Battle Type: {self.match.config.battle_type.name()}"] + list(str(table).split("\n"))
 
-    def display_battle(self, matchup: Matchup) -> str:
+    def display_battle(self, matchup: Matchup) -> list[str]:
         """Formats the battle data into a string that can be printed to the terminal."""
         battle = self.match.results[matchup]
         fights = battle.fight_results[-3:] if len(battle.fight_results) >= 3 else battle.fight_results
         out = []
         for i, fight in enumerate(fights, max(len(battle.fight_results) - 2, 1)):
-            data = [
+            out += [
+                "",
                 f"Fight {i} at size {fight.generator.size}:",
                 "Generator params:",
             ]
-            data += [f"    {name}: {val}" for name, val in fight.generator.params.dict().items()]
+            out += [f"    {name}: {val}" for name, val in fight.generator.params.dict().items()]
             if fight.solver is not None:
-                data += ["Solver params:"]
-                data += [f"    {name}: {val}" for name, val in fight.solver.params.dict().items()]
+                out += ["Solver params:"]
+                out += [f"    {name}: {val}" for name, val in fight.solver.params.dict().items()]
 
             if isinstance(fight.generator.result, ProgramError):
-                data.append("Generator failed!")
-                data.append(str(fight.generator.result))
+                out.append("Generator failed!")
+                out.append(str(fight.generator.result))
             elif isinstance(fight.solver, ProgramError):
-                data.append("Solver failed!")
-                data.append(str(fight.solver.result))
+                out.append("Solver failed!")
+                out.append(str(fight.solver.result))
             else:
-                data.append("Successful fight")
-            data.append(f"Score: {fight.score}")
-            out.append("\n".join(data))
+                out.append("Successful fight")
+            out.append(f"Score: {fight.score}")
 
         if matchup in self.battle_data:
-            data = [f"{key}: {val}" for key, val in self.battle_data[matchup].dict().items()]
-            out.append("\n".join(data))
+            out += [""] + [f"{key}: {val}" for key, val in self.battle_data[matchup].dict().items()]
 
         if matchup in self.fight_data:
             fight = self.fight_data[matchup]
-            data = [
+            out += [
+                "",
                 "Current fight:",
             ]
             if fight.generator is not None:
-                data.append(f"Size: {fight.generator.size}")
-                data += [
-                    f"{key}: {val}" for key, val in fight.generator.params.dict().items()
-                ]
+                out.append(f"Size: {fight.generator.size}")
+                out += [f"{key}: {val}" for key, val in fight.generator.params.dict().items()]
                 if isinstance(fight.generator, ProgramDisplayData):
-                    data.append("Currently running...")
+                    out.append("Currently running...")
                 else:
-                    data.append(f"Runtime: {fight.generator.runtime}")
+                    out.append(f"Runtime: {fight.generator.runtime}")
                     if isinstance(fight.generator.result, GeneratorResult.Data):
-                        data.append("Ran successfully.")
+                        out.append("Ran successfully.")
                     else:
-                        data.append(f"Failed!")
-                        data.append(str(fight.generator.result))
+                        out.append(f"Failed!")
+                        out.append(str(fight.generator.result))
             if fight.solver is not None:
-                data.append(f"Size: {fight.solver.size}")
-                data += [
-                    f"{key}: {val}" for key, val in fight.solver.params.dict().items()
-                ]
+                out.append(f"Size: {fight.solver.size}")
+                out += [f"{key}: {val}" for key, val in fight.solver.params.dict().items()]
                 if isinstance(fight.solver, ProgramDisplayData):
-                    data.append("Currently running...")
+                    out.append("Currently running...")
                 else:
-                    data.append(f"Runtime: {fight.solver.runtime}")
+                    out.append(f"Runtime: {fight.solver.runtime}")
                     if isinstance(fight.solver.result, GeneratorResult.Data):
-                        data.append("Ran successfully.")
+                        out.append("Ran successfully.")
                     else:
-                        data.append(f"Failed!")
-                        data.append(str(fight.solver.result))
+                        out.append(f"Failed!")
+                        out.append(str(fight.solver.result))
 
-        return "\n\n".join(out)
+        return out
 
 
 if __name__ == "__main__":
