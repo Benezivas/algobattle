@@ -92,8 +92,11 @@ class Match(Subject):
         for home_matchup, away_matchup in self.teams.grouped_matchups:
             home_team: Team = getattr(home_matchup, self.config.battle_type.scoring_team)
             away_team: Team = getattr(away_matchup, self.config.battle_type.scoring_team)
-            home_res = self.results[home_matchup]
-            away_res = self.results[away_matchup]
+            try:
+                home_res = self.results[home_matchup]
+                away_res = self.results[away_matchup]
+            except KeyError:
+                continue
             total_score = home_res.score() + away_res.score()
             if total_score == 0:
                 # Default values for proportions, assuming no team manages to solve anything
