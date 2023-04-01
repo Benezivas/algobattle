@@ -14,7 +14,7 @@ from importlib.metadata import version as pkg_version
 from prettytable import DOUBLE_BORDER, PrettyTable
 
 from pydantic import BaseModel, validator
-from anyio import run
+from anyio import create_task_group, run, sleep
 
 from algobattle.battle import Battle, FightUiData
 from algobattle.docker_util import DockerConfig, GeneratorResult, Image, ProgramDisplayData, ProgramError, SolverResult
@@ -232,17 +232,25 @@ def parse_cli_args(args: list[str]) -> tuple[Path, Config]:
     return problem, config
 
 
+async def _run_with_ui(match_config: MatchConfig, battle_config: Battle.Config, problem: type[Problem], teams: TeamHandler, ui: "CliUi"):
+    async with create_task_group() as tg:
+        tg.start_soon(ui.loop)
+        result = await Match.run(match_config, battle_config, problem, teams, ui)
+        tg.cancel_scope.cancel()
+        return result
+
+
 def main():
     """Entrypoint of `algobattle` CLI."""
     try:
-        problem, config = parse_cli_args(sys.argv[1:])
+        problem_path, config = parse_cli_args(sys.argv[1:])
         logger = setup_logging(config.execution.logging_path, config.execution.verbose, config.execution.display != "logs")
 
     except KeyboardInterrupt:
         raise SystemExit("Received keyboard interrupt, terminating execution.")
 
     try:
-        problem = Problem.import_from_path(problem)
+        problem = Problem.import_from_path(problem_path)
         with TeamHandler.build(config.teams, problem, config.docker, config.execution.safe_build) as teams, ExitStack() as stack:
             if config.execution.display == "ui":
                 ui = CliUi()
@@ -250,7 +258,7 @@ def main():
             else:
                 ui = None
 
-            result = run(Match.run, config.match, config.battle_config, problem, teams, ui)
+            result = run(_run_with_ui, config.match, config.battle_config, problem, teams, ui)
 
             logger.info("#" * 78)
             logger.info(result.display())
@@ -310,16 +318,10 @@ class CliUi(Ui):
         """Notifies the Ui that a specific battle has been completed."""
         self.battle_data.pop(matchup, None)
         self.fight_data.pop(matchup, None)
-        self.update()
-
-    def update_fights(self, matchup: Matchup) -> None:
-        """Notifies the Ui to update the display of fight results for a specific battle."""
-        self.update()
 
     def update_battle_data(self, matchup: Matchup, data: Battle.UiData) -> None:
         """Passes new custom battle data to the Ui."""
         self.battle_data[matchup] = data
-        self.update()
 
     def update_curr_fight(
         self,
@@ -336,7 +338,11 @@ class CliUi(Ui):
         if role == "solver" or role is None:
             assert not isinstance(data, GeneratorResult)
             self.fight_data[matchup].solver = data
-        self.update()
+
+    async def loop(self) -> None:
+        while True:
+            self.update()
+            await sleep(0.1)
 
     @check_for_terminal
     def update(self) -> None:
