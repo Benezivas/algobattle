@@ -255,7 +255,6 @@ class Iterated(Battle):
         During execution, this function updates the self.round_data dict,
         which automatically notifies all observers subscribed to this object.s
         """
-        results = []
         for _ in range(config.rounds):
             base_increment = 0
             alive = True
@@ -263,7 +262,7 @@ class Iterated(Battle):
             cap = config.iteration_cap
             current = min_size
             while alive:
-                self.ui.update_data(self.UiData(reached=results + [reached], cap=cap))
+                self.ui.update_data(self.UiData(reached=self.results + [reached], cap=cap))
                 result = await self.run_fight(generator, solver, current)
                 score = result.score
                 if score < config.approximation_ratio:
@@ -292,7 +291,7 @@ class Iterated(Battle):
                         # We have failed at this value of n already, reset the step size!
                         current -= base_increment ** config.exponent - 1
                         base_increment = 1
-            results.append(reached)
+            self.results.append(reached)
 
     @inherit_docs
     def score(self) -> float:
