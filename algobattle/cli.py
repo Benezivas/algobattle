@@ -262,10 +262,13 @@ def main():
 
             logger.info("#" * 78)
             logger.info(CliUi.display_match(result))
+            print("\n".join(CliUi.display_match(result)))
             if config.match.points > 0:
                 points = result.calculate_points()
                 for team, pts in points.items():
-                    logger.info(f"Team {team} gained {pts:.1f} points.")
+                    line = f"Team {team} gained {pts:.1f} points."
+                    print(line)
+                    logger.info(line)
 
     except KeyboardInterrupt:
         logger.critical("Received keyboard interrupt, terminating execution.")
@@ -386,7 +389,7 @@ class CliUi(Ui):
             curses.flushinp()
 
     @staticmethod
-    def display_match(match) -> list[str]:
+    def display_match(match: Match) -> list[str]:
         """Formats the match data into a table that can be printed to the terminal."""
         table = PrettyTable(field_names=["Generator", "Solver", "Result"], min_width=5)
         table.set_style(DOUBLE_BORDER)
