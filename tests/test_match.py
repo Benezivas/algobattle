@@ -24,7 +24,7 @@ class TestTeam(Team):
 def dummy_result(*score: float) -> list[Fight]:
     """Creates a list of dummy results for testing"""
     return [
-        Fight(s, GeneratorResult(ProgramError(""), 0, 0, RunParameters()), None)
+        Fight(s, 0, GeneratorResult(ProgramError(""), 0, 0, RunParameters()), None)
         for s in score
     ]
 
