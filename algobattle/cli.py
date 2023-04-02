@@ -410,13 +410,7 @@ class CliUi(Ui):
             out += [
                 "",
                 f"Fight {i} at size {fight.generator.size}:",
-                "Generator params:",
             ]
-            out += [f"    {name}: {val}" for name, val in fight.generator.params.dict().items()]
-            if fight.solver is not None:
-                out += ["Solver params:"]
-                out += [f"    {name}: {val}" for name, val in fight.solver.params.dict().items()]
-
             if isinstance(fight.generator.result, ProgramError):
                 out.append("Generator failed!")
                 out.append(str(fight.generator.result))
