@@ -9,7 +9,7 @@ from anyio import create_task_group, CapacityLimiter, TASK_STATUS_IGNORED
 from anyio.to_thread import current_default_thread_limiter
 from anyio.abc import TaskStatus
 
-from algobattle.battle import Battle, Iterated, BattleUiProxy
+from algobattle.battle import Battle, FightUiProxy, Iterated, BattleUiProxy
 from algobattle.docker_util import GeneratorResult, ProgramUiProxy, SolverResult
 from algobattle.team import Matchup, TeamHandler, Team
 from algobattle.problem import Problem
@@ -149,7 +149,13 @@ class Match:
 
 @dataclass
 class Ui:
-    """Base class for a UI that observes a Match and displays its data."""
+    """Base class for a UI that observes a Match and displays its data.
+    
+    The Ui object both observes the match object as it's being built and receives additional updates through method calls.
+    To do this, it provides several objects whose methods are essentially curried versions of its own methods.
+    These observer classes should generally not be subclassed, all Ui functionality can be implemented by just subclassing
+    :cls:`Ui` and implementing its methods.
+    """
 
     match: Match = field(init=False)
     active_battles: list[Matchup] = field(default_factory=list, init=False)
@@ -189,16 +195,14 @@ class Ui:
 
     @dataclass
     class BattleObserver(BattleUiProxy):
-        """Tracks updates for a specific battle"""
+        """Tracks updates for a specific battle."""
 
         ui: "Ui"
         matchup: Matchup
-        generator: "Ui.ProgramObserver" = field(init=False)
-        solver: "Ui.ProgramObserver" = field(init=False)
+        fight_ui: "Ui.FightObserver" = field(init=False)
 
         def __post_init__(self) -> None:
-            self.generator = Ui.ProgramObserver(self, "generator")
-            self.solver = Ui.ProgramObserver(self, "solver")
+            self.fight_ui = Ui.FightObserver(self)
 
         @inherit_docs
         def update_fights(self) -> None:
@@ -212,13 +216,29 @@ class Ui:
             """Informs the Ui of a newly started fight."""
             self.ui.start_fight(self.matchup, size)
 
+    @dataclass
+    class FightObserver(FightUiProxy):
+        """Tracks updates for the currently executed fight of a battle."""
+
+        battle_ui: "Ui.BattleObserver"
+        generator: "Ui.ProgramObserver" = field(init=False)
+        solver: "Ui.ProgramObserver" = field(init=False)
+
+        def __post_init__(self) -> None:
+            self.generator = Ui.ProgramObserver(self.battle_ui, "generator")
+            self.solver = Ui.ProgramObserver(self.battle_ui, "solver")
+
         @inherit_docs
-        def update_curr_fight(
+        def start(self, size: int) -> None:
+            self.battle_ui.ui.start_fight(self.battle_ui.matchup, size)
+
+        @inherit_docs
+        def update(
             self,
             role: Role | None = None,
             data: TimerInfo | float | GeneratorResult | SolverResult | None = None,
         ) -> None:
-            self.ui.update_curr_fight(self.matchup, role, data)
+            self.battle_ui.ui.update_curr_fight(self.battle_ui.matchup, role, data)
 
     @dataclass
     class ProgramObserver(ProgramUiProxy):

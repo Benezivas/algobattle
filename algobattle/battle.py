@@ -13,6 +13,7 @@ from typing import (
     Literal,
     Mapping,
     Protocol,
+    Self,
     TypeAlias,
     TypeVar,
     get_origin,
@@ -31,6 +32,42 @@ logger = logging.getLogger("algobattle.battle")
 _Config: TypeAlias = Any
 T = TypeVar("T")
 
+
+class FightUiProxy(Protocol):
+    """Provides an interface for :cls:`Fight` to update the Ui."""
+
+    generator: ProgramUiProxy
+    solver: ProgramUiProxy
+
+    def start(self, size: int) -> None:
+        """Informs the Ui of a newly started fight."""
+
+    @overload
+    @abstractmethod
+    def update(self, role: Literal["generator"], data: datetime | float | GeneratorResult | None) -> None:
+        ...
+
+    @overload
+    @abstractmethod
+    def update(self, role: Literal["solver"], data: datetime | float | SolverResult | None) -> None:
+        ...
+
+    @overload
+    @abstractmethod
+    def update(self, role: None = None, data: None = None) -> None:
+        ...
+
+    @abstractmethod
+    def update(
+        self,
+        role: Role | None = None,
+        data: datetime | float | ProgramResult | None = None,
+    ) -> None:
+        """Updates the ui with info about the current fight.
+        
+        `data` is either the starting time of the 
+        """
+    
 
 @dataclass
 class Fight:
@@ -55,45 +92,15 @@ class FightUiData:
 class BattleUiProxy(Protocol):
     """Provides an interface for :cls:`Battle`s to update the Ui."""
 
-    generator: ProgramUiProxy
-    solver: ProgramUiProxy
-
-    @abstractmethod
-    def update_fights(self) -> None:
-        """Notifies the Ui to update the display of fight results for this battle."""
+    fight_ui: FightUiProxy
 
     @abstractmethod
     def update_data(self, data: "Battle.UiData") -> None:
         """Passes new custom display data to the Ui."""
 
-    def start_fight(self, size: int) -> None:
-        """Informs the Ui of a newly started fight."""
-
-    @overload
     @abstractmethod
-    def update_curr_fight(self, role: Literal["generator"], data: datetime | float | GeneratorResult | None) -> None:
-        ...
-
-    @overload
-    @abstractmethod
-    def update_curr_fight(self, role: Literal["solver"], data: datetime | float | SolverResult | None) -> None:
-        ...
-
-    @overload
-    @abstractmethod
-    def update_curr_fight(self, role: None = None, data: None = None) -> None:
-        ...
-
-    @abstractmethod
-    def update_curr_fight(
-        self,
-        role: Role | None = None,
-        data: datetime | float | ProgramResult | None = None,
-    ) -> None:
-        """Updates the ui with info about the current fight.
-        
-        `data` is either the starting time of the 
-        """
+    def update_fights(self) -> None:
+        """Notifies the Ui to update the display of fight results for this battle."""
 
 
 @dataclass
@@ -185,8 +192,10 @@ class Battle(ABC):
         generator_battle_output: Mapping[str, type[Encodable]] = {},
         solver_battle_output: Mapping[str, type[Encodable]] = {},
     ) -> Fight:
-        """Execute a single fight of a battle, running the generator and solver and handling any errors gracefully."""
-        self.ui.start_fight(size)
+        """Execute a single fight of a battle between the given programs."""
+        fight_ui = self.ui.fight_ui
+        
+        fight_ui.start(size)
         gen_result = await generator.run(
             size=size,
             timeout=timeout_generator,
@@ -194,9 +203,9 @@ class Battle(ABC):
             cpus=cpus_generator,
             battle_input=generator_battle_input,
             battle_output=generator_battle_output,
-            ui=self.ui.generator,
+            ui=fight_ui.generator,
         )
-        self.ui.update_curr_fight("generator", gen_result)
+        fight_ui.update("generator", gen_result)
         if isinstance(gen_result.result, ProgramError):
             return Fight(score=1, size=size, generator=gen_result, solver=None)
 
@@ -208,9 +217,9 @@ class Battle(ABC):
             cpus=cpus_solver,
             battle_input=solver_battle_input,
             battle_output=solver_battle_output,
-            ui=self.ui.solver,
+            ui=fight_ui.solver,
         )
-        self.ui.update_curr_fight("solver", sol_result)
+        fight_ui.update("solver", sol_result)
         if isinstance(sol_result.result, ProgramError):
             return Fight(score=0, size=size, generator=gen_result, solver=sol_result)
 
@@ -219,10 +228,10 @@ class Battle(ABC):
         )
         score = max(0, min(1, float(score)))
         logger.info(f"The solver achieved a score of {score}.")
-        res = Fight(score, size, gen_result, sol_result)
-        self.fight_results.append(res)
+        result = Fight(score, size, gen_result, sol_result)
+        self.fight_results.append(result)
         self.ui.update_fights()
-        return res
+        return result
 
 
 @dataclass
