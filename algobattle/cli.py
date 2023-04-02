@@ -232,7 +232,9 @@ def parse_cli_args(args: list[str]) -> tuple[Path, Config]:
     return problem, config
 
 
-async def _run_with_ui(match_config: MatchConfig, battle_config: Battle.Config, problem: type[Problem], teams: TeamHandler, ui: "CliUi"):
+async def _run_with_ui(
+    match_config: MatchConfig, battle_config: Battle.Config, problem: type[Problem], teams: TeamHandler, ui: "CliUi"
+):
     async with create_task_group() as tg:
         tg.start_soon(ui.loop)
         result = await Match.run(match_config, battle_config, problem, teams, ui)
@@ -251,7 +253,9 @@ def main():
 
     try:
         problem = Problem.import_from_path(problem_path)
-        with TeamHandler.build(config.teams, problem, config.docker, config.execution.safe_build) as teams, ExitStack() as stack:
+        with TeamHandler.build(
+            config.teams, problem, config.docker, config.execution.safe_build
+        ) as teams, ExitStack() as stack:
             if config.execution.display == "ui":
                 ui = CliUi()
                 stack.enter_context(ui)
@@ -355,7 +359,7 @@ class CliUi(Ui):
         logo = [
             r"    _    _             _           _   _   _      ",
             r"   / \  | | __ _  ___ | |__   __ _| |_| |_| | ___ ",
-            r"  / _ \ | |/ _` |/ _ \| |_ \ / _` | __| __| |/ _ ""\\",   # we need this to have the string end with a \
+            r"  / _ \ | |/ _` |/ _ \| |_ \ / _` | __| __| |/ _ " "\\",  # we need this to have the string end with a \
             r" / ___ \| | (_| | (_) | |_) | (_| | |_| |_| |  __/",
             r"/_/   \_\_|\__, |\___/|_.__/ \__,_|\__|\__|_|\___|",
             r"            |___/                                 ",
@@ -363,9 +367,7 @@ class CliUi(Ui):
         terminal_height, terminal_width = self.stdscr.getmaxyx()
         out: list[str] = []
         if terminal_width >= 50:
-            out += [
-                line.center(terminal_width - 1) for line in logo
-            ]
+            out += [line.center(terminal_width - 1) for line in logo]
         out.append(f"Algobattle version {pkg_version(__package__)}")
         out += self.display_match(self.match)
         for matchup in self.active_battles:
@@ -444,7 +446,7 @@ class CliUi(Ui):
                     if isinstance(fight.generator.result, GeneratorResult.Data):
                         out.append("Ran successfully.")
                     else:
-                        out.append(f"Failed!")
+                        out.append("Failed!")
                         out.append(str(fight.generator.result))
             if fight.solver is not None:
                 out.append("Solver:")
@@ -460,7 +462,7 @@ class CliUi(Ui):
                     if isinstance(fight.solver.result, Problem.Solution):
                         out.append("Ran successfully.")
                     else:
-                        out.append(f"Failed!")
+                        out.append("Failed!")
                         out.append(str(fight.solver.result))
 
         return out

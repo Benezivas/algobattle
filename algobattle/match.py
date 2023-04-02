@@ -150,7 +150,7 @@ class Match:
 @dataclass
 class Ui:
     """Base class for a UI that observes a Match and displays its data.
-    
+
     The Ui object both observes the match object as it's being built and receives additional updates through method calls.
     To do this, it provides several objects whose methods are essentially curried versions of its own methods.
     These observer classes should generally not be subclassed, all Ui functionality can be implemented by just subclassing

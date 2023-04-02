@@ -13,7 +13,6 @@ from typing import (
     Literal,
     Mapping,
     Protocol,
-    Self,
     TypeAlias,
     TypeVar,
     get_origin,
@@ -23,7 +22,15 @@ from typing import (
 
 from pydantic import BaseModel, Field, BaseConfig
 
-from algobattle.docker_util import ProgramError, Generator, ProgramResult, ProgramUiProxy, Solver, GeneratorResult, SolverResult
+from algobattle.docker_util import (
+    ProgramError,
+    Generator,
+    ProgramResult,
+    ProgramUiProxy,
+    Solver,
+    GeneratorResult,
+    SolverResult,
+)
 from algobattle.util import Encodable, Role, TimerInfo, inherit_docs
 
 logger = logging.getLogger("algobattle.battle")
@@ -64,10 +71,10 @@ class FightUiProxy(Protocol):
         data: datetime | float | ProgramResult | None = None,
     ) -> None:
         """Updates the ui with info about the current fight.
-        
-        `data` is either the starting time of the 
+
+        `data` is either the starting time of the
         """
-    
+
 
 @dataclass
 class Fight:
@@ -85,7 +92,7 @@ class FightUiData:
 
     size: int
     generator: TimerInfo | float | GeneratorResult | None = None
-    solver:  TimerInfo | float | SolverResult | None = None
+    solver: TimerInfo | float | SolverResult | None = None
 
 
 # We need this to be here to prevent an import cycle between match.py and battle.py
@@ -121,16 +128,16 @@ class Battle(ABC):
             """Constructs a list of argument names and `**kwargs` that can be passed to `ArgumentParser.add_argument()`."""
             arguments: list[tuple[str, dict[str, Any]]] = []
             resolved_annotations = get_type_hints(cls)
-            for name, field in cls.__fields__.items():
-                kwargs = field.field_info.extra
-                kwargs["help"] = kwargs.get("help", "") + f" Default: {field.default}"
+            for name, model_field in cls.__fields__.items():
+                kwargs = model_field.field_info.extra
+                kwargs["help"] = kwargs.get("help", "") + f" Default: {model_field.default}"
                 if resolved_annotations[name] == bool and "action" not in kwargs and "const" not in kwargs:
                     kwargs["action"] = "store_const"
-                    kwargs["const"] = not field.default
+                    kwargs["const"] = not model_field.default
                 elif get_origin(resolved_annotations[name]) == Literal and "choices" not in kwargs:
                     kwargs["choices"] = resolved_annotations[name].__args__
 
-                arguments.append((field.name, kwargs))
+                arguments.append((model_field.name, kwargs))
             return arguments
 
         class Config(BaseConfig):
@@ -194,7 +201,7 @@ class Battle(ABC):
     ) -> Fight:
         """Execute a single fight of a battle between the given programs."""
         fight_ui = self.ui.fight_ui
-        
+
         fight_ui.start(size)
         gen_result = await generator.run(
             size=size,
@@ -282,15 +289,17 @@ class Iterated(Battle):
                 result = await self.run_fight(generator, solver, current)
                 score = result.score
                 if score < config.approximation_ratio:
-                    logger.info(f"Solver does not meet the required solution quality at instance size "
-                                f"{current}. ({score}/{config.approximation_ratio})")
+                    logger.info(
+                        f"Solver does not meet the required solution quality at instance size "
+                        f"{current}. ({score}/{config.approximation_ratio})"
+                    )
                     alive = False
 
                 if not alive and base_increment > 1:
                     # The step size increase was too aggressive, take it back and reset the base_increment
                     logger.info(f"Setting the solution cap to {current}...")
                     cap = current
-                    current -= base_increment ** config.exponent
+                    current -= base_increment**config.exponent
                     base_increment = 0
                     alive = True
                 elif current > reached and alive:
@@ -301,11 +310,11 @@ class Iterated(Battle):
                     alive = False
                 else:
                     base_increment += 1
-                    current += base_increment ** config.exponent
+                    current += base_increment**config.exponent
 
                     if current >= cap:
                         # We have failed at this value of n already, reset the step size!
-                        current -= base_increment ** config.exponent - 1
+                        current -= base_increment**config.exponent - 1
                         base_increment = 1
             self.results.append(reached)
 
@@ -343,7 +352,7 @@ class Averaged(Battle):
                 f"The problem specifies a minimum size of {min_size} but the chosen size is only {config.instance_size}!"
             )
         for i in range(config.iterations):
-            self.ui.update_data(self.UiData(round=i+1))
+            self.ui.update_data(self.UiData(round=i + 1))
             await self.run_fight(generator, solver, config.instance_size)
 
     @inherit_docs
