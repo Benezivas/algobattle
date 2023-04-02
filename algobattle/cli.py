@@ -7,7 +7,7 @@ from functools import partial
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, ClassVar, Literal, Mapping, ParamSpec, Self, TypeVar
+from typing import Any, Callable, ClassVar, Mapping, ParamSpec, Self, TypeVar
 import tomllib
 from importlib.metadata import version as pkg_version
 
@@ -26,8 +26,7 @@ from algobattle.util import Role, TimerInfo, check_path, flat_intersperse
 class ExecutionConfig(BaseModel):
     """Config data regarding program execution."""
 
-    display: Literal["silent", "logs", "ui"] = "ui"
-    verbose: bool = False
+    silent: bool = False
     safe_build: bool = False
 
 
@@ -110,14 +109,8 @@ def parse_cli_args(args: list[str]) -> tuple[Path, Config]:
     parser.add_argument(
         "--config", type=partial(check_path, type="file"), help="Path to a config file, defaults to '{problem} / config.toml'."
     )
-    parser.add_argument(
-        "--display",
-        choices=["silent", "ui"],
-        help="Choose output mode, silent disables all output"
-        " ui displays a small GUI showing the progress of the battle. Default: ui.",
-    )
+    parser.add_argument("-s", "--silent", action="store_const", const=True, help="Disable the cli Ui.")
 
-    parser.add_argument("--verbose", "-v", dest="verbose", action="store_const", const=True, help="More detailed log output.")
     parser.add_argument(
         "--safe_build",
         action="store_const",
@@ -175,10 +168,11 @@ def parse_cli_args(args: list[str]) -> tuple[Path, Config]:
 
 
 async def _run_with_ui(
-    match_config: MatchConfig, battle_config: Battle.Config, problem: type[Problem], teams: TeamHandler, ui: "CliUi"
+    match_config: MatchConfig, battle_config: Battle.Config, problem: type[Problem], teams: TeamHandler, ui: "CliUi | None"
 ):
     async with create_task_group() as tg:
-        tg.start_soon(ui.loop)
+        if ui is not None:
+            tg.start_soon(ui.loop)
         result = await Match.run(match_config, battle_config, problem, teams, ui)
         tg.cancel_scope.cancel()
         return result
@@ -197,11 +191,11 @@ def main():
         with TeamHandler.build(
             config.teams, problem, config.docker, config.execution.safe_build
         ) as teams, ExitStack() as stack:
-            if config.execution.display == "ui":
+            if config.execution.silent:
+                ui = None
+            else:
                 ui = CliUi()
                 stack.enter_context(ui)
-            else:
-                ui = None
 
             result = run(_run_with_ui, config.match, config.battle_config, problem, teams, ui)
             print("\n".join(CliUi.display_match(result)))
