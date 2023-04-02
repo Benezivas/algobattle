@@ -323,7 +323,11 @@ class CliUi(Ui):
         table.align["Result"] = "r"
 
         for matchup, result in match.results.items():
-            table.add_row([str(matchup.generator), str(matchup.solver), result.format_score(result.score())])
+            if result.run_exception is None:
+                res = result.format_score(result.score())
+            else:
+                res = f"Error: {result.run_exception}"
+            table.add_row([str(matchup.generator), str(matchup.solver), res])
 
         return [f"Battle Type: {match.config.battle_type.name()}"] + list(str(table).split("\n"))
 

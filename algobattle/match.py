@@ -37,22 +37,15 @@ class MatchConfig(BaseModel):
             raise TypeError
 
 
+@dataclass
 class Match:
     """The Result of a whole Match."""
 
-    def __init__(
-        self,
-        config: MatchConfig,
-        battle_config: Battle.Config,
-        problem: type[Problem],
-        teams: TeamHandler,
-    ) -> None:
-        self.results: dict[Matchup, Battle] = {}
-        self.config = config
-        self.battle_config = battle_config
-        self.problem = problem
-        self.teams = teams
-        super().__init__()
+    config: MatchConfig
+    battle_config: Battle.Config
+    problem: type[Problem]
+    teams: TeamHandler
+    results: dict[Matchup, Battle] = field(default_factory=dict, init=False)
 
     async def _run_battle(
         self,
@@ -73,9 +66,8 @@ class Match:
                     self.battle_config,
                     self.problem.min_size,
                 )
-            except Exception as _:
-                #! Add some useful error logging schema here
-                pass
+            except Exception as e:
+                battle.run_exception = e
             finally:
                 ui.battle_completed(matchup)
 
