@@ -77,6 +77,70 @@ class FightUiProxy(Protocol):
 
 
 @dataclass
+class FightHandler:
+    """Helper class to run fights of a given matchup."""
+
+    _generator: Generator
+    _solver: Solver
+    _battle: "Battle"
+
+    async def run(
+        self,
+        size: int,
+        *,
+        timeout_generator: float | None = ...,
+        space_generator: int | None = ...,
+        cpus_generator: int = ...,
+        timeout_solver: float | None = ...,
+        space_solver: int | None = ...,
+        cpus_solver: int = ...,
+        generator_battle_input: Mapping[str, Encodable] = {},
+        solver_battle_input: Mapping[str, Encodable] = {},
+        generator_battle_output: Mapping[str, type[Encodable]] = {},
+        solver_battle_output: Mapping[str, type[Encodable]] = {},
+    ) -> "Fight":
+        """Execute a single fight of a battle between the given programs."""
+        ui = self._battle.ui.fight_ui
+        ui.start(size)
+        gen_result = await self._generator.run(
+            size=size,
+            timeout=timeout_generator,
+            space=space_generator,
+            cpus=cpus_generator,
+            battle_input=generator_battle_input,
+            battle_output=generator_battle_output,
+            ui=ui.generator,
+        )
+        ui.update("generator", gen_result)
+        if isinstance(gen_result.result, ProgramError):
+            return Fight(score=1, size=size, generator=gen_result, solver=None)
+
+        sol_result = await self._solver.run(
+            gen_result.result.problem,
+            size=size,
+            timeout=timeout_solver,
+            space=space_solver,
+            cpus=cpus_solver,
+            battle_input=solver_battle_input,
+            battle_output=solver_battle_output,
+            ui=ui.solver,
+        )
+        ui.update("solver", sol_result)
+        if isinstance(sol_result.result, ProgramError):
+            return Fight(score=0, size=size, generator=gen_result, solver=sol_result)
+
+        score = gen_result.result.problem.calculate_score(
+            solution=sol_result.result, generator_solution=gen_result.result.solution, size=size
+        )
+        score = max(0, min(1, float(score)))
+        logger.info(f"The solver achieved a score of {score}.")
+        result = Fight(score, size, gen_result, sol_result)
+        self._battle.fight_results.append(result)
+        self._battle.ui.update_fights()
+        return result
+
+
+@dataclass
 class Fight:
     """The result of one execution of the generator and the solver with the generated instance."""
 
@@ -178,67 +242,9 @@ class Battle(ABC):
         return cls.__name__
 
     @abstractmethod
-    async def run_battle(self, generator: Generator, solver: Solver, config: _Config, min_size: int) -> None:
+    async def run_battle(self, fight: FightHandler, config: _Config, min_size: int) -> None:
         """Calculates the next instance size that should be fought over."""
         raise NotImplementedError
-
-    async def run_fight(
-        self,
-        generator: Generator,
-        solver: Solver,
-        size: int,
-        *,
-        timeout_generator: float | None = ...,
-        space_generator: int | None = ...,
-        cpus_generator: int = ...,
-        timeout_solver: float | None = ...,
-        space_solver: int | None = ...,
-        cpus_solver: int = ...,
-        generator_battle_input: Mapping[str, Encodable] = {},
-        solver_battle_input: Mapping[str, Encodable] = {},
-        generator_battle_output: Mapping[str, type[Encodable]] = {},
-        solver_battle_output: Mapping[str, type[Encodable]] = {},
-    ) -> Fight:
-        """Execute a single fight of a battle between the given programs."""
-        fight_ui = self.ui.fight_ui
-
-        fight_ui.start(size)
-        gen_result = await generator.run(
-            size=size,
-            timeout=timeout_generator,
-            space=space_generator,
-            cpus=cpus_generator,
-            battle_input=generator_battle_input,
-            battle_output=generator_battle_output,
-            ui=fight_ui.generator,
-        )
-        fight_ui.update("generator", gen_result)
-        if isinstance(gen_result.result, ProgramError):
-            return Fight(score=1, size=size, generator=gen_result, solver=None)
-
-        sol_result = await solver.run(
-            gen_result.result.problem,
-            size=size,
-            timeout=timeout_solver,
-            space=space_solver,
-            cpus=cpus_solver,
-            battle_input=solver_battle_input,
-            battle_output=solver_battle_output,
-            ui=fight_ui.solver,
-        )
-        fight_ui.update("solver", sol_result)
-        if isinstance(sol_result.result, ProgramError):
-            return Fight(score=0, size=size, generator=gen_result, solver=sol_result)
-
-        score = gen_result.result.problem.calculate_score(
-            solution=sol_result.result, generator_solution=gen_result.result.solution, size=size
-        )
-        score = max(0, min(1, float(score)))
-        logger.info(f"The solver achieved a score of {score}.")
-        result = Fight(score, size, gen_result, sol_result)
-        self.fight_results.append(result)
-        self.ui.update_fights()
-        return result
 
 
 @dataclass
@@ -259,7 +265,7 @@ class Iterated(Battle):
         reached: list[int]
         cap: int
 
-    async def run_battle(self, generator: Generator, solver: Solver, config: Config, min_size: int) -> None:
+    async def run_battle(self, fight: FightHandler, config: Config, min_size: int) -> None:
         """Execute one iterative battle between a generating and a solving team.
 
         Incrementally try to search for the highest n for which the solver is
@@ -286,7 +292,7 @@ class Iterated(Battle):
             current = min_size
             while alive:
                 self.ui.update_data(self.UiData(reached=self.results + [reached], cap=cap))
-                result = await self.run_fight(generator, solver, current)
+                result = await fight.run(current)
                 score = result.score
                 if score < config.approximation_ratio:
                     logger.info(
@@ -341,7 +347,7 @@ class Averaged(Battle):
     class UiData(Battle.UiData):
         round: int
 
-    async def run_battle(self, generator: Generator, solver: Solver, config: Config, min_size: int) -> None:
+    async def run_battle(self, fight: FightHandler, config: Config, min_size: int) -> None:
         """Execute one averaged battle between a generating and a solving team.
 
         Execute several fights between two teams on a fixed instance size
@@ -353,7 +359,7 @@ class Averaged(Battle):
             )
         for i in range(config.iterations):
             self.ui.update_data(self.UiData(round=i + 1))
-            await self.run_fight(generator, solver, config.instance_size)
+            await fight.run(config.instance_size)
 
     @inherit_docs
     def score(self) -> float:
