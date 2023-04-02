@@ -1,12 +1,13 @@
 """Main battle script. Executes all possible types of battles, see battle --help for all options."""
 from argparse import ArgumentParser, Namespace
+from collections import defaultdict
 from contextlib import ExitStack
 import curses
 from dataclasses import dataclass, field
 from functools import partial
 import sys
 import logging
-import datetime as dt
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, ClassVar, Literal, Mapping, ParamSpec, Self, TypeVar
 import tomllib
@@ -17,11 +18,11 @@ from pydantic import BaseModel, validator
 from anyio import create_task_group, run, sleep
 
 from algobattle.battle import Battle, FightUiData
-from algobattle.docker_util import DockerConfig, GeneratorResult, Image, ProgramDisplayData, ProgramError, SolverResult
+from algobattle.docker_util import DockerConfig, GeneratorResult, Image, ProgramError, SolverResult
 from algobattle.match import MatchConfig, Match, Ui
 from algobattle.problem import Problem
 from algobattle.team import Matchup, TeamHandler, TeamInfo
-from algobattle.util import Role, check_path
+from algobattle.util import Role, TimerInfo, check_path
 
 logger = logging.getLogger("algobattle.cli")
 
@@ -50,7 +51,7 @@ def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
 
     Path(logging_path).mkdir(exist_ok=True)
 
-    t = dt.datetime.now()
+    t = datetime.now()
     current_timestamp = f"{t.year:04d}-{t.month:02d}-{t.day:02d}_{t.hour:02d}-{t.minute:02d}-{t.second:02d}"
     logging_path = Path(logging_path, current_timestamp + ".log")
 
@@ -296,7 +297,7 @@ class CliUi(Ui):
     """A Ui displaying the data to the cli."""
 
     battle_data: dict[Matchup, Battle.UiData] = field(default_factory=dict, init=False)
-    fight_data: dict[Matchup, FightUiData] = field(default_factory=dict, init=False)
+    fight_data: defaultdict[Matchup, FightUiData] = field(default_factory=lambda: defaultdict(FightUiData), init=False)
 
     @check_for_terminal
     def __enter__(self) -> Self:
@@ -330,11 +331,9 @@ class CliUi(Ui):
         self,
         matchup: Matchup,
         role: Role | None = None,
-        data: ProgramDisplayData | GeneratorResult | SolverResult | None = None,
+        data: TimerInfo | float | GeneratorResult | SolverResult | None = None,
     ) -> None:
         """Passes new info about the current fight to the Ui."""
-        if matchup not in self.fight_data:
-            self.fight_data[matchup] = FightUiData()
         if role == "generator" or role is None:
             assert not isinstance(data, SolverResult)
             self.fight_data[matchup].generator = data
@@ -433,13 +432,17 @@ class CliUi(Ui):
             fight = self.fight_data[matchup]
             out += [
                 "",
-                "Current fight:" if fight.generator is None else f"Current fight at size {fight.generator.size}",
+                "Current fight:",
             ]
             if fight.generator is not None:
                 out.append("Generator:")
-                out += [f"    {key}: {val}" for key, val in fight.generator.params.dict().items()]
-                if isinstance(fight.generator, ProgramDisplayData):
-                    out.append("Currently running...")
+                if isinstance(fight.generator, TimerInfo):
+                    runtime_info = str(round((datetime.now() - fight.generator.start).total_seconds(), 1))
+                    if fight.generator.timeout is not None:
+                        runtime_info += f"/{round(fight.generator.timeout, 1)}"
+                    out.append(f"Currently running... ({runtime_info})")
+                elif isinstance(fight.generator, float):
+                    out.append(f"Runtime: {fight.generator}")
                 else:
                     out.append(f"Runtime: {fight.generator.runtime}")
                     if isinstance(fight.generator.result, GeneratorResult.Data):
@@ -449,9 +452,13 @@ class CliUi(Ui):
                         out.append(str(fight.generator.result))
             if fight.solver is not None:
                 out.append("Solver:")
-                out += [f"    {key}: {val}" for key, val in fight.solver.params.dict().items()]
-                if isinstance(fight.solver, ProgramDisplayData):
-                    out.append("Currently running...")
+                if isinstance(fight.solver, TimerInfo):
+                    runtime_info = str(round((datetime.now() - fight.solver.start).total_seconds(), 1))
+                    if fight.solver.timeout is not None:
+                        runtime_info += f"/{round(fight.solver.timeout, 1)}"
+                    out.append(f"Currently running... ({runtime_info})")
+                elif isinstance(fight.solver, float):
+                    out.append(f"Runtime: {fight.solver}")
                 else:
                     out.append(f"Runtime: {fight.solver.runtime}")
                     if isinstance(fight.solver.result, Problem.Solution):

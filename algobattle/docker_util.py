@@ -1,6 +1,5 @@
 """Leightweight wrapper around docker functionality."""
 from abc import ABC, abstractmethod
-from datetime import datetime
 import logging
 from pathlib import Path
 from timeit import default_timer
@@ -109,22 +108,12 @@ class ProgramUiProxy(Protocol):
     """Provides an interface for :cls:`Program`s to update the Ui."""
 
     @abstractmethod
-    def start(self, size: int, timeout: float | None, space: int | None, cpus: int) -> None:
+    def start(self, timeout: float | None) -> None:
         """Signals that the program execution has been started."""
 
     @abstractmethod
     def stop(self, runtime: float) -> None:
         """Signals that the program execution has been finished."""
-
-
-@dataclass
-class ProgramDisplayData:
-    """Display data for the currently executing program."""
-
-    start_time: datetime
-    size: int
-    params: RunParameters
-    runtime: float | None = None
 
 
 @dataclass
@@ -316,7 +305,7 @@ class Image:
             )
 
             if ui is not None:
-                ui.start(size, timeout, memory, cpus)
+                ui.start(timeout)
             elapsed_time = await run_sync(self._run_container, container, timeout)
             if ui is not None:
                 ui.stop(elapsed_time)

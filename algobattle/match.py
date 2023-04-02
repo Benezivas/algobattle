@@ -4,17 +4,16 @@ from datetime import datetime
 import logging
 from typing import Self
 
-from prettytable import PrettyTable, DOUBLE_BORDER
 from pydantic import BaseModel, validator
 from anyio import create_task_group, CapacityLimiter, TASK_STATUS_IGNORED
 from anyio.to_thread import current_default_thread_limiter
 from anyio.abc import TaskStatus
 
 from algobattle.battle import Battle, Iterated, BattleUiProxy
-from algobattle.docker_util import GeneratorResult, ProgramDisplayData, ProgramUiProxy, RunParameters, SolverResult
+from algobattle.docker_util import GeneratorResult, ProgramUiProxy, SolverResult
 from algobattle.team import Matchup, TeamHandler, Team
 from algobattle.problem import Problem
-from algobattle.util import Role, inherit_docs
+from algobattle.util import Role, TimerInfo, inherit_docs
 
 logger = logging.getLogger("algobattle.match")
 
@@ -179,7 +178,7 @@ class Ui:
         self,
         matchup: Matchup,
         role: Role | None = None,
-        data: ProgramDisplayData | GeneratorResult | SolverResult | None = None,
+        data: TimerInfo | float | GeneratorResult | SolverResult | None = None,
     ) -> None:
         """Passes new info about the current fight to the Ui."""
         return
@@ -209,7 +208,7 @@ class Ui:
         def update_curr_fight(
             self,
             role: Role | None = None,
-            data: ProgramDisplayData | GeneratorResult | SolverResult | None = None,
+            data: TimerInfo | float | GeneratorResult | SolverResult | None = None,
         ) -> None:
             self.ui.update_curr_fight(self.matchup, role, data)
 
@@ -219,20 +218,11 @@ class Ui:
 
         battle: "Ui.BattleObserver"
         role: Role
-        data: ProgramDisplayData | None = None
 
         @inherit_docs
-        def start(self, size: int, timeout: float | None, space: int | None, cpus: int) -> None:
-            self.data = ProgramDisplayData(
-                datetime.now(),
-                size,
-                RunParameters(timeout=timeout, space=space, cpus=cpus),
-            )
-            self.battle.ui.update_curr_fight(self.battle.matchup, self.role, self.data)
+        def start(self, timeout: float | None) -> None:
+            self.battle.ui.update_curr_fight(self.battle.matchup, self.role, TimerInfo(datetime.now(), timeout))
 
         @inherit_docs
         def stop(self, runtime: float) -> None:
-            if self.data is None:
-                raise RuntimeError
-            self.data.runtime = runtime
-            self.battle.ui.update_curr_fight(self.battle.matchup, self.role, self.data)
+            self.battle.ui.update_curr_fight(self.battle.matchup, self.role, runtime)

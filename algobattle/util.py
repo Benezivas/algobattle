@@ -1,5 +1,7 @@
 """Collection of utility functions."""
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from datetime import datetime
 import json
 import logging
 from pathlib import Path
@@ -148,3 +150,11 @@ class EncodableModel(BaseModel, CustomEncodable, ABC):
             elif isinstance(getattr(self, name, None), EncodableModel):
                 excludes[name] = getattr(self, name)._excludes(team)
         return excludes
+
+
+@dataclass
+class TimerInfo:
+    """Basic data holding info on a timer."""
+
+    start: datetime
+    timeout: float | None

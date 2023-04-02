@@ -3,6 +3,7 @@
 The battle class is a base class for specific type of battle that can be executed.
 """
 from dataclasses import dataclass, field
+from datetime import datetime
 from importlib.metadata import entry_points
 import logging
 from abc import abstractmethod, ABC
@@ -21,8 +22,8 @@ from typing import (
 
 from pydantic import BaseModel, Field, BaseConfig
 
-from algobattle.docker_util import ProgramDisplayData, ProgramError, Generator, ProgramResult, ProgramUiProxy, Solver, GeneratorResult, SolverResult
-from algobattle.util import Encodable, Role, inherit_docs
+from algobattle.docker_util import ProgramError, Generator, ProgramResult, ProgramUiProxy, Solver, GeneratorResult, SolverResult
+from algobattle.util import Encodable, Role, TimerInfo, inherit_docs
 
 logger = logging.getLogger("algobattle.battle")
 
@@ -38,6 +39,14 @@ class FightResult:
     score: float
     generator: GeneratorResult
     solver: SolverResult | None
+
+
+@dataclass
+class FightUiData:
+    """Holds display data about the currently executing fight."""
+
+    generator: TimerInfo | float | GeneratorResult | None = None
+    solver:  TimerInfo | float | SolverResult | None = None
 
 
 # We need this to be here to prevent an import cycle between match.py and battle.py
@@ -57,12 +66,12 @@ class BattleUiProxy(Protocol):
 
     @overload
     @abstractmethod
-    def update_curr_fight(self, role: Literal["generator"], data: ProgramDisplayData | GeneratorResult | None) -> None:
+    def update_curr_fight(self, role: Literal["generator"], data: datetime | float | GeneratorResult | None) -> None:
         ...
 
     @overload
     @abstractmethod
-    def update_curr_fight(self, role: Literal["solver"], data: ProgramDisplayData | SolverResult | None) -> None:
+    def update_curr_fight(self, role: Literal["solver"], data: datetime | float | SolverResult | None) -> None:
         ...
 
     @overload
@@ -74,20 +83,12 @@ class BattleUiProxy(Protocol):
     def update_curr_fight(
         self,
         role: Role | None = None,
-        data: ProgramDisplayData | ProgramResult | None = None,
+        data: datetime | float | ProgramResult | None = None,
     ) -> None:
         """Updates the ui with info about the current fight.
         
         `data` is either the starting time of the 
         """
-
-
-@dataclass
-class FightUiData:
-    """Holds display data about the currently executing fight."""
-
-    generator:  ProgramDisplayData | GeneratorResult | None = None
-    solver:  ProgramDisplayData | SolverResult | None = None
 
 
 @dataclass
