@@ -384,7 +384,7 @@ class Image:
 class ProgramResult:
     """Result of a program execution."""
 
-    result: "GeneratorResult.Data | Problem.Solution | ProgramError"
+    result: "Any | Problem.Solution | ProgramError"
     runtime: float
     size: int
     params: RunParameters
