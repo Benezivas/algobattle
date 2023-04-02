@@ -2,15 +2,12 @@
 from abc import ABC, abstractmethod
 import importlib.util
 from inspect import isclass
-import logging
 import sys
 from pathlib import Path
 from typing import Any, ClassVar, Literal, Protocol, SupportsFloat, Self, Generic, TypeAlias, TypeVar, runtime_checkable
 from pydantic import Field
 from pydantic.generics import GenericModel
 from algobattle.util import CustomEncodable, EncodableModel, Role, inherit_docs
-
-logger = logging.getLogger("algobattle.problem")
 
 
 _Problem: TypeAlias = Any
@@ -141,7 +138,6 @@ class Problem(CustomEncodable, ABC):
             sys.modules[spec.name] = problem_module
             spec.loader.exec_module(problem_module)
         except Exception as e:
-            logger.critical(f"Importing the given problem failed with the following exception: {e}")
             raise ValueError from e
 
         try:
@@ -162,7 +158,6 @@ class Problem(CustomEncodable, ABC):
             return problem_cls
 
         except Exception as e:
-            logger.critical(f"Importing the given problem failed with the following exception: {e}")
             raise ValueError from e
         finally:
             sys.modules.pop("_problem")

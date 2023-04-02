@@ -1,17 +1,14 @@
 """Tests for the Match class."""
 # pyright: reportMissingSuperCall=false
 from unittest import IsolatedAsyncioTestCase, TestCase, main
-import logging
 from pathlib import Path
 
-from algobattle.cli import Config, ExecutionConfig, parse_cli_args, setup_logging
+from algobattle.cli import Config, ExecutionConfig, parse_cli_args
 from algobattle.battle import Fight, Iterated, Averaged
 from algobattle.match import MatchConfig, Match, Ui
 from algobattle.team import Team, Matchup, TeamHandler, TeamInfo
 from algobattle.docker_util import DockerConfig, GeneratorResult, ProgramError, RunParameters, get_os_type
 from .testsproblem import Problem as TestProblem
-
-logging.disable(logging.CRITICAL)
 
 
 class TestTeam(Team):
@@ -143,8 +140,6 @@ class Execution(IsolatedAsyncioTestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        logging.disable(logging.NOTSET)  # reenable logging
-        setup_logging(Path.home() / ".algobattle_logs", verbose_logging=True, silent=False)
         problem_path = Path(__file__).parent / "testsproblem"
         cls.problem = TestProblem
         cls.config = MatchConfig()
@@ -157,11 +152,6 @@ class Execution(IsolatedAsyncioTestCase):
         if get_os_type() == "windows":
             cls.generator /= "Dockerfile_windows"
             cls.solver /= "Dockerfile_windows"
-
-    @classmethod
-    def tearDownClass(cls) -> None:
-        logging.disable(logging.CRITICAL)
-        return super().tearDownClass()
 
     async def test_basic(self):
         team = TeamInfo("team0", self.generator, self.solver)

@@ -5,7 +5,6 @@ The battle class is a base class for specific type of battle that can be execute
 from dataclasses import dataclass, field
 from datetime import datetime
 from importlib.metadata import entry_points
-import logging
 from abc import abstractmethod, ABC
 from typing import (
     Any,
@@ -32,8 +31,6 @@ from algobattle.docker_util import (
     SolverResult,
 )
 from algobattle.util import Encodable, Role, TimerInfo, inherit_docs
-
-logger = logging.getLogger("algobattle.battle")
 
 
 _Config: TypeAlias = Any
@@ -133,7 +130,6 @@ class FightHandler:
             solution=sol_result.result, generator_solution=gen_result.result.solution, size=size
         )
         score = max(0, min(1, float(score)))
-        logger.info(f"The solver achieved a score of {score}.")
         result = Fight(score, size, gen_result, sol_result)
         self._battle.fight_results.append(result)
         self._battle.ui.update_fights()
@@ -295,15 +291,10 @@ class Iterated(Battle):
                 result = await fight.run(current)
                 score = result.score
                 if score < config.approximation_ratio:
-                    logger.info(
-                        f"Solver does not meet the required solution quality at instance size "
-                        f"{current}. ({score}/{config.approximation_ratio})"
-                    )
                     alive = False
 
                 if not alive and base_increment > 1:
                     # The step size increase was too aggressive, take it back and reset the base_increment
-                    logger.info(f"Setting the solution cap to {current}...")
                     cap = current
                     current -= base_increment**config.exponent
                     base_increment = 0

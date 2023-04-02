@@ -5,7 +5,6 @@ import curses
 from dataclasses import dataclass, field
 from functools import partial
 import sys
-import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, ClassVar, Literal, Mapping, ParamSpec, Self, TypeVar
@@ -23,63 +22,11 @@ from algobattle.problem import Problem
 from algobattle.team import Matchup, TeamHandler, TeamInfo
 from algobattle.util import Role, TimerInfo, check_path, flat_intersperse
 
-logger = logging.getLogger("algobattle.cli")
-
-
-def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
-    """Creates and returns a parent logger.
-
-    Parameters
-    ----------
-    logging_path : Path
-        Path to folder where the logfile should be stored at.
-    verbose_logging : bool
-        Flag indicating whether to include debug messages in the output
-    silent : bool
-        Flag indicating whether not to pipe the logging output to stderr.
-
-    Returns
-    -------
-    logger : Logger
-        The Logger object.
-    """
-    common_logging_level = logging.INFO
-
-    if verbose_logging:
-        common_logging_level = logging.DEBUG
-
-    Path(logging_path).mkdir(exist_ok=True)
-
-    t = datetime.now()
-    current_timestamp = f"{t.year:04d}-{t.month:02d}-{t.day:02d}_{t.hour:02d}-{t.minute:02d}-{t.second:02d}"
-    logging_path = Path(logging_path, current_timestamp + ".log")
-
-    logging.basicConfig(
-        handlers=[logging.FileHandler(logging_path, "w", "utf-8")],
-        level=common_logging_level,
-        format="%(asctime)s %(levelname)s: %(message)s",
-        datefmt="%H:%M:%S",
-    )
-    logger = logging.getLogger("algobattle")
-
-    if not silent:
-        # Pipe logging out to console
-        _consolehandler = logging.StreamHandler(stream=sys.stderr)
-        _consolehandler.setLevel(common_logging_level)
-
-        _consolehandler.setFormatter(logging.Formatter("%(message)s"))
-
-        logger.addHandler(_consolehandler)
-
-    logger.info(f"You can find the log files for this run in {logging_path}")
-    return logger
-
 
 class ExecutionConfig(BaseModel):
     """Config data regarding program execution."""
 
     display: Literal["silent", "logs", "ui"] = "ui"
-    logging_path: Path = Path.home() / ".algobattle_logs"
     verbose: bool = False
     safe_build: bool = False
 
@@ -164,14 +111,9 @@ def parse_cli_args(args: list[str]) -> tuple[Path, Config]:
         "--config", type=partial(check_path, type="file"), help="Path to a config file, defaults to '{problem} / config.toml'."
     )
     parser.add_argument(
-        "--logging_path",
-        type=partial(check_path, type="dir"),
-        help="Folder that logs are written into, defaults to '~/.algobattle_logs'.",
-    )
-    parser.add_argument(
         "--display",
-        choices=["silent", "logs", "ui"],
-        help="Choose output mode, silent disables all output, logs displays the battle logs on STDERR,"
+        choices=["silent", "ui"],
+        help="Choose output mode, silent disables all output"
         " ui displays a small GUI showing the progress of the battle. Default: ui.",
     )
 
@@ -246,7 +188,6 @@ def main():
     """Entrypoint of `algobattle` CLI."""
     try:
         problem_path, config = parse_cli_args(sys.argv[1:])
-        logger = setup_logging(config.execution.logging_path, config.execution.verbose, config.execution.display != "logs")
 
     except KeyboardInterrupt:
         raise SystemExit("Received keyboard interrupt, terminating execution.")
@@ -263,19 +204,14 @@ def main():
                 ui = None
 
             result = run(_run_with_ui, config.match, config.battle_config, problem, teams, ui)
-
-            logger.info("#" * 78)
-            logger.info(CliUi.display_match(result))
             print("\n".join(CliUi.display_match(result)))
             if config.match.points > 0:
                 points = result.calculate_points()
                 for team, pts in points.items():
-                    line = f"Team {team} gained {pts:.1f} points."
-                    print(line)
-                    logger.info(line)
+                    print(f"Team {team} gained {pts:.1f} points.")
 
     except KeyboardInterrupt:
-        logger.critical("Received keyboard interrupt, terminating execution.")
+        print("Received keyboard interrupt, terminating execution.")
 
 
 P = ParamSpec("P")
@@ -287,7 +223,6 @@ def check_for_terminal(function: Callable[P, R]) -> Callable[P, R | None]:
 
     def wrapper(*args: P.args, **kwargs: P.kwargs):
         if not sys.stdout.isatty():
-            logger.error("Not attached to a terminal.")
             return None
         else:
             return function(*args, **kwargs)

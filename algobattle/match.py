@@ -1,7 +1,6 @@
 """Central managing module for an algorithmic battle."""
 from dataclasses import dataclass, field
 from datetime import datetime
-import logging
 from typing import Self
 
 from pydantic import BaseModel, validator
@@ -14,8 +13,6 @@ from algobattle.docker_util import GeneratorResult, ProgramUiProxy, SolverResult
 from algobattle.team import Matchup, TeamHandler, Team
 from algobattle.problem import Problem
 from algobattle.util import Role, TimerInfo, inherit_docs
-
-logger = logging.getLogger("algobattle.match")
 
 
 class MatchConfig(BaseModel):
@@ -76,8 +73,9 @@ class Match:
                     self.battle_config,
                     self.problem.min_size,
                 )
-            except Exception as e:
-                logger.critical(f"Unhandeled error during execution of battle!\n{e}")
+            except Exception as _:
+                #! Add some useful error logging schema here
+                pass
             finally:
                 ui.battle_completed(matchup)
 

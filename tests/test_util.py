@@ -1,6 +1,5 @@
 """Tests for all util functions."""
 import unittest
-import logging
 import random
 from pathlib import Path
 
@@ -8,9 +7,6 @@ from algobattle.match import MatchConfig
 from algobattle.problem import Problem
 from algobattle.battle import Battle, Iterated, Averaged
 from . import testsproblem
-
-logging.disable(logging.CRITICAL)
-
 
 class Utiltests(unittest.TestCase):
     """Tests for the util functions."""

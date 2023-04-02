@@ -1,6 +1,5 @@
 """Leightweight wrapper around docker functionality."""
 from abc import ABC, abstractmethod
-import logging
 from pathlib import Path
 from timeit import default_timer
 from typing import Any, ClassVar, Iterator, Literal, Mapping, Protocol, Self, TypedDict, cast
@@ -20,9 +19,6 @@ from urllib3.exceptions import ReadTimeoutError
 
 from algobattle.util import Encodable, Role, TempDir, encode, decode, inherit_docs
 from algobattle.problem import Problem
-
-
-logger = logging.getLogger("algobattle.docker")
 
 
 _client_var: DockerClient | None = None
@@ -55,9 +51,7 @@ def client() -> DockerClient:
         else:
             _client_var.ping()
     except (DockerException, APIError):
-        err = "Could not connect to the docker daemon. Is docker running?"
-        logger.error(err)
-        raise SystemExit(f"Exited algobattle: {err}")
+        raise SystemExit("Could not connect to the docker daemon. Is docker running?")
     return _client_var
 
 
@@ -135,7 +129,6 @@ class ArchivedImage:
                 raise KeyError
             self.path.unlink()
         except APIError as e:
-            logger.warning(f"Docker APIError thrown while restoring '{self.name}'")
             raise DockerError(f"Docker APIError thrown while restoring '{self.name}'") from e
         return Image(self.name, self.id, self.description, path=self.path)
 
@@ -193,15 +186,12 @@ class Image:
             OS errors, and errors thrown by the docker daemon.
         """
         if not path.exists():
-            logger.warning(f"Error when building {image_name}: '{path}' does not exist on the file system.")
             raise RuntimeError
         if path.is_file():
             if dockerfile is not None:
-                logger.warning(f"Error when building {image_name}: '{path}' refers to a file and 'dockerfile' is specified.")
                 raise RuntimeError
             dockerfile = path.name
             path = path.parent
-        logger.debug(f"Building docker image with options: {path = !s}, {image_name = }, {timeout = }")
         try:
             try:
                 old_image = cast(DockerImage, client().images.get(image_name))
@@ -223,13 +213,10 @@ class Image:
                     old_image.remove(force=True)
 
         except Timeout as e:
-            logger.warning(f"Build process for '{path}' ran into a timeout!")
             raise BuildError(f"Build process for '{path}' ran into a timeout!") from e
         except DockerBuildError as e:
-            logger.warning(f"Building '{path}' did not complete successfully:\n{e.msg}")
             raise BuildError(f"Building '{path}' did not complete successfully:\n{e.msg}") from e
         except APIError as e:
-            logger.warning(f"Docker APIError thrown while building '{path}':\n{e}")
             raise DockerError(f"Docker APIError thrown while building '{path}':\n{e}") from e
 
         return cls(image_name, cast(str, image.id), description if description is not None else image_name, path=path)
@@ -311,10 +298,8 @@ class Image:
                 ui.stop(elapsed_time)
 
         except ImageNotFound as e:
-            logger.warning(f"Image {self.name} (id={self.id}) does not exist")
             raise RuntimeError(f"Image {self.name} (id={self.id}) does not exist") from e
         except APIError as e:
-            logger.warning(f"Docker API Error thrown while running {self.name}")
             raise DockerError(str(e)) from e
         finally:
             if container is not None:
@@ -323,7 +308,6 @@ class Image:
                 except APIError as e:
                     raise DockerError(f"Couldn't remove {name}") from e
 
-        logger.debug(f"Approximate elapsed runtime: {elapsed_time}/{timeout} seconds.")
         return elapsed_time
 
     def remove(self) -> None:
@@ -464,26 +448,12 @@ class Program(ABC):
         ui: ProgramUiProxy | None = None,
     ) -> GeneratorResult | SolverResult:
         """Execute the program, processing input and output data."""
-        set_params: dict[str, Any] = {}
         if timeout is Ellipsis:
             timeout = self.config.timeout
-        else:
-            set_params["timeout"] = timeout
         if space is Ellipsis:
             space = self.config.space
-        else:
-            set_params["space"] = space
         if cpus is Ellipsis:
             cpus = self.config.cpus
-        else:
-            set_params["cpus"] = cpus
-        if self.role == "generator":
-            param_msg = f" at size {size}"
-        else:
-            param_msg = ""
-        if set_params:
-            param_msg += " with parameters " + ", ".join(f"{k}: {v}" for k, v in set_params.items())
-        logger.info(f"Running {self.role} of team {self.team_name}{param_msg}.")
         run_params = RunParameters(timeout=timeout, space=space, cpus=cpus)
         result_class = GeneratorResult if self.role == "generator" else SolverResult
 
@@ -509,7 +479,6 @@ class Program(ABC):
                 try:
                     encode(battle_input, input / "battle_data", size, self.role)
                 except Exception as e:
-                    logger.critical("Battle data couldn't be encoded into files!")
                     return result_class(EncodingError(f"Battle data couldn't be encoded:\n{e}"), 0, size, run_params)
             if battle_output:
                 (output / "battle_data").mkdir()
@@ -564,13 +533,9 @@ class Generator(Program):
         except EncodingError:
             raise
         except Exception as e:
-            msg = f"The output of team {self.team_name}'s {self.role} can not be decoded properly!\n{e}"
-            logger.warning(msg)
-            raise EncodingError(msg) from e
+            raise EncodingError(f"The output of team {self.team_name}'s {self.role} can not be decoded properly!\n{e}") from e
         if not problem.is_valid(size):
-            msg = f"{self.role.capitalize()} of team {self.team_name} output an invalid instance!"
-            logger.warning(msg)
-            raise EncodingError(msg)
+            raise EncodingError(f"{self.role.capitalize()} of team {self.team_name} output an invalid instance!")
 
         if problem.with_solution:
             try:
@@ -578,13 +543,9 @@ class Generator(Program):
             except EncodingError:
                 raise
             except Exception as e:
-                msg = f"The solution output of team {self.team_name}'s generator can not be decoded properly!\n{e}"
-                logger.warning(msg)
-                raise EncodingError(msg) from e
+                raise EncodingError(f"The solution output of team {self.team_name}'s generator can not be decoded properly!\n{e}") from e
             if not solution.is_valid(problem, size):
-                msg = f"The generator of team {self.team_name} output an invalid solution!"
-                logger.warning(msg)
-                raise EncodingError(msg)
+                raise EncodingError(f"The generator of team {self.team_name} output an invalid solution!")
         else:
             solution = None
         return GeneratorResult._Data(problem, solution)
@@ -634,13 +595,9 @@ class Solver(Program):
         except EncodingError:
             raise
         except Exception as e:
-            msg = f"The output of team {self.team_name}'s {self.role} can not be decoded properly!\n{e}"
-            logger.warning(msg)
-            raise EncodingError(msg) from e
+            raise EncodingError(f"The output of team {self.team_name}'s {self.role} can not be decoded properly!\n{e}") from e
         if not solution.is_valid(instance, size):
-            msg = f"{self.role.capitalize()} of team {self.team_name} output an invalid solution!"
-            logger.warning(msg)
-            raise EncodingError(msg)
+            raise EncodingError(f"{self.role.capitalize()} of team {self.team_name} output an invalid solution!")
         return solution
 
     async def run(

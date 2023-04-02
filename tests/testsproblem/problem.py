@@ -1,14 +1,7 @@
 """Problem class built for tests."""
-import logging
 from typing import ClassVar, SupportsFloat
 
 from algobattle.problem import ProblemModel, SolutionModel
-
-logger = logging.getLogger('algobattle.problems.testsproblem')
-
-
-
-
 
 
 class Tests(ProblemModel):

@@ -1,7 +1,6 @@
 """Tests for all docker functions."""
 from typing import cast
 from unittest import IsolatedAsyncioTestCase, main as run_tests
-import logging
 import random
 from pathlib import Path
 
@@ -22,8 +21,6 @@ from algobattle.docker_util import (
 from algobattle.util import TempDir
 from . import testsproblem
 from .testsproblem.problem import Tests as TestProblem
-
-logging.disable(logging.CRITICAL)
 
 
 class ImageTests(IsolatedAsyncioTestCase):
