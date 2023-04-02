@@ -174,6 +174,10 @@ class Ui:
         """Passes new custom battle data to the Ui."""
         return
 
+    def start_fight(self, matchup: Matchup, size: int) -> None:
+        """Informs the Ui of a newly started fight."""
+        return
+
     def update_curr_fight(
         self,
         matchup: Matchup,
@@ -203,6 +207,10 @@ class Ui:
         @inherit_docs
         def update_data(self, data: Battle.UiData) -> None:
             self.ui.update_battle_data(self.matchup, data)
+
+        def start_fight(self, size: int) -> None:
+            """Informs the Ui of a newly started fight."""
+            self.ui.start_fight(self.matchup, size)
 
         @inherit_docs
         def update_curr_fight(

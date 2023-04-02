@@ -1,6 +1,5 @@
 """Main battle script. Executes all possible types of battles, see battle --help for all options."""
 from argparse import ArgumentParser, Namespace
-from collections import defaultdict
 from contextlib import ExitStack
 import curses
 from dataclasses import dataclass, field
@@ -297,7 +296,7 @@ class CliUi(Ui):
     """A Ui displaying the data to the cli."""
 
     battle_data: dict[Matchup, Battle.UiData] = field(default_factory=dict, init=False)
-    fight_data: defaultdict[Matchup, FightUiData] = field(default_factory=lambda: defaultdict(FightUiData), init=False)
+    fight_data: dict[Matchup, FightUiData] = field(default_factory=dict, init=False)
 
     @check_for_terminal
     def __enter__(self) -> Self:
@@ -327,6 +326,10 @@ class CliUi(Ui):
         """Passes new custom battle data to the Ui."""
         self.battle_data[matchup] = data
 
+    def start_fight(self, matchup: Matchup, size: int) -> None:
+        """Informs the Ui of a newly started fight."""
+        self.fight_data[matchup] = FightUiData(size, None, None)
+
     def update_curr_fight(
         self,
         matchup: Matchup,
@@ -337,7 +340,6 @@ class CliUi(Ui):
         if role == "generator" or role is None:
             assert not isinstance(data, SolverResult)
             self.fight_data[matchup].generator = data
-            self.fight_data[matchup].solver = None
         if role == "solver" or role is None:
             assert not isinstance(data, GeneratorResult)
             self.fight_data[matchup].solver = data
@@ -432,7 +434,7 @@ class CliUi(Ui):
             fight = self.fight_data[matchup]
             out += [
                 "",
-                "Current fight:",
+                f"Current fight at size {fight.size}:",
             ]
             if fight.generator is not None:
                 out.append("Generator:")

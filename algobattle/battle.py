@@ -33,10 +33,11 @@ T = TypeVar("T")
 
 
 @dataclass
-class FightResult:
+class Fight:
     """The result of one execution of the generator and the solver with the generated instance."""
 
     score: float
+    size: int
     generator: GeneratorResult
     solver: SolverResult | None
 
@@ -45,6 +46,7 @@ class FightResult:
 class FightUiData:
     """Holds display data about the currently executing fight."""
 
+    size: int
     generator: TimerInfo | float | GeneratorResult | None = None
     solver:  TimerInfo | float | SolverResult | None = None
 
@@ -63,6 +65,9 @@ class BattleUiProxy(Protocol):
     @abstractmethod
     def update_data(self, data: "Battle.UiData") -> None:
         """Passes new custom display data to the Ui."""
+
+    def start_fight(self, size: int) -> None:
+        """Informs the Ui of a newly started fight."""
 
     @overload
     @abstractmethod
@@ -96,7 +101,7 @@ class Battle(ABC):
     """Abstract Base class for classes that execute a specific kind of battle."""
 
     ui: BattleUiProxy
-    fight_results: list[FightResult] = field(default_factory=list)
+    fight_results: list[Fight] = field(default_factory=list)
 
     scoring_team: ClassVar[Role] = "solver"
     _battle_types: ClassVar[dict[str, type["Battle"]]] = {}
@@ -179,8 +184,9 @@ class Battle(ABC):
         solver_battle_input: Mapping[str, Encodable] = {},
         generator_battle_output: Mapping[str, type[Encodable]] = {},
         solver_battle_output: Mapping[str, type[Encodable]] = {},
-    ) -> FightResult:
+    ) -> Fight:
         """Execute a single fight of a battle, running the generator and solver and handling any errors gracefully."""
+        self.ui.start_fight(size)
         gen_result = await generator.run(
             size=size,
             timeout=timeout_generator,
@@ -192,7 +198,7 @@ class Battle(ABC):
         )
         self.ui.update_curr_fight("generator", gen_result)
         if isinstance(gen_result.result, ProgramError):
-            return FightResult(score=1, generator=gen_result, solver=None)
+            return Fight(score=1, size=size, generator=gen_result, solver=None)
 
         sol_result = await solver.run(
             gen_result.result.problem,
@@ -206,14 +212,14 @@ class Battle(ABC):
         )
         self.ui.update_curr_fight("solver", sol_result)
         if isinstance(sol_result.result, ProgramError):
-            return FightResult(score=0, generator=gen_result, solver=sol_result)
+            return Fight(score=0, size=size, generator=gen_result, solver=sol_result)
 
         score = gen_result.result.problem.calculate_score(
             solution=sol_result.result, generator_solution=gen_result.result.solution, size=size
         )
         score = max(0, min(1, float(score)))
         logger.info(f"The solver achieved a score of {score}.")
-        res = FightResult(score, gen_result, sol_result)
+        res = Fight(score, size, gen_result, sol_result)
         self.fight_results.append(res)
         self.ui.update_fights()
         return res

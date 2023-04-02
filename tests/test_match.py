@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 
 from algobattle.cli import Config, ExecutionConfig, parse_cli_args, setup_logging
-from algobattle.battle import FightResult, Iterated, Averaged
+from algobattle.battle import Fight, Iterated, Averaged
 from algobattle.match import MatchConfig, Match, Ui
 from algobattle.team import Team, Matchup, TeamHandler, TeamInfo
 from algobattle.docker_util import DockerConfig, GeneratorResult, ProgramError, RunParameters, get_os_type
@@ -21,10 +21,10 @@ class TestTeam(Team):
         self.name = team_name
 
 
-def dummy_result(*score: float) -> list[FightResult]:
+def dummy_result(*score: float) -> list[Fight]:
     """Creates a list of dummy results for testing"""
     return [
-        FightResult(s, GeneratorResult(ProgramError(""), 0, 0, RunParameters()), None)
+        Fight(s, GeneratorResult(ProgramError(""), 0, 0, RunParameters()), None)
         for s in score
     ]
 
