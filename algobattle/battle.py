@@ -37,6 +37,15 @@ _Config: TypeAlias = Any
 T = TypeVar("T")
 
 
+class Fight(BaseModel):
+    """The result of one execution of the generator and the solver with the generated instance."""
+
+    score: float
+    size: int
+    generator: GeneratorResult
+    solver: SolverResult | None
+
+
 class FightUiProxy(Protocol):
     """Provides an interface for :cls:`Fight` to update the Ui."""
 
@@ -96,7 +105,7 @@ class FightHandler:
         solver_battle_input: Mapping[str, Encodable] = {},
         generator_battle_output: Mapping[str, type[Encodable]] = {},
         solver_battle_output: Mapping[str, type[Encodable]] = {},
-    ) -> "Fight":
+    ) -> Fight:
         """Execute a single fight of a battle between the given programs."""
         ui = self._ui.fight_ui
         ui.start(size)
@@ -135,15 +144,6 @@ class FightHandler:
         self._battle.fight_results.append(result)
         self._ui.update_fights()
         return result
-
-
-class Fight(BaseModel):
-    """The result of one execution of the generator and the solver with the generated instance."""
-
-    score: float
-    size: int
-    generator: GeneratorResult
-    solver: SolverResult | None
 
 
 @dataclass

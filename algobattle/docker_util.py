@@ -364,8 +364,7 @@ class Image:
             raise ExecutionTimeout(f"{self.description} exceeded the time limit", elapsed_time)
 
 
-@dataclass
-class ProgramResult:
+class ProgramResult(BaseModel):
     """Result of a program execution."""
 
     result: "Any | Problem.Solution | ProgramError"
@@ -375,7 +374,6 @@ class ProgramResult:
     battle_data: dict[str, Encodable] | None = None
 
 
-@dataclass
 class GeneratorResult(ProgramResult):
     """Result of a single generator execution."""
 
@@ -387,7 +385,6 @@ class GeneratorResult(ProgramResult):
     result: _Data | ProgramError
 
 
-@dataclass
 class SolverResult(ProgramResult):
     """Result of a single solver execution."""
 
@@ -461,7 +458,7 @@ class Program(ABC):
             try:
                 self._setup_folders(input, output, size, input_instance)
             except ProgramError as e:
-                return result_class(e, 0, size, run_params)
+                return result_class(result=e, runtime=0, size=size, params=run_params)
             with open(input / "info.json", "w+") as f:
                 json.dump(
                     {
@@ -479,28 +476,34 @@ class Program(ABC):
                 try:
                     encode(battle_input, input / "battle_data", size, self.role)
                 except Exception as e:
-                    return result_class(EncodingError(f"Battle data couldn't be encoded:\n{e}"), 0, size, run_params)
+                    return result_class(result=EncodingError(f"Battle data couldn't be encoded:\n{e}"), runtime=0, size=size, params=run_params)
             if battle_output:
                 (output / "battle_data").mkdir()
 
             try:
                 runtime = await self.image.run(input, output, timeout=timeout, memory=space, cpus=cpus, ui=ui)
             except ExecutionError as e:
-                return result_class(e, e.runtime, size, run_params)
+                return result_class(result=e, runtime=e.runtime, size=size, params=run_params)
             except ProgramError as e:
-                return result_class(e, 0, size, run_params)
+                return result_class(result=e, runtime=0, size=size, params=run_params)
 
             try:
                 output_data = self._parse_output(output, size, input_instance)
             except ProgramError as e:
-                return result_class(e, runtime, size, run_params)
+                return result_class(result=e, runtime=runtime, size=size, params=run_params)
 
             if battle_output:
                 decoded_battle_output = decode(battle_output, output / "battle_data", size, self.role)
             else:
                 decoded_battle_output = None
 
-        return result_class(output_data, runtime, size, run_params, decoded_battle_output)  # type: ignore
+        return result_class(
+            result=cast(Any, output_data),
+            runtime=runtime,
+            size=size,
+            params=run_params,
+            battle_data=decoded_battle_output,
+        )
 
     @inherit_docs
     def remove(self) -> None:
