@@ -6,13 +6,25 @@ import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any, ClassVar, Iterable, Literal, Mapping, TypeVar, Self
-from pydantic import BaseModel
+from pydantic import BaseConfig, BaseModel
 
 
 Role = Literal["generator", "solver"]
 
 
 T = TypeVar("T")
+
+
+class BaseModel(BaseModel):
+    """Base class for all pydantic models."""
+
+    class Config(BaseConfig):
+        """Base config for all pydandic configs."""
+
+        json_encoders = {
+            Exception: str,
+        }
+
 
 
 def inherit_docs(obj: T) -> T:

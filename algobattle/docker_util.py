@@ -13,11 +13,11 @@ from docker.models.images import Image as DockerImage
 from docker.models.containers import Container as DockerContainer
 from docker.types import Mount, LogConfig, Ulimit
 from requests import Timeout, ConnectionError
-from pydantic import BaseModel, Field
+from pydantic import Field
 from anyio.to_thread import run_sync
 from urllib3.exceptions import ReadTimeoutError
 
-from algobattle.util import Encodable, Role, TempDir, encode, decode, inherit_docs
+from algobattle.util import Encodable, Role, TempDir, encode, decode, inherit_docs, BaseModel
 from algobattle.problem import Problem
 
 

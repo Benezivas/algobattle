@@ -3,7 +3,7 @@
 from unittest import IsolatedAsyncioTestCase, TestCase, main
 from pathlib import Path
 
-from algobattle.cli import Config, ExecutionConfig, parse_cli_args
+from algobattle.cli import BattleConfig, ExecutionConfig, parse_cli_args
 from algobattle.battle import Fight, Iterated, Averaged
 from algobattle.match import MatchConfig, Match, Ui
 from algobattle.team import Team, Matchup, TeamHandler, TeamInfo
@@ -188,7 +188,7 @@ class Parsing(TestCase):
     def test_no_cfg_default(self):
         problem, cfg = parse_cli_args([str(self.problem_path)])
         self.assertEqual(problem, self.problem_path)
-        self.assertEqual(cfg, Config(teams=self.teams))
+        self.assertEqual(cfg, BattleConfig(teams=self.teams))
         self.assertEqual(cfg.battle_config, Iterated.Config())
 
     def test_empty_cfg(self):
@@ -196,7 +196,7 @@ class Parsing(TestCase):
             [str(self.problem_path), "--config", str(self.configs_path / "empty.toml")]
         )
         self.assertEqual(problem, self.problem_path)
-        self.assertEqual(cfg, Config(teams=self.teams))
+        self.assertEqual(cfg, BattleConfig(teams=self.teams))
         self.assertEqual(cfg.battle_config, Iterated.Config())
 
     def test_cfg(self):
@@ -204,7 +204,7 @@ class Parsing(TestCase):
             [str(self.problem_path), "--config", str(self.configs_path / "test.toml")]
         )
         self.assertEqual(problem, self.problem_path)
-        self.assertEqual(cfg, Config(
+        self.assertEqual(cfg, BattleConfig(
             match=MatchConfig(
                 points=10,
                 battle_type=Averaged,
@@ -229,7 +229,7 @@ class Parsing(TestCase):
             ]
         )
         self.assertEqual(problem, self.problem_path)
-        self.assertEqual(cfg, Config(
+        self.assertEqual(cfg, BattleConfig(
             match=MatchConfig(
                 points=10,
                 battle_type=Averaged,
@@ -254,7 +254,7 @@ class Parsing(TestCase):
             ]
         )
         self.assertEqual(problem, self.problem_path)
-        self.assertEqual(cfg, Config(
+        self.assertEqual(cfg, BattleConfig(
             match=MatchConfig(
                 points=20,
                 battle_type=Iterated,
@@ -277,7 +277,7 @@ class Parsing(TestCase):
 
     def test_cfg_team(self):
         _, cfg = parse_cli_args([str(self.problem_path), f"--config={self.configs_path / 'teams.toml'}"])
-        self.assertEqual(cfg, Config(
+        self.assertEqual(cfg, BattleConfig(
             teams=[TeamInfo("team 1", Path(), Path()), TeamInfo("team 2", Path(), Path())]
         ))
 

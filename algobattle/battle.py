@@ -5,7 +5,7 @@ The battle class is a base class for specific type of battle that can be execute
 from dataclasses import dataclass, field
 from datetime import datetime
 from importlib.metadata import entry_points
-from abc import abstractmethod, ABC
+from abc import abstractmethod
 from typing import (
     Any,
     ClassVar,
@@ -19,7 +19,7 @@ from typing import (
     overload,
 )
 
-from pydantic import BaseModel, Field, BaseConfig
+from pydantic import Field, BaseConfig
 
 from algobattle.docker_util import (
     ProgramError,
@@ -30,7 +30,7 @@ from algobattle.docker_util import (
     GeneratorResult,
     SolverResult,
 )
-from algobattle.util import Encodable, Role, TimerInfo, inherit_docs
+from algobattle.util import Encodable, Role, TimerInfo, inherit_docs, BaseModel
 
 
 _Config: TypeAlias = Any
@@ -179,7 +179,7 @@ class Battle(BaseModel):
 
     _battle_types: ClassVar[dict[str, type["Battle"]]] = {}
 
-    class Config(BaseModel):
+    class BattleConfig(BaseModel):
         """Object containing the config variables the battle types use."""
 
         @classmethod
@@ -199,7 +199,7 @@ class Battle(BaseModel):
                 arguments.append((model_field.name, kwargs))
             return arguments
 
-        class Config(BaseConfig):
+        class Config(BaseModel.Config):
             """Pydandtic config."""
 
             validate_assignment = True
@@ -237,7 +237,7 @@ class Battle(BaseModel):
         return cls.__name__
 
     @abstractmethod
-    async def run_battle(self, fight: FightHandler, config: Config, min_size: int, ui: BattleUiProxy) -> None:
+    async def run_battle(self, fight: FightHandler, config: BattleConfig, min_size: int, ui: BattleUiProxy) -> None:
         """Calculates the next instance size that should be fought over."""
         raise NotImplementedError
 
@@ -256,7 +256,7 @@ class Iterated(Battle):
     results: list[int] = field(default_factory=list)
 
     @inherit_docs
-    class Config(Battle.Config):
+    class BattleConfig(Battle.BattleConfig):
         rounds: int = Field(default=5, help="Repeats the battle and averages the results.")
         iteration_cap: int = Field(default=50_000, help="Maximum instance size that will be tried.")
         exponent: int = Field(default=2, help="Determines how quickly the instance size grows.")
@@ -336,7 +336,7 @@ class Averaged(Battle):
     """Class that executes an averaged battle."""
 
     @inherit_docs
-    class Config(Battle.Config):
+    class BattleConfig(Battle.BattleConfig):
         instance_size: int = Field(default=10, help="Instance size that will be fought at.")
         iterations: int = Field(default=10, help="Number of iterations in each round.")
 

@@ -5,7 +5,7 @@ from datetime import datetime
 from itertools import combinations
 from typing import Self
 
-from pydantic import BaseModel, validator
+from pydantic import validator
 from anyio import create_task_group, CapacityLimiter, TASK_STATUS_IGNORED
 from anyio.to_thread import current_default_thread_limiter
 from anyio.abc import TaskStatus
@@ -14,7 +14,7 @@ from algobattle.battle import Battle, FightHandler, FightUiProxy, Iterated, Batt
 from algobattle.docker_util import GeneratorResult, ProgramUiProxy, SolverResult
 from algobattle.team import Matchup, TeamHandler
 from algobattle.problem import Problem
-from algobattle.util import Role, TimerInfo, inherit_docs
+from algobattle.util import Role, TimerInfo, inherit_docs, BaseModel
 
 
 class MatchConfig(BaseModel):
@@ -50,7 +50,7 @@ class Match(BaseModel):
         self,
         battle: Battle,
         matchup: Matchup,
-        config: Battle.Config,
+        config: Battle.BattleConfig,
         problem: type[Problem],
         ui: "Ui",
         limiter: CapacityLimiter,
@@ -78,7 +78,7 @@ class Match(BaseModel):
     async def run(
         cls,
         config: MatchConfig,
-        battle_config: Battle.Config,
+        battle_config: Battle.BattleConfig,
         problem: type[Problem],
         teams: TeamHandler,
         ui: "Ui | None" = None,

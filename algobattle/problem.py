@@ -5,8 +5,10 @@ from inspect import isclass
 import sys
 from pathlib import Path
 from typing import Any, ClassVar, Literal, Protocol, SupportsFloat, Self, Generic, TypeAlias, TypeVar, runtime_checkable
+
 from pydantic import Field
 from pydantic.generics import GenericModel
+
 from algobattle.util import CustomEncodable, EncodableModel, Role, inherit_docs
 
 
@@ -197,10 +199,10 @@ class ProblemModel(EncodableModel, Problem, ABC):
         """Generates the default json schema specifying the I/O for this problem."""
         return cls.schema_json(indent=4)
 
-    class Config:
+    class Config(EncodableModel.Config):
         """Pydantic config object to hide these fields in the json if someone redeclared them incorrectly."""
 
-        fields = {
+        fields: dict[str, Any] = {
             "filename": {"exclude": True},
             "name": {"exclude": True},
             "min_size": {"exclude": True},
@@ -220,10 +222,10 @@ class SolutionModel(EncodableModel, Problem.Solution, ABC):
         """Generates the default json schema specifying the I/O for this solution."""
         return cls.schema_json(indent=4)
 
-    class Config:
+    class Config(EncodableModel.Config):
         """Pydantic config object to hide these fields in the json if someone redeclared them incorrectly."""
 
-        fields = {"filename": {"exclude": True}}
+        fields: dict[str, Any] = {"filename": {"exclude": True}}
 
 
 class DirectedGraph(ProblemModel):
