@@ -131,14 +131,13 @@ class FightHandler:
             solution=sol_result.result, generator_solution=gen_result.result.solution, size=size
         )
         score = max(0, min(1, float(score)))
-        result = Fight(score, size, gen_result, sol_result)
+        result = Fight(score=score, size=size, generator=gen_result, solver=sol_result)
         self._battle.fight_results.append(result)
         self._ui.update_fights()
         return result
 
 
-@dataclass
-class Fight:
+class Fight(BaseModel):
     """The result of one execution of the generator and the solver with the generated instance."""
 
     score: float
