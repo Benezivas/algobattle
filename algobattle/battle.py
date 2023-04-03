@@ -80,6 +80,7 @@ class FightHandler:
     _generator: Generator
     _solver: Solver
     _battle: "Battle"
+    _ui: "BattleUiProxy"
 
     async def run(
         self,
@@ -97,7 +98,7 @@ class FightHandler:
         solver_battle_output: Mapping[str, type[Encodable]] = {},
     ) -> "Fight":
         """Execute a single fight of a battle between the given programs."""
-        ui = self._battle.ui.fight_ui
+        ui = self._ui.fight_ui
         ui.start(size)
         gen_result = await self._generator.run(
             size=size,
@@ -132,7 +133,7 @@ class FightHandler:
         score = max(0, min(1, float(score)))
         result = Fight(score, size, gen_result, sol_result)
         self._battle.fight_results.append(result)
-        self._battle.ui.update_fights()
+        self._ui.update_fights()
         return result
 
 
@@ -170,13 +171,11 @@ class BattleUiProxy(Protocol):
         """Notifies the Ui to update the display of fight results for this battle."""
 
 
-@dataclass
-class Battle(ABC):
+class Battle(BaseModel):
     """Abstract Base class for classes that execute a specific kind of battle."""
 
-    ui: BattleUiProxy
     fight_results: list[Fight] = field(default_factory=list)
-    run_exception: Exception | None = field(default=None, init=False)
+    run_exception: Exception | None = None
 
     _battle_types: ClassVar[dict[str, type["Battle"]]] = {}
 
@@ -238,9 +237,16 @@ class Battle(ABC):
         return cls.__name__
 
     @abstractmethod
-    async def run_battle(self, fight: FightHandler, config: _Config, min_size: int) -> None:
+    async def run_battle(self, fight: FightHandler, config: Config, min_size: int, ui: BattleUiProxy) -> None:
         """Calculates the next instance size that should be fought over."""
         raise NotImplementedError
+
+    def archive(self) -> dict[str, Any]:
+        """Encodes the battle data into a jsonable dict."""
+
+        return {
+            "run_exception": self.run_exception
+        }
 
 
 @dataclass
@@ -261,7 +267,7 @@ class Iterated(Battle):
         reached: list[int]
         cap: int
 
-    async def run_battle(self, fight: FightHandler, config: Config, min_size: int) -> None:
+    async def run_battle(self, fight: FightHandler, config: _Config, min_size: int, ui: BattleUiProxy) -> None:
         """Execute one iterative battle between a generating and a solving team.
 
         Incrementally try to search for the highest n for which the solver is
@@ -287,7 +293,7 @@ class Iterated(Battle):
             cap = config.iteration_cap
             current = min_size
             while alive:
-                self.ui.update_data(self.UiData(reached=self.results + [reached], cap=cap))
+                ui.update_data(self.UiData(reached=self.results + [reached], cap=cap))
                 result = await fight.run(current)
                 score = result.score
                 if score < config.approximation_ratio:
@@ -338,7 +344,7 @@ class Averaged(Battle):
     class UiData(Battle.UiData):
         round: int
 
-    async def run_battle(self, fight: FightHandler, config: Config, min_size: int) -> None:
+    async def run_battle(self, fight: FightHandler, config: _Config, min_size: int, ui: BattleUiProxy) -> None:
         """Execute one averaged battle between a generating and a solving team.
 
         Execute several fights between two teams on a fixed instance size
@@ -349,7 +355,7 @@ class Averaged(Battle):
                 f"The problem specifies a minimum size of {min_size} but the chosen size is only {config.instance_size}!"
             )
         for i in range(config.iterations):
-            self.ui.update_data(self.UiData(round=i + 1))
+            ui.update_data(self.UiData(round=i + 1))
             await fight.run(config.instance_size)
 
     @inherit_docs

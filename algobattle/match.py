@@ -60,12 +60,14 @@ class Match(BaseModel):
         async with limiter:
             ui.start_battle(matchup)
             task_status.started()
-            handler = FightHandler(matchup.generator.generator, matchup.solver.solver, battle)
+            battle_ui = ui.get_battle_observer(matchup)
+            handler = FightHandler(matchup.generator.generator, matchup.solver.solver, battle, battle_ui)
             try:
                 await battle.run_battle(
                     handler,
                     config,
                     problem.min_size,
+                    battle_ui,
                 )
             except Exception as e:
                 battle.run_exception = e
@@ -90,7 +92,7 @@ class Match(BaseModel):
         current_default_thread_limiter().total_tokens = config.parallel_battles
         async with create_task_group() as tg:
             for matchup in teams.matchups:
-                battle = config.battle_type(ui.get_battle_observer(matchup))
+                battle = config.battle_type()
                 result.results[matchup.generator.name][matchup.solver.name] = battle
                 await tg.start(result._run_battle, battle, matchup, battle_config, problem, ui, limiter)
             return result
