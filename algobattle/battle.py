@@ -19,7 +19,7 @@ from typing import (
     overload,
 )
 
-from pydantic import Field, BaseConfig, validator
+from pydantic import Field
 
 from algobattle.docker_util import (
     ProgramError,
