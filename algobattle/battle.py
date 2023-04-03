@@ -19,7 +19,7 @@ from typing import (
     overload,
 )
 
-from pydantic import Field, BaseConfig
+from pydantic import Field, BaseConfig, validator
 
 from algobattle.docker_util import (
     ProgramError,
@@ -175,7 +175,7 @@ class Battle(BaseModel):
     """Abstract Base class for classes that execute a specific kind of battle."""
 
     fight_results: list[Fight] = field(default_factory=list)
-    run_exception: Exception | None = None
+    run_exception: Exception | str | None = None
 
     _battle_types: ClassVar[dict[str, type["Battle"]]] = {}
 
@@ -219,7 +219,7 @@ class Battle(BaseModel):
     def __init_subclass__(cls) -> None:
         if cls.name() not in Battle._battle_types:
             Battle._battle_types[cls.name().lower()] = cls
-        return super().__init_subclass__()
+        return super().__init_subclass__()       
 
     @abstractmethod
     def score(self) -> float:

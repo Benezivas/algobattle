@@ -5,7 +5,9 @@ from datetime import datetime
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from traceback import format_exception
 from typing import Any, ClassVar, Iterable, Literal, Mapping, TypeVar, Self
+
 from pydantic import BaseConfig, BaseModel
 
 
@@ -15,6 +17,11 @@ Role = Literal["generator", "solver"]
 T = TypeVar("T")
 
 
+def str_with_traceback(exception: Exception) -> str:
+    """Returns the full exception info with a stacktrace."""
+    return "\n".join(format_exception(exception))
+
+
 class BaseModel(BaseModel):
     """Base class for all pydantic models."""
 
@@ -22,9 +29,8 @@ class BaseModel(BaseModel):
         """Base config for all pydandic configs."""
 
         json_encoders = {
-            Exception: str,
+            Exception: str_with_traceback,
         }
-
 
 
 def inherit_docs(obj: T) -> T:
