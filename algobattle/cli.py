@@ -4,6 +4,7 @@ from contextlib import ExitStack
 import curses
 from dataclasses import dataclass, field
 from functools import partial
+import pickle
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -12,7 +13,7 @@ import tomllib
 from importlib.metadata import version as pkg_version
 
 from prettytable import DOUBLE_BORDER, PrettyTable
-from pydantic import BaseModel, validator
+from pydantic import validator
 from anyio import create_task_group, run, sleep
 
 from algobattle.battle import Battle, Fight, FightUiData
@@ -20,7 +21,7 @@ from algobattle.docker_util import DockerConfig, GeneratorResult, Image, Program
 from algobattle.match import MatchConfig, Match, Ui
 from algobattle.problem import Problem
 from algobattle.team import Matchup, TeamHandler, TeamInfo
-from algobattle.util import Role, TimerInfo, check_path, flat_intersperse
+from algobattle.util import Role, TimerInfo, check_path, BaseModel, flat_intersperse
 
 
 class ExecutionConfig(BaseModel):
@@ -28,19 +29,20 @@ class ExecutionConfig(BaseModel):
 
     silent: bool = False
     safe_build: bool = False
+    result_output: Path | None = None
 
 
-class Config(BaseModel):
+class BattleConfig(BaseModel):
     """Pydantic model to parse the config file."""
 
     teams: list[TeamInfo] = []
     execution: ExecutionConfig = ExecutionConfig()
     match: MatchConfig = MatchConfig()
     docker: DockerConfig = DockerConfig()
-    battle: dict[str, Battle.Config] = {n: b.Config() for n, b in Battle.all().items()}
+    battle: dict[str, Battle.BattleConfig] = {n: b.BattleConfig() for n, b in Battle.all().items()}
 
     @property
-    def battle_config(self) -> Battle.Config:
+    def battle_config(self) -> Battle.BattleConfig:
         """The config object for the used battle type."""
         return self.battle[self.match.battle_type.name().lower()]
 
@@ -53,7 +55,7 @@ class Config(BaseModel):
         out = {}
         for name, battle_cls in battle_types.items():
             data = vals.get(name, {})
-            out[name] = battle_cls.Config.parse_obj(data)
+            out[name] = battle_cls.BattleConfig.parse_obj(data)
         return out
 
     _cli_mapping: ClassVar[dict[str, Any]] = {
@@ -69,7 +71,7 @@ class Config(BaseModel):
 
     def include_cli(self, cli: Namespace) -> None:
         """Updates itself using the data in the passed argparse namespace."""
-        Config._include_cli(self, cli, self._cli_mapping)
+        BattleConfig._include_cli(self, cli, self._cli_mapping)
         for battle_name, config in self.battle.items():
             for name in config.__fields__:
                 cli_name = f"{battle_name}_{name}"
@@ -83,7 +85,7 @@ class Config(BaseModel):
                 continue
             value = getattr(model, name)
             if isinstance(value, BaseModel):
-                Config._include_cli(value, cli, mapping.get(name, {}))
+                BattleConfig._include_cli(value, cli, mapping.get(name, {}))
             else:
                 cli_val = getattr(cli, mapping.get(name, name))
                 if cli_val is not None:
@@ -102,7 +104,7 @@ class Config(BaseModel):
         return cls.parse_obj(config_dict)
 
 
-def parse_cli_args(args: list[str]) -> tuple[Path, Config]:
+def parse_cli_args(args: list[str]) -> tuple[Path, BattleConfig]:
     """Parse a given CLI arg list into config objects."""
     parser = ArgumentParser()
     parser.add_argument("problem", type=check_path, help="Path to a folder with the problem file.")
@@ -110,6 +112,9 @@ def parse_cli_args(args: list[str]) -> tuple[Path, Config]:
         "--config", type=partial(check_path, type="file"), help="Path to a config file, defaults to '{problem} / config.toml'."
     )
     parser.add_argument("-s", "--silent", action="store_const", const=True, help="Disable the cli Ui.")
+    parser.add_argument(
+        "--result_output", type=check_path, help="If set, the match result object will be saved to the specified file."
+    )
 
     parser.add_argument(
         "--safe_build",
@@ -138,7 +143,7 @@ def parse_cli_args(args: list[str]) -> tuple[Path, Config]:
     # battle types have their configs automatically added to the CLI args
     for battle_name, battle in Battle.all().items():
         group = parser.add_argument_group(battle_name)
-        for name, kwargs in battle.Config.as_argparse_args():
+        for name, kwargs in battle.BattleConfig.as_argparse_args():
             group.add_argument(f"--{battle_name.lower()}_{name}", **kwargs)
 
     parsed = parser.parse_args(args)
@@ -150,11 +155,11 @@ def parse_cli_args(args: list[str]) -> tuple[Path, Config]:
 
     if cfg_path.is_file():
         try:
-            config = Config.from_file(cfg_path)
+            config = BattleConfig.from_file(cfg_path)
         except Exception as e:
             raise ValueError(f"Invalid config file, terminating execution.\n{e}")
     else:
-        config = Config()
+        config = BattleConfig()
     config.include_cli(parsed)
     if config.docker.advanced_run_params is not None:
         Image.run_kwargs = config.docker.advanced_run_params.to_docker_args()
@@ -168,7 +173,7 @@ def parse_cli_args(args: list[str]) -> tuple[Path, Config]:
 
 
 async def _run_with_ui(
-    match_config: MatchConfig, battle_config: Battle.Config, problem: type[Problem], teams: TeamHandler, ui: "CliUi | None"
+    match_config: MatchConfig, battle_config: Battle.BattleConfig, problem: type[Problem], teams: TeamHandler, ui: "CliUi | None"
 ):
     async with create_task_group() as tg:
         if ui is not None:
@@ -203,6 +208,12 @@ def main():
                 points = result.calculate_points()
                 for team, pts in points.items():
                     print(f"Team {team} gained {pts:.1f} points.")
+            if config.execution.result_output:
+                t = datetime.now()
+                filename = f"{t.year:04d}-{t.month:02d}-{t.day:02d}_{t.hour:02d}-{t.minute:02d}-{t.second:02d}.log"
+                output_path = config.execution.result_output / filename
+                with open(output_path, "wb+") as f:
+                    pickle.dump(result, f)
 
     except KeyboardInterrupt:
         print("Received keyboard interrupt, terminating execution.")
@@ -316,12 +327,13 @@ class CliUi(Ui):
         table.set_style(DOUBLE_BORDER)
         table.align["Result"] = "r"
 
-        for matchup, result in match.results.items():
-            if result.run_exception is None:
-                res = result.format_score(result.score())
-            else:
-                res = f"Error: {result.run_exception}"
-            table.add_row([str(matchup.generator), str(matchup.solver), res])
+        for generating, battles in match.results.items():
+            for solving, result in battles.items():
+                if result.run_exception is None:
+                    res = result.format_score(result.score())
+                else:
+                    res = f"Error: {result.run_exception}"
+                table.add_row([generating, solving, res])
 
         return [f"Battle Type: {match.config.battle_type.name()}"] + list(str(table).split("\n"))
 
@@ -380,7 +392,7 @@ class CliUi(Ui):
 
     def display_battle(self, matchup: Matchup) -> list[str]:
         """Formats the battle data into a string that can be printed to the terminal."""
-        battle = self.match.results[matchup]
+        battle = self.match.results[matchup.generator.name][matchup.solver.name]
         fights = battle.fight_results[-3:] if len(battle.fight_results) >= 3 else battle.fight_results
         sections: list[list[str]] = []
 
