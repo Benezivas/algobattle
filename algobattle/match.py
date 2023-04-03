@@ -1,6 +1,8 @@
 """Central managing module for an algorithmic battle."""
+from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
+from itertools import combinations
 from typing import Self
 
 from pydantic import BaseModel, validator
@@ -10,7 +12,7 @@ from anyio.abc import TaskStatus
 
 from algobattle.battle import Battle, FightHandler, FightUiProxy, Iterated, BattleUiProxy
 from algobattle.docker_util import GeneratorResult, ProgramUiProxy, SolverResult
-from algobattle.team import Matchup, TeamHandler, Team
+from algobattle.team import Matchup, TeamHandler
 from algobattle.problem import Problem
 from algobattle.util import Role, TimerInfo, inherit_docs
 
@@ -37,20 +39,19 @@ class MatchConfig(BaseModel):
             raise TypeError
 
 
-@dataclass
-class Match:
+class Match(BaseModel):
     """The Result of a whole Match."""
 
-    config: MatchConfig
-    battle_config: Battle.Config
-    problem: type[Problem]
-    teams: TeamHandler
-    results: dict[Matchup, Battle] = field(default_factory=dict, init=False)
+    active_teams: list[str]
+    excluded_teams: list[str]
+    results: defaultdict[str, dict[str, Battle]] = field(default_factory=lambda: defaultdict(dict), init=False)
 
     async def _run_battle(
         self,
         battle: Battle,
         matchup: Matchup,
+        config: Battle.Config,
+        problem: type[Problem],
         ui: "Ui",
         limiter: CapacityLimiter,
         *,
@@ -63,8 +64,8 @@ class Match:
             try:
                 await battle.run_battle(
                     handler,
-                    self.battle_config,
-                    self.problem.min_size,
+                    config,
+                    problem.min_size,
                 )
             except Exception as e:
                 battle.run_exception = e
@@ -81,7 +82,7 @@ class Match:
         ui: "Ui | None" = None,
     ) -> Self:
         """Executes a match with the specified parameters."""
-        result = cls(config, battle_config, problem, teams)
+        result = cls(active_teams=[t.name for t in teams.active], excluded_teams=[t.name for t in teams.excluded])
         if ui is None:
             ui = Ui()
         ui.match = result
@@ -90,47 +91,46 @@ class Match:
         async with create_task_group() as tg:
             for matchup in teams.matchups:
                 battle = config.battle_type(ui.get_battle_observer(matchup))
-                result.results[matchup] = battle
-                await tg.start(result._run_battle, battle, matchup, ui, limiter)
+                result.results[matchup.generator.name][matchup.solver.name] = battle
+                await tg.start(result._run_battle, battle, matchup, battle_config, problem, ui, limiter)
             return result
 
-    def calculate_points(self) -> dict[str, float]:
+    def calculate_points(self, points_per_matchup: int) -> dict[str, float]:
         """Calculate the number of points each team scored.
 
         Each pair of teams fights for the achievable points among one another.
         These achievable points are split over all rounds.
         """
-        achievable_points = self.config.points
-        if len(self.teams.active) == 0:
+        if len(self.active_teams) == 0:
             return {}
-        if len(self.teams.active) == 1:
-            return {self.teams.active[0].name: achievable_points}
+        if len(self.active_teams) == 1:
+            return {self.active_teams[0]: points_per_matchup}
 
-        points = {team.name: 0.0 for team in self.teams.active + self.teams.excluded}
-        points_per_battle = round(achievable_points / (len(self.teams.active) - 1), 1)
+        points = {team: 0.0 for team in self.active_teams + self.excluded_teams}
+        points_per_battle = round(points_per_matchup / (len(self.active_teams) - 1), 1)
 
-        for home_matchup, away_matchup in self.teams.grouped_matchups:
+        for first, second in combinations(self.active_teams, 2):
             try:
-                home_res = self.results[home_matchup]
-                away_res = self.results[away_matchup]
+                first_res = self.results[second][first]
+                second_res = self.results[first][second]
             except KeyError:
                 continue
-            total_score = home_res.score() + away_res.score()
+            total_score = first_res.score() + second_res.score()
             if total_score == 0:
                 # Default values for proportions, assuming no team manages to solve anything
-                home_ratio = 0.5
-                away_ratio = 0.5
+                first_ratio = 0.5
+                second_ratio = 0.5
             else:
-                home_ratio = home_res.score() / total_score
-                away_ratio = away_res.score() / total_score
+                first_ratio = first_res.score() / total_score
+                second_ratio = second_res.score() / total_score
 
-            points[home_matchup.solver.name] += round(points_per_battle * home_ratio, 1)
-            points[away_matchup.solver.name] += round(points_per_battle * away_ratio, 1)
+            points[first] += round(points_per_battle * first_ratio, 1)
+            points[second] += round(points_per_battle * second_ratio, 1)
 
         # we need to also add the points each team would have gotten fighting the excluded teams
         # each active team would have had one set of battles against each excluded team
-        for team in self.teams.active:
-            points[team.name] += points_per_battle * len(self.teams.excluded)
+        for team in self.active_teams:
+            points[team] += points_per_battle * len(self.excluded_teams)
 
         return points
 
