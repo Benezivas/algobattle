@@ -93,7 +93,7 @@ class Match(Subject):
             for matchup in teams.matchups:
                 battle = config.battle_type(observer=observer)      # type: ignore
                 result.results[matchup] = battle
-                await tg.start(cls._run_battle, battle, matchup, battle_config, problem.min_size, limiter)
+                await tg.start(result._run_battle, battle, matchup, limiter)
             return result
 
     def calculate_points(self) -> dict[str, float]:
