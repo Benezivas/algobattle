@@ -350,7 +350,9 @@ class Image:
             if response["StatusCode"] == 0:
                 return elapsed_time
             else:
-                message = f"Program crashed with exit code {response['StatusCode']} and error message:\n{container.logs().decode()}"
+                message = (
+                    f"Program crashed with exit code {response['StatusCode']} and error message:\n{container.logs().decode()}"
+                )
                 raise ExecutionError(message, elapsed_time)
         except (Timeout, ConnectionError) as e:
             container.kill()
@@ -396,7 +398,7 @@ class Program(ABC):
 
     image: Image
     config: RunParameters
-    team_name: str  
+    team_name: str
     problem_class: type[Problem]
 
     role: ClassVar[Role]
@@ -486,7 +488,7 @@ class Program(ABC):
                     encode(battle_input, input / "battle_data", size, self.role)
                 except Exception as e:
                     logger.critical("Battle data couldn't be encoded into files!")
-                    return result_class(EncodingError("Battle data couldn't be encoded:\n{e}"), 0, size, run_params)
+                    return result_class(EncodingError(f"Battle data couldn't be encoded:\n{e}"), 0, size, run_params)
             if battle_output:
                 (output / "battle_data").mkdir()
 
@@ -507,7 +509,7 @@ class Program(ABC):
             else:
                 decoded_battle_output = None
 
-        return result_class(output_data, runtime, size, run_params, decoded_battle_output)      # type: ignore
+        return result_class(output_data, runtime, size, run_params, decoded_battle_output)  # type: ignore
 
     @inherit_docs
     def remove(self) -> None:
@@ -518,6 +520,7 @@ class Program(ABC):
 
     def __exit__(self, _type, _value_, _traceback):
         self.remove()
+
 
 class Generator(Program):
     """A higher level interface for a team's generator."""
