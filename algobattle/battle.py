@@ -178,7 +178,6 @@ class Battle(ABC):
     fight_results: list[Fight] = field(default_factory=list)
     run_exception: Exception | None = field(default=None, init=False)
 
-    scoring_team: ClassVar[Role] = "solver"
     _battle_types: ClassVar[dict[str, type["Battle"]]] = {}
 
     class Config(BaseModel):
