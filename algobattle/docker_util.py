@@ -13,7 +13,7 @@ from docker.models.images import Image as DockerImage
 from docker.models.containers import Container as DockerContainer
 from docker.types import Mount, LogConfig, Ulimit
 from requests import Timeout, ConnectionError
-from pydantic import Field
+from pydantic import Field, validator
 from anyio.to_thread import run_sync
 from urllib3.exceptions import ReadTimeoutError
 
@@ -401,30 +401,33 @@ class Image:
             raise ExecutionTimeout(f"{self.description} exceeded the time limit", elapsed_time)
 
 
+@dataclass
+class _GenResData:
+    problem: Problem
+    solution: Problem.Solution | None = None
+
+
 class ProgramResult(BaseModel):
     """Result of a program execution."""
 
-    result: "GeneratorResult.Data | Problem.Solution | ProgramError"
+    result: _GenResData | Problem.Solution | ProgramError | None = None
     runtime: float
     size: int
     params: RunParameters
-    battle_data: dict[str, Encodable] | None = None
+    battle_data: dict[str, Encodable] | None = Field(default=None, exclude=True)
 
     class Config(BaseModel.Config):
         json_encoders = {
-            ExceptionModel: lambda e: e.jsonify(),
+            _GenResData: lambda _: "null",
+            Problem.Solution: lambda _: "null",
+            ProgramError: lambda e: e.jsonify(),
         }
 
 
 class GeneratorResult(ProgramResult):
     """Result of a single generator execution."""
 
-    @dataclass
-    class _Data:
-        problem: Problem
-        solution: Problem.Solution | None = None
-
-    result: _Data | ProgramError
+    result: _GenResData | ProgramError
 
 
 class SolverResult(ProgramResult):
@@ -471,7 +474,7 @@ class Program(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def _parse_output(self, output: Path, size: int, instance: Problem | None) -> GeneratorResult._Data | Problem.Solution:
+    def _parse_output(self, output: Path, size: int, instance: Problem | None) -> _GenResData | Problem.Solution:
         raise NotImplementedError
 
     async def _run(
@@ -571,7 +574,7 @@ class Generator(Program):
         if self.problem_class.with_solution:
             (output / "solution").mkdir()
 
-    def _parse_output(self, output: Path, size: int, instance: Problem | None) -> GeneratorResult._Data:
+    def _parse_output(self, output: Path, size: int, instance: Problem | None) -> _GenResData:
         assert instance is None
         try:
             problem = self.problem_class.decode(output / "instance", size, self.role)
@@ -593,7 +596,7 @@ class Generator(Program):
                 raise EncodingError(f"The generator of team {self.team_name} output an invalid solution!")
         else:
             solution = None
-        return GeneratorResult._Data(problem, solution)
+        return _GenResData(problem, solution)
 
     async def run(
         self,
