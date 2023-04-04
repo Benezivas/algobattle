@@ -57,12 +57,12 @@ class FightUiProxy(Protocol):
 
     @overload
     @abstractmethod
-    def update(self, role: Literal["generator"], data: datetime | float | GeneratorResult | None) -> None:
+    def update(self, role: Literal["generator"], data: GeneratorResult) -> None:
         ...
 
     @overload
     @abstractmethod
-    def update(self, role: Literal["solver"], data: datetime | float | SolverResult | None) -> None:
+    def update(self, role: Literal["solver"], data: SolverResult) -> None:
         ...
 
     @overload
@@ -74,7 +74,7 @@ class FightUiProxy(Protocol):
     def update(
         self,
         role: Role | None = None,
-        data: datetime | float | ProgramResult | None = None,
+        data: ProgramResult | None = None,
     ) -> None:
         """Updates the ui with info about the current fight.
 

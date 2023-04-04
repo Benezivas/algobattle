@@ -404,7 +404,7 @@ class Image:
 class ProgramResult(BaseModel):
     """Result of a program execution."""
 
-    result: "Any | Problem.Solution | ProgramError"
+    result: "GeneratorResult.Data | Problem.Solution | ProgramError"
     runtime: float
     size: int
     params: RunParameters
