@@ -28,10 +28,6 @@ class BaseModel(BaseModel):
     class Config(BaseConfig):
         """Base config for all pydandic configs."""
 
-        json_encoders = {
-            Exception: str_with_traceback,
-        }
-
 
 def inherit_docs(obj: T) -> T:
     """Decorator to mark a method as inheriting its docstring.

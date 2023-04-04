@@ -30,7 +30,7 @@ from algobattle.docker_util import (
     GeneratorResult,
     SolverResult,
 )
-from algobattle.util import Encodable, Role, TimerInfo, inherit_docs, BaseModel
+from algobattle.util import Encodable, Role, TimerInfo, inherit_docs, BaseModel, str_with_traceback
 
 
 _Config: TypeAlias = Any
@@ -177,6 +177,12 @@ class Battle(BaseModel):
     run_exception: Exception | str | None = None
 
     _battle_types: ClassVar[dict[str, type["Battle"]]] = {}
+
+    class Config(BaseModel.Config):
+
+        json_encoders = {
+            Exception: str_with_traceback,
+        }
 
     class BattleConfig(BaseModel):
         """Object containing the config variables the battle types use."""

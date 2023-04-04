@@ -60,12 +60,14 @@ def get_os_type() -> Literal["linux", "windows"]:
     return client().info()["OSType"]
 
 
-class BuildError(Exception):
-    """Indicates that the build process could not be completed successfully."""
+class ExceptionModel(Exception):
+    """An exception that can be encoded into a json file."""
 
+    _child_classes: dict[str, type[Self]] = {}
 
-class ProgramError(Exception):
-    """Parent class for exceptions raised during the execution of a program."""
+    def __init_subclass__(cls) -> None:
+        cls._child_classes[cls.__name__] = cls
+        return super().__init_subclass__()
 
     def __init__(self, message: str, *args: object) -> None:
         self.message = message
@@ -74,6 +76,36 @@ class ProgramError(Exception):
     def __str__(self) -> str:
         return f"{self.__class__.__name__}: {self.message}"
 
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate
+
+    @classmethod
+    def validate(cls, v: Any) -> Self:
+        if isinstance(v, cls):
+            return v
+        if not isinstance(v, dict):
+            raise ValueError
+        try:
+            child_class = cls._child_classes[v.pop("type")]
+        except KeyError:
+            child_class = cls
+        return child_class(**v)
+
+    def jsonify(self) -> dict[str, Any]:
+        return {
+            "type": self.__class__.__name__,
+            "message": self.message,
+        }
+
+
+class BuildError(ExceptionModel):
+    """Indicates that the build process could not be completed successfully."""
+
+
+class ProgramError(ExceptionModel):
+    """Parent class for exceptions raised during the execution of a program."""
+
 
 class ExecutionError(ProgramError):
     """Indicates that the program could not be executed successfully."""
@@ -81,6 +113,11 @@ class ExecutionError(ProgramError):
     def __init__(self, message: str, runtime: float, *args: object) -> None:
         self.runtime = runtime
         super().__init__(message, *args)
+
+    def jsonify(self) -> dict[str, Any]:
+        out = super().jsonify()
+        out["runtime"] = self.runtime
+        return out
 
 
 class ExecutionTimeout(ExecutionError):
@@ -372,6 +409,11 @@ class ProgramResult(BaseModel):
     size: int
     params: RunParameters
     battle_data: dict[str, Encodable] | None = None
+
+    class Config(BaseModel.Config):
+        json_encoders = {
+            ExceptionModel: lambda e: e.jsonify(),
+        }
 
 
 class GeneratorResult(ProgramResult):
