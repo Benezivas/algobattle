@@ -769,7 +769,7 @@ class AdvancedBuildArgs(BaseModel):
     Contains all options exposed on the python docker build api, except those set by :meth:`Image.build` itself.
     """
 
-    class ContainerLimits(TypedDict):
+    class _ContainerLimits(TypedDict):
         memory: int
         memswap: int
         cpushares: int
@@ -782,7 +782,7 @@ class AdvancedBuildArgs(BaseModel):
     pull: bool | None = None
     forcerm: bool = True
     buildargs: dict[Any, Any] | None = None
-    container_limits: ContainerLimits | None = None
+    container_limits: _ContainerLimits | None = None
     shmsize: int | None = None
     labels: dict[Any, Any] | None = None
     cache_from: list[Any] | None = None
