@@ -349,6 +349,7 @@ class CliUi(Ui):
             self.fight_data[matchup].solver = data
 
     async def loop(self) -> None:
+        """Periodically updates the Ui with the current match info."""
         while True:
             self.update()
             await sleep(0.1)
