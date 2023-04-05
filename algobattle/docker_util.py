@@ -378,11 +378,11 @@ class GeneratorResult(ProgramResult):
     """Result of a single generator execution."""
 
     @dataclass
-    class Data:
+    class _Data:
         problem: Problem
         solution: Problem.Solution | None = None
 
-    result: Data | ProgramError
+    result: _Data | ProgramError
 
 
 @dataclass
@@ -430,7 +430,7 @@ class Program(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def _parse_output(self, output: Path, size: int, instance: Problem | None) -> GeneratorResult.Data | Problem.Solution:
+    def _parse_output(self, output: Path, size: int, instance: Problem | None) -> GeneratorResult._Data | Problem.Solution:
         raise NotImplementedError
 
     async def _run(
@@ -535,7 +535,7 @@ class Generator(Program):
         if self.problem_class.with_solution:
             (output / "solution").mkdir()
 
-    def _parse_output(self, output: Path, size: int, instance: Problem | None) -> GeneratorResult.Data:
+    def _parse_output(self, output: Path, size: int, instance: Problem | None) -> GeneratorResult._Data:
         assert instance is None
         try:
             problem = self.problem_class.decode(output / "instance", size, self.role)
@@ -565,7 +565,7 @@ class Generator(Program):
                 raise EncodingError(msg)
         else:
             solution = None
-        return GeneratorResult.Data(problem, solution)
+        return GeneratorResult._Data(problem, solution)
 
     async def run(
         self,
@@ -646,26 +646,26 @@ class AdvancedRunArgs(BaseModel):
     and those set by :meth:`Image.run` itself.
     """
 
-    class BlockIOWeight(TypedDict):
+    class _BlockIOWeight(TypedDict):
         Path: str
         Weight: int
 
-    class DeviceRate(TypedDict):
+    class _DeviceRate(TypedDict):
         Path: str
         Rate: int
 
-    class HealthCheck(TypedDict):
+    class _HealthCheck(TypedDict):
         test: list[str] | str
         interval: int
         timeout: int
         retries: int
         start_period: int
 
-    class LogConfigArgs(TypedDict):
+    class _LogConfigArgs(TypedDict):
         type: str
         conifg: dict[Any, Any]
 
-    class UlimitArgs(TypedDict):
+    class _UlimitArgs(TypedDict):
         name: str
         soft: int
         hard: int
@@ -673,7 +673,7 @@ class AdvancedRunArgs(BaseModel):
     network_mode: str = "none"
     command: str | list[str] | None = None
     auto_remove: bool | None = None
-    blkio_weight_device: list[BlockIOWeight] | None = None
+    blkio_weight_device: list[_BlockIOWeight] | None = None
     blkio_weight: int | None = Field(default=None, ge=10, le=1000)
     cap_add: list[str] | None = None
     cap_drop: list[str] | None = None
@@ -689,10 +689,10 @@ class AdvancedRunArgs(BaseModel):
     cpuset_cpus: str | None = None
     cpuset_mems: str | None = None
     device_cgroup_rules: list[str] | None = None
-    device_read_bps: list[DeviceRate] | None = None
-    device_read_iops: list[DeviceRate] | None = None
-    device_write_bps: list[DeviceRate] | None = None
-    device_write_iops: list[DeviceRate] | None = None
+    device_read_bps: list[_DeviceRate] | None = None
+    device_read_iops: list[_DeviceRate] | None = None
+    device_write_bps: list[_DeviceRate] | None = None
+    device_write_iops: list[_DeviceRate] | None = None
     devices: list[str] | None = None
     dns: list[str] | None = None
     dns_opt: list[str] | None = None
@@ -702,7 +702,7 @@ class AdvancedRunArgs(BaseModel):
     environment: dict[str, str] | list[str] | None = None
     extra_hosts: dict[str, str] | None = None
     group_add: list[str] | None = None
-    healthcheck: HealthCheck | None = None
+    healthcheck: _HealthCheck | None = None
     hostname: str | None = None
     init: bool | None = None
     init_path: str | None = None
@@ -711,7 +711,7 @@ class AdvancedRunArgs(BaseModel):
     kernel_memory: int | str | None = None
     labels: dict[str, str] | list[str] | None = None
     links: dict[str, str] | None = None
-    log_config: LogConfigArgs | None = None
+    log_config: _LogConfigArgs | None = None
     lxc_conf: dict[Any, Any] | None = None
     mac_address: str | None = None
     mem_limit: int | str | None = None
@@ -742,7 +742,7 @@ class AdvancedRunArgs(BaseModel):
     sysctls: dict[Any, Any] | None = None
     tmpfs: dict[Any, Any] | None = None
     tty: bool | None = None
-    ulimits: list[UlimitArgs] | None = None
+    ulimits: list[_UlimitArgs] | None = None
     use_config_proxy: bool | None = None
     user: str | int | None = None
     userns_mode: str | None = None
