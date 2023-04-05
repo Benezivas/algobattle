@@ -131,7 +131,7 @@ class ProgramTests(IsolatedAsyncioTestCase):
         with Generator.build(*self.dockerfile("generator"), TestProblem, self.params) as gen:
             res = await gen.run(5)
             correct = TestProblem(semantics=True)
-            assert isinstance(res.result, GeneratorResult.Data)
+            assert isinstance(res.result, GeneratorResult._Data)
             self.assertEqual(res.result.problem, correct)
 
     async def test_sol_timeout(self):

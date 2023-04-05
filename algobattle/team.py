@@ -128,6 +128,9 @@ class Matchup:
         yield self.generator
         yield self.solver
 
+    def __repr__(self) -> str:
+        return f"Matchup({self.generator.name}, {self.solver.name})"
+
 
 class TeamHandler:
     """Handles building teams and cleaning them up."""
