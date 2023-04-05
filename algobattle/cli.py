@@ -443,11 +443,11 @@ class CliUi(Ui):
                     out.append(f"Runtime: {fight.generator}")
                 else:
                     out.append(f"Runtime: {fight.generator.runtime}")
-                    if isinstance(fight.generator.result, GeneratorResult.Data):
-                        out.append("Ran successfully.")
-                    else:
+                    if isinstance(fight.generator.result, ProgramError):
                         out.append("Failed!")
                         out.append(str(fight.generator.result))
+                    else:
+                        out.append("Ran successfully.")
             if fight.solver is not None:
                 out.append("Solver:")
                 if isinstance(fight.solver, TimerInfo):
