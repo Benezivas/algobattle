@@ -19,7 +19,7 @@ from typing import (
 
 from pydantic import BaseModel, Field, BaseConfig
 
-from algobattle.docker_util import DockerError, Generator, Solver, GeneratorResult, SolverResult
+from algobattle.docker_util import ProgramError, Generator, Solver, GeneratorResult, SolverResult
 from algobattle.ui import Observer, Subject
 from algobattle.util import Encodable, Role, inherit_docs
 
@@ -35,8 +35,8 @@ class CombinedResults:
     """The result of one execution of the generator and the solver with the generated instance."""
 
     score: float
-    generator: GeneratorResult | DockerError
-    solver: SolverResult | DockerError | None
+    generator: GeneratorResult | ProgramError
+    solver: SolverResult | ProgramError | None
 
 
 class Battle(Subject, ABC):
@@ -106,11 +106,11 @@ class Battle(Subject, ABC):
         return cls.__name__
 
     @abstractmethod
-    def run_battle(self, generator: Generator, solver: Solver, config: _Config, min_size: int) -> None:
+    async def run_battle(self, generator: Generator, solver: Solver, config: _Config, min_size: int) -> None:
         """Calculates the next instance size that should be fought over."""
         raise NotImplementedError
 
-    def run_programs(
+    async def run_programs(
         self,
         generator: Generator,
         solver: Solver,
@@ -129,33 +129,32 @@ class Battle(Subject, ABC):
     ) -> CombinedResults:
         """Execute a single fight of a battle, running the generator and solver and handling any errors gracefully."""
         self.notify()
-        try:
-            gen_result = generator.run(
-                size=size,
-                timeout=timeout_generator,
-                space=space_generator,
-                cpus=cpus_generator,
-                battle_input=generator_battle_input,
-                battle_output=generator_battle_output,
-            )
-        except DockerError as e:
-            return CombinedResults(score=1, generator=e, solver=None)
+        gen_result = await generator.run(
+            size=size,
+            timeout=timeout_generator,
+            space=space_generator,
+            cpus=cpus_generator,
+            battle_input=generator_battle_input,
+            battle_output=generator_battle_output,
+        )
+        if isinstance(gen_result.result, ProgramError):
+            return CombinedResults(score=1, generator=gen_result.result, solver=None)
 
-        try:
-            sol_result = solver.run(
-                gen_result.problem,
-                size=size,
-                timeout=timeout_solver,
-                space=space_solver,
-                cpus=cpus_solver,
-                battle_input=solver_battle_input,
-                battle_output=solver_battle_output,
-            )
-        except DockerError as e:
-            return CombinedResults(score=0, generator=gen_result, solver=e)
+        self.notify()
+        sol_result = await solver.run(
+            gen_result.result.problem,
+            size=size,
+            timeout=timeout_solver,
+            space=space_solver,
+            cpus=cpus_solver,
+            battle_input=solver_battle_input,
+            battle_output=solver_battle_output,
+        )
+        if isinstance(sol_result.result, ProgramError):
+            return CombinedResults(score=0, generator=gen_result, solver=sol_result)
 
-        score = gen_result.problem.calculate_score(
-            solution=sol_result.solution, generator_solution=gen_result.solution, size=size
+        score = gen_result.result.problem.calculate_score(
+            solution=sol_result.result, generator_solution=gen_result.result.solution, size=size
         )
         score = max(0, min(1, float(score)))
         logger.info(f"The solver achieved a score of {score}.")
@@ -177,7 +176,7 @@ class Iterated(Battle):
         exponent: int = Field(default=2, help="Determines how quickly the instance size grows.")
         approximation_ratio: float = Field(default=1, help="Approximation ratio that a solver needs to achieve to pass.")
 
-    def run_battle(self, generator: Generator, solver: Solver, config: Config, min_size: int) -> None:
+    async def run_battle(self, generator: Generator, solver: Solver, config: Config, min_size: int) -> None:
         """Execute one iterative battle between a generating and a solving team.
 
         Incrementally try to search for the highest n for which the solver is
@@ -204,7 +203,7 @@ class Iterated(Battle):
             self.cap = config.iteration_cap
             self.current = min_size
             while alive:
-                result = self.run_programs(generator, solver, self.current)
+                result = await self.run_programs(generator, solver, self.current)
                 score = result.score
                 if score < config.approximation_ratio:
                     logger.info(f"Solver does not meet the required solution quality at instance size "
@@ -258,7 +257,7 @@ class Averaged(Battle):
         instance_size: int = Field(default=10, help="Instance size that will be fought at.")
         iterations: int = Field(default=10, help="Number of iterations in each round.")
 
-    def run_battle(self, generator: Generator, solver: Solver, config: Config, min_size: int) -> None:
+    async def run_battle(self, generator: Generator, solver: Solver, config: Config, min_size: int) -> None:
         """Execute one averaged battle between a generating and a solving team.
 
         Execute several fights between two teams on a fixed instance size
@@ -272,7 +271,7 @@ class Averaged(Battle):
         self.scores: list[float] = []
         for i in range(config.iterations):
             self.curr_iter = i + 1
-            result = self.run_programs(generator, solver, config.instance_size)
+            result = await self.run_programs(generator, solver, config.instance_size)
             self.scores.append(result.score)
 
     @inherit_docs

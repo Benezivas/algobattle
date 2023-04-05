@@ -1,19 +1,19 @@
 """Tests for all docker functions."""
-from __future__ import annotations
 from typing import cast
-from unittest import TestCase, main as run_tests
+from unittest import IsolatedAsyncioTestCase, main as run_tests
 import logging
 import random
 from pathlib import Path
 
 from algobattle.docker_util import (
-    DockerError,
+    ExecutionTimeout,
+    BuildError,
     EncodingError,
     ExecutionError,
     Generator,
+    GeneratorResult,
     Image,
     RunParameters,
-    SemanticsError,
     Solver,
     client,
     DockerImage,
@@ -26,7 +26,7 @@ from .testsproblem.problem import Tests as TestProblem
 logging.disable(logging.CRITICAL)
 
 
-class ImageTests(TestCase):
+class ImageTests(IsolatedAsyncioTestCase):
     """Tests for the Image functions."""
 
     @classmethod
@@ -40,12 +40,12 @@ class ImageTests(TestCase):
 
     def test_build_timeout(self):
         """Raises an error if building a container runs into a timeout."""
-        with self.assertRaises(DockerError), Image.build(*self.dockerfile("build_timeout"), timeout=0.5):
+        with self.assertRaises(BuildError), Image.build(*self.dockerfile("build_timeout"), timeout=0.5):
             pass
 
     def test_build_failed(self):
         """Raises an error if building a docker container fails for any reason other than a timeout."""
-        with self.assertRaises(DockerError), Image.build(*self.dockerfile("build_error")):
+        with self.assertRaises(BuildError), Image.build(*self.dockerfile("build_error")):
             pass
 
     def test_build_successful(self):
@@ -55,22 +55,22 @@ class ImageTests(TestCase):
 
     def test_build_nonexistant_path(self):
         """Raises an error if the path to the container does not exist in the file system."""
-        with self.assertRaises(DockerError):
+        with self.assertRaises(RuntimeError):
             nonexistent_file = None
             while nonexistent_file is None or nonexistent_file.exists():
                 nonexistent_file = Path(str(random.randint(0, 2 ** 80)))
             with Image.build(nonexistent_file, "foo_bar"):
                 pass
 
-    def test_run_timeout(self):
-        """`Image.run()` normally terminates when the container times out."""
-        with Image.build(*self.dockerfile("generator_timeout")) as image:
-            image.run(timeout=1.0)
+    async def test_run_timeout(self):
+        """`Image.run()` raises an error when the container times out."""
+        with Image.build(*self.dockerfile("generator_timeout")) as image, self.assertRaises(ExecutionTimeout):
+            await image.run(timeout=1.0)
 
-    def test_run_error(self):
+    async def test_run_error(self):
         """Raises an error if the container doesn't run successfully."""
-        with self.assertRaises(DockerError), Image.build(*self.dockerfile("generator_execution_error")) as image:
-            image.run(timeout=10.0)
+        with self.assertRaises(ExecutionError), Image.build(*self.dockerfile("generator_execution_error")) as image:
+            await image.run(timeout=10.0)
 
     def test_archive(self):
         """Raises an error if the image can't be archived and restored properly."""
@@ -84,7 +84,7 @@ class ImageTests(TestCase):
             assert docker_image.tags == [original_tag]
 
 
-class ProgramTests(TestCase):
+class ProgramTests(IsolatedAsyncioTestCase):
     """Tests for the Program functions."""
 
     @classmethod
@@ -102,67 +102,68 @@ class ProgramTests(TestCase):
         else:
             return cls.problem_path / name, name
 
-    def test_gen_timeout(self):
-        """The generator doesnt output a solution."""
+    async def test_gen_timeout(self):
+        """The generator times out."""
         with Generator.build(*self.dockerfile("generator_timeout"), TestProblem, self.params_short) as gen:
-            with self.assertRaises(EncodingError):
-                gen.run(5)
+            res = await gen.run(5)
+            self.assertIsInstance(res.result, ExecutionTimeout)
 
-    def test_gen_exec_err(self):
+    async def test_gen_exec_err(self):
         """The generator doesn't execute properly."""
         with Generator.build(*self.dockerfile("generator_execution_error"), TestProblem, self.params) as gen:
-            with self.assertRaises(ExecutionError):
-                gen.run(5)
+            res = await gen.run(5)
+            self.assertIsInstance(res.result, ExecutionError)
 
-    def test_gen_syn_err(self):
+    async def test_gen_syn_err(self):
         """The generator outputs a syntactically incorrect solution."""
         with Generator.build(*self.dockerfile("generator_syntax_error"), TestProblem, self.params) as gen:
-            with self.assertRaises(EncodingError):
-                gen.run(5)
+            res = await gen.run(5)
+            self.assertIsInstance(res.result, EncodingError)
 
-    def test_gen_sem_err(self):
+    async def test_gen_sem_err(self):
         """The generator outputs a semantically incorrect solution."""
         with Generator.build(*self.dockerfile("generator_semantics_error"), TestProblem, self.params) as gen:
-            with self.assertRaises(SemanticsError):
-                gen.run(5)
+            res = await gen.run(5)
+            self.assertIsInstance(res.result, EncodingError)
 
-    def test_gen_succ(self):
+    async def test_gen_succ(self):
         """The generator returns the fixed instance."""
         with Generator.build(*self.dockerfile("generator"), TestProblem, self.params) as gen:
-            res = gen.run(5)
+            res = await gen.run(5)
             correct = TestProblem(semantics=True)
-            self.assertEqual(res.problem, correct)
+            assert isinstance(res.result, GeneratorResult._Data)
+            self.assertEqual(res.result.problem, correct)
 
-    def test_sol_timeout(self):
+    async def test_sol_timeout(self):
         """The solver times out."""
         with Solver.build(*self.dockerfile("solver_timeout"), TestProblem, self.params_short) as sol:
-            with self.assertRaises(EncodingError):
-                sol.run(self.instance, 5)
+            res = await sol.run(self.instance, 5)
+            self.assertIsInstance(res.result, ExecutionTimeout)
 
-    def test_sol_exec_err(self):
+    async def test_sol_exec_err(self):
         """The solver doesn't execute properly."""
         with Solver.build(*self.dockerfile("solver_execution_error"), TestProblem, self.params) as sol:
-            with self.assertRaises(ExecutionError):
-                sol.run(self.instance, 5)
+            res = await sol.run(self.instance, 5)
+            self.assertIsInstance(res.result, ExecutionError)
 
-    def test_sol_syn_err(self):
+    async def test_sol_syn_err(self):
         """The solver outputs a syntactically incorrect solution."""
         with Solver.build(*self.dockerfile("solver_syntax_error"), TestProblem, self.params) as sol:
-            with self.assertRaises(EncodingError):
-                sol.run(self.instance, 5)
+            res = await sol.run(self.instance, 5)
+            self.assertIsInstance(res.result, EncodingError)
 
-    def test_sol_sem_err(self):
+    async def test_sol_sem_err(self):
         """The solver outputs a semantically incorrect solution."""
         with Solver.build(*self.dockerfile("solver_semantics_error"), TestProblem, self.params) as sol:
-            with self.assertRaises(SemanticsError):
-                sol.run(self.instance, 5)
+            res = await sol.run(self.instance, 5)
+            self.assertIsInstance(res.result, EncodingError)
 
-    def test_sol_succ(self):
+    async def test_sol_succ(self):
         """The solver outputs a solution with a low quality."""
         with Solver.build(*self.dockerfile("solver"), TestProblem, self.params) as sol:
-            res = sol.run(self.instance, 5)
+            res = await sol.run(self.instance, 5)
             correct = TestProblem.Solution(semantics=True, quality=True)
-            self.assertEqual(res.solution, correct)
+            self.assertEqual(res.result, correct)
 
 
 if __name__ == "__main__":

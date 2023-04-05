@@ -1,5 +1,4 @@
 """Main battle script. Executes all possible types of battles, see battle --help for all options."""
-from __future__ import annotations
 from argparse import ArgumentParser, Namespace
 from contextlib import ExitStack
 from functools import partial
@@ -11,9 +10,10 @@ from typing import Any, ClassVar, Literal, Mapping, Self
 import tomllib
 
 from pydantic import BaseModel, validator
+from anyio import run
 
 from algobattle.battle import Battle
-from algobattle.docker_util import DockerConfig
+from algobattle.docker_util import DockerConfig, Image
 from algobattle.match import MatchConfig, Match
 from algobattle.problem import Problem
 from algobattle.team import TeamHandler, TeamInfo
@@ -111,6 +111,8 @@ class Config(BaseModel):
         "docker": {
             "generator": {"timeout": "generator_timeout", "space": "generator_space", "cpus": "generator_cpus"},
             "solver": {"timeout": "solver_timeout", "space": "solver_space", "cpus": "solver_cpus"},
+            "advanced_run_params": None,
+            "advanced_build_params": None,
         },
     }
 
@@ -178,6 +180,11 @@ def parse_cli_args(args: list[str]) -> tuple[Path, Config]:
     )
 
     parser.add_argument("--battle_type", choices=[name.lower() for name in Battle.all()], help="Type of battle to be used.")
+    parser.add_argument(
+        "--parallel_battles",
+        type=int,
+        help="Number of battles that are executed in parallel.",
+    )
     parser.add_argument("--points", type=int, help="number of points distributed between teams.")
 
     parser.add_argument("--build_timeout", type=float, help="Timeout for the build step of each docker image.")
@@ -209,6 +216,10 @@ def parse_cli_args(args: list[str]) -> tuple[Path, Config]:
     else:
         config = Config()
     config.include_cli(parsed)
+    if config.docker.advanced_run_params is not None:
+        Image.run_kwargs = config.docker.advanced_run_params.to_docker_args()
+    if config.docker.advanced_build_params is not None:
+        Image.run_kwargs = config.docker.advanced_build_params.to_docker_args()
 
     if not config.teams:
         config.teams.append(TeamInfo(name="team_0", generator=problem / "generator", solver=problem / "solver"))
@@ -234,7 +245,7 @@ def main():
             else:
                 ui = None
 
-            result = Match.run(config.match, config.battle_config, problem, teams, ui)
+            result = run(Match.run, config.match, config.battle_config, problem, teams, ui)
 
             logger.info("#" * 78)
             logger.info(result.display())

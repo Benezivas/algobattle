@@ -1,6 +1,4 @@
 """Team class, stores necessary information about a Team, such as their associated solver and generator."""
-from __future__ import annotations
-
 from dataclasses import dataclass
 from itertools import combinations
 from pathlib import Path
@@ -25,7 +23,7 @@ class TeamInfo:
     generator: Path
     solver: Path
 
-    def build(self, problem: type[Problem], config: DockerConfig, *, auto_cleanup=True) -> Team:
+    def build(self, problem: type[Problem], config: DockerConfig, *, auto_cleanup=True) -> "Team":
         """Builds the specified docker files into images and return the corresponding team.
 
         Raises
@@ -97,7 +95,7 @@ class Team:
             self.solver.remove()
         _team_names.remove(self.name)
 
-    def archive(self, dir: Path) -> _ArchivedTeam:
+    def archive(self, dir: Path) -> "_ArchivedTeam":
         """Archives the images this team uses."""
         gen = self.generator.image.archive(dir)
         sol = self.solver.image.archive(dir)
@@ -148,8 +146,8 @@ class TeamHandler:
             self.excluded = []
         super().__init__()
 
-    @staticmethod
-    def build(infos: list[TeamInfo], problem: type[Problem], config: DockerConfig, safe_build: bool = False) -> TeamHandler:
+    @classmethod
+    def build(cls, infos: list[TeamInfo], problem: type[Problem], config: DockerConfig, safe_build: bool = False) -> Self:
         """Builds the specified team objects."""
         excluded: list[TeamInfo] = []
         if safe_build:
@@ -164,7 +162,7 @@ class TeamHandler:
                         logger.warning(f"Building generators and solvers for team {info.name} failed, they will be excluded!")
                         excluded.append(info)
 
-                return TeamHandler([team.restore() for team in archives], excluded)
+                return cls([team.restore() for team in archives], excluded)
         else:
             teams: list[Team] = []
             for info in infos:
@@ -174,7 +172,7 @@ class TeamHandler:
                 except (ValueError, DockerError):
                     logger.warning(f"Building generators and solvers for team {info.name} failed, they will be excluded!")
                     excluded.append(info)
-            return TeamHandler(teams, excluded)
+            return cls(teams, excluded)
 
     def __enter__(self) -> Self:
         return self

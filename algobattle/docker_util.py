@@ -1,24 +1,26 @@
 """Leightweight wrapper around docker functionality."""
-from __future__ import annotations
-from abc import ABC
+from abc import ABC, abstractmethod
 import logging
 from pathlib import Path
-from time import sleep
 from timeit import default_timer
-from typing import Any, Iterator, Literal, Mapping, Self, cast
+from typing import Any, ClassVar, Iterator, Literal, Mapping, Self, TypedDict, cast
 from uuid import uuid1
 import json
 from dataclasses import dataclass
+
 from docker import DockerClient
-from docker.errors import APIError, BuildError, DockerException, ImageNotFound
+from docker.errors import APIError, BuildError as DockerBuildError, DockerException, ImageNotFound
 from docker.models.images import Image as DockerImage
 from docker.models.containers import Container as DockerContainer
-from docker.types import Mount
-from requests import Timeout
+from docker.types import Mount, LogConfig, Ulimit
+from requests import Timeout, ConnectionError
+from pydantic import BaseModel, Field
+from anyio.to_thread import run_sync
+from urllib3.exceptions import ReadTimeoutError
+
 from algobattle.util import Encodable, Role, TempDir, encode, decode, inherit_docs
 from algobattle.problem import Problem
 
-from pydantic import BaseModel
 
 logger = logging.getLogger("algobattle.docker")
 
@@ -40,6 +42,8 @@ class DockerConfig(BaseModel):
     build_timeout: float | None = None
     generator: RunParameters = RunParameters()
     solver: RunParameters = RunParameters()
+    advanced_run_params: "AdvancedRunArgs | None" = None
+    advanced_build_params: "AdvancedBuildArgs | None" = None
 
 
 def client() -> DockerClient:
@@ -62,34 +66,43 @@ def get_os_type() -> Literal["linux", "windows"]:
     return client().info()["OSType"]
 
 
-class DockerError(Exception):
-    """Error type for any issue during the execution of a docker command.
+class BuildError(Exception):
+    """Indicates that the build process could not be completed successfully."""
 
-    Parent class of all exceptions raised by functions in the docker module.
-    """
 
-    pass
+class ProgramError(Exception):
+    """Parent class for exceptions raised during the execution of a program."""
 
-class ExecutionError(DockerError):
-    """Exception raised when the execution of a container fails."""
+    def __init__(self, message: str, *args: object) -> None:
+        self.message = message
+        super().__init__(*args)
 
-    def __init__(self, *args: object, runtime: float, exit_code: int, error_message: str) -> None:
+    def __str__(self) -> str:
+        return f"{self.__class__.__name__}: {self.message}"
+
+
+class ExecutionError(ProgramError):
+    """Indicates that the program could not be executed successfully."""
+
+    def __init__(self, message: str, runtime: float, *args: object) -> None:
         self.runtime = runtime
-        self.exit_code = exit_code
-        self.error_message = error_message
-        super().__init__(runtime, *args)
+        super().__init__(message, *args)
 
 
-class EncodingError(DockerError):
-    """Indicates that the given data couldn't be encoded or decoded properly."""
-
-    pass
+class ExecutionTimeout(ExecutionError):
+    """Indicates that the program ran into the timeout."""
 
 
-class SemanticsError(DockerError):
-    """Indicates that the parsed data is semantically incorrect."""
+class EncodingError(ProgramError):
+    """Indicates that the given data could not be encoded or decoded properly."""
 
-    pass
+    def __init__(self, message: str = "", *args: object) -> None:
+        super().__init__(message, *args)
+
+
+class DockerError(ProgramError, BuildError):
+    """Indicates that an issue with the docker daemon occured."""
+
 
 @dataclass
 class ArchivedImage:
@@ -100,7 +113,7 @@ class ArchivedImage:
     id: str
     description: str
 
-    def restore(self) -> Image:
+    def restore(self) -> "Image":
         """Restores a docker image from an archive."""
         try:
             with open(self.path, "rb") as file:
@@ -111,7 +124,7 @@ class ArchivedImage:
             self.path.unlink()
         except APIError as e:
             logger.warning(f"Docker APIError thrown while restoring '{self.name}'")
-            raise DockerError from e
+            raise DockerError(f"Docker APIError thrown while restoring '{self.name}'") from e
         return Image(self.name, self.id, self.description, path=self.path)
 
 
@@ -128,6 +141,16 @@ class Image:
     description: str
     path: Path
 
+    run_kwargs: ClassVar[dict[str, Any]] = {
+        "network_mode": "none",
+    }
+    build_kwargs: ClassVar[dict[str, Any]] = {
+        "rm": True,
+        "forcerm": True,
+        "quiet": True,
+        "network_mode": "host",
+    }
+
     @classmethod
     def build(
         cls,
@@ -137,7 +160,7 @@ class Image:
         timeout: float | None = None,
         *,
         dockerfile: str | None = None,
-    ) -> Image:
+    ) -> Self:
         """Constructs the python Image object and uses the docker daemon to build the image.
 
         Parameters
@@ -159,11 +182,11 @@ class Image:
         """
         if not path.exists():
             logger.warning(f"Error when building {image_name}: '{path}' does not exist on the file system.")
-            raise DockerError
+            raise RuntimeError
         if path.is_file():
             if dockerfile is not None:
                 logger.warning(f"Error when building {image_name}: '{path}' refers to a file and 'dockerfile' is specified.")
-                raise DockerError
+                raise RuntimeError
             dockerfile = path.name
             path = path.parent
         logger.debug(f"Building docker image with options: {path = !s}, {image_name = }, {timeout = }")
@@ -178,11 +201,8 @@ class Image:
                     path=str(path),
                     tag=image_name,
                     timeout=timeout,
-                    rm=True,
-                    forcerm=True,
-                    quiet=True,
-                    network_mode="host",
                     dockerfile=dockerfile,
+                    **cls.build_kwargs,
                 ),
             )
             if old_image is not None:
@@ -192,13 +212,13 @@ class Image:
 
         except Timeout as e:
             logger.warning(f"Build process for '{path}' ran into a timeout!")
-            raise DockerError from e
-        except BuildError as e:
+            raise BuildError(f"Build process for '{path}' ran into a timeout!") from e
+        except DockerBuildError as e:
             logger.warning(f"Building '{path}' did not complete successfully:\n{e.msg}")
-            raise DockerError from e
+            raise BuildError(f"Building '{path}' did not complete successfully:\n{e.msg}") from e
         except APIError as e:
             logger.warning(f"Docker APIError thrown while building '{path}':\n{e}")
-            raise DockerError from e
+            raise DockerError(f"Docker APIError thrown while building '{path}':\n{e}") from e
 
         return cls(image_name, cast(str, image.id), description if description is not None else image_name, path=path)
 
@@ -208,13 +228,13 @@ class Image:
     def __exit__(self, _type, _value_, _traceback):
         self.remove()
 
-    def run(
+    async def run(
         self,
         input_dir: Path | None = None,
         output_dir: Path | None = None,
         timeout: float | None = None,
         memory: int | None = None,
-        cpus: int | None = None
+        cpus: int | None = None,
     ) -> float:
         """Runs a docker image with the provided input and returns its output.
 
@@ -265,30 +285,19 @@ class Image:
                     mem_limit=memory,
                     nano_cpus=cpus,
                     detach=True,
-                    network_mode="none",
                     mounts=mounts,
+                    **self.run_kwargs,
                 ),
             )
 
-            container.start()
-            start_time = default_timer()
-            while container.reload() or container.status == "running":
-                if timeout is not None and default_timer() - start_time > timeout:
-                    logger.warning(f"{self.description} exceeded time limit!")
-                    container.kill()
-                    break
-                sleep(0.01)
-            elapsed_time = round(default_timer() - start_time, 2)
-
-            if (exit_code := cast(dict[str, Any], container.attrs)["State"]["ExitCode"]) != 0:
-                raise ExecutionError(runtime=elapsed_time, exit_code=exit_code, error_message=container.logs().decode())
+            elapsed_time = await run_sync(self._run_container, container, timeout)
 
         except ImageNotFound as e:
             logger.warning(f"Image {self.name} (id={self.id}) does not exist")
-            raise DockerError from e
+            raise RuntimeError(f"Image {self.name} (id={self.id}) does not exist") from e
         except APIError as e:
             logger.warning(f"Docker API Error thrown while running {self.name}")
-            raise DockerError from e
+            raise DockerError(str(e)) from e
         finally:
             if container is not None:
                 try:
@@ -331,56 +340,75 @@ class Image:
             raise DockerError(f"Docker APIError thrown while archiving '{self.name}'") from e
         return ArchivedImage(path, self.name, self.id, self.description)
 
+    def _run_container(self, container: DockerContainer, timeout: float | None = None) -> float:
+        container.start()
+        start_time = default_timer()
+        elapsed_time = 0
+        try:
+            response = container.wait(timeout=timeout)
+            elapsed_time = round(default_timer() - start_time, 2)
+            if response["StatusCode"] == 0:
+                return elapsed_time
+            else:
+                message = (
+                    f"Program crashed with exit code {response['StatusCode']} and error message:\n{container.logs().decode()}"
+                )
+                raise ExecutionError(message, elapsed_time)
+        except (Timeout, ConnectionError) as e:
+            container.kill()
+            elapsed_time = round(default_timer() - start_time, 2)
+            if len(e.args) != 1 or not isinstance(e.args[0], ReadTimeoutError):
+                raise
+            raise ExecutionTimeout(f"{self.description} exceeded the time limit", elapsed_time)
+
 
 @dataclass
-class GeneratorResult:
-    """Result of a single generator or solver execution."""
+class ProgramResult:
+    """Result of a program execution."""
 
-    problem: Problem
+    result: Any
     runtime: float
-    solution: Problem.Solution | None = None
+    size: int
+    params: RunParameters
     battle_data: dict[str, Encodable] | None = None
 
 
 @dataclass
-class SolverResult:
-    """Result of a single generator or solver execution."""
+class GeneratorResult(ProgramResult):
+    """Result of a single generator execution."""
 
-    solution: Problem.Solution
-    runtime: float
-    battle_data: dict[str, Encodable] | None = None
+    @dataclass
+    class _Data:
+        problem: Problem
+        solution: Problem.Solution | None = None
+
+    result: _Data | ProgramError
 
 
+@dataclass
+class SolverResult(ProgramResult):
+    """Result of a single solver execution."""
+
+    result: Problem.Solution | ProgramError
+
+
+@dataclass
 class Program(ABC):
     """A higher level interface for a team's programs."""
 
-    role: Role
-    data_role: Literal["instance", "solution"]
+    image: Image
+    config: RunParameters
+    team_name: str
+    problem_class: type[Problem]
 
-    def __init_subclass__(cls) -> None:
-        cls.data_role = "instance" if cls.role == "generator" else "solution"
-        return super().__init_subclass__()
-
-    def __init__(
-        self,
-        image: Image,
-        config: RunParameters,
-        team_name: str,
-        data_type: type[Problem] | type[Problem.Solution]
-    ) -> None:
-        # we can't take a ref to the Team object here since it won't be created til after the Programs
-        self.image = image
-        self.config = config
-        self.team_name = team_name
-        self.data_type = data_type
-        super().__init__()
+    role: ClassVar[Role]
 
     @classmethod
     def build(
         cls,
         image: Path | Image | ArchivedImage,
         team_name: str,
-        problem_type: type[Problem],
+        problem_class: type[Problem],
         config: RunParameters,
         timeout: float | None = None,
     ) -> Self:
@@ -395,13 +423,17 @@ class Program(ABC):
         elif isinstance(image, ArchivedImage):
             image = image.restore()
 
-        if cls.role == "generator":
-            data_type = problem_type
-        else:
-            data_type = problem_type.Solution
-        return cls(image, config, team_name, data_type)
+        return cls(image, config, team_name, problem_class)
 
-    def _run(
+    @abstractmethod
+    def _setup_folders(self, input: Path, output: Path, size: int, instance: Problem | None) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def _parse_output(self, output: Path, size: int, instance: Problem | None) -> GeneratorResult._Data | Problem.Solution:
+        raise NotImplementedError
+
+    async def _run(
         self,
         size: int,
         input_instance: Problem | None = None,
@@ -411,7 +443,7 @@ class Program(ABC):
         cpus: int = ...,
         battle_input: Mapping[str, Encodable] = {},
         battle_output: Mapping[str, type[Encodable]] = {},
-    ) -> Any:
+    ) -> GeneratorResult | SolverResult:
         """Execute the program, processing input and output data."""
         set_params: dict[str, Any] = {}
         if timeout is Ellipsis:
@@ -433,26 +465,14 @@ class Program(ABC):
         if set_params:
             param_msg += " with parameters " + ", ".join(f"{k}: {v}" for k, v in set_params.items())
         logger.info(f"Running {self.role} of team {self.team_name}{param_msg}.")
+        run_params = RunParameters(timeout=timeout, space=space, cpus=cpus)
+        result_class = GeneratorResult if self.role == "generator" else SolverResult
 
         with TempDir() as input, TempDir() as output:
-            if self.role == "generator":
-                with open(input / "size", "w+") as f:
-                    f.write(str(size))
-            else:
-                assert input_instance is not None
-                (input / "instance").mkdir()
-                try:
-                    input_instance.encode(input / "instance", size, self.role)
-                except Exception as e:
-                    logger.critical("Problem instance couldn't be encoded into files!")
-                    raise DockerError from e
-            if battle_input:
-                (input / "battle_data").mkdir()
-                try:
-                    encode(battle_input, input / "battle_data", size, self.role)
-                except Exception as e:
-                    logger.critical("Battle data couldn't be encoded into files!")
-                    raise DockerError from e
+            try:
+                self._setup_folders(input, output, size, input_instance)
+            except ProgramError as e:
+                return result_class(e, 0, size, run_params)
             with open(input / "info.json", "w+") as f:
                 json.dump({
                     "size": size,
@@ -462,70 +482,34 @@ class Program(ABC):
                     "battle_input": {name: obj.__class__.__name__ for name, obj in battle_input.items()},
                     "battle_output": {name: cls.__name__ for name, cls in battle_output.items()},
                 }, f)
-
-            (output / self.data_role).mkdir()
-            if issubclass(self.data_type, Problem) and self.data_type.with_solution:
-                (output / "solution").mkdir()
+            if battle_input:
+                (input / "battle_data").mkdir()
+                try:
+                    encode(battle_input, input / "battle_data", size, self.role)
+                except Exception as e:
+                    logger.critical("Battle data couldn't be encoded into files!")
+                    return result_class(EncodingError(f"Battle data couldn't be encoded:\n{e}"), 0, size, run_params)
             if battle_output:
                 (output / "battle_data").mkdir()
 
             try:
-                runtime = self.image.run(input, output, timeout=timeout, memory=space, cpus=cpus)
+                runtime = await self.image.run(input, output, timeout=timeout, memory=space, cpus=cpus)
             except ExecutionError as e:
-                logger.warning(f"{self.role.capitalize()} of team {self.team_name} crashed!")
-                logger.info(f"After {e.runtime:.2f}s, with exit code {e.exit_code} and error message:\n{e.error_message}")
-                raise
-            except DockerError:
-                logger.warning(f"{self.role.capitalize()} of team {self.team_name} couldn't be executed successfully!")
-                raise
+                return result_class(e, e.runtime, size, run_params)
+            except ProgramError as e:
+                return result_class(e, 0, size, run_params)
 
             try:
-                output_data = self.data_type.decode(output / self.data_role, size, self.role)
-            except Exception as e:
-                logger.warning(
-                    f"The {self.data_role} output of team {self.team_name}'s {self.role} can not be decoded properly!"
-                )
-                raise EncodingError from e
-            if self.role == "generator" and isinstance(output_data, Problem) and output_data.with_solution:
-                try:
-                    generator_solution = output_data.Solution.decode(output / "solution", size, self.role)
-                except Exception as e:
-                    logger.warning(
-                        f"The solution output of team {self.team_name}'s generator can not be decoded properly!"
-                    )
-                    raise EncodingError from e
-            else:
-                generator_solution = None
+                output_data = self._parse_output(output, size, input_instance)
+            except ProgramError as e:
+                return result_class(e, runtime, size, run_params)
 
             if battle_output:
                 decoded_battle_output = decode(battle_output, output / "battle_data", size, self.role)
             else:
                 decoded_battle_output = None
 
-        if self.role == "generator":
-            assert isinstance(output_data, Problem)
-            is_valid = output_data.is_valid(size)
-        else:
-            assert isinstance(output_data, Problem.Solution)
-            is_valid = output_data.is_valid(input_instance, size)
-
-        if not is_valid:
-            logger.warning(
-                f"{self.role.capitalize()} of team {self.team_name} output an invalid {self.data_role}!"
-            )
-            raise SemanticsError
-
-        if generator_solution is not None:
-            is_valid = generator_solution.is_valid(output_data, size)
-            if not is_valid:
-                logger.warning(f"The generator of team {self.team_name} output an invalid solution!")
-                raise SemanticsError
-
-        logger.info(f"{self.role.capitalize()} of team {self.team_name} output a valid {self.data_role}.")
-        if isinstance(output_data, Problem):
-            return GeneratorResult(output_data, runtime, generator_solution, decoded_battle_output)
-        else:
-            return SolverResult(output_data, runtime, decoded_battle_output)
+        return result_class(output_data, runtime, size, run_params, decoded_battle_output)  # type: ignore
 
     @inherit_docs
     def remove(self) -> None:
@@ -537,12 +521,53 @@ class Program(ABC):
     def __exit__(self, _type, _value_, _traceback):
         self.remove()
 
+
 class Generator(Program):
     """A higher level interface for a team's generator."""
 
-    role = "generator"
+    role: ClassVar[Role] = "generator"
 
-    def run(
+    def _setup_folders(self, input: Path, output: Path, size: int, instance: Problem | None) -> None:
+        assert instance is None
+        with open(input / "size", "w+") as f:
+            f.write(str(size))
+        (output / "instance").mkdir()
+        if self.problem_class.with_solution:
+            (output / "solution").mkdir()
+
+    def _parse_output(self, output: Path, size: int, instance: Problem | None) -> GeneratorResult._Data:
+        assert instance is None
+        try:
+            problem = self.problem_class.decode(output / "instance", size, self.role)
+        except EncodingError:
+            raise
+        except Exception as e:
+            msg = f"The output of team {self.team_name}'s {self.role} can not be decoded properly!\n{e}"
+            logger.warning(msg)
+            raise EncodingError(msg) from e
+        if not problem.is_valid(size):
+            msg = f"{self.role.capitalize()} of team {self.team_name} output an invalid instance!"
+            logger.warning(msg)
+            raise EncodingError(msg)
+
+        if problem.with_solution:
+            try:
+                solution = problem.Solution.decode(output / "solution", size, self.role)
+            except EncodingError:
+                raise
+            except Exception as e:
+                msg = f"The solution output of team {self.team_name}'s generator can not be decoded properly!\n{e}"
+                logger.warning(msg)
+                raise EncodingError(msg) from e
+            if not solution.is_valid(problem, size):
+                msg = f"The generator of team {self.team_name} output an invalid solution!"
+                logger.warning(msg)
+                raise EncodingError(msg)
+        else:
+            solution = None
+        return GeneratorResult._Data(problem, solution)
+
+    async def run(
         self,
         size: int,
         *,
@@ -553,7 +578,7 @@ class Generator(Program):
         battle_output: Mapping[str, type[Encodable]] = {},
     ) -> GeneratorResult:
         """Execute the generator, passing in the size and processing the created problem instance."""
-        return self._run(
+        return cast(GeneratorResult, await self._run(
             size=size,
             input_instance=None,
             timeout=timeout,
@@ -561,15 +586,37 @@ class Generator(Program):
             cpus=cpus,
             battle_input=battle_input,
             battle_output=battle_output
-        )
+        ))
 
 
 class Solver(Program):
     """A higher level interface for a team's solver."""
 
-    role = "solver"
+    role: ClassVar[Role] = "solver"
 
-    def run(
+    def _setup_folders(self, input: Path, output: Path, size: int, instance: Problem | None) -> None:
+        assert instance is not None
+        (input / "instance").mkdir()
+        instance.encode(input / "instance", size, self.role)
+        (output / "solution").mkdir()
+
+    def _parse_output(self, output: Path, size: int, instance: Problem | None) -> Problem.Solution:
+        assert instance is not None
+        try:
+            solution = self.problem_class.Solution.decode(output / "solution", size, self.role)
+        except EncodingError:
+            raise
+        except Exception as e:
+            msg = f"The output of team {self.team_name}'s {self.role} can not be decoded properly!\n{e}"
+            logger.warning(msg)
+            raise EncodingError(msg) from e
+        if not solution.is_valid(instance, size):
+            msg = f"{self.role.capitalize()} of team {self.team_name} output an invalid solution!"
+            logger.warning(msg)
+            raise EncodingError(msg)
+        return solution
+
+    async def run(
         self,
         instance: Problem,
         size: int,
@@ -581,7 +628,7 @@ class Solver(Program):
         battle_output: Mapping[str, type[Encodable]] = {},
     ) -> SolverResult:
         """Execute the solver, passing in the problem instance and processing the created solution."""
-        return self._run(
+        return cast(SolverResult, await self._run(
             size=size,
             input_instance=instance,
             timeout=timeout,
@@ -589,4 +636,167 @@ class Solver(Program):
             cpus=cpus,
             battle_input=battle_input,
             battle_output=battle_output
-        )
+        ))
+
+
+class AdvancedRunArgs(BaseModel):
+    """Advanced docker run options.
+
+    Contains all options exposed on the python docker run api, except `device_requests`
+    and those set by :meth:`Image.run` itself.
+    """
+
+    class _BlockIOWeight(TypedDict):
+        Path: str
+        Weight: int
+
+    class _DeviceRate(TypedDict):
+        Path: str
+        Rate: int
+
+    class _HealthCheck(TypedDict):
+        test: list[str] | str
+        interval: int
+        timeout: int
+        retries: int
+        start_period: int
+
+    class _LogConfigArgs(TypedDict):
+        type: str
+        conifg: dict[Any, Any]
+
+    class _UlimitArgs(TypedDict):
+        name: str
+        soft: int
+        hard: int
+
+    network_mode: str = "none"
+    command: str | list[str] | None = None
+    auto_remove: bool | None = None
+    blkio_weight_device: list[_BlockIOWeight] | None = None
+    blkio_weight: int | None = Field(default=None, ge=10, le=1000)
+    cap_add: list[str] | None = None
+    cap_drop: list[str] | None = None
+    cgroup_parent: str | None = None
+    cgroupns: str | None = None
+    cpu_count: int | None = None
+    cpu_percent: int | None = None
+    cpu_period: int | None = None
+    cpu_quota: int | None = None
+    cpu_rt_period: int | None = None
+    cpu_rt_runtime: int | None = None
+    cpu_shares: int | None = None
+    cpuset_cpus: str | None = None
+    cpuset_mems: str | None = None
+    device_cgroup_rules: list[str] | None = None
+    device_read_bps: list[_DeviceRate] | None = None
+    device_read_iops: list[_DeviceRate] | None = None
+    device_write_bps: list[_DeviceRate] | None = None
+    device_write_iops: list[_DeviceRate] | None = None
+    devices: list[str] | None = None
+    dns: list[str] | None = None
+    dns_opt: list[str] | None = None
+    dns_search: list[str] | None = None
+    domainname: str | list[str] | None = None
+    entrypoint: str | list[str] | None = None
+    environment: dict[str, str] | list[str] | None = None
+    extra_hosts: dict[str, str] | None = None
+    group_add: list[str] | None = None
+    healthcheck: _HealthCheck | None = None
+    hostname: str | None = None
+    init: bool | None = None
+    init_path: str | None = None
+    ipc_mode: str | None = None
+    isolation: str | None = None
+    kernel_memory: int | str | None = None
+    labels: dict[str, str] | list[str] | None = None
+    links: dict[str, str] | None = None
+    log_config: _LogConfigArgs | None = None
+    lxc_conf: dict[Any, Any] | None = None
+    mac_address: str | None = None
+    mem_limit: int | str | None = None
+    mem_reservation: int | str | None = None
+    mem_swappiness: int | None = None
+    memswap_limit: str | int | None = None
+    network: str | None = None
+    network_disabled: bool | None = None
+    oom_kill_disable: bool | None = None
+    oom_score_adj: int | None = None
+    pid_mode: str | None = None
+    pids_limit: int | None = None
+    platform: str | None = None
+    ports: dict[Any, Any] | None = None
+    privileged: bool | None = None
+    publish_all_ports: bool | None = None
+    read_only: bool | None = None
+    restart_policy: dict[Any, Any] | None = None
+    runtime: str | None = None
+    security_opt: list[str] | None = None
+    shm_size: str | int | None = None
+    stdin_open: bool | None = None
+    stdout: bool | None = None
+    stderr: bool | None = None
+    stop_signal: str | None = None
+    storage_opt: dict[Any, Any] | None = None
+    stream: bool | None = None
+    sysctls: dict[Any, Any] | None = None
+    tmpfs: dict[Any, Any] | None = None
+    tty: bool | None = None
+    ulimits: list[_UlimitArgs] | None = None
+    use_config_proxy: bool | None = None
+    user: str | int | None = None
+    userns_mode: str | None = None
+    uts_mode: str | None = None
+    version: str | None = None
+    volume_driver: str | None = None
+    volumes: dict[Any, Any] | list[Any] | None = None
+    volumes_from: list[Any] | None = None
+    working_dir: str | None = None
+
+    def to_docker_args(self) -> dict[str, Any]:
+        """Transforms the object into :meth:`client.containers.run` kwargs."""
+        kwargs = self.dict(exclude_none=True)
+        if "log_config" in kwargs:
+            kwargs["log_config"] = LogConfig(**kwargs["log_config"])
+        if "ulimits" in kwargs:
+            kwargs["ulimits"] = Ulimit(**kwargs["ulimits"])
+        return kwargs
+
+
+class AdvancedBuildArgs(BaseModel):
+    """Advanced docker build options.
+
+    Contains all options exposed on the python docker build api, except those set by :meth:`Image.build` itself.
+    """
+
+    class _ContainerLimits(TypedDict):
+        memory: int
+        memswap: int
+        cpushares: int
+        cpusetcpus: str
+
+    quiet: bool = True
+    nocache: bool | None = None
+    rm: bool = True
+    encoding: str | None = None
+    pull: bool | None = None
+    forcerm: bool = True
+    buildargs: dict[Any, Any] | None = None
+    container_limits: _ContainerLimits | None = None
+    shmsize: int | None = None
+    labels: dict[Any, Any] | None = None
+    cache_from: list[Any] | None = None
+    target: str | None = None
+    network_mode: str = "host"
+    squash: bool | None = None
+    extra_hosts: dict[Any, Any] | None = None
+    platform: str | None = None
+    isolation: str | None = None
+    use_config_proxy: bool | None = None
+
+    def to_docker_args(self) -> dict[str, Any]:
+        """Transforms the object into :meth:`client.images.build` kwargs."""
+        return self.dict(exclude_none=True)
+
+
+DockerConfig.update_forward_refs()

@@ -1,10 +1,12 @@
 """Central managing module for an algorithmic battle."""
-from __future__ import annotations
 import logging
 from typing import Self
 
 from prettytable import PrettyTable, DOUBLE_BORDER
 from pydantic import BaseModel, validator
+from anyio import create_task_group, CapacityLimiter, TASK_STATUS_IGNORED
+from anyio.to_thread import current_default_thread_limiter
+from anyio.abc import TaskStatus
 
 from algobattle.battle import Battle, Iterated
 from algobattle.ui import Observer, Subject
@@ -19,6 +21,7 @@ class MatchConfig(BaseModel):
 
     battle_type: type[Battle] = Iterated
     points: int = 100
+    parallel_battles: int = 1
 
     @validator("battle_type", pre=True)
     def parse_battle_type(cls, value):
@@ -53,8 +56,28 @@ class Match(Subject):
         self.teams = teams
         super().__init__(observer)
 
+    async def _run_battle(
+        self,
+        battle: Battle,
+        matchup: Matchup,
+        limiter: CapacityLimiter,
+        *,
+        task_status: TaskStatus = TASK_STATUS_IGNORED,
+    ) -> None:
+        async with limiter:
+            task_status.started()
+            try:
+                await battle.run_battle(
+                    matchup.generator.generator,
+                    matchup.solver.solver,
+                    self.battle_config,
+                    self.problem.min_size,
+                )
+            except Exception as e:
+                logger.critical(f"Unhandeled error during execution of battle!\n{e}")
+
     @classmethod
-    def run(
+    async def run(
         cls,
         config: MatchConfig,
         battle_config: Battle.Config,
@@ -62,17 +85,16 @@ class Match(Subject):
         teams: TeamHandler,
         observer: Observer | None = None,
     ) -> Self:
-        """Executes the match with the specified parameters."""
+        """Executes a match with the specified parameters."""
         result = cls(config, battle_config, problem, teams, observer)
-        for matchup in teams.matchups:
-            battle = config.battle_type(observer=observer)
-            result.results[matchup] = battle
-            try:
-                battle.run_battle(matchup.generator.generator, matchup.solver.solver, battle_config, problem.min_size)
-            except Exception as e:
-                logger.critical(f"Unhandeled error during execution of battle!\n{e}")
-            result.notify("match")
-        return result
+        limiter = CapacityLimiter(config.parallel_battles)
+        current_default_thread_limiter().total_tokens = config.parallel_battles
+        async with create_task_group() as tg:
+            for matchup in teams.matchups:
+                battle = config.battle_type(observer=observer)      # type: ignore
+                result.results[matchup] = battle
+                await tg.start(result._run_battle, battle, matchup, limiter)
+            return result
 
     def calculate_points(self) -> dict[str, float]:
         """Calculate the number of points each team scored.
