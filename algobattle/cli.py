@@ -462,6 +462,7 @@ class CliUi(Ui):
             fight_history: list[list[str]] = []
             for i, fight in enumerate(fights, max(len(battle.fight_results) - 2, 1)):
                 fight_history.append(self.display_fight(fight, i))
+            fight_history = fight_history[::-1]
             fight_display = [
                 "Most recent fights:",
             ] + list(flat_intersperse(fight_history, ""))
