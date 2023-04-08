@@ -357,18 +357,8 @@ class CliUi(Ui):
     @check_for_terminal
     def update(self) -> None:
         """Disaplys the current status of the match to the cli."""
-        logo = [
-            r"    _    _             _           _   _   _      ",
-            r"   / \  | | __ _  ___ | |__   __ _| |_| |_| | ___ ",
-            r"  / _ \ | |/ _` |/ _ \| |_ \ / _` | __| __| |/ _ " "\\",  # we need this to have the string end with a \
-            r" / ___ \| | (_| | (_) | |_) | (_| | |_| |_| |  __/",
-            r"/_/   \_\_|\__, |\___/|_.__/ \__,_|\__|\__|_|\___|",
-            r"            |___/                                 ",
-        ]
-        terminal_height, terminal_width = self.stdscr.getmaxyx()
+        terminal_height, _ = self.stdscr.getmaxyx()
         out: list[str] = []
-        if terminal_width >= 50:
-            out += [line.center(terminal_width - 1) for line in logo]
         out.append(f"Algobattle version {pkg_version(__package__)}")
         out += self.display_match(self.match)
         for matchup in self.active_battles:
