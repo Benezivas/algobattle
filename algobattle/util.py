@@ -6,7 +6,7 @@ import json
 import logging
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, ClassVar, Literal, Mapping, TypeVar, Self
+from typing import Any, ClassVar, Iterable, Literal, Mapping, TypeVar, Self
 from pydantic import BaseModel
 
 
@@ -158,3 +158,12 @@ class TimerInfo:
 
     start: datetime
     timeout: float | None
+
+
+def flat_intersperse(iterable: Iterable[Iterable[T]], element: T) -> Iterable[T]:
+    """Inserts `element` between each iterator in `iterable`."""
+    iterator = iter(iterable)
+    yield from next(iterator)
+    for item in iterator:
+        yield element
+        yield from item

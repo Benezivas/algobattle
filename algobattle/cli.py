@@ -11,17 +11,17 @@ from pathlib import Path
 from typing import Any, Callable, ClassVar, Literal, Mapping, ParamSpec, Self, TypeVar
 import tomllib
 from importlib.metadata import version as pkg_version
-from prettytable import DOUBLE_BORDER, PrettyTable
 
+from prettytable import DOUBLE_BORDER, PrettyTable
 from pydantic import BaseModel, validator
 from anyio import create_task_group, run, sleep
 
-from algobattle.battle import Battle, FightUiData
+from algobattle.battle import Battle, Fight, FightUiData
 from algobattle.docker_util import DockerConfig, GeneratorResult, Image, ProgramError, ProgramResult, SolverResult
 from algobattle.match import MatchConfig, Match, Ui
 from algobattle.problem import Problem
 from algobattle.team import Matchup, TeamHandler, TeamInfo
-from algobattle.util import Role, TimerInfo, check_path
+from algobattle.util import Role, TimerInfo, check_path, flat_intersperse
 
 logger = logging.getLogger("algobattle.cli")
 
@@ -364,8 +364,6 @@ class CliUi(Ui):
         for matchup in self.active_battles:
             out += [
                 "",
-                "",
-                f"{matchup.generator.name} vs {matchup.solver.name}",
             ] + self.display_battle(matchup)
 
         if len(out) > terminal_height:
@@ -433,38 +431,47 @@ class CliUi(Ui):
             self.display_program("solver", fight.solver),
         ]
 
+    @staticmethod
+    def display_fight(fight: Fight, index: int) -> list[str]:
+        """Formats a completed fight into a compact overview."""
+        out = [f"Fight {index} at size {fight.generator.size}:"]
+        if isinstance(fight.generator.result, ProgramError):
+            out.append("Generator failed!")
+            out.append(str(fight.generator.result))
+        elif isinstance(fight.solver, ProgramError):
+            out.append("Solver failed!")
+            out.append(str(fight.solver.result))
+        else:
+            out.append("Successful fight")
+        out.append(f"Score: {fight.score}")
+        return out
+
+
     def display_battle(self, matchup: Matchup) -> list[str]:
         """Formats the battle data into a string that can be printed to the terminal."""
         battle = self.match.results[matchup]
         fights = battle.fight_results[-3:] if len(battle.fight_results) >= 3 else battle.fight_results
-        out: list[str] = []
+        sections: list[list[str]] = []
 
         if matchup in self.battle_data:
-            out += [
-                "",
-                "Battle data:",
-            ] + [f"{key}: {val}" for key, val in self.battle_data[matchup].dict().items()]
+            sections.append([f"{key}: {val}" for key, val in self.battle_data[matchup].dict().items()])
 
         if matchup in self.fight_data:
-            out.append("")
-            out += self.display_current_fight(matchup)
+            sections.append(self.display_current_fight(matchup))
 
-        for i, fight in enumerate(fights, max(len(battle.fight_results) - 2, 1)):
-            out += [
-                "",
-                f"Fight {i} at size {fight.generator.size}:",
-            ]
-            if isinstance(fight.generator.result, ProgramError):
-                out.append("Generator failed!")
-                out.append(str(fight.generator.result))
-            elif isinstance(fight.solver, ProgramError):
-                out.append("Solver failed!")
-                out.append(str(fight.solver.result))
-            else:
-                out.append("Successful fight")
-            out.append(f"Score: {fight.score}")
+        if fights:
+            fight_history: list[list[str]] = []
+            for i, fight in enumerate(fights, max(len(battle.fight_results) - 2, 1)):
+                fight_history.append(self.display_fight(fight, i))
+            fight_display = [
+                "Most recent fights:",
+            ] + list(flat_intersperse(fight_history, ""))
+            sections.append(fight_display)
 
-        return out
+        combined_sections = list(flat_intersperse(sections, ""))
+        return [
+            f"Battle {matchup.generator.name} vs {matchup.solver.name}:",
+        ] + combined_sections
 
 
 if __name__ == "__main__":
