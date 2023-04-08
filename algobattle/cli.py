@@ -441,7 +441,10 @@ class CliUi(Ui):
         out = []
 
         if matchup in self.battle_data:
-            out += [""] + [f"{key}: {val}" for key, val in self.battle_data[matchup].dict().items()]
+            out += [
+                "",
+                "Battle data:",
+            ] + [f"{key}: {val}" for key, val in self.battle_data[matchup].dict().items()]
 
         if matchup in self.fight_data:
             out += self.display_current_fight(matchup)
