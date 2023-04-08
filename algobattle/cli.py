@@ -437,12 +437,11 @@ class CliUi(Ui):
         out = [f"Fight {index} at size {fight.generator.size}:"]
         if isinstance(fight.generator.result, ProgramError):
             out.append("Generator failed!")
-            out.append(str(fight.generator.result))
-        elif isinstance(fight.solver, ProgramError):
+            return out
+        assert fight.solver is not None
+        if isinstance(fight.solver.result, ProgramError):
             out.append("Solver failed!")
-            out.append(str(fight.solver.result))
-        else:
-            out.append("Successful fight")
+            return out
         out.append(f"Score: {fight.score}")
         return out
 
