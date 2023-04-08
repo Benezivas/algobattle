@@ -394,11 +394,58 @@ class CliUi(Ui):
 
         return [f"Battle Type: {match.config.battle_type.name()}"] + list(str(table).split("\n"))
 
+    def display_current_fight(self, matchup: Matchup) -> list[str]:
+        """Formats the current fight of a battle into a compact overview."""
+        fight = self.fight_data[matchup]
+        out = [
+            f"Current fight at size {fight.size}:",
+        ]
+        if fight.generator is not None:
+            out.append("Generator:")
+            if isinstance(fight.generator, TimerInfo):
+                runtime_info = str(round((datetime.now() - fight.generator.start).total_seconds(), 1))
+                if fight.generator.timeout is not None:
+                    runtime_info += f"/{round(fight.generator.timeout, 1)}"
+                out.append(f"Currently running... ({runtime_info})")
+            elif isinstance(fight.generator, float):
+                out.append(f"Runtime: {fight.generator}")
+            else:
+                out.append(f"Runtime: {fight.generator.runtime}")
+                if isinstance(fight.generator.result, ProgramError):
+                    out.append("Failed!")
+                    out.append(str(fight.generator.result))
+                else:
+                    out.append("Ran successfully.")
+        if fight.solver is not None:
+            out.append("Solver:")
+            if isinstance(fight.solver, TimerInfo):
+                runtime_info = str(round((datetime.now() - fight.solver.start).total_seconds(), 1))
+                if fight.solver.timeout is not None:
+                    runtime_info += f"/{round(fight.solver.timeout, 1)}"
+                out.append(f"Currently running... ({runtime_info})")
+            elif isinstance(fight.solver, float):
+                out.append(f"Runtime: {fight.solver}")
+            else:
+                out.append(f"Runtime: {fight.solver.runtime}")
+                if isinstance(fight.solver.result, Problem.Solution):
+                    out.append("Ran successfully.")
+                else:
+                    out.append("Failed!")
+                    out.append(str(fight.solver.result))
+        return out
+
     def display_battle(self, matchup: Matchup) -> list[str]:
         """Formats the battle data into a string that can be printed to the terminal."""
         battle = self.match.results[matchup]
         fights = battle.fight_results[-3:] if len(battle.fight_results) >= 3 else battle.fight_results
         out = []
+
+        if matchup in self.battle_data:
+            out += [""] + [f"{key}: {val}" for key, val in self.battle_data[matchup].dict().items()]
+
+        if matchup in self.fight_data:
+            out += self.display_current_fight(matchup)
+
         for i, fight in enumerate(fights, max(len(battle.fight_results) - 2, 1)):
             out += [
                 "",
@@ -413,48 +460,6 @@ class CliUi(Ui):
             else:
                 out.append("Successful fight")
             out.append(f"Score: {fight.score}")
-
-        if matchup in self.battle_data:
-            out += [""] + [f"{key}: {val}" for key, val in self.battle_data[matchup].dict().items()]
-
-        if matchup in self.fight_data:
-            fight = self.fight_data[matchup]
-            out += [
-                "",
-                f"Current fight at size {fight.size}:",
-            ]
-            if fight.generator is not None:
-                out.append("Generator:")
-                if isinstance(fight.generator, TimerInfo):
-                    runtime_info = str(round((datetime.now() - fight.generator.start).total_seconds(), 1))
-                    if fight.generator.timeout is not None:
-                        runtime_info += f"/{round(fight.generator.timeout, 1)}"
-                    out.append(f"Currently running... ({runtime_info})")
-                elif isinstance(fight.generator, float):
-                    out.append(f"Runtime: {fight.generator}")
-                else:
-                    out.append(f"Runtime: {fight.generator.runtime}")
-                    if isinstance(fight.generator.result, ProgramError):
-                        out.append("Failed!")
-                        out.append(str(fight.generator.result))
-                    else:
-                        out.append("Ran successfully.")
-            if fight.solver is not None:
-                out.append("Solver:")
-                if isinstance(fight.solver, TimerInfo):
-                    runtime_info = str(round((datetime.now() - fight.solver.start).total_seconds(), 1))
-                    if fight.solver.timeout is not None:
-                        runtime_info += f"/{round(fight.solver.timeout, 1)}"
-                    out.append(f"Currently running... ({runtime_info})")
-                elif isinstance(fight.solver, float):
-                    out.append(f"Runtime: {fight.solver}")
-                else:
-                    out.append(f"Runtime: {fight.solver.runtime}")
-                    if isinstance(fight.solver.result, Problem.Solution):
-                        out.append("Ran successfully.")
-                    else:
-                        out.append("Failed!")
-                        out.append(str(fight.solver.result))
 
         return out
 
