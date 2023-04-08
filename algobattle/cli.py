@@ -394,7 +394,7 @@ class CliUi(Ui):
 
     @staticmethod
     def display_program(role: Role, data: TimerInfo | float | ProgramResult | None) -> str:
-        """Formats program runtime data"""
+        """Formats program runtime data."""
         role_str = role.capitalize() + ": "
         out = f"{role_str: <11}"
         if data is None:
@@ -418,7 +418,7 @@ class CliUi(Ui):
             out += "         "  # same length padding as timeout info string
         else:
             out += f" / {timeout:3.1f}s"
-        
+
         out += f" {state_glyph}"
         return out
 
@@ -444,7 +444,6 @@ class CliUi(Ui):
             return out
         out.append(f"Score: {fight.score}")
         return out
-
 
     def display_battle(self, matchup: Matchup) -> list[str]:
         """Formats the battle data into a string that can be printed to the terminal."""
