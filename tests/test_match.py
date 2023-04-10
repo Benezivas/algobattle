@@ -5,10 +5,10 @@ import logging
 from pathlib import Path
 
 from algobattle.cli import Config, ExecutionConfig, parse_cli_args, setup_logging
-from algobattle.battle import Iterated, Averaged
-from algobattle.match import MatchConfig, Match
+from algobattle.battle import Fight, Iterated, Averaged
+from algobattle.match import MatchConfig, Match, Ui
 from algobattle.team import Team, Matchup, TeamHandler, TeamInfo
-from algobattle.docker_util import DockerConfig, RunParameters, get_os_type
+from algobattle.docker_util import DockerConfig, GeneratorResult, ProgramError, RunParameters, get_os_type
 from .testsproblem import Problem as TestProblem
 
 logging.disable(logging.CRITICAL)
@@ -19,6 +19,14 @@ class TestTeam(Team):
 
     def __init__(self, team_name: str) -> None:
         self.name = team_name
+
+
+def dummy_result(*score: float) -> list[Fight]:
+    """Creates a list of dummy results for testing."""
+    return [
+        Fight(s, 0, GeneratorResult(ProgramError(""), 0, 0, RunParameters()), None)
+        for s in score
+    ]
 
 
 class Matchtests(TestCase):
@@ -50,7 +58,7 @@ class Matchtests(TestCase):
     def test_calculate_points_iterated_no_successful_round(self):
         """Two teams should get an equal amount of points if nobody solved anything."""
         match = Match(MatchConfig(), Iterated.Config(), TestProblem, self.teams)
-        battle = Iterated()
+        battle = Iterated(Ui.BattleObserver(Ui(), self.matchup0))
         battle.results = [0]
         match.results[self.matchup0] = battle
         match.results[self.matchup1] = battle
@@ -59,8 +67,8 @@ class Matchtests(TestCase):
     def test_calculate_points_iterated_draw(self):
         """Two teams should get an equal amount of points if both solved a problem equally well."""
         match = Match(MatchConfig(), Iterated.Config(), TestProblem, self.teams)
-        battle = Iterated()
-        battle.reached = 20
+        battle = Iterated(Ui.BattleObserver(Ui(), self.matchup0))
+        battle.results = [20]
         match.results[self.matchup0] = battle
         match.results[self.matchup1] = battle
         self.assertEqual(match.calculate_points(), {self.team0.name: 50, self.team1.name: 50})
@@ -68,9 +76,9 @@ class Matchtests(TestCase):
     def test_calculate_points_iterated_domination(self):
         """One team should get all points if it solved anything and the other team nothing."""
         match = Match(MatchConfig(), Iterated.Config(), TestProblem, self.teams)
-        battle = Iterated()
+        battle = Iterated(Ui.BattleObserver(Ui(), self.matchup0))
         battle.results = [10]
-        battle2 = Iterated()
+        battle2 = Iterated(Ui.BattleObserver(Ui(), self.matchup0))
         battle2.results = [0]
         match.results[self.matchup0] = battle
         match.results[self.matchup1] = battle2
@@ -79,9 +87,9 @@ class Matchtests(TestCase):
     def test_calculate_points_iterated_one_team_better(self):
         """One team should get more points than the other if it performed better."""
         match = Match(MatchConfig(), Iterated.Config(), TestProblem, self.teams)
-        battle = Iterated()
+        battle = Iterated(Ui.BattleObserver(Ui(), self.matchup0))
         battle.results = [10]
-        battle2 = Iterated()
+        battle2 = Iterated(Ui.BattleObserver(Ui(), self.matchup0))
         battle2.results = [20]
         match.results[self.matchup0] = battle
         match.results[self.matchup1] = battle2
@@ -90,8 +98,8 @@ class Matchtests(TestCase):
     def test_calculate_points_averaged_no_successful_round(self):
         """Two teams should get an equal amount of points if nobody solved anything."""
         match = Match(MatchConfig(battle_type=Averaged), Averaged.Config(), TestProblem, self.teams)
-        battle = Averaged()
-        battle.scores = [0, 0, 0]
+        battle = Averaged(Ui.BattleObserver(Ui(), self.matchup0))
+        battle.fight_results = dummy_result(0, 0, 0)
         match.results[self.matchup0] = battle
         match.results[self.matchup1] = battle
         self.assertEqual(match.calculate_points(), {self.team0.name: 50, self.team1.name: 50})
@@ -99,8 +107,8 @@ class Matchtests(TestCase):
     def test_calculate_points_averaged_draw(self):
         """Two teams should get an equal amount of points if both solved a problem equally well."""
         match = Match(MatchConfig(battle_type=Averaged), Averaged.Config(), TestProblem, self.teams)
-        battle = Averaged()
-        battle.scores = [.5, .5, .5]
+        battle = Averaged(Ui.BattleObserver(Ui(), self.matchup0))
+        battle.fight_results = dummy_result(.5, .5, .5)
         match.results[self.matchup0] = battle
         match.results[self.matchup1] = battle
         self.assertEqual(match.calculate_points(), {self.team0.name: 50, self.team1.name: 50})
@@ -108,10 +116,10 @@ class Matchtests(TestCase):
     def test_calculate_points_averaged_domination(self):
         """One team should get all points if it solved anything and the other team nothing."""
         match = Match(MatchConfig(battle_type=Averaged), Averaged.Config(), TestProblem, self.teams)
-        battle = Averaged()
-        battle.scores = [0, 0, 0]
-        battle2 = Averaged()
-        battle2.scores = [1, 1, 1]
+        battle = Averaged(Ui.BattleObserver(Ui(), self.matchup0))
+        battle.fight_results = dummy_result(0, 0, 0)
+        battle2 = Averaged(Ui.BattleObserver(Ui(), self.matchup0))
+        battle2.fight_results = dummy_result(1, 1, 1)
         match.results[self.matchup0] = battle
         match.results[self.matchup1] = battle2
         self.assertEqual(match.calculate_points(), {self.team0.name: 100, self.team1.name: 0})
@@ -119,13 +127,13 @@ class Matchtests(TestCase):
     def test_calculate_points_averaged_one_team_better(self):
         """One team should get more points than the other if it performed better."""
         match = Match(MatchConfig(battle_type=Averaged), Averaged.Config(), TestProblem, self.teams)
-        battle = Averaged()
-        battle.scores = [.6, .6, .6]
-        battle2 = Averaged()
-        battle2.scores = [.4, .4, .4]
+        battle = Averaged(Ui.BattleObserver(Ui(), self.matchup0))
+        battle.fight_results = dummy_result(.6, .6, .6)
+        battle2 = Averaged(Ui.BattleObserver(Ui(), self.matchup0))
+        battle2.fight_results = dummy_result(.4, .4, .4)
         match.results[self.matchup0] = battle
         match.results[self.matchup1] = battle2
-        self.assertEqual(match.calculate_points(), {self.team0.name: 60, self.team1.name: 40})
+        self.assertEqual(match.calculate_points(), {self.team0.name: 40, self.team1.name: 60})
 
     # TODO: Add tests for remaining functions
 
@@ -158,19 +166,19 @@ class Execution(IsolatedAsyncioTestCase):
     async def test_basic(self):
         team = TeamInfo("team0", self.generator, self.solver)
         with TeamHandler.build([team], self.problem, self.docker_config, safe_build=True) as teams:
-            await Match.run(self.config, self.iter_config, TestProblem, teams)
+            await Match.run(self.config, self.iter_config, TestProblem, teams, Ui())
 
     async def test_multi_team(self):
         team0 = TeamInfo("team0", self.generator, self.solver)
         team1 = TeamInfo("team1", self.generator, self.solver)
         with TeamHandler.build([team0, team1], self.problem, self.docker_config, safe_build=True) as teams:
-            await Match.run(self.config, self.iter_config, TestProblem, teams)
+            await Match.run(self.config, self.iter_config, TestProblem, teams, Ui())
 
     async def test_averaged(self):
         team = TeamInfo("team0", self.generator, self.solver)
         with TeamHandler.build([team], self.problem, self.docker_config, safe_build=True) as teams:
             config = MatchConfig(battle_type=Averaged)
-            await Match.run(config, self.avg_config, TestProblem, teams)
+            await Match.run(config, self.avg_config, TestProblem, teams, Ui())
 
 
 class Parsing(TestCase):

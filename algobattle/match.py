@@ -1,17 +1,19 @@
 """Central managing module for an algorithmic battle."""
+from dataclasses import dataclass, field
+from datetime import datetime
 import logging
 from typing import Self
 
-from prettytable import PrettyTable, DOUBLE_BORDER
 from pydantic import BaseModel, validator
 from anyio import create_task_group, CapacityLimiter, TASK_STATUS_IGNORED
 from anyio.to_thread import current_default_thread_limiter
 from anyio.abc import TaskStatus
 
-from algobattle.battle import Battle, Iterated
-from algobattle.ui import Observer, Subject
+from algobattle.battle import Battle, FightUiProxy, Iterated, BattleUiProxy
+from algobattle.docker_util import GeneratorResult, ProgramUiProxy, SolverResult
 from algobattle.team import Matchup, TeamHandler, Team
 from algobattle.problem import Problem
+from algobattle.util import Role, TimerInfo, inherit_docs
 
 logger = logging.getLogger("algobattle.match")
 
@@ -38,7 +40,7 @@ class MatchConfig(BaseModel):
             raise TypeError
 
 
-class Match(Subject):
+class Match:
     """The Result of a whole Match."""
 
     def __init__(
@@ -47,24 +49,25 @@ class Match(Subject):
         battle_config: Battle.Config,
         problem: type[Problem],
         teams: TeamHandler,
-        observer: Observer | None = None,
     ) -> None:
         self.results: dict[Matchup, Battle] = {}
         self.config = config
         self.battle_config = battle_config
         self.problem = problem
         self.teams = teams
-        super().__init__(observer)
+        super().__init__()
 
     async def _run_battle(
         self,
         battle: Battle,
         matchup: Matchup,
+        ui: "Ui",
         limiter: CapacityLimiter,
         *,
         task_status: TaskStatus = TASK_STATUS_IGNORED,
     ) -> None:
         async with limiter:
+            ui.start_battle(matchup)
             task_status.started()
             try:
                 await battle.run_battle(
@@ -75,6 +78,8 @@ class Match(Subject):
                 )
             except Exception as e:
                 logger.critical(f"Unhandeled error during execution of battle!\n{e}")
+            finally:
+                ui.battle_completed(matchup)
 
     @classmethod
     async def run(
@@ -83,17 +88,20 @@ class Match(Subject):
         battle_config: Battle.Config,
         problem: type[Problem],
         teams: TeamHandler,
-        observer: Observer | None = None,
+        ui: "Ui | None" = None,
     ) -> Self:
         """Executes a match with the specified parameters."""
-        result = cls(config, battle_config, problem, teams, observer)
+        result = cls(config, battle_config, problem, teams)
+        if ui is None:
+            ui = Ui()
+        ui.match = result
         limiter = CapacityLimiter(config.parallel_battles)
         current_default_thread_limiter().total_tokens = config.parallel_battles
         async with create_task_group() as tg:
             for matchup in teams.matchups:
-                battle = config.battle_type(observer=observer)      # type: ignore
+                battle = config.battle_type(ui.get_battle_observer(matchup))
                 result.results[matchup] = battle
-                await tg.start(result._run_battle, battle, matchup, limiter)
+                await tg.start(result._run_battle, battle, matchup, ui, limiter)
             return result
 
     def calculate_points(self) -> dict[str, float]:
@@ -138,13 +146,111 @@ class Match(Subject):
 
         return points
 
-    def display(self) -> str:
-        """Formats the match data into a table that can be printed to the terminal."""
-        table = PrettyTable(field_names=["Generator", "Solver", "Result"], min_width=5)
-        table.set_style(DOUBLE_BORDER)
-        table.align["Result"] = "r"
 
-        for matchup, result in self.results.items():
-            table.add_row([str(matchup.generator), str(matchup.solver), result.format_score(result.score())])
+@dataclass
+class Ui:
+    """Base class for a UI that observes a Match and displays its data.
 
-        return f"Battle Type: {self.config.battle_type.name()}\n{table}"
+    The Ui object both observes the match object as it's being built and receives additional updates through method calls.
+    To do this, it provides several objects whose methods are essentially curried versions of its own methods.
+    These observer classes should generally not be subclassed, all Ui functionality can be implemented by just subclassing
+    :cls:`Ui` and implementing its methods.
+    """
+
+    match: Match = field(init=False)
+    active_battles: list[Matchup] = field(default_factory=list, init=False)
+
+    def get_battle_observer(self, matchup: Matchup) -> "BattleObserver":
+        """Creates an observer for a specifc battle."""
+        return self.BattleObserver(self, matchup)
+
+    def start_battle(self, matchup: Matchup) -> None:
+        """Notifies the Ui that a battle has been started."""
+        self.active_battles.append(matchup)
+
+    def battle_completed(self, matchup: Matchup) -> None:
+        """Notifies the Ui that a specific battle has been completed."""
+        self.active_battles.remove(matchup)
+
+    def update_fights(self, matchup: Matchup) -> None:
+        """Notifies the Ui to update the display of fight results for a specific battle."""
+        return
+
+    def update_battle_data(self, matchup: Matchup, data: Battle.UiData) -> None:
+        """Passes new custom battle data to the Ui."""
+        return
+
+    def start_fight(self, matchup: Matchup, size: int) -> None:
+        """Informs the Ui of a newly started fight."""
+        return
+
+    def update_curr_fight(
+        self,
+        matchup: Matchup,
+        role: Role | None = None,
+        data: TimerInfo | float | GeneratorResult | SolverResult | None = None,
+    ) -> None:
+        """Passes new info about the current fight to the Ui."""
+        return
+
+    @dataclass
+    class BattleObserver(BattleUiProxy):
+        """Tracks updates for a specific battle."""
+
+        ui: "Ui"
+        matchup: Matchup
+        fight_ui: "Ui.FightObserver" = field(init=False)
+
+        def __post_init__(self) -> None:
+            self.fight_ui = Ui.FightObserver(self)
+
+        @inherit_docs
+        def update_fights(self) -> None:
+            self.ui.update_fights(self.matchup)
+
+        @inherit_docs
+        def update_data(self, data: Battle.UiData) -> None:
+            self.ui.update_battle_data(self.matchup, data)
+
+        def start_fight(self, size: int) -> None:
+            """Informs the Ui of a newly started fight."""
+            self.ui.start_fight(self.matchup, size)
+
+    @dataclass
+    class FightObserver(FightUiProxy):
+        """Tracks updates for the currently executed fight of a battle."""
+
+        battle_ui: "Ui.BattleObserver"
+        generator: "Ui.ProgramObserver" = field(init=False)
+        solver: "Ui.ProgramObserver" = field(init=False)
+
+        def __post_init__(self) -> None:
+            self.generator = Ui.ProgramObserver(self.battle_ui, "generator")
+            self.solver = Ui.ProgramObserver(self.battle_ui, "solver")
+
+        @inherit_docs
+        def start(self, size: int) -> None:
+            self.battle_ui.ui.start_fight(self.battle_ui.matchup, size)
+
+        @inherit_docs
+        def update(
+            self,
+            role: Role | None = None,
+            data: TimerInfo | float | GeneratorResult | SolverResult | None = None,
+        ) -> None:
+            self.battle_ui.ui.update_curr_fight(self.battle_ui.matchup, role, data)
+
+    @dataclass
+    class ProgramObserver(ProgramUiProxy):
+        """Tracks state of a specific program execution."""
+
+        battle: "Ui.BattleObserver"
+        role: Role
+
+        @inherit_docs
+        def start(self, timeout: float | None) -> None:
+            self.battle.ui.update_curr_fight(self.battle.matchup, self.role, TimerInfo(datetime.now(), timeout))
+
+        @inherit_docs
+        def stop(self, runtime: float) -> None:
+            self.battle.ui.update_curr_fight(self.battle.matchup, self.role, runtime)

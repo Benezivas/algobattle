@@ -1,10 +1,12 @@
 """Collection of utility functions."""
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from datetime import datetime
 import json
 import logging
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, ClassVar, Literal, Mapping, TypeVar, Self
+from typing import Any, ClassVar, Iterable, Literal, Mapping, TypeVar, Self
 from pydantic import BaseModel
 
 
@@ -148,3 +150,20 @@ class EncodableModel(BaseModel, CustomEncodable, ABC):
             elif isinstance(getattr(self, name, None), EncodableModel):
                 excludes[name] = getattr(self, name)._excludes(team)
         return excludes
+
+
+@dataclass
+class TimerInfo:
+    """Basic data holding info on a timer."""
+
+    start: datetime
+    timeout: float | None
+
+
+def flat_intersperse(iterable: Iterable[Iterable[T]], element: T) -> Iterable[T]:
+    """Inserts `element` between each iterator in `iterable`."""
+    iterator = iter(iterable)
+    yield from next(iterator)
+    for item in iterator:
+        yield element
+        yield from item
