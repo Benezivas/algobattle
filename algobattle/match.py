@@ -9,7 +9,7 @@ from anyio import create_task_group, CapacityLimiter, TASK_STATUS_IGNORED
 from anyio.to_thread import current_default_thread_limiter
 from anyio.abc import TaskStatus
 
-from algobattle.battle import Battle, FightUiProxy, Iterated, BattleUiProxy
+from algobattle.battle import Battle, FightHandler, FightUiProxy, Iterated, BattleUiProxy
 from algobattle.docker_util import GeneratorResult, ProgramUiProxy, SolverResult
 from algobattle.team import Matchup, TeamHandler, Team
 from algobattle.problem import Problem
@@ -69,10 +69,10 @@ class Match:
         async with limiter:
             ui.start_battle(matchup)
             task_status.started()
+            handler = FightHandler(matchup.generator.generator, matchup.solver.solver, battle)
             try:
                 await battle.run_battle(
-                    matchup.generator.generator,
-                    matchup.solver.solver,
+                    handler,
                     self.battle_config,
                     self.problem.min_size,
                 )
