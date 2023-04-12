@@ -103,64 +103,63 @@ class ProgramTests(IsolatedAsyncioTestCase):
         """The generator times out."""
         with Generator.build(*self.dockerfile("generator_timeout"), TestProblem, self.params_short) as gen:
             res = await gen.run(5)
-            self.assertIsInstance(res.result, ExecutionTimeout)
+            self.assertIsInstance(res.info.error, ExecutionTimeout)
 
     async def test_gen_exec_err(self):
         """The generator doesn't execute properly."""
         with Generator.build(*self.dockerfile("generator_execution_error"), TestProblem, self.params) as gen:
             res = await gen.run(5)
-            self.assertIsInstance(res.result, ExecutionError)
+            self.assertIsInstance(res.info.error, ExecutionError)
 
     async def test_gen_syn_err(self):
         """The generator outputs a syntactically incorrect solution."""
         with Generator.build(*self.dockerfile("generator_syntax_error"), TestProblem, self.params) as gen:
             res = await gen.run(5)
-            self.assertIsInstance(res.result, EncodingError)
+            self.assertIsInstance(res.info.error, EncodingError)
 
     async def test_gen_sem_err(self):
         """The generator outputs a semantically incorrect solution."""
         with Generator.build(*self.dockerfile("generator_semantics_error"), TestProblem, self.params) as gen:
             res = await gen.run(5)
-            self.assertIsInstance(res.result, EncodingError)
+            self.assertIsInstance(res.info.error, EncodingError)
 
     async def test_gen_succ(self):
         """The generator returns the fixed instance."""
         with Generator.build(*self.dockerfile("generator"), TestProblem, self.params) as gen:
             res = await gen.run(5)
             correct = TestProblem(semantics=True)
-            assert isinstance(res.result, GeneratorResult._Data)
-            self.assertEqual(res.result.problem, correct)
+            self.assertEqual(res.instance, correct)
 
     async def test_sol_timeout(self):
         """The solver times out."""
         with Solver.build(*self.dockerfile("solver_timeout"), TestProblem, self.params_short) as sol:
             res = await sol.run(self.instance, 5)
-            self.assertIsInstance(res.result, ExecutionTimeout)
+            self.assertIsInstance(res.info.error, ExecutionTimeout)
 
     async def test_sol_exec_err(self):
         """The solver doesn't execute properly."""
         with Solver.build(*self.dockerfile("solver_execution_error"), TestProblem, self.params) as sol:
             res = await sol.run(self.instance, 5)
-            self.assertIsInstance(res.result, ExecutionError)
+            self.assertIsInstance(res.info.error, ExecutionError)
 
     async def test_sol_syn_err(self):
         """The solver outputs a syntactically incorrect solution."""
         with Solver.build(*self.dockerfile("solver_syntax_error"), TestProblem, self.params) as sol:
             res = await sol.run(self.instance, 5)
-            self.assertIsInstance(res.result, EncodingError)
+            self.assertIsInstance(res.info.error, EncodingError)
 
     async def test_sol_sem_err(self):
         """The solver outputs a semantically incorrect solution."""
         with Solver.build(*self.dockerfile("solver_semantics_error"), TestProblem, self.params) as sol:
             res = await sol.run(self.instance, 5)
-            self.assertIsInstance(res.result, EncodingError)
+            self.assertIsInstance(res.info.error, EncodingError)
 
     async def test_sol_succ(self):
         """The solver outputs a solution with a low quality."""
         with Solver.build(*self.dockerfile("solver"), TestProblem, self.params) as sol:
             res = await sol.run(self.instance, 5)
             correct = TestProblem.Solution(semantics=True, quality=True)
-            self.assertEqual(res.result, correct)
+            self.assertEqual(res.solution, correct)
 
 
 if __name__ == "__main__":
