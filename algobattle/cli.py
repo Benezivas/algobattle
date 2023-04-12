@@ -4,7 +4,6 @@ from contextlib import ExitStack
 import curses
 from dataclasses import dataclass, field
 from functools import partial
-import pickle
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -174,7 +173,7 @@ def parse_cli_args(args: list[str]) -> tuple[Path, BattleConfig]:
 
 async def _run_with_ui(
     match_config: MatchConfig, battle_config: Battle.BattleConfig, problem: type[Problem], teams: TeamHandler, ui: "CliUi | None"
-):
+) -> Match:
     async with create_task_group() as tg:
         if ui is not None:
             tg.start_soon(ui.loop)
@@ -205,15 +204,16 @@ def main():
             result = run(_run_with_ui, config.match, config.battle_config, problem, teams, ui)
             print("\n".join(CliUi.display_match(result)))
             if config.match.points > 0:
-                points = result.calculate_points()
+                points = result.calculate_points(config.match.points)
                 for team, pts in points.items():
                     print(f"Team {team} gained {pts:.1f} points.")
             if config.execution.result_output:
                 t = datetime.now()
-                filename = f"{t.year:04d}-{t.month:02d}-{t.day:02d}_{t.hour:02d}-{t.minute:02d}-{t.second:02d}.log"
+                filename = f"{t.year:04d}-{t.month:02d}-{t.day:02d}_{t.hour:02d}-{t.minute:02d}-{t.second:02d}.json"
                 output_path = config.execution.result_output / filename
-                with open(output_path, "wb+") as f:
-                    pickle.dump(result, f)
+                json = result.json()
+                with open(output_path, "w+") as f:
+                    f.write(json)
 
     except KeyboardInterrupt:
         print("Received keyboard interrupt, terminating execution.")
@@ -335,7 +335,7 @@ class CliUi(Ui):
                     res = f"Error: {result.run_exception}"
                 table.add_row([generating, solving, res])
 
-        return [f"Battle Type: {match.config.battle_type.name()}"] + list(str(table).split("\n"))
+        return str(table).split("\n")
 
     @staticmethod
     def display_program(role: Role, data: TimerInfo | float | ProgramResult | None) -> str:
