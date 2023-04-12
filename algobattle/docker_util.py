@@ -61,7 +61,7 @@ def get_os_type() -> Literal["linux", "windows"]:
 
 
 class _BaseException(Exception):
-    def __init__(self, message: str, detail: str = "", *args: object) -> None:
+    def __init__(self, message: str, detail: str | None = None, *args: object) -> None:
         self.message = message
         self.detail = detail
         super().__init__(*args)
@@ -90,7 +90,7 @@ class ExecutionTimeout(ExecutionError):
 class EncodingError(ProgramError):
     """Indicates that the given data could not be encoded or decoded properly."""
 
-    def __init__(self, message: str = "", detail: str = "", *args: object) -> None:
+    def __init__(self, message: str = "", detail: str | None = None, *args: object) -> None:
         super().__init__(message, detail, *args)
 
 
@@ -103,7 +103,7 @@ class ExceptionInfo(BaseModel):
 
     type: str
     message: str
-    detail: str = ""
+    detail: str | None = None
 
     @classmethod
     def from_exception(cls, error: _BaseException) -> Self:
@@ -230,11 +230,11 @@ class Image:
                     old_image.remove(force=True)
 
         except Timeout as e:
-            raise BuildError(f"Build process for '{path}' ran into a timeout!") from e
+            raise BuildError(f"Build process for '{image_name}' ran into a timeout.") from e
         except DockerBuildError as e:
-            raise BuildError(f"Building '{path}' did not complete successfully:\n{e.msg}") from e
+            raise BuildError(f"Building '{image_name}' did not complete successfully.", e.msg) from e
         except APIError as e:
-            raise DockerError(f"Docker APIError thrown while building '{path}':\n{e}") from e
+            raise DockerError(f"Docker APIError thrown while building '{image_name}'.", str(e)) from e
 
         return cls(image_name, cast(str, image.id), description if description is not None else image_name, path=path)
 
@@ -317,13 +317,13 @@ class Image:
         except ImageNotFound as e:
             raise RuntimeError(f"Image {self.name} (id={self.id}) does not exist") from e
         except APIError as e:
-            raise DockerError(str(e)) from e
+            raise DockerError(f"Docker APIError thrown while running '{self.name}'.", str(e)) from e
         finally:
             if container is not None:
                 try:
                     container.remove(force=True)
                 except APIError as e:
-                    raise DockerError(f"Couldn't remove {name}") from e
+                    raise DockerError(f"Couldn't remove {name}", str(e)) from e
 
         return elapsed_time
 
@@ -356,7 +356,7 @@ class Image:
                     file.write(chunk)
             image.remove(force=True)
         except APIError as e:
-            raise DockerError(f"Docker APIError thrown while archiving '{self.name}'") from e
+            raise DockerError(f"Docker APIError thrown while archiving '{self.name}'", str(e)) from e
         return ArchivedImage(path, self.name, self.id, self.description)
 
     def _run_container(self, container: DockerContainer, timeout: float | None = None) -> float:
@@ -369,16 +369,17 @@ class Image:
             if response["StatusCode"] == 0:
                 return elapsed_time
             else:
-                message = (
-                    f"Program crashed with exit code {response['StatusCode']} and error message:\n{container.logs().decode()}"
+                raise ExecutionError(
+                    "The program executed in the container crashed.",
+                    f"exit code: {response['StatusCode']}, error message:\n{container.logs().decode()}",
+                    runtime=elapsed_time,
                 )
-                raise ExecutionError(message, runtime=elapsed_time)
         except (Timeout, ConnectionError) as e:
             container.kill()
             elapsed_time = round(default_timer() - start_time, 2)
             if len(e.args) != 1 or not isinstance(e.args[0], ReadTimeoutError):
                 raise
-            raise ExecutionTimeout(f"{self.description} exceeded the time limit", runtime=elapsed_time)
+            raise ExecutionTimeout(f"The docker container exceeded the time limit.", runtime=elapsed_time)
 
 
 class ProgramRunInfo(BaseModel):
@@ -599,9 +600,9 @@ class Generator(Program):
         except EncodingError:
             raise
         except Exception as e:
-            raise EncodingError(f"The output of team {self.team_name}'s {self.role} can not be decoded properly!\n{e}") from e
+            raise EncodingError(f"Error thrown while decoding the problem instance.", detail=str(e)) from e
         if not problem.is_valid(size):
-            raise EncodingError(f"{self.role.capitalize()} of team {self.team_name} output an invalid instance!")
+            raise EncodingError(f"Instance is not valid.")
 
         if problem.with_solution:
             try:
@@ -609,11 +610,9 @@ class Generator(Program):
             except EncodingError:
                 raise
             except Exception as e:
-                raise EncodingError(
-                    f"The solution output of team {self.team_name}'s generator can not be decoded properly!\n{e}"
-                ) from e
+                raise EncodingError("Error thrown while decoding the solution.", str(e)) from e
             if not solution.is_valid(problem, size):
-                raise EncodingError(f"The generator of team {self.team_name} output an invalid solution!")
+                raise EncodingError("Solution is not valid.")
         else:
             solution = None
         return _GenResData(problem, solution)
