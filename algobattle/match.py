@@ -132,9 +132,10 @@ class Match(BaseModel):
         """Returns the battle for the given matchup."""
         if matchup is not None:
             self.results[matchup.generator.name][matchup.solver.name] = battle
-        if generating is not None and solving is not None:
+        elif generating is not None and solving is not None:
             self.results[generating.name][solving.name] = battle
-        raise TypeError
+        else:
+            raise TypeError
 
     def calculate_points(self, points_per_matchup: int) -> dict[str, float]:
         """Calculate the number of points each team scored.
