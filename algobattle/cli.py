@@ -379,7 +379,7 @@ class CliUi(Ui):
     @staticmethod
     def display_fight(fight: Fight, index: int) -> list[str]:
         """Formats a completed fight into a compact overview."""
-        out = [f"Fight {index} at size {fight.generator.size}:"]
+        out = [f"Fight {index} at size {fight.size}:"]
         if fight.generator.error is not None:
             out.append("Generator failed!")
             return out

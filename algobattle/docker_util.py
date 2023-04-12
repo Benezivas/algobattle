@@ -404,7 +404,6 @@ class Image:
 class ProgramRunInfo(BaseModel):
     """Metadata about a program execution."""
 
-    size: int
     params: RunParameters
     runtime: float
     error: ProgramError | None = None
@@ -512,7 +511,7 @@ class Program(ABC):
             try:
                 self._setup_folders(input, output, size, input_instance)
             except ProgramError as e:
-                return result_class(ProgramRunInfo(size=size, params=run_params, runtime=0, error=e))
+                return result_class(ProgramRunInfo(params=run_params, runtime=0, error=e))
             with open(input / "info.json", "w+") as f:
                 json.dump(
                     {
@@ -531,7 +530,6 @@ class Program(ABC):
                     encode(battle_input, input / "battle_data", size, self.role)
                 except Exception as e:
                     return result_class(ProgramRunInfo(
-                        size=size,
                         params=run_params,
                         runtime=0,
                         error=EncodingError(f"Battle data couldn't be encoded:\n{e}"),
@@ -543,14 +541,12 @@ class Program(ABC):
                 runtime = await self.image.run(input, output, timeout=timeout, memory=space, cpus=cpus, ui=ui)
             except ExecutionError as e:
                 return result_class(ProgramRunInfo(
-                    size=size,
                     params=run_params,
                     runtime=e.runtime,
                     error=e,
                 ))
             except ProgramError as e:
                 return result_class(ProgramRunInfo(
-                    size=size,
                     params=run_params,
                     runtime=0,
                     error=e,
@@ -560,7 +556,6 @@ class Program(ABC):
                 output_data = self._parse_output(output, size, input_instance)
             except ProgramError as e:
                 return result_class(ProgramRunInfo(
-                    size=size,
                     params=run_params,
                     runtime=runtime,
                     error=e,
@@ -574,7 +569,6 @@ class Program(ABC):
         if isinstance(output_data, _GenResData):
             return GeneratorResult(
                 ProgramRunInfo(
-                    size=size,
                     params=run_params,
                     runtime=runtime,
                 ),
@@ -585,7 +579,6 @@ class Program(ABC):
         else:
             return SolverResult(
                 ProgramRunInfo(
-                    size=size,
                     params=run_params,
                     runtime=runtime,
                 ),
