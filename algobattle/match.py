@@ -106,18 +106,21 @@ class Match(BaseModel):
             return result
 
     @overload
-    def battle(self, matchup: Matchup) -> Battle: ...
+    def battle(self, matchup: Matchup) -> Battle | None: ...
 
     @overload
-    def battle(self, *, generating: Team, solving: Team) -> Battle: ...
+    def battle(self, *, generating: Team, solving: Team) -> Battle | None: ...
 
-    def battle(self, matchup: Matchup | None = None, *, generating: Team | None = None, solving: Team | None = None) -> Battle:
+    def battle(self, matchup: Matchup | None = None, *, generating: Team | None = None, solving: Team | None = None) -> Battle | None:
         """Returns the battle for the given matchup."""
-        if matchup is not None:
-            return self.results[matchup.generator.name][matchup.solver.name]
-        if generating is not None and solving is not None:
-            return self.results[generating.name][solving.name]
-        raise TypeError
+        try:
+            if matchup is not None:
+                return self.results[matchup.generator.name][matchup.solver.name]
+            if generating is not None and solving is not None:
+                return self.results[generating.name][solving.name]
+            raise TypeError
+        except KeyError:
+            return None
 
     def calculate_points(self, points_per_matchup: int) -> dict[str, float]:
         """Calculate the number of points each team scored.
