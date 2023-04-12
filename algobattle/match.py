@@ -14,7 +14,7 @@ from algobattle.battle import Battle, FightHandler, FightUiProxy, Iterated, Batt
 from algobattle.docker_util import ProgramRunInfo, ProgramUiProxy
 from algobattle.team import Matchup, TeamHandler
 from algobattle.problem import Problem
-from algobattle.util import Role, TimerInfo, inherit_docs, BaseModel
+from algobattle.util import Role, TimerInfo, inherit_docs, BaseModel, str_with_traceback
 
 
 class MatchConfig(BaseModel):
@@ -75,8 +75,8 @@ class Match(BaseModel):
                     problem.min_size,
                     battle_ui,
                 )
-            #except Exception as e:
-            #    battle.run_exception = e
+            except Exception as e:
+                battle.run_exception = str_with_traceback(e)
             finally:
                 ui.battle_completed(matchup)
 

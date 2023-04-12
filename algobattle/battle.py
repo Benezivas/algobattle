@@ -167,16 +167,9 @@ class Battle(BaseModel):
     """Abstract Base class for classes that execute a specific kind of battle."""
 
     fight_results: list[Fight] = Field(default_factory=list)
-    run_exception: Exception | str | None = None
+    run_exception: str | None = None
 
     _battle_types: ClassVar[dict[str, type["Battle"]]] = {}
-
-    class Config(BaseModel.Config):
-
-        arbitrary_types_allowed = True
-        json_encoders = {
-            Exception: str_with_traceback,
-        }
 
     class BattleConfig(BaseModel):
         """Object containing the config variables the battle types use."""
