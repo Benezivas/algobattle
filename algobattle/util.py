@@ -8,7 +8,7 @@ from tempfile import TemporaryDirectory
 from traceback import format_exception
 from typing import Any, ClassVar, Iterable, Literal, Mapping, TypeVar, Self
 
-from pydantic import BaseConfig, BaseModel
+from pydantic import BaseConfig, BaseModel, Extra
 
 
 Role = Literal["generator", "solver"]
@@ -27,6 +27,9 @@ class BaseModel(BaseModel):
 
     class Config(BaseConfig):
         """Base config for all pydandic configs."""
+
+        extra = Extra.forbid
+        underscore_attrs_are_private = False
 
 
 def inherit_docs(obj: T) -> T:

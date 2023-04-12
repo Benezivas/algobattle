@@ -11,7 +11,7 @@ from anyio.to_thread import current_default_thread_limiter
 from anyio.abc import TaskStatus
 
 from algobattle.battle import Battle, FightHandler, FightUiProxy, Iterated, BattleUiProxy
-from algobattle.docker_util import GeneratorResult, ProgramUiProxy, SolverResult
+from algobattle.docker_util import GeneratorResult, ProgramRunInfo, ProgramUiProxy, SolverResult
 from algobattle.team import Matchup, TeamHandler
 from algobattle.problem import Problem
 from algobattle.util import Role, TimerInfo, inherit_docs, BaseModel
@@ -75,8 +75,8 @@ class Match(BaseModel):
                     problem.min_size,
                     battle_ui,
                 )
-            except Exception as e:
-                battle.run_exception = e
+            #except Exception as e:
+            #    battle.run_exception = e
             finally:
                 ui.battle_completed(matchup)
 
@@ -186,7 +186,7 @@ class Ui:
         self,
         matchup: Matchup,
         role: Role | None = None,
-        data: TimerInfo | float | GeneratorResult | SolverResult | None = None,
+        data: TimerInfo | float | ProgramRunInfo | None = None,
     ) -> None:
         """Passes new info about the current fight to the Ui."""
         return
@@ -234,7 +234,7 @@ class Ui:
         def update(
             self,
             role: Role | None = None,
-            data: TimerInfo | float | GeneratorResult | SolverResult | None = None,
+            data: TimerInfo | float | ProgramRunInfo | None = None,
         ) -> None:
             self.battle_ui.ui.update_curr_fight(self.battle_ui.matchup, role, data)
 

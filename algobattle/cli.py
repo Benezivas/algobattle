@@ -16,7 +16,7 @@ from pydantic import validator
 from anyio import create_task_group, run, sleep
 
 from algobattle.battle import Battle, Fight, FightUiData
-from algobattle.docker_util import DockerConfig, GeneratorResult, Image, ProgramError, ProgramResult, SolverResult
+from algobattle.docker_util import DockerConfig, GeneratorResult, Image, ProgramError, ProgramRunInfo, SolverResult
 from algobattle.match import MatchConfig, Match, Ui
 from algobattle.problem import Problem
 from algobattle.team import Matchup, TeamHandler, TeamInfo
@@ -278,7 +278,7 @@ class CliUi(Ui):
         self,
         matchup: Matchup,
         role: Role | None = None,
-        data: TimerInfo | float | GeneratorResult | SolverResult | None = None,
+        data: TimerInfo | float | ProgramRunInfo | None = None,
     ) -> None:
         """Passes new info about the current fight to the Ui."""
         if role == "generator" or role is None:
@@ -338,7 +338,7 @@ class CliUi(Ui):
         return str(table).split("\n")
 
     @staticmethod
-    def display_program(role: Role, data: TimerInfo | float | ProgramResult | None) -> str:
+    def display_program(role: Role, data: TimerInfo | float | ProgramRunInfo | None) -> str:
         """Formats program runtime data."""
         role_str = role.capitalize() + ": "
         out = f"{role_str: <11}"
@@ -356,7 +356,7 @@ class CliUi(Ui):
         else:
             runtime = data.runtime
             timeout = data.params.timeout
-            state_glyph = "🗙" if isinstance(data.result, ProgramError) else "✓"
+            state_glyph = "✓" if data.error is None else "🗙"
 
         out += f"{runtime:3.1f}s"
         if timeout is None:
@@ -380,11 +380,11 @@ class CliUi(Ui):
     def display_fight(fight: Fight, index: int) -> list[str]:
         """Formats a completed fight into a compact overview."""
         out = [f"Fight {index} at size {fight.generator.size}:"]
-        if isinstance(fight.generator.result, ProgramError):
+        if fight.generator.error is not None:
             out.append("Generator failed!")
             return out
         assert fight.solver is not None
-        if isinstance(fight.solver.result, ProgramError):
+        if fight.solver.error is not None:
             out.append("Solver failed!")
             return out
         out.append(f"Score: {fight.score}")

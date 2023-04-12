@@ -21,13 +21,10 @@ from typing import (
 from pydantic import Field
 
 from algobattle.docker_util import (
-    ProgramError,
     Generator,
-    ProgramResult,
+    ProgramRunInfo,
     ProgramUiProxy,
     Solver,
-    GeneratorResult,
-    SolverResult,
 )
 from algobattle.util import Encodable, Role, TimerInfo, inherit_docs, BaseModel, str_with_traceback
 
@@ -41,8 +38,8 @@ class Fight(BaseModel):
 
     score: float
     size: int
-    generator: GeneratorResult
-    solver: SolverResult | None
+    generator: ProgramRunInfo
+    solver: ProgramRunInfo | None
 
 
 class FightUiProxy(Protocol):
@@ -56,12 +53,12 @@ class FightUiProxy(Protocol):
 
     @overload
     @abstractmethod
-    def update(self, role: Literal["generator"], data: GeneratorResult) -> None:
+    def update(self, role: Literal["generator"], data: ProgramRunInfo) -> None:
         ...
 
     @overload
     @abstractmethod
-    def update(self, role: Literal["solver"], data: SolverResult) -> None:
+    def update(self, role: Literal["solver"], data: ProgramRunInfo) -> None:
         ...
 
     @overload
@@ -73,7 +70,7 @@ class FightUiProxy(Protocol):
     def update(
         self,
         role: Role | None = None,
-        data: ProgramResult | None = None,
+        data: ProgramRunInfo | None = None,
     ) -> None:
         """Updates the ui with info about the current fight.
 
@@ -117,12 +114,12 @@ class FightHandler:
             battle_output=generator_battle_output,
             ui=ui.generator,
         )
-        ui.update("generator", gen_result)
-        if isinstance(gen_result.result, ProgramError):
-            return Fight(score=1, size=size, generator=gen_result, solver=None)
+        ui.update("generator", gen_result.info)
+        if gen_result.instance is None:
+            return Fight(score=1, size=size, generator=gen_result.info, solver=None)
 
         sol_result = await self._solver.run(
-            gen_result.result.problem,
+            gen_result.instance,
             size=size,
             timeout=timeout_solver,
             space=space_solver,
@@ -131,15 +128,15 @@ class FightHandler:
             battle_output=solver_battle_output,
             ui=ui.solver,
         )
-        ui.update("solver", sol_result)
-        if isinstance(sol_result.result, ProgramError):
-            return Fight(score=0, size=size, generator=gen_result, solver=sol_result)
+        ui.update("solver", sol_result.info)
+        if sol_result.solution is None:
+            return Fight(score=0, size=size, generator=gen_result.info, solver=sol_result.info)
 
-        score = gen_result.result.problem.calculate_score(
-            solution=sol_result.result, generator_solution=gen_result.result.solution, size=size
+        score = gen_result.instance.calculate_score(
+            solution=sol_result.solution, generator_solution=gen_result.solution, size=size
         )
         score = max(0, min(1, float(score)))
-        result = Fight(score=score, size=size, generator=gen_result, solver=sol_result)
+        result = Fight(score=score, size=size, generator=gen_result.info, solver=sol_result.info)
         self._battle.fight_results.append(result)
         self._ui.update_fights()
         return result
@@ -150,8 +147,8 @@ class FightUiData:
     """Holds display data about the currently executing fight."""
 
     size: int
-    generator: TimerInfo | float | GeneratorResult | None = None
-    solver: TimerInfo | float | SolverResult | None = None
+    generator: TimerInfo | float | ProgramRunInfo | None = None
+    solver: TimerInfo | float | ProgramRunInfo | None = None
 
 
 # We need this to be here to prevent an import cycle between match.py and battle.py

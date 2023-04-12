@@ -2,7 +2,7 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
 from timeit import default_timer
-from typing import Any, ClassVar, Iterator, Literal, Mapping, Protocol, Self, TypedDict, cast
+from typing import Any, ClassVar, Iterator, Literal, Mapping, Protocol, Self, TypeAlias, TypedDict, cast
 from uuid import uuid1
 import json
 from dataclasses import dataclass
@@ -13,7 +13,7 @@ from docker.models.images import Image as DockerImage
 from docker.models.containers import Container as DockerContainer
 from docker.types import Mount, LogConfig, Ulimit
 from requests import Timeout, ConnectionError
-from pydantic import Field, validator
+from pydantic import Field, PrivateAttr, validator
 from anyio.to_thread import run_sync
 from urllib3.exceptions import ReadTimeoutError
 
@@ -401,39 +401,48 @@ class Image:
             raise ExecutionTimeout(f"{self.description} exceeded the time limit", elapsed_time)
 
 
-@dataclass
-class _GenResData:
-    problem: Problem
-    solution: Problem.Solution | None = None
+class ProgramRunInfo(BaseModel):
+    """Metadata about a program execution."""
 
-
-class ProgramResult(BaseModel):
-    """Result of a program execution."""
-
-    result: _GenResData | Problem.Solution | ProgramError | None = None
-    runtime: float
     size: int
     params: RunParameters
-    battle_data: dict[str, Encodable] | None = Field(default=None, exclude=True)
+    runtime: float
+    error: ProgramError | None = None
 
     class Config(BaseModel.Config):
+        arbitrary_types_allowed = True
         json_encoders = {
-            _GenResData: lambda _: "null",
-            Problem.Solution: lambda _: "null",
             ProgramError: lambda e: e.jsonify(),
         }
 
 
+@dataclass
+class ProgramResult:
+    """The result of a program execution"""
+
+    info: ProgramRunInfo
+    battle_data: dict[str, Encodable] | None = None
+
+
+@dataclass
 class GeneratorResult(ProgramResult):
     """Result of a single generator execution."""
 
-    result: _GenResData | ProgramError
+    instance: Problem | None = None
+    solution: Problem.Solution | None = None
 
 
+@dataclass
 class SolverResult(ProgramResult):
     """Result of a single solver execution."""
 
-    result: Problem.Solution | ProgramError
+    solution: Problem.Solution | None = None
+
+
+@dataclass
+class _GenResData:
+    problem: Problem
+    solution: Problem.Solution | None
 
 
 @dataclass
@@ -503,7 +512,7 @@ class Program(ABC):
             try:
                 self._setup_folders(input, output, size, input_instance)
             except ProgramError as e:
-                return result_class(result=e, runtime=0, size=size, params=run_params)
+                return result_class(ProgramRunInfo(size=size, params=run_params, runtime=0, error=e))
             with open(input / "info.json", "w+") as f:
                 json.dump(
                     {
@@ -521,34 +530,68 @@ class Program(ABC):
                 try:
                     encode(battle_input, input / "battle_data", size, self.role)
                 except Exception as e:
-                    return result_class(result=EncodingError(f"Battle data couldn't be encoded:\n{e}"), runtime=0, size=size, params=run_params)
+                    return result_class(ProgramRunInfo(
+                        size=size,
+                        params=run_params,
+                        runtime=0,
+                        error=EncodingError(f"Battle data couldn't be encoded:\n{e}"),
+                    ))
             if battle_output:
                 (output / "battle_data").mkdir()
 
             try:
                 runtime = await self.image.run(input, output, timeout=timeout, memory=space, cpus=cpus, ui=ui)
             except ExecutionError as e:
-                return result_class(result=e, runtime=e.runtime, size=size, params=run_params)
+                return result_class(ProgramRunInfo(
+                    size=size,
+                    params=run_params,
+                    runtime=e.runtime,
+                    error=e,
+                ))
             except ProgramError as e:
-                return result_class(result=e, runtime=0, size=size, params=run_params)
+                return result_class(ProgramRunInfo(
+                    size=size,
+                    params=run_params,
+                    runtime=0,
+                    error=e,
+                ))
 
             try:
                 output_data = self._parse_output(output, size, input_instance)
             except ProgramError as e:
-                return result_class(result=e, runtime=runtime, size=size, params=run_params)
+                return result_class(ProgramRunInfo(
+                    size=size,
+                    params=run_params,
+                    runtime=runtime,
+                    error=e,
+                ))
 
             if battle_output:
                 decoded_battle_output = decode(battle_output, output / "battle_data", size, self.role)
             else:
                 decoded_battle_output = None
 
-        return result_class(
-            result=cast(Any, output_data),
-            runtime=runtime,
-            size=size,
-            params=run_params,
-            battle_data=decoded_battle_output,
-        )
+        if isinstance(output_data, _GenResData):
+            return GeneratorResult(
+                ProgramRunInfo(
+                    size=size,
+                    params=run_params,
+                    runtime=runtime,
+                ),
+                battle_data=decoded_battle_output,
+                instance=output_data.problem,
+                solution=output_data.solution,
+            )
+        else:
+            return SolverResult(
+                ProgramRunInfo(
+                    size=size,
+                    params=run_params,
+                    runtime=runtime,
+                ),
+                battle_data=decoded_battle_output,
+                solution=output_data,
+            )
 
     @inherit_docs
     def remove(self) -> None:
