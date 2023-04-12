@@ -2,8 +2,7 @@
 
 The battle class is a base class for specific type of battle that can be executed.
 """
-from dataclasses import dataclass, field
-from datetime import datetime
+from dataclasses import dataclass
 from importlib.metadata import entry_points
 from abc import abstractmethod
 from typing import (
@@ -173,13 +172,14 @@ class BattleUiProxy(Protocol):
 class Battle(BaseModel):
     """Abstract Base class for classes that execute a specific kind of battle."""
 
-    fight_results: list[Fight] = field(default_factory=list)
+    fight_results: list[Fight] = Field(default_factory=list)
     run_exception: Exception | str | None = None
 
     _battle_types: ClassVar[dict[str, type["Battle"]]] = {}
 
     class Config(BaseModel.Config):
 
+        arbitrary_types_allowed = True
         json_encoders = {
             Exception: str_with_traceback,
         }
@@ -254,11 +254,10 @@ class Battle(BaseModel):
         }
 
 
-@dataclass
 class Iterated(Battle):
     """Class that executes an iterated battle."""
 
-    results: list[int] = field(default_factory=list)
+    results: list[int] = Field(default_factory=list)
 
     @inherit_docs
     class BattleConfig(Battle.BattleConfig):
@@ -336,7 +335,6 @@ class Iterated(Battle):
         return str(int(score))
 
 
-@dataclass
 class Averaged(Battle):
     """Class that executes an averaged battle."""
 

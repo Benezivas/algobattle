@@ -5,7 +5,7 @@ from datetime import datetime
 from itertools import combinations
 from typing import Self
 
-from pydantic import validator
+from pydantic import validator, Field
 from anyio import create_task_group, CapacityLimiter, TASK_STATUS_IGNORED
 from anyio.to_thread import current_default_thread_limiter
 from anyio.abc import TaskStatus
@@ -48,10 +48,9 @@ class MatchConfig(BaseModel):
 class Match(BaseModel):
     """The Result of a whole Match."""
 
-    config: MatchConfig
     active_teams: list[str]
     excluded_teams: list[str]
-    results: defaultdict[str, dict[str, Battle]] = field(default_factory=lambda: defaultdict(dict), init=False)
+    results: defaultdict[str, dict[str, Battle]] = Field(default_factory=lambda: defaultdict(dict), init=False)
 
     async def _run_battle(
         self,
@@ -92,7 +91,6 @@ class Match(BaseModel):
     ) -> Self:
         """Executes a match with the specified parameters."""
         result = cls(
-            config=config,
             active_teams=[t.name for t in teams.active], excluded_teams=[t.name for t in teams.excluded],
         )
         if ui is None:
@@ -107,13 +105,12 @@ class Match(BaseModel):
                 await tg.start(result._run_battle, battle, matchup, battle_config, problem, ui, limiter)
             return result
 
-    def calculate_points(self) -> dict[str, float]:
+    def calculate_points(self, points_per_matchup: int) -> dict[str, float]:
         """Calculate the number of points each team scored.
 
         Each pair of teams fights for the achievable points among one another.
         These achievable points are split over all rounds.
         """
-        points_per_matchup = self.config.points
         if len(self.active_teams) == 0:
             return {}
         if len(self.active_teams) == 1:
