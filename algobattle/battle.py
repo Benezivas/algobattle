@@ -53,12 +53,7 @@ class FightUiProxy(Protocol):
 
     @overload
     @abstractmethod
-    def update(self, role: Literal["generator"], data: ProgramRunInfo) -> None:
-        ...
-
-    @overload
-    @abstractmethod
-    def update(self, role: Literal["solver"], data: ProgramRunInfo) -> None:
+    def update(self, role: Literal["generator", "solver"], data: ProgramRunInfo) -> None:
         ...
 
     @overload
