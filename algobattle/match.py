@@ -122,6 +122,20 @@ class Match(BaseModel):
         except KeyError:
             return None
 
+    @overload
+    def insert_battle(self, battle: Battle, matchup: Matchup) -> Battle | None: ...
+
+    @overload
+    def insert_battle(self, battle: Battle, *, generating: Team, solving: Team) -> Battle | None: ...
+
+    def insert_battle(self, battle: Battle, matchup: Matchup | None = None, *, generating: Team | None = None, solving: Team | None = None) -> Battle | None:
+        """Returns the battle for the given matchup."""
+        if matchup is not None:
+            self.results[matchup.generator.name][matchup.solver.name] = battle
+        if generating is not None and solving is not None:
+            self.results[generating.name][solving.name] = battle
+        raise TypeError
+
     def calculate_points(self, points_per_matchup: int) -> dict[str, float]:
         """Calculate the number of points each team scored.
 
