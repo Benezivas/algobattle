@@ -16,7 +16,7 @@ from pydantic import validator
 from anyio import create_task_group, run, sleep
 
 from algobattle.battle import Battle, Fight, FightUiData
-from algobattle.docker_util import DockerConfig, GeneratorResult, Image, ProgramError, ProgramRunInfo, SolverResult
+from algobattle.docker_util import DockerConfig, GeneratorResult, Image, ProgramRunInfo, SolverResult
 from algobattle.match import MatchConfig, Match, Ui
 from algobattle.problem import Problem
 from algobattle.team import Matchup, TeamHandler, TeamInfo

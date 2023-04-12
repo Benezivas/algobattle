@@ -11,7 +11,7 @@ from anyio.to_thread import current_default_thread_limiter
 from anyio.abc import TaskStatus
 
 from algobattle.battle import Battle, FightHandler, FightUiProxy, Iterated, BattleUiProxy
-from algobattle.docker_util import GeneratorResult, ProgramRunInfo, ProgramUiProxy, SolverResult
+from algobattle.docker_util import ProgramRunInfo, ProgramUiProxy
 from algobattle.team import Matchup, TeamHandler
 from algobattle.problem import Problem
 from algobattle.util import Role, TimerInfo, inherit_docs, BaseModel
