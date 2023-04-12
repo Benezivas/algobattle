@@ -87,6 +87,11 @@ class FightHandler:
     _battle: "Battle"
     _ui: "BattleUiProxy"
 
+    def _saved(self, fight: Fight) -> Fight:
+        self._battle.fight_results.append(fight)
+        self._ui.update_fights()
+        return fight
+
     async def run(
         self,
         size: int,
@@ -116,7 +121,7 @@ class FightHandler:
         )
         ui.update("generator", gen_result.info)
         if gen_result.instance is None:
-            return Fight(score=1, size=size, generator=gen_result.info, solver=None)
+            return self._saved(Fight(score=1, size=size, generator=gen_result.info, solver=None))
 
         sol_result = await self._solver.run(
             gen_result.instance,
@@ -130,16 +135,13 @@ class FightHandler:
         )
         ui.update("solver", sol_result.info)
         if sol_result.solution is None:
-            return Fight(score=0, size=size, generator=gen_result.info, solver=sol_result.info)
+            return self._saved(Fight(score=0, size=size, generator=gen_result.info, solver=sol_result.info))
 
         score = gen_result.instance.calculate_score(
             solution=sol_result.solution, generator_solution=gen_result.solution, size=size
         )
         score = max(0, min(1, float(score)))
-        result = Fight(score=score, size=size, generator=gen_result.info, solver=sol_result.info)
-        self._battle.fight_results.append(result)
-        self._ui.update_fights()
-        return result
+        return self._saved(Fight(score=score, size=size, generator=gen_result.info, solver=sol_result.info))
 
 
 @dataclass
