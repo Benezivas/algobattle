@@ -60,64 +60,27 @@ def get_os_type() -> Literal["linux", "windows"]:
     return client().info()["OSType"]
 
 
-class ExceptionModel(Exception):
-    """An exception that can be encoded into a json file."""
-
-    _child_classes: dict[str, type[Self]] = {}
-
-    def __init_subclass__(cls) -> None:
-        cls._child_classes[cls.__name__] = cls
-        return super().__init_subclass__()
-
-    def __init__(self, message: str, *args: object) -> None:
+class _BaseException(Exception):
+    def __init__(self, message: str, detail: str = "", *args: object) -> None:
         self.message = message
+        self.detail = detail
         super().__init__(*args)
 
-    def __str__(self) -> str:
-        return f"{self.__class__.__name__}: {self.message}"
 
-    @classmethod
-    def __get_validators__(cls):
-        yield cls.validate
-
-    @classmethod
-    def validate(cls, v: Any) -> Self:
-        if isinstance(v, cls):
-            return v
-        if not isinstance(v, dict):
-            raise ValueError
-        try:
-            child_class = cls._child_classes[v.pop("type")]
-        except KeyError:
-            child_class = cls
-        return child_class(**v)
-
-    def jsonify(self) -> dict[str, Any]:
-        return {
-            "type": self.__class__.__name__,
-            "message": self.message,
-        }
-
-
-class BuildError(ExceptionModel):
+class BuildError(_BaseException):
     """Indicates that the build process could not be completed successfully."""
 
 
-class ProgramError(ExceptionModel):
+class ProgramError(_BaseException):
     """Parent class for exceptions raised during the execution of a program."""
 
 
 class ExecutionError(ProgramError):
     """Indicates that the program could not be executed successfully."""
 
-    def __init__(self, message: str, runtime: float, *args: object) -> None:
+    def __init__(self, message: str, detail: str = "", *args: object, runtime: float) -> None:
         self.runtime = runtime
-        super().__init__(message, *args)
-
-    def jsonify(self) -> dict[str, Any]:
-        out = super().jsonify()
-        out["runtime"] = self.runtime
-        return out
+        super().__init__(message, detail, *args)
 
 
 class ExecutionTimeout(ExecutionError):
@@ -127,12 +90,29 @@ class ExecutionTimeout(ExecutionError):
 class EncodingError(ProgramError):
     """Indicates that the given data could not be encoded or decoded properly."""
 
-    def __init__(self, message: str = "", *args: object) -> None:
-        super().__init__(message, *args)
+    def __init__(self, message: str = "", detail: str = "", *args: object) -> None:
+        super().__init__(message, detail, *args)
 
 
 class DockerError(ProgramError, BuildError):
     """Indicates that an issue with the docker daemon occured."""
+
+
+class ExceptionInfo(BaseModel):
+    """An exception that can be encoded into a json file."""
+
+    type: str
+    message: str
+    detail: str = ""
+
+    @classmethod
+    def from_exception(cls, error: _BaseException) -> Self:
+        """Constructs an instance from a raised exception."""
+        return cls(
+            type=error.__class__.__name__,
+            message=error.message,
+            detail=error.detail,
+        )
 
 
 class ProgramUiProxy(Protocol):
@@ -392,13 +372,13 @@ class Image:
                 message = (
                     f"Program crashed with exit code {response['StatusCode']} and error message:\n{container.logs().decode()}"
                 )
-                raise ExecutionError(message, elapsed_time)
+                raise ExecutionError(message, runtime=elapsed_time)
         except (Timeout, ConnectionError) as e:
             container.kill()
             elapsed_time = round(default_timer() - start_time, 2)
             if len(e.args) != 1 or not isinstance(e.args[0], ReadTimeoutError):
                 raise
-            raise ExecutionTimeout(f"{self.description} exceeded the time limit", elapsed_time)
+            raise ExecutionTimeout(f"{self.description} exceeded the time limit", runtime=elapsed_time)
 
 
 class ProgramRunInfo(BaseModel):
@@ -406,15 +386,7 @@ class ProgramRunInfo(BaseModel):
 
     params: RunParameters
     runtime: float
-    error: ProgramError | None = None
-
-    class Config(BaseModel.Config):
-        """Pydantic config."""
-
-        arbitrary_types_allowed = True
-        json_encoders = {
-            ProgramError: lambda e: e.jsonify(),
-        }
+    error: ExceptionInfo | None = None
 
 
 @dataclass
@@ -513,7 +485,7 @@ class Program(ABC):
             try:
                 self._setup_folders(input, output, size, input_instance)
             except ProgramError as e:
-                return result_class(ProgramRunInfo(params=run_params, runtime=0, error=e))
+                return result_class(ProgramRunInfo(params=run_params, runtime=0, error=ExceptionInfo.from_exception(e)))
             with open(input / "info.json", "w+") as f:
                 json.dump(
                     {
@@ -535,7 +507,7 @@ class Program(ABC):
                         ProgramRunInfo(
                             params=run_params,
                             runtime=0,
-                            error=EncodingError(f"Battle data couldn't be encoded:\n{e}"),
+                            error=ExceptionInfo(type="EncodingError", message=f"Battle data couldn't be encoded:\n{e}"),
                         )
                     )
             if battle_output:
@@ -548,7 +520,7 @@ class Program(ABC):
                     ProgramRunInfo(
                         params=run_params,
                         runtime=e.runtime,
-                        error=e,
+                        error=ExceptionInfo.from_exception(e),
                     )
                 )
             except ProgramError as e:
@@ -556,7 +528,7 @@ class Program(ABC):
                     ProgramRunInfo(
                         params=run_params,
                         runtime=0,
-                        error=e,
+                        error=ExceptionInfo.from_exception(e),
                     )
                 )
 
@@ -567,7 +539,7 @@ class Program(ABC):
                     ProgramRunInfo(
                         params=run_params,
                         runtime=runtime,
-                        error=e,
+                        error=ExceptionInfo.from_exception(e),
                     )
                 )
 
