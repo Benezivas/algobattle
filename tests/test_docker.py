@@ -10,7 +10,6 @@ from algobattle.docker_util import (
     EncodingError,
     ExecutionError,
     Generator,
-    GeneratorResult,
     Image,
     RunParameters,
     Solver,
