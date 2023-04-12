@@ -39,6 +39,7 @@ class MatchConfig(BaseModel):
             raise TypeError
 
     class Config(BaseModel.Config):
+        """Pydantic config."""
 
         json_encoders = {
             type[Battle]: lambda b: b.name().lower(),
@@ -91,7 +92,8 @@ class Match(BaseModel):
     ) -> Self:
         """Executes a match with the specified parameters."""
         result = cls(
-            active_teams=[t.name for t in teams.active], excluded_teams=[t.name for t in teams.excluded],
+            active_teams=[t.name for t in teams.active],
+            excluded_teams=[t.name for t in teams.excluded],
         )
         if ui is None:
             ui = Ui()
@@ -106,12 +108,16 @@ class Match(BaseModel):
             return result
 
     @overload
-    def battle(self, matchup: Matchup) -> Battle | None: ...
+    def battle(self, matchup: Matchup) -> Battle | None:
+        ...
 
     @overload
-    def battle(self, *, generating: Team, solving: Team) -> Battle | None: ...
+    def battle(self, *, generating: Team, solving: Team) -> Battle | None:
+        ...
 
-    def battle(self, matchup: Matchup | None = None, *, generating: Team | None = None, solving: Team | None = None) -> Battle | None:
+    def battle(
+        self, matchup: Matchup | None = None, *, generating: Team | None = None, solving: Team | None = None
+    ) -> Battle | None:
         """Returns the battle for the given matchup."""
         try:
             if matchup is not None:
@@ -123,12 +129,16 @@ class Match(BaseModel):
             return None
 
     @overload
-    def insert_battle(self, battle: Battle, matchup: Matchup) -> Battle | None: ...
+    def insert_battle(self, battle: Battle, matchup: Matchup) -> Battle | None:
+        ...
 
     @overload
-    def insert_battle(self, battle: Battle, *, generating: Team, solving: Team) -> Battle | None: ...
+    def insert_battle(self, battle: Battle, *, generating: Team, solving: Team) -> Battle | None:
+        ...
 
-    def insert_battle(self, battle: Battle, matchup: Matchup | None = None, *, generating: Team | None = None, solving: Team | None = None) -> Battle | None:
+    def insert_battle(
+        self, battle: Battle, matchup: Matchup | None = None, *, generating: Team | None = None, solving: Team | None = None
+    ) -> Battle | None:
         """Returns the battle for the given matchup."""
         if matchup is not None:
             self.results[matchup.generator.name][matchup.solver.name] = battle

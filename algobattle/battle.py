@@ -211,7 +211,7 @@ class Battle(BaseModel):
     def __init_subclass__(cls) -> None:
         if cls.name() not in Battle._battle_types:
             Battle._battle_types[cls.name().lower()] = cls
-        return super().__init_subclass__()       
+        return super().__init_subclass__()
 
     @abstractmethod
     def score(self) -> float:
@@ -235,10 +235,7 @@ class Battle(BaseModel):
 
     def archive(self) -> dict[str, Any]:
         """Encodes the battle data into a jsonable dict."""
-
-        return {
-            "run_exception": self.run_exception
-        }
+        return {"run_exception": self.run_exception}
 
 
 class Iterated(Battle):

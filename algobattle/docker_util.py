@@ -409,6 +409,8 @@ class ProgramRunInfo(BaseModel):
     error: ProgramError | None = None
 
     class Config(BaseModel.Config):
+        """Pydantic config."""
+
         arbitrary_types_allowed = True
         json_encoders = {
             ProgramError: lambda e: e.jsonify(),
@@ -417,7 +419,7 @@ class ProgramRunInfo(BaseModel):
 
 @dataclass
 class ProgramResult:
-    """The result of a program execution"""
+    """The result of a program execution."""
 
     info: ProgramRunInfo
     battle_data: dict[str, Encodable] | None = None
@@ -529,37 +531,45 @@ class Program(ABC):
                 try:
                     encode(battle_input, input / "battle_data", size, self.role)
                 except Exception as e:
-                    return result_class(ProgramRunInfo(
-                        params=run_params,
-                        runtime=0,
-                        error=EncodingError(f"Battle data couldn't be encoded:\n{e}"),
-                    ))
+                    return result_class(
+                        ProgramRunInfo(
+                            params=run_params,
+                            runtime=0,
+                            error=EncodingError(f"Battle data couldn't be encoded:\n{e}"),
+                        )
+                    )
             if battle_output:
                 (output / "battle_data").mkdir()
 
             try:
                 runtime = await self.image.run(input, output, timeout=timeout, memory=space, cpus=cpus, ui=ui)
             except ExecutionError as e:
-                return result_class(ProgramRunInfo(
-                    params=run_params,
-                    runtime=e.runtime,
-                    error=e,
-                ))
+                return result_class(
+                    ProgramRunInfo(
+                        params=run_params,
+                        runtime=e.runtime,
+                        error=e,
+                    )
+                )
             except ProgramError as e:
-                return result_class(ProgramRunInfo(
-                    params=run_params,
-                    runtime=0,
-                    error=e,
-                ))
+                return result_class(
+                    ProgramRunInfo(
+                        params=run_params,
+                        runtime=0,
+                        error=e,
+                    )
+                )
 
             try:
                 output_data = self._parse_output(output, size, input_instance)
             except ProgramError as e:
-                return result_class(ProgramRunInfo(
-                    params=run_params,
-                    runtime=runtime,
-                    error=e,
-                ))
+                return result_class(
+                    ProgramRunInfo(
+                        params=run_params,
+                        runtime=runtime,
+                        error=e,
+                    )
+                )
 
             if battle_output:
                 decoded_battle_output = decode(battle_output, output / "battle_data", size, self.role)
@@ -627,7 +637,9 @@ class Generator(Program):
             except EncodingError:
                 raise
             except Exception as e:
-                raise EncodingError(f"The solution output of team {self.team_name}'s generator can not be decoded properly!\n{e}") from e
+                raise EncodingError(
+                    f"The solution output of team {self.team_name}'s generator can not be decoded properly!\n{e}"
+                ) from e
             if not solution.is_valid(problem, size):
                 raise EncodingError(f"The generator of team {self.team_name} output an invalid solution!")
         else:
