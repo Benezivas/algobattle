@@ -379,7 +379,7 @@ class Image:
             elapsed_time = round(default_timer() - start_time, 2)
             if len(e.args) != 1 or not isinstance(e.args[0], ReadTimeoutError):
                 raise
-            raise ExecutionTimeout(f"The docker container exceeded the time limit.", runtime=elapsed_time)
+            raise ExecutionTimeout("The docker container exceeded the time limit.", runtime=elapsed_time)
 
 
 class ProgramRunInfo(BaseModel):
@@ -600,9 +600,9 @@ class Generator(Program):
         except EncodingError:
             raise
         except Exception as e:
-            raise EncodingError(f"Error thrown while decoding the problem instance.", detail=str(e)) from e
+            raise EncodingError("Error thrown while decoding the problem instance.", detail=str(e)) from e
         if not problem.is_valid(size):
-            raise EncodingError(f"Instance is not valid.")
+            raise EncodingError("Instance is not valid.")
 
         if problem.with_solution:
             try:
