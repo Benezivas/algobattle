@@ -3,7 +3,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
 from itertools import combinations
-from typing import Self
+from typing import Self, overload
 
 from pydantic import validator, Field
 from anyio import create_task_group, CapacityLimiter, TASK_STATUS_IGNORED
@@ -12,7 +12,7 @@ from anyio.abc import TaskStatus
 
 from algobattle.battle import Battle, FightHandler, FightUiProxy, Iterated, BattleUiProxy
 from algobattle.docker_util import ProgramRunInfo, ProgramUiProxy
-from algobattle.team import Matchup, TeamHandler
+from algobattle.team import Matchup, Team, TeamHandler
 from algobattle.problem import Problem
 from algobattle.util import Role, TimerInfo, inherit_docs, BaseModel, str_with_traceback
 
@@ -104,6 +104,20 @@ class Match(BaseModel):
                 result.results[matchup.generator.name][matchup.solver.name] = battle
                 await tg.start(result._run_battle, battle, matchup, battle_config, problem, ui, limiter)
             return result
+
+    @overload
+    def battle(self, matchup: Matchup) -> Battle: ...
+
+    @overload
+    def battle(self, *, generating: Team, solving: Team) -> Battle: ...
+
+    def battle(self, matchup: Matchup | None = None, *, generating: Team | None = None, solving: Team | None = None) -> Battle:
+        """Returns the battle for the given matchup."""
+        if matchup is not None:
+            return self.results[matchup.generator.name][matchup.solver.name]
+        if generating is not None and solving is not None:
+            return self.results[generating.name][solving.name]
+        raise TypeError
 
     def calculate_points(self, points_per_matchup: int) -> dict[str, float]:
         """Calculate the number of points each team scored.
