@@ -9,7 +9,7 @@ from typing import Any, ClassVar, Literal, Protocol, SupportsFloat, Self, Generi
 from pydantic import Field
 from pydantic.generics import GenericModel
 
-from algobattle.util import CustomEncodable, EncodableModel, Role, inherit_docs
+from algobattle.util import Encodable, EncodableModel, Role, inherit_docs
 
 
 _Problem: TypeAlias = Any
@@ -40,7 +40,7 @@ class Scored(Protocol):
         raise NotImplementedError
 
 
-class Problem(CustomEncodable, ABC):
+class Problem(Encodable, ABC):
     """Problem base class."""
 
     name: ClassVar[str]
@@ -62,17 +62,6 @@ class Problem(CustomEncodable, ABC):
         if "export" not in cls.__dict__:
             cls.export = export
         return super().__init_subclass__()
-
-    @classmethod
-    @abstractmethod
-    def decode(cls: type[Self], source_dir: Path, size: int, team: Role) -> Self:
-        """Parses the container output into a problem instance."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def encode(self, target_dir: Path, size: int, team: Role) -> None:
-        """Encodes the problem instance into files that can be passed to docker containers."""
-        raise NotImplementedError
 
     def is_valid(self, size: int) -> bool:
         """Validates that the parsed instance is semantically correct."""
@@ -164,7 +153,7 @@ class Problem(CustomEncodable, ABC):
         finally:
             sys.modules.pop("_problem")
 
-    class Solution(CustomEncodable, ABC):
+    class Solution(Encodable, ABC):
         """A proposed solution for an instance of this problem."""
 
         @classmethod

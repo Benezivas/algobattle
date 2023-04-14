@@ -69,77 +69,22 @@ class TempDir(TemporaryDirectory[Any]):
         return Path(self.name)
 
 
-class CustomEncodable(ABC):
-    """Represents problem data that docker containers can interact with."""
+class Encodable(ABC):
+    """Represents data that docker containers can interact with."""
 
     @classmethod
     @abstractmethod
     def decode(cls: type[Self], source_dir: Path, size: int, team: Role) -> Self:
-        """Parses the container output into problem data."""
-        ...
+        """Parses the container output into a python object."""
+        raise NotImplementedError
 
     @abstractmethod
     def encode(self, target_dir: Path, size: int, team: Role) -> None:
         """Encodes the data into files that can be passed to docker containers."""
-        ...
+        raise NotImplementedError
 
 
-Encodable = CustomEncodable | str | bytes | dict[Any, Any] | None
-
-
-def encode(data: Mapping[str, Encodable], target_dir: Path, size: int, team: Role) -> None:
-    """Encodes data into a folder.
-
-    Each element will be encoded into a file or folder named after its key. :cls:`CustomEncodables` use their own method,
-    strings will be encoded with utf8, bytes are written as is, and dictionaries will be encoded as json.
-    """
-    for name, obj in data.items():
-        try:
-            if isinstance(obj, CustomEncodable):
-                (target_dir / name).mkdir()
-                obj.encode(target_dir / name, size, team)
-            elif isinstance(obj, str):
-                with open(target_dir / name, "w+") as f:
-                    f.write(obj)
-            elif isinstance(obj, bytes):
-                with open(target_dir / name, "wb+") as f:
-                    f.write(obj)
-            elif isinstance(obj, dict):
-                with open(target_dir / name, "w+") as f:
-                    json.dump(obj, f)
-        except Exception:
-            pass
-
-
-def decode(data_spec: Mapping[str, type[Encodable]], source_dir: Path, size: int, team: Role) -> dict[str, Encodable | None]:
-    """Decodes data from a folder.
-
-    The output is a dictionary with the same keys as `data_spec` and values that are objects of the specified types.
-    :cls:`CustomEncodables` use their own method, strings will be decoded with utf8, bytes are read directly,
-    and dictionaries will be decoded from json.
-    Any :cls:`Excpeption`s are caught and the corresponding field in the dict be set to `None`.
-    """
-    out = {}
-    for name, cls in data_spec.items():
-        try:
-            if issubclass(cls, CustomEncodable):
-                (source_dir / name).mkdir()
-                out[name] = cls.decode(source_dir / name, size, team)
-            elif issubclass(cls, str):
-                with open(source_dir / name, "r") as f:
-                    out[name] = f.read()
-            elif issubclass(cls, bytes):
-                with open(source_dir / name, "rb") as f:
-                    out[name] = f.read()
-            elif issubclass(cls, dict):
-                with open(source_dir / name, "r") as f:
-                    out[name] = json.load(f)
-        except Exception:
-            out[name] = None
-    return out
-
-
-class EncodableModel(BaseModel, CustomEncodable, ABC):
+class EncodableModel(BaseModel, Encodable, ABC):
     """Problem data that can easily be encoded into and decoded from json files."""
 
     filename: ClassVar[str]

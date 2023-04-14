@@ -97,10 +97,10 @@ class FightHandler:
         timeout_solver: float | None = ...,
         space_solver: int | None = ...,
         cpus_solver: int = ...,
-        generator_battle_input: Mapping[str, Encodable] = {},
-        solver_battle_input: Mapping[str, Encodable] = {},
-        generator_battle_output: Mapping[str, type[Encodable]] = {},
-        solver_battle_output: Mapping[str, type[Encodable]] = {},
+        generator_battle_input: Encodable | None = None,
+        solver_battle_input: Encodable | None = None,
+        generator_battle_output: type[Encodable] | None = None,
+        solver_battle_output: type[Encodable] | None = None,
     ) -> Fight:
         """Execute a single fight of a battle between the given programs."""
         ui = self._ui.fight_ui

@@ -2,7 +2,7 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
 from timeit import default_timer
-from typing import Any, ClassVar, Iterator, Literal, Mapping, Protocol, Self, TypedDict, cast
+from typing import Any, ClassVar, Iterator, Literal, Protocol, Self, TypedDict, cast
 from uuid import uuid1
 import json
 from dataclasses import dataclass
@@ -17,7 +17,7 @@ from pydantic import Field
 from anyio.to_thread import run_sync
 from urllib3.exceptions import ReadTimeoutError
 
-from algobattle.util import Encodable, Role, TempDir, encode, decode, inherit_docs, BaseModel
+from algobattle.util import Encodable, Role, TempDir, inherit_docs, BaseModel
 from algobattle.problem import Problem
 
 
@@ -395,7 +395,7 @@ class ProgramResult:
     """The result of a program execution."""
 
     info: ProgramRunInfo
-    battle_data: dict[str, Encodable] | None = None
+    battle_data: Encodable | None = None
 
 
 @dataclass
@@ -468,8 +468,8 @@ class Program(ABC):
         timeout: float | None = ...,
         space: int | None = ...,
         cpus: int = ...,
-        battle_input: Mapping[str, Encodable] = {},
-        battle_output: Mapping[str, type[Encodable]] = {},
+        battle_input: Encodable | None = None,
+        battle_output: type[Encodable] | None = None,
         ui: ProgramUiProxy | None = None,
     ) -> GeneratorResult | SolverResult:
         """Execute the program, processing input and output data."""
@@ -494,15 +494,13 @@ class Program(ABC):
                         "timeout": timeout,
                         "space": space,
                         "cpus": cpus,
-                        "battle_input": {name: obj.__class__.__name__ for name, obj in battle_input.items()},
-                        "battle_output": {name: cls.__name__ for name, cls in battle_output.items()},
                     },
                     f,
                 )
-            if battle_input:
+            if battle_input is not None:
                 (input / "battle_data").mkdir()
                 try:
-                    encode(battle_input, input / "battle_data", size, self.role)
+                    battle_input.encode(input / "battle_data", size, self.role)
                 except Exception as e:
                     return result_class(
                         ProgramRunInfo(
@@ -511,7 +509,7 @@ class Program(ABC):
                             error=ExceptionInfo(type="EncodingError", message=f"Battle data couldn't be encoded:\n{e}"),
                         )
                     )
-            if battle_output:
+            if battle_output is not None:
                 (output / "battle_data").mkdir()
 
             try:
@@ -545,7 +543,7 @@ class Program(ABC):
                 )
 
             if battle_output:
-                decoded_battle_output = decode(battle_output, output / "battle_data", size, self.role)
+                decoded_battle_output = battle_output.decode(output / "battle_data", size, self.role)
             else:
                 decoded_battle_output = None
 
@@ -624,8 +622,8 @@ class Generator(Program):
         timeout: float | None = ...,
         space: int | None = ...,
         cpus: int = ...,
-        battle_input: Mapping[str, Encodable] = {},
-        battle_output: Mapping[str, type[Encodable]] = {},
+        battle_input: Encodable | None = None,
+        battle_output: type[Encodable] | None = None,
         ui: ProgramUiProxy | None = None,
     ) -> GeneratorResult:
         """Execute the generator, passing in the size and processing the created problem instance."""
@@ -675,8 +673,8 @@ class Solver(Program):
         timeout: float | None = ...,
         space: int | None = ...,
         cpus: int = ...,
-        battle_input: Mapping[str, Encodable] = {},
-        battle_output: Mapping[str, type[Encodable]] = {},
+        battle_input: Encodable | None = None,
+        battle_output: type[Encodable] | None = None,
         ui: ProgramUiProxy | None = None,
     ) -> SolverResult:
         """Execute the solver, passing in the problem instance and processing the created solution."""
