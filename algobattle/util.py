@@ -3,19 +3,33 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 import json
-import logging
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from traceback import format_exception
 from typing import Any, ClassVar, Iterable, Literal, Mapping, TypeVar, Self
-from pydantic import BaseModel
+
+from pydantic import BaseConfig, BaseModel, Extra
 
 
 Role = Literal["generator", "solver"]
 
-logger = logging.getLogger("algobattle.util")
-
 
 T = TypeVar("T")
+
+
+def str_with_traceback(exception: Exception) -> str:
+    """Returns the full exception info with a stacktrace."""
+    return "\n".join(format_exception(exception))
+
+
+class BaseModel(BaseModel):
+    """Base class for all pydantic models."""
+
+    class Config(BaseConfig):
+        """Base config for all pydandic configs."""
+
+        extra = Extra.forbid
+        underscore_attrs_are_private = False
 
 
 def inherit_docs(obj: T) -> T:
@@ -93,8 +107,8 @@ def encode(data: Mapping[str, Encodable], target_dir: Path, size: int, team: Rol
             elif isinstance(obj, dict):
                 with open(target_dir / name, "w+") as f:
                     json.dump(obj, f)
-        except Exception as e:
-            logger.critical(f"Failed to encode {obj} from into files at {target_dir / name}!\nException: {e}")
+        except Exception:
+            pass
 
 
 def decode(data_spec: Mapping[str, type[Encodable]], source_dir: Path, size: int, team: Role) -> dict[str, Encodable | None]:
@@ -120,8 +134,7 @@ def decode(data_spec: Mapping[str, type[Encodable]], source_dir: Path, size: int
             elif issubclass(cls, dict):
                 with open(source_dir / name, "r") as f:
                     out[name] = json.load(f)
-        except Exception as e:
-            logger.critical(f"Failed to decode {cls} object from data at {source_dir / name}!\nException: {e}")
+        except Exception:
             out[name] = None
     return out
 

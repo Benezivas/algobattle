@@ -2,15 +2,14 @@
 from abc import ABC, abstractmethod
 import importlib.util
 from inspect import isclass
-import logging
 import sys
 from pathlib import Path
 from typing import Any, ClassVar, Literal, Protocol, SupportsFloat, Self, Generic, TypeAlias, TypeVar, runtime_checkable
+
 from pydantic import Field
 from pydantic.generics import GenericModel
-from algobattle.util import CustomEncodable, EncodableModel, Role, inherit_docs
 
-logger = logging.getLogger("algobattle.problem")
+from algobattle.util import CustomEncodable, EncodableModel, Role, inherit_docs
 
 
 _Problem: TypeAlias = Any
@@ -141,7 +140,6 @@ class Problem(CustomEncodable, ABC):
             sys.modules[spec.name] = problem_module
             spec.loader.exec_module(problem_module)
         except Exception as e:
-            logger.critical(f"Importing the given problem failed with the following exception: {e}")
             raise ValueError from e
 
         try:
@@ -162,7 +160,6 @@ class Problem(CustomEncodable, ABC):
             return problem_cls
 
         except Exception as e:
-            logger.critical(f"Importing the given problem failed with the following exception: {e}")
             raise ValueError from e
         finally:
             sys.modules.pop("_problem")
@@ -202,10 +199,10 @@ class ProblemModel(EncodableModel, Problem, ABC):
         """Generates the default json schema specifying the I/O for this problem."""
         return cls.schema_json(indent=4)
 
-    class Config:
+    class Config(EncodableModel.Config):
         """Pydantic config object to hide these fields in the json if someone redeclared them incorrectly."""
 
-        fields = {
+        fields: dict[str, Any] = {
             "filename": {"exclude": True},
             "name": {"exclude": True},
             "min_size": {"exclude": True},
@@ -225,10 +222,10 @@ class SolutionModel(EncodableModel, Problem.Solution, ABC):
         """Generates the default json schema specifying the I/O for this solution."""
         return cls.schema_json(indent=4)
 
-    class Config:
+    class Config(EncodableModel.Config):
         """Pydantic config object to hide these fields in the json if someone redeclared them incorrectly."""
 
-        fields = {"filename": {"exclude": True}}
+        fields: dict[str, Any] = {"filename": {"exclude": True}}
 
 
 class DirectedGraph(ProblemModel):

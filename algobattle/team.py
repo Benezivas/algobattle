@@ -3,13 +3,10 @@ from dataclasses import dataclass
 from itertools import combinations
 from pathlib import Path
 from typing import Iterable, Iterator, Self
-import logging
 
 from algobattle.docker_util import DockerConfig, DockerError, ArchivedImage, Generator, Solver
 from algobattle.problem import Problem
 from algobattle.util import TempDir
-
-logger = logging.getLogger("algobattle.team")
 
 
 _team_names: set[str] = set()
@@ -159,7 +156,6 @@ class TeamHandler:
                         team = team.archive(folder)
                         archives.append(team)
                     except Exception:
-                        logger.warning(f"Building generators and solvers for team {info.name} failed, they will be excluded!")
                         excluded.append(info)
 
                 return cls([team.restore() for team in archives], excluded)
@@ -170,7 +166,6 @@ class TeamHandler:
                     team = info.build(problem, config, auto_cleanup=safe_build)
                     teams.append(team)
                 except (ValueError, DockerError):
-                    logger.warning(f"Building generators and solvers for team {info.name} failed, they will be excluded!")
                     excluded.append(info)
             return cls(teams, excluded)
 

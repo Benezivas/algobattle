@@ -5,96 +5,43 @@ import curses
 from dataclasses import dataclass, field
 from functools import partial
 import sys
-import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, ClassVar, Literal, Mapping, ParamSpec, Self, TypeVar
+from typing import Any, Callable, ClassVar, Mapping, ParamSpec, Self, TypeVar
 import tomllib
 from importlib.metadata import version as pkg_version
 
 from prettytable import DOUBLE_BORDER, PrettyTable
-from pydantic import BaseModel, validator
+from pydantic import validator
 from anyio import create_task_group, run, sleep
 
 from algobattle.battle import Battle, Fight, FightUiData
-from algobattle.docker_util import DockerConfig, GeneratorResult, Image, ProgramError, ProgramResult, SolverResult
+from algobattle.docker_util import DockerConfig, GeneratorResult, Image, ProgramRunInfo, SolverResult
 from algobattle.match import MatchConfig, Match, Ui
 from algobattle.problem import Problem
 from algobattle.team import Matchup, TeamHandler, TeamInfo
-from algobattle.util import Role, TimerInfo, check_path, flat_intersperse
-
-logger = logging.getLogger("algobattle.cli")
-
-
-def setup_logging(logging_path: Path, verbose_logging: bool, silent: bool):
-    """Creates and returns a parent logger.
-
-    Parameters
-    ----------
-    logging_path : Path
-        Path to folder where the logfile should be stored at.
-    verbose_logging : bool
-        Flag indicating whether to include debug messages in the output
-    silent : bool
-        Flag indicating whether not to pipe the logging output to stderr.
-
-    Returns
-    -------
-    logger : Logger
-        The Logger object.
-    """
-    common_logging_level = logging.INFO
-
-    if verbose_logging:
-        common_logging_level = logging.DEBUG
-
-    Path(logging_path).mkdir(exist_ok=True)
-
-    t = datetime.now()
-    current_timestamp = f"{t.year:04d}-{t.month:02d}-{t.day:02d}_{t.hour:02d}-{t.minute:02d}-{t.second:02d}"
-    logging_path = Path(logging_path, current_timestamp + ".log")
-
-    logging.basicConfig(
-        handlers=[logging.FileHandler(logging_path, "w", "utf-8")],
-        level=common_logging_level,
-        format="%(asctime)s %(levelname)s: %(message)s",
-        datefmt="%H:%M:%S",
-    )
-    logger = logging.getLogger("algobattle")
-
-    if not silent:
-        # Pipe logging out to console
-        _consolehandler = logging.StreamHandler(stream=sys.stderr)
-        _consolehandler.setLevel(common_logging_level)
-
-        _consolehandler.setFormatter(logging.Formatter("%(message)s"))
-
-        logger.addHandler(_consolehandler)
-
-    logger.info(f"You can find the log files for this run in {logging_path}")
-    return logger
+from algobattle.util import Role, TimerInfo, check_path, BaseModel, flat_intersperse
 
 
 class ExecutionConfig(BaseModel):
     """Config data regarding program execution."""
 
-    display: Literal["silent", "logs", "ui"] = "ui"
-    logging_path: Path = Path.home() / ".algobattle_logs"
-    verbose: bool = False
+    silent: bool = False
     safe_build: bool = False
+    result_output: Path | None = None
 
 
-class Config(BaseModel):
+class BattleConfig(BaseModel):
     """Pydantic model to parse the config file."""
 
     teams: list[TeamInfo] = []
     execution: ExecutionConfig = ExecutionConfig()
     match: MatchConfig = MatchConfig()
     docker: DockerConfig = DockerConfig()
-    battle: dict[str, Battle.Config] = {n: b.Config() for n, b in Battle.all().items()}
+    battle: dict[str, Battle.BattleConfig] = {n: b.BattleConfig() for n, b in Battle.all().items()}
 
     @property
-    def battle_config(self) -> Battle.Config:
+    def battle_config(self) -> Battle.BattleConfig:
         """The config object for the used battle type."""
         return self.battle[self.match.battle_type.name().lower()]
 
@@ -107,7 +54,7 @@ class Config(BaseModel):
         out = {}
         for name, battle_cls in battle_types.items():
             data = vals.get(name, {})
-            out[name] = battle_cls.Config.parse_obj(data)
+            out[name] = battle_cls.BattleConfig.parse_obj(data)
         return out
 
     _cli_mapping: ClassVar[dict[str, Any]] = {
@@ -123,7 +70,7 @@ class Config(BaseModel):
 
     def include_cli(self, cli: Namespace) -> None:
         """Updates itself using the data in the passed argparse namespace."""
-        Config._include_cli(self, cli, self._cli_mapping)
+        BattleConfig._include_cli(self, cli, self._cli_mapping)
         for battle_name, config in self.battle.items():
             for name in config.__fields__:
                 cli_name = f"{battle_name}_{name}"
@@ -137,7 +84,7 @@ class Config(BaseModel):
                 continue
             value = getattr(model, name)
             if isinstance(value, BaseModel):
-                Config._include_cli(value, cli, mapping.get(name, {}))
+                BattleConfig._include_cli(value, cli, mapping.get(name, {}))
             else:
                 cli_val = getattr(cli, mapping.get(name, name))
                 if cli_val is not None:
@@ -156,26 +103,18 @@ class Config(BaseModel):
         return cls.parse_obj(config_dict)
 
 
-def parse_cli_args(args: list[str]) -> tuple[Path, Config]:
+def parse_cli_args(args: list[str]) -> tuple[Path, BattleConfig]:
     """Parse a given CLI arg list into config objects."""
     parser = ArgumentParser()
     parser.add_argument("problem", type=check_path, help="Path to a folder with the problem file.")
     parser.add_argument(
         "--config", type=partial(check_path, type="file"), help="Path to a config file, defaults to '{problem} / config.toml'."
     )
+    parser.add_argument("-s", "--silent", action="store_const", const=True, help="Disable the cli Ui.")
     parser.add_argument(
-        "--logging_path",
-        type=partial(check_path, type="dir"),
-        help="Folder that logs are written into, defaults to '~/.algobattle_logs'.",
-    )
-    parser.add_argument(
-        "--display",
-        choices=["silent", "logs", "ui"],
-        help="Choose output mode, silent disables all output, logs displays the battle logs on STDERR,"
-        " ui displays a small GUI showing the progress of the battle. Default: ui.",
+        "--result_output", type=check_path, help="If set, the match result object will be saved to the specified file."
     )
 
-    parser.add_argument("--verbose", "-v", dest="verbose", action="store_const", const=True, help="More detailed log output.")
     parser.add_argument(
         "--safe_build",
         action="store_const",
@@ -203,7 +142,7 @@ def parse_cli_args(args: list[str]) -> tuple[Path, Config]:
     # battle types have their configs automatically added to the CLI args
     for battle_name, battle in Battle.all().items():
         group = parser.add_argument_group(battle_name)
-        for name, kwargs in battle.Config.as_argparse_args():
+        for name, kwargs in battle.BattleConfig.as_argparse_args():
             group.add_argument(f"--{battle_name.lower()}_{name}", **kwargs)
 
     parsed = parser.parse_args(args)
@@ -215,11 +154,11 @@ def parse_cli_args(args: list[str]) -> tuple[Path, Config]:
 
     if cfg_path.is_file():
         try:
-            config = Config.from_file(cfg_path)
+            config = BattleConfig.from_file(cfg_path)
         except Exception as e:
             raise ValueError(f"Invalid config file, terminating execution.\n{e}")
     else:
-        config = Config()
+        config = BattleConfig()
     config.include_cli(parsed)
     if config.docker.advanced_run_params is not None:
         Image.run_kwargs = config.docker.advanced_run_params.to_docker_args()
@@ -233,10 +172,11 @@ def parse_cli_args(args: list[str]) -> tuple[Path, Config]:
 
 
 async def _run_with_ui(
-    match_config: MatchConfig, battle_config: Battle.Config, problem: type[Problem], teams: TeamHandler, ui: "CliUi"
-):
+    match_config: MatchConfig, battle_config: Battle.BattleConfig, problem: type[Problem], teams: TeamHandler, ui: "CliUi | None"
+) -> Match:
     async with create_task_group() as tg:
-        tg.start_soon(ui.loop)
+        if ui is not None:
+            tg.start_soon(ui.loop)
         result = await Match.run(match_config, battle_config, problem, teams, ui)
         tg.cancel_scope.cancel()
         return result
@@ -246,7 +186,6 @@ def main():
     """Entrypoint of `algobattle` CLI."""
     try:
         problem_path, config = parse_cli_args(sys.argv[1:])
-        logger = setup_logging(config.execution.logging_path, config.execution.verbose, config.execution.display != "logs")
 
     except KeyboardInterrupt:
         raise SystemExit("Received keyboard interrupt, terminating execution.")
@@ -256,26 +195,28 @@ def main():
         with TeamHandler.build(
             config.teams, problem, config.docker, config.execution.safe_build
         ) as teams, ExitStack() as stack:
-            if config.execution.display == "ui":
+            if config.execution.silent:
+                ui = None
+            else:
                 ui = CliUi()
                 stack.enter_context(ui)
-            else:
-                ui = None
 
             result = run(_run_with_ui, config.match, config.battle_config, problem, teams, ui)
-
-            logger.info("#" * 78)
-            logger.info(CliUi.display_match(result))
             print("\n".join(CliUi.display_match(result)))
             if config.match.points > 0:
-                points = result.calculate_points()
+                points = result.calculate_points(config.match.points)
                 for team, pts in points.items():
-                    line = f"Team {team} gained {pts:.1f} points."
-                    print(line)
-                    logger.info(line)
+                    print(f"Team {team} gained {pts:.1f} points.")
+            if config.execution.result_output:
+                t = datetime.now()
+                filename = f"{t.year:04d}-{t.month:02d}-{t.day:02d}_{t.hour:02d}-{t.minute:02d}-{t.second:02d}.json"
+                output_path = config.execution.result_output / filename
+                json = result.json()
+                with open(output_path, "w+") as f:
+                    f.write(json)
 
     except KeyboardInterrupt:
-        logger.critical("Received keyboard interrupt, terminating execution.")
+        print("Received keyboard interrupt, terminating execution.")
 
 
 P = ParamSpec("P")
@@ -287,7 +228,6 @@ def check_for_terminal(function: Callable[P, R]) -> Callable[P, R | None]:
 
     def wrapper(*args: P.args, **kwargs: P.kwargs):
         if not sys.stdout.isatty():
-            logger.error("Not attached to a terminal.")
             return None
         else:
             return function(*args, **kwargs)
@@ -338,7 +278,7 @@ class CliUi(Ui):
         self,
         matchup: Matchup,
         role: Role | None = None,
-        data: TimerInfo | float | GeneratorResult | SolverResult | None = None,
+        data: TimerInfo | float | ProgramRunInfo | None = None,
     ) -> None:
         """Passes new info about the current fight to the Ui."""
         if role == "generator" or role is None:
@@ -387,13 +327,18 @@ class CliUi(Ui):
         table.set_style(DOUBLE_BORDER)
         table.align["Result"] = "r"
 
-        for matchup, result in match.results.items():
-            table.add_row([str(matchup.generator), str(matchup.solver), result.format_score(result.score())])
+        for generating, battles in match.results.items():
+            for solving, result in battles.items():
+                if result.run_exception is None:
+                    res = result.format_score(result.score())
+                else:
+                    res = f"Error: {result.run_exception}"
+                table.add_row([generating, solving, res])
 
-        return [f"Battle Type: {match.config.battle_type.name()}"] + list(str(table).split("\n"))
+        return str(table).split("\n")
 
     @staticmethod
-    def display_program(role: Role, data: TimerInfo | float | ProgramResult | None) -> str:
+    def display_program(role: Role, data: TimerInfo | float | ProgramRunInfo | None) -> str:
         """Formats program runtime data."""
         role_str = role.capitalize() + ": "
         out = f"{role_str: <11}"
@@ -411,7 +356,7 @@ class CliUi(Ui):
         else:
             runtime = data.runtime
             timeout = data.params.timeout
-            state_glyph = "🗙" if isinstance(data.result, ProgramError) else "✓"
+            state_glyph = "✓" if data.error is None else "🗙"
 
         out += f"{runtime:3.1f}s"
         if timeout is None:
@@ -434,12 +379,12 @@ class CliUi(Ui):
     @staticmethod
     def display_fight(fight: Fight, index: int) -> list[str]:
         """Formats a completed fight into a compact overview."""
-        out = [f"Fight {index} at size {fight.generator.size}:"]
-        if isinstance(fight.generator.result, ProgramError):
+        out = [f"Fight {index} at size {fight.size}:"]
+        if fight.generator.error is not None:
             out.append("Generator failed!")
             return out
         assert fight.solver is not None
-        if isinstance(fight.solver.result, ProgramError):
+        if fight.solver.error is not None:
             out.append("Solver failed!")
             return out
         out.append(f"Score: {fight.score}")
@@ -447,7 +392,7 @@ class CliUi(Ui):
 
     def display_battle(self, matchup: Matchup) -> list[str]:
         """Formats the battle data into a string that can be printed to the terminal."""
-        battle = self.match.results[matchup]
+        battle = self.match.results[matchup.generator.name][matchup.solver.name]
         fights = battle.fight_results[-3:] if len(battle.fight_results) >= 3 else battle.fight_results
         sections: list[list[str]] = []
 
