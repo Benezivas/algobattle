@@ -1,4 +1,4 @@
-"""Leightweight wrapper around docker functionality."""
+"""Module providing an interface to interact with the teams' programs."""
 from abc import ABC, abstractmethod
 from pathlib import Path
 from timeit import default_timer
@@ -39,7 +39,7 @@ _client_var: DockerClient | None = None
 
 
 class RunParameters(BaseModel):
-    """The parameters determining how a container is run."""
+    """The parameters determining how a program is run."""
 
     timeout: float | None = 30
     space: int | None = None
@@ -47,7 +47,7 @@ class RunParameters(BaseModel):
 
 
 class DockerConfig(BaseModel):
-    """Grouped config options that are relevant to the interaction with docker."""
+    """Config options relevant to the way programs are run and built."""
 
     build_timeout: float | None = None
     safe_build: bool = False
@@ -89,7 +89,6 @@ class ArchivedImage:
     path: Path
     name: str
     id: str
-    description: str
 
     def restore(self) -> "Image":
         """Restores a docker image from an archive."""
@@ -102,7 +101,7 @@ class ArchivedImage:
             self.path.unlink()
         except APIError as e:
             raise DockerError(f"Docker APIError thrown while restoring '{self.name}'") from e
-        return Image(self.name, self.id, self.description, path=self.path)
+        return Image(self.name, self.id, self.path)
 
 
 @dataclass
@@ -115,7 +114,6 @@ class Image:
 
     name: str
     id: str
-    description: str
     path: Path
 
     run_kwargs: ClassVar[dict[str, Any]] = {
@@ -133,7 +131,6 @@ class Image:
         cls,
         path: Path,
         image_name: str,
-        description: str | None = None,
         timeout: float | None = None,
         *,
         dockerfile: str | None = None,
@@ -191,7 +188,7 @@ class Image:
         except APIError as e:
             raise BuildError(f"Docker APIError thrown while building '{image_name}'.", detail=str(e)) from e
 
-        return cls(image_name, cast(str, image.id), description if description is not None else image_name, path=path)
+        return cls(image_name, cast(str, image.id), path=path)
 
     def __enter__(self):
         return self
@@ -312,7 +309,7 @@ class Image:
             image.remove(force=True)
         except APIError as e:
             raise DockerError(f"Docker APIError thrown while archiving '{self.name}'", detail=str(e)) from e
-        return ArchivedImage(path, self.name, self.id, self.description)
+        return ArchivedImage(path, self.name, self.id)
 
     def _run_container(self, container: DockerContainer, timeout: float | None = None) -> float:
         container.start()
@@ -399,7 +396,6 @@ class Program(ABC):
             image = Image.build(
                 path=image,
                 image_name=f"{cls.role}-{team_name}",
-                description=f"{cls.role} for team {team_name}",
                 timeout=timeout,
             )
         elif isinstance(image, ArchivedImage):
