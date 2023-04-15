@@ -119,7 +119,7 @@ class ProgramTests(IsolatedAsyncioTestCase):
         with Generator.build(*self.dockerfile("generator_semantics_error"), TestProblem, self.params) as gen:
             res = await gen.run(5)
             assert res.info.error is not None
-            self.assertEqual(res.info.error.type, "EncodingError")
+            self.assertEqual(res.info.error.type, "ValidationError")
 
     async def test_gen_succ(self):
         """The generator returns the fixed instance."""
@@ -154,7 +154,7 @@ class ProgramTests(IsolatedAsyncioTestCase):
         with Solver.build(*self.dockerfile("solver_semantics_error"), TestProblem, self.params) as sol:
             res = await sol.run(self.instance, 5)
             assert res.info.error is not None
-            self.assertEqual(res.info.error.type, "EncodingError")
+            self.assertEqual(res.info.error.type, "ValidationError")
 
     async def test_sol_succ(self):
         """The solver outputs a solution with a low quality."""

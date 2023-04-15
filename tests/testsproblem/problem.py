@@ -2,6 +2,7 @@
 from typing import ClassVar, SupportsFloat
 
 from algobattle.problem import ProblemModel, SolutionModel
+from algobattle.util import ValidationError
 
 
 class TestProblem(ProblemModel):
@@ -16,13 +17,15 @@ class TestProblem(ProblemModel):
         semantics: bool
         quality: bool
 
-        def is_valid(self, instance: "TestProblem", size: int) -> bool:
-            return self.semantics
+        def validate_solution(self, instance: "TestProblem", size: int):
+            if not self.semantics:
+                raise ValidationError("")
 
     semantics: bool
 
-    def is_valid(self, size: int) -> bool:
-        return self.semantics
+    def validate_instance(self, size: int):
+        if not self.semantics:
+            raise ValidationError("")
 
     def calculate_score(self, solution: Solution, generator_solution: Solution | None, size: int) -> SupportsFloat:
         return solution.quality
