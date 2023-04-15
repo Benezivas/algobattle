@@ -7,7 +7,7 @@ from tempfile import TemporaryDirectory
 from traceback import format_exception
 from typing import Any, ClassVar, Iterable, Literal, TypeVar, Self
 
-from pydantic import BaseConfig, BaseModel, Extra
+from pydantic import BaseConfig, BaseModel, Extra, ValidationError as PydanticValidationError
 
 
 Role = Literal["generator", "solver"]
@@ -91,12 +91,20 @@ class EncodableModel(BaseModel, Encodable, ABC):
     @inherit_docs
     @classmethod
     def decode(cls: type[Self], source_dir: Path, size: int, team: Role) -> Self:
-        return cls.parse_file(source_dir / cls.filename)
+        try:
+            return cls.parse_file(source_dir / cls.filename)
+        except PydanticValidationError as e:
+            raise EncodingError("Json data does not fit the schema.", detail=str(e))
+        except Exception as e:
+            raise EncodingError("Unknown error while decoding the data.", detail=str(e))
 
     @inherit_docs
     def encode(self, target_dir: Path, size: int, team: Role) -> None:
-        with open(target_dir / self.filename, "w") as f:
-            f.write(self.json(exclude=self._excludes(team)))
+        try:
+            with open(target_dir / self.filename, "w") as f:
+                f.write(self.json(exclude=self._excludes(team)))
+        except Exception as e:
+            raise EncodingError("Unkown error while encoding the data.", detail=str(e))
 
     def _excludes(self, team: Role) -> dict[str | int, Any]:
         excludes = {}
