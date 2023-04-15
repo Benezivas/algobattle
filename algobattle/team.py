@@ -20,7 +20,7 @@ class TeamInfo:
     generator: Path
     solver: Path
 
-    def build(self, problem: type[Problem], config: DockerConfig, *, auto_cleanup=True) -> "Team":
+    def build(self, problem: type[Problem], config: DockerConfig) -> "Team":
         """Builds the specified docker files into images and return the corresponding team.
 
         Raises
@@ -36,10 +36,10 @@ class TeamInfo:
         generator = Generator.build(self.generator, self.name, problem, config.generator, config.build_timeout)
         try:
             solver = Solver.build(self.solver, self.name, problem, config.solver, config.build_timeout)
-        except DockerError:
+        except:
             generator.remove()
             raise
-        return Team(name, generator, solver, _cleanup_generator=auto_cleanup, _cleanup_solver=auto_cleanup)
+        return Team(name, generator, solver)
 
 
 @dataclass
@@ -49,8 +49,6 @@ class Team:
     name: str
     generator: Generator
     solver: Solver
-    _cleanup_generator: bool = False
-    _cleanup_solver: bool = False
 
     def __post_init__(self) -> None:
         """Creates a team object.
@@ -86,10 +84,8 @@ class Team:
 
     def cleanup(self) -> None:
         """Removes the built docker images."""
-        if self._cleanup_generator:
-            self.generator.remove()
-        if self._cleanup_solver:
-            self.solver.remove()
+        self.generator.remove()
+        self.solver.remove()
         _team_names.remove(self.name)
 
     def archive(self, dir: Path) -> "_ArchivedTeam":
@@ -154,7 +150,7 @@ class TeamHandler:
                 archives: list[_ArchivedTeam] = []
                 for info in infos:
                     try:
-                        team = info.build(problem, config, auto_cleanup=True)
+                        team = info.build(problem, config)
                         team = team.archive(folder)
                         archives.append(team)
                     except Exception:
@@ -165,7 +161,7 @@ class TeamHandler:
             teams: list[Team] = []
             for info in infos:
                 try:
-                    team = info.build(problem, config, auto_cleanup=safe_build)
+                    team = info.build(problem, config)
                     teams.append(team)
                 except (ValueError, DockerError):
                     excluded.append(info)
