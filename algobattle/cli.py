@@ -14,7 +14,7 @@ from prettytable import DOUBLE_BORDER, PrettyTable
 from anyio import create_task_group, run, sleep
 
 from algobattle.battle import Battle, Fight, FightUiData
-from algobattle.docker_util import GeneratorResult, Image, ProgramRunInfo, SolverResult
+from algobattle.docker_util import GeneratorResult, ProgramRunInfo, SolverResult
 from algobattle.match import MatchConfig, Match, Ui
 from algobattle.problem import Problem
 from algobattle.team import Matchup, TeamInfo
@@ -59,10 +59,6 @@ def parse_cli_args(args: list[str]) -> tuple[CliOptions, MatchConfig]:
             raise ValueError(f"Invalid config file, terminating execution.\n{e}")
     else:
         config = MatchConfig()
-    if config.docker.advanced_run_params is not None:
-        Image.run_kwargs = config.docker.advanced_run_params.to_docker_args()
-    if config.docker.advanced_build_params is not None:
-        Image.run_kwargs = config.docker.advanced_build_params.to_docker_args()
 
     if not config.teams:
         config.teams.append(

@@ -13,7 +13,7 @@ from anyio.to_thread import current_default_thread_limiter
 from anyio.abc import TaskStatus
 
 from algobattle.battle import Battle, FightHandler, FightUiProxy, BattleUiProxy
-from algobattle.docker_util import DockerConfig, ProgramRunInfo, ProgramUiProxy
+from algobattle.docker_util import DockerConfig, Image, ProgramRunInfo, ProgramUiProxy
 from algobattle.team import Matchup, Team, TeamHandler, TeamInfo
 from algobattle.problem import Problem
 from algobattle.util import Role, TimerInfo, inherit_docs, BaseModel, str_with_traceback
@@ -107,6 +107,10 @@ class Match(BaseModel):
         """Executes a match with the specified parameters."""
         if ui is None:
             ui = Ui()
+        if config.docker.advanced_run_params is not None:
+            Image.run_kwargs = config.docker.advanced_run_params.to_docker_args()
+        if config.docker.advanced_build_params is not None:
+            Image.run_kwargs = config.docker.advanced_build_params.to_docker_args()
         with TeamHandler.build(config.teams, problem, config.docker) as teams:
             result = cls(
                 active_teams=[t.name for t in teams.active],
