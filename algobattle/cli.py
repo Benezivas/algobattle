@@ -58,39 +58,6 @@ class BattleConfig(BaseModel):
             out[name] = battle_cls.BattleConfig.parse_obj(data)
         return out
 
-    _cli_mapping: ClassVar[dict[str, Any]] = {
-        "teams": None,
-        "battle": None,
-        "docker": {
-            "generator": {"timeout": "generator_timeout", "space": "generator_space", "cpus": "generator_cpus"},
-            "solver": {"timeout": "solver_timeout", "space": "solver_space", "cpus": "solver_cpus"},
-            "advanced_run_params": None,
-            "advanced_build_params": None,
-        },
-    }
-
-    def include_cli(self, cli: Namespace) -> None:
-        """Updates itself using the data in the passed argparse namespace."""
-        BattleConfig._include_cli(self, cli, self._cli_mapping)
-        for battle_name, config in self.battle.items():
-            for name in config.__fields__:
-                cli_name = f"{battle_name}_{name}"
-                if getattr(cli, cli_name) is not None:
-                    setattr(config, name, getattr(cli, cli_name))
-
-    @staticmethod
-    def _include_cli(model: BaseModel, cli: Namespace, mapping: dict[str, Any]) -> None:
-        for name in model.__fields__:
-            if name in mapping and mapping[name] is None:
-                continue
-            value = getattr(model, name)
-            if isinstance(value, BaseModel):
-                BattleConfig._include_cli(value, cli, mapping.get(name, {}))
-            else:
-                cli_val = getattr(cli, mapping.get(name, name))
-                if cli_val is not None:
-                    setattr(model, name, cli_val)
-
     @classmethod
     def from_file(cls, file: Path) -> Self:
         """Parses a config object from a toml file."""
@@ -117,7 +84,6 @@ def parse_cli_args(args: list[str]) -> tuple[ExecutionConfig, BattleConfig]:
     parser.add_argument(
         "--result_output", type=check_path, help="If set, the match result object will be saved to the specified file."
     )
-
     parser.add_argument(
         "--safe_build",
         action="store_const",
@@ -125,22 +91,6 @@ def parse_cli_args(args: list[str]) -> tuple[ExecutionConfig, BattleConfig]:
         help="Isolate docker image builds from each other. Significantly slows down battle setup"
         " but prevents images from interfering with each other.",
     )
-
-    parser.add_argument("--battle_type", choices=[name.lower() for name in Battle.all()], help="Type of battle to be used.")
-    parser.add_argument(
-        "--parallel_battles",
-        type=int,
-        help="Number of battles that are executed in parallel.",
-    )
-    parser.add_argument("--points", type=int, help="number of points distributed between teams.")
-
-    parser.add_argument("--build_timeout", type=float, help="Timeout for the build step of each docker image.")
-    parser.add_argument("--generator_timeout", type=float, help="Time limit for the generator execution.")
-    parser.add_argument("--solver_timeout", type=float, help="Time limit for the solver execution.")
-    parser.add_argument("--generator_space", type=int, help="Memory limit for the generator execution, in MB.")
-    parser.add_argument("--solver_space", type=int, help="Memory limit the solver execution, in MB.")
-    parser.add_argument("--generator_cpus", type=int, help="Number of cpu cores used for generator container execution.")
-    parser.add_argument("--solver_cpus", type=int, help="Number of cpu cores used for solver container execution.")
 
     parsed = parser.parse_args(args)
     exec_config = ExecutionConfig(
@@ -161,7 +111,6 @@ def parse_cli_args(args: list[str]) -> tuple[ExecutionConfig, BattleConfig]:
             raise ValueError(f"Invalid config file, terminating execution.\n{e}")
     else:
         config = BattleConfig()
-    config.include_cli(parsed)
     if config.docker.advanced_run_params is not None:
         Image.run_kwargs = config.docker.advanced_run_params.to_docker_args()
     if config.docker.advanced_build_params is not None:
