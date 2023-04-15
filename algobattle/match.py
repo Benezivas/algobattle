@@ -84,7 +84,7 @@ class Match(BaseModel):
             ui.start_battle(matchup)
             task_status.started()
             battle_ui = ui.get_battle_observer(matchup)
-            handler = FightHandler(matchup.generator.generator, matchup.solver.solver, battle, battle_ui)
+            handler = FightHandler(matchup.generator.generator, matchup.solver.solver, battle, battle_ui.fight_ui)
             try:
                 await battle.run_battle(
                     handler,
@@ -272,16 +272,8 @@ class Ui:
             self.fight_ui = Ui.FightObserver(self)
 
         @inherit_docs
-        def update_fights(self) -> None:
-            self.ui.update_fights(self.matchup)
-
-        @inherit_docs
         def update_data(self, data: Battle.UiData) -> None:
             self.ui.update_battle_data(self.matchup, data)
-
-        def start_fight(self, size: int) -> None:
-            """Informs the Ui of a newly started fight."""
-            self.ui.start_fight(self.matchup, size)
 
     @dataclass
     class FightObserver(FightUiProxy):
@@ -306,6 +298,10 @@ class Ui:
             data: TimerInfo | float | ProgramRunInfo | None = None,
         ) -> None:
             self.battle_ui.ui.update_curr_fight(self.battle_ui.matchup, role, data)
+        
+        @inherit_docs
+        def end(self) -> None:
+            self.battle_ui.ui.update_fights(self.battle_ui.matchup)
 
     @dataclass
     class ProgramObserver(ProgramUiProxy):
