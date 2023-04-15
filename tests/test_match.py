@@ -161,9 +161,9 @@ class Execution(IsolatedAsyncioTestCase):
         cls.config = MatchConfig(
             docker=DockerConfig(generator=run_params, solver=run_params),
             battle={
-            "Iterated": Iterated.BattleConfig(iteration_cap=10, rounds=2),
-            "Averaged": Averaged.BattleConfig(instance_size=5, iterations=3),
-            }
+                "Iterated": Iterated.BattleConfig(iteration_cap=10, rounds=2),
+                "Averaged": Averaged.BattleConfig(instance_size=5, iterations=3),
+            },
         )
         cls.generator = problem_path / "generator"
         cls.solver = problem_path / "solver"

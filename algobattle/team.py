@@ -36,7 +36,7 @@ class TeamInfo:
         generator = Generator.build(self.generator, self.name, problem, config.generator, config.build_timeout)
         try:
             solver = Solver.build(self.solver, self.name, problem, config.solver, config.build_timeout)
-        except:
+        except Exception:
             generator.remove()
             raise
         return Team(name, generator, solver)
