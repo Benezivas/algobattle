@@ -232,10 +232,6 @@ class Battle(BaseModel):
         """Calculates the next instance size that should be fought over."""
         raise NotImplementedError
 
-    def archive(self) -> dict[str, Any]:
-        """Encodes the battle data into a jsonable dict."""
-        return {"run_exception": self.run_exception}
-
 
 class Iterated(Battle):
     """Class that executes an iterated battle."""
