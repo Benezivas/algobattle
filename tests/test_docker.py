@@ -52,7 +52,7 @@ class ImageTests(IsolatedAsyncioTestCase):
         with self.assertRaises(RuntimeError):
             nonexistent_file = None
             while nonexistent_file is None or nonexistent_file.exists():
-                nonexistent_file = Path(str(random.randint(0, 2 ** 80)))
+                nonexistent_file = Path(str(random.randint(0, 2**80)))
             with Image.build(nonexistent_file, "foo_bar"):
                 pass
 

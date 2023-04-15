@@ -144,7 +144,9 @@ class TeamHandler:
         super().__init__()
 
     @classmethod
-    def build(cls, infos: list[TeamInfo], problem: type[Problem], config: DockerConfig, safe_build: bool = False) -> Self:
+    def build(
+        cls, infos: list[TeamInfo], problem: type[Problem], config: DockerConfig, safe_build: bool = False
+    ) -> Self:
         """Builds the specified team objects."""
         excluded: list[TeamInfo] = []
         if safe_build:

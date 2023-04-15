@@ -128,6 +128,7 @@ def flat_intersperse(iterable: Iterable[Iterable[T]], element: T) -> Iterable[T]
 
 class AlgobattleBaseException(Exception):
     """Base exception class for errors used by the algobattle package."""
+
     def __init__(self, message: str, *args: object, detail: str | None = None) -> None:
         self.message = message
         self.detail = detail

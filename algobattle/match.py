@@ -137,7 +137,12 @@ class Match(BaseModel):
         ...
 
     def insert_battle(
-        self, battle: Battle, matchup: Matchup | None = None, *, generating: Team | None = None, solving: Team | None = None
+        self,
+        battle: Battle,
+        matchup: Matchup | None = None,
+        *,
+        generating: Team | None = None,
+        solving: Team | None = None,
     ) -> Battle | None:
         """Returns the battle for the given matchup."""
         if matchup is not None:

@@ -247,7 +247,9 @@ class Iterated(Battle):
         rounds: int = Field(default=5, help="Repeats the battle and averages the results.")
         iteration_cap: int = Field(default=50_000, help="Maximum instance size that will be tried.")
         exponent: int = Field(default=2, help="Determines how quickly the instance size grows.")
-        approximation_ratio: float = Field(default=1, help="Approximation ratio that a solver needs to achieve to pass.")
+        approximation_ratio: float = Field(
+            default=1, help="Approximation ratio that a solver needs to achieve to pass."
+        )
 
     @inherit_docs
     class UiData(Battle.UiData):

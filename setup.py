@@ -2,4 +2,5 @@
 # with future pip releases this file might be obsolete
 
 import setuptools
+
 setuptools.setup()

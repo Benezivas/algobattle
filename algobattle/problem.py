@@ -53,7 +53,7 @@ class Problem(Encodable, ABC):
 
     def validate_instance(self, size: int):
         """Validates that the parsed instance is semantically correct.
-        
+
         Should raise a :cls:`ValidationError` if the created instance is invalid."""
         return
 
@@ -159,9 +159,9 @@ class Problem(Encodable, ABC):
 
         def validate_solution(self, instance: _Problem, size: int):
             """Validates that the parsed instance is semantically correct.
-            
+
             Should raise a :cls:`ValidationError` if the created instance is invalid."""
-            return    
+            return
 
         @classmethod
         def io_schema(cls) -> str | None:
@@ -214,8 +214,8 @@ class DirectedGraph(ProblemModel):
 
     export: ClassVar[bool] = False
 
-    num_vertices: int = Field(ge=0, le=2 ** 63 - 1)
-    edges: list[tuple[int, int]] = Field(ge=0, le=2 ** 63 - 1, unique_items=True)
+    num_vertices: int = Field(ge=0, le=2**63 - 1)
+    edges: list[tuple[int, int]] = Field(ge=0, le=2**63 - 1, unique_items=True)
 
     @inherit_docs
     def validate_instance(self, size: int):

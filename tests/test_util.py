@@ -8,6 +8,7 @@ from algobattle.problem import Problem
 from algobattle.battle import Battle, Iterated, Averaged
 from . import testsproblem
 
+
 class Utiltests(unittest.TestCase):
     """Tests for the util functions."""
 
@@ -16,9 +17,9 @@ class Utiltests(unittest.TestCase):
         """Set up a problem, default config, fight handler and get a file name not existing on the file system."""
         cls.config = MatchConfig()
         cls.problem_path = Path(testsproblem.__file__).parent / "problem.py"
-        cls.rand_file_name = str(random.randint(0, 2 ** 80))
+        cls.rand_file_name = str(random.randint(0, 2**80))
         while Path(cls.rand_file_name).exists():
-            cls.rand_file_name = str(random.randint(0, 2 ** 80))
+            cls.rand_file_name = str(random.randint(0, 2**80))
 
     def test_import_problem_from_path_existing_path(self):
         """Importing works when importing a Problem from an existing path."""
@@ -35,5 +36,5 @@ class Utiltests(unittest.TestCase):
         self.assertEqual(Battle.all()["averaged"], Averaged)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
