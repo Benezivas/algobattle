@@ -9,7 +9,6 @@ from typing import (
     Any,
     ClassVar,
     Literal,
-    Mapping,
     Protocol,
     TypeAlias,
     TypeVar,

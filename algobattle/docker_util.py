@@ -17,7 +17,21 @@ from pydantic import Field
 from anyio.to_thread import run_sync
 from urllib3.exceptions import ReadTimeoutError
 
-from algobattle.util import AlgobattleBaseException, BuildError, DockerError, Encodable, EncodingError, ExceptionInfo, ExecutionError, ExecutionTimeout, ValidationError, Role, TempDir, inherit_docs, BaseModel
+from algobattle.util import (
+    AlgobattleBaseException,
+    BuildError,
+    DockerError,
+    Encodable,
+    EncodingError,
+    ExceptionInfo,
+    ExecutionError,
+    ExecutionTimeout,
+    ValidationError,
+    Role,
+    TempDir,
+    inherit_docs,
+    BaseModel,
+)
 from algobattle.problem import Problem
 
 
