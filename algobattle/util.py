@@ -137,10 +137,10 @@ def flat_intersperse(iterable: Iterable[Iterable[T]], element: T) -> Iterable[T]
 class AlgobattleBaseException(Exception):
     """Base exception class for errors used by the algobattle package."""
 
-    def __init__(self, message: str, *args: object, detail: str | None = None) -> None:
+    def __init__(self, message: str, *, detail: str | None = None) -> None:
         self.message = message
         self.detail = detail
-        super().__init__(*args)
+        super().__init__()
 
 
 class EncodingError(AlgobattleBaseException):
@@ -158,9 +158,9 @@ class BuildError(AlgobattleBaseException):
 class ExecutionError(AlgobattleBaseException):
     """Indicates that the program could not be executed successfully."""
 
-    def __init__(self, message: str, *args: object, detail: str | None = None, runtime: float) -> None:
+    def __init__(self, message: str, *, detail: str | None = None, runtime: float) -> None:
         self.runtime = runtime
-        super().__init__(message, detail, *args)
+        super().__init__(message, detail=detail)
 
 
 class ExecutionTimeout(ExecutionError):
