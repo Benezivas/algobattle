@@ -14,7 +14,6 @@ from algobattle.docker_util import (
     Solver,
     client,
     DockerImage,
-    get_os_type,
 )
 from algobattle.util import TempDir
 from . import testsproblem
@@ -92,10 +91,7 @@ class ProgramTests(IsolatedAsyncioTestCase):
 
     @classmethod
     def dockerfile(cls, name: str) -> tuple[Path, str]:
-        if get_os_type() == "windows":
-            return cls.problem_path / name / "Dockerfile_windows", name
-        else:
-            return cls.problem_path / name, name
+        return cls.problem_path / name, name
 
     async def test_gen_timeout(self):
         """The generator times out."""

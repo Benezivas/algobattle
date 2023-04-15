@@ -2,7 +2,7 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
 from timeit import default_timer
-from typing import Any, ClassVar, Iterator, Literal, Protocol, Self, TypedDict, cast
+from typing import Any, ClassVar, Iterator, Protocol, Self, TypedDict, cast
 from uuid import uuid1
 import json
 from dataclasses import dataclass
@@ -67,11 +67,6 @@ def client() -> DockerClient:
     except (DockerException, APIError):
         raise SystemExit("Could not connect to the docker daemon. Is docker running?")
     return _client_var
-
-
-def get_os_type() -> Literal["linux", "windows"]:
-    """OS running inside docker containers."""
-    return client().info()["OSType"]
 
 
 class ProgramUiProxy(Protocol):

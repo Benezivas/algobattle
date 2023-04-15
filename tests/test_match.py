@@ -7,7 +7,7 @@ from algobattle.cli import BattleConfig, ExecutionConfig, parse_cli_args
 from algobattle.battle import Fight, Iterated, Averaged
 from algobattle.match import MatchConfig, Match, Ui
 from algobattle.team import Team, Matchup, TeamHandler, TeamInfo
-from algobattle.docker_util import DockerConfig, ProgramRunInfo, RunParameters, get_os_type
+from algobattle.docker_util import DockerConfig, ProgramRunInfo, RunParameters
 from .testsproblem import Problem as TestProblem
 
 
@@ -164,9 +164,6 @@ class Execution(IsolatedAsyncioTestCase):
         cls.avg_config = Averaged.BattleConfig(instance_size=5, iterations=3)
         cls.generator = problem_path / "generator"
         cls.solver = problem_path / "solver"
-        if get_os_type() == "windows":
-            cls.generator /= "Dockerfile_windows"
-            cls.solver /= "Dockerfile_windows"
 
     async def test_basic(self):
         team = TeamInfo("team0", self.generator, self.solver)
