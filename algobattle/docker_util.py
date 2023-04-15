@@ -558,8 +558,12 @@ class Generator(Program):
             raise
         except Exception as e:
             raise EncodingError("Error thrown while decoding the problem instance.", detail=str(e)) from e
-        if not problem.is_valid(size):
-            raise ValidationError("Instance is not valid.")
+        try:
+            problem.validate_instance(size)
+        except ValidationError:
+            raise
+        except Exception as e:
+            raise ValidationError("Unknown error during instance validation.", detail=str(e)) from e
 
         if problem.with_solution:
             try:
@@ -568,8 +572,12 @@ class Generator(Program):
                 raise
             except Exception as e:
                 raise EncodingError("Error thrown while decoding the solution.", detail=str(e)) from e
-            if not solution.is_valid(problem, size):
-                raise ValidationError("Solution is not valid.")
+            try:
+                solution.validate_solution(problem, size)
+            except ValidationError:
+                raise
+            except Exception as e:
+                raise ValidationError("Unknown error during solution validation.", detail=str(e)) from e
         else:
             solution = None
         return _GenResData(problem, solution)
@@ -620,8 +628,12 @@ class Solver(Program):
             raise
         except Exception as e:
             raise EncodingError("Error thrown while decoding the solution.", detail=str(e)) from e
-        if not solution.is_valid(instance, size):
-            raise ValidationError("Solution is not valid.")
+        try:
+            solution.validate_solution(instance, size)
+        except ValidationError:
+            raise
+        except Exception as e:
+            raise ValidationError("Unknown error during solution validation.", detail=str(e)) from e
         return solution
 
     async def run(

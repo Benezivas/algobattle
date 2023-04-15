@@ -9,7 +9,7 @@ from typing import Any, ClassVar, Literal, Protocol, SupportsFloat, Self, Generi
 from pydantic import Field
 from pydantic.generics import GenericModel
 
-from algobattle.util import Encodable, EncodableModel, Role, inherit_docs
+from algobattle.util import Encodable, EncodableModel, Role, inherit_docs, ValidationError
 
 
 _Problem: TypeAlias = Any
@@ -51,9 +51,11 @@ class Problem(Encodable, ABC):
             cls.export = export
         return super().__init_subclass__()
 
-    def is_valid(self, size: int) -> bool:
-        """Validates that the parsed instance is semantically correct."""
-        return True
+    def validate_instance(self, size: int):
+        """Validates that the parsed instance is semantically correct.
+        
+        Should raise a :cls:`ValidationError` if the created instance is invalid."""
+        return
 
     def calculate_score(self, solution: _Solution, generator_solution: _Solution | None, size: int) -> SupportsFloat:
         """Calculates how well a solution solves this problem instance.
@@ -155,9 +157,11 @@ class Problem(Encodable, ABC):
             """Encodes the solution into files that can be passed to docker containers."""
             raise NotImplementedError
 
-        def is_valid(self, instance: _Problem, size: int) -> bool:
-            """Validates that the parsed solution is semantically correct."""
-            return True
+        def validate_solution(self, instance: _Problem, size: int):
+            """Validates that the parsed instance is semantically correct.
+            
+            Should raise a :cls:`ValidationError` if the created instance is invalid."""
+            return    
 
         @classmethod
         def io_schema(cls) -> str | None:
@@ -214,11 +218,11 @@ class DirectedGraph(ProblemModel):
     edges: list[tuple[int, int]] = Field(ge=0, le=2 ** 63 - 1, unique_items=True)
 
     @inherit_docs
-    def is_valid(self, size: int) -> bool:
-        return (
-            self.num_vertices <= size
-            and all(u < self.num_vertices and v < self.num_vertices for u, v in self.edges)
-        )
+    def validate_instance(self, size: int):
+        if self.num_vertices > size:
+            raise ValidationError("Graph contains too many vertices.")
+        if any(u >= self.num_vertices or v >= self.num_vertices for u, v in self.edges):
+            raise ValidationError("Graph contains edges whose endpoints aren't valid vertices")
 
 
 class UndirectedGraph(DirectedGraph):
@@ -227,43 +231,41 @@ class UndirectedGraph(DirectedGraph):
     export: ClassVar[bool] = False
 
     @inherit_docs
-    def is_valid(self, size: int) -> bool:
-        if not super().is_valid(size):
-            return False
-        edges = set(self.edges)
-        return all(u != v for u, v in edges) and all((v, u) not in edges for u, v in edges)
+    def validate_instance(self, size: int):
+        super().validate_instance(size)
+        if any(u == v for u, v in self.edges):
+            raise ValidationError("Undirected graph contains self loops.")
+
+        # we remove the redundant edge definitions to create an easy to use normal form
+        normalized_edges: set[tuple[int, int]] = set()
+        for u, v in self.edges:
+            if (v, u) not in normalized_edges:
+                normalized_edges.add((u, v))
+        self.edges = list(normalized_edges)
 
 
 Weight = TypeVar("Weight")
 
 
-class EdgeWeights(GenericModel, Generic[Weight]):
+class EdgeWeights(DirectedGraph, GenericModel, Generic[Weight]):
     """Mixin for graphs with weighted edges."""
 
     edge_weights: list[Weight]
 
     @inherit_docs
-    def check_semantics(self, size: int) -> bool:
-        assert isinstance(self, DirectedGraph)
-        as_parent = super()
-        if isinstance(as_parent, Problem):
-            if not as_parent.is_valid(size):
-                return False
-
-        return len(self.edge_weights) == len(self.edges)
+    def validate_instance(self, size: int):
+        super().validate_instance(size)
+        if len(self.edge_weights) == len(self.edges):
+            raise ValidationError("Number of edge weights doesn't match the number of edges.")
 
 
-class VertexWeights(GenericModel, Generic[Weight]):
+class VertexWeights(DirectedGraph, GenericModel, Generic[Weight]):
     """Mixin for graphs with weighted vertices."""
 
     vertex_weights: list[Weight]
 
     @inherit_docs
-    def check_semantics(self, size: int) -> bool:
-        assert isinstance(self, DirectedGraph)
-        as_parent = super()
-        if isinstance(as_parent, Problem):
-            if not as_parent.is_valid(size):
-                return False
-
-        return len(self.vertex_weights) == self.num_vertices
+    def validate_instance(self, size: int):
+        super().validate_instance(size)
+        if len(self.vertex_weights) == self.num_vertices:
+            raise ValidationError("Number of vertex weights doesn't match the number of vertices.")
