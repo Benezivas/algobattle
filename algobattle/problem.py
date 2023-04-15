@@ -16,18 +16,6 @@ _Problem: TypeAlias = Any
 _Solution: TypeAlias = Any
 
 
-class ProblemError(Exception):
-    """Parent class of all exceptions related to the problem module."""
-
-    pass
-
-
-class ContainerError(ProblemError):
-    """Raised when the container returned malformed data."""
-
-    pass
-
-
 @runtime_checkable
 class Scored(Protocol):
     """A solution with an associated score."""

@@ -125,3 +125,56 @@ def flat_intersperse(iterable: Iterable[Iterable[T]], element: T) -> Iterable[T]
     for item in iterator:
         yield element
         yield from item
+
+
+class AlgobattleBaseException(Exception):
+    """Base exception class for errors used by the algobattle package."""
+    def __init__(self, message: str, *args: object, detail: str | None = None) -> None:
+        self.message = message
+        self.detail = detail
+        super().__init__(*args)
+
+
+class EncodingError(AlgobattleBaseException):
+    """Indicates that the given data could not be encoded or decoded properly."""
+
+
+class ValidationError(AlgobattleBaseException):
+    """Indicates that the decoded problem instance or solution is invalid."""
+
+
+class BuildError(AlgobattleBaseException):
+    """Indicates that the build process could not be completed successfully."""
+
+
+class ExecutionError(AlgobattleBaseException):
+    """Indicates that the program could not be executed successfully."""
+
+    def __init__(self, message: str, *args: object, detail: str | None = None, runtime: float) -> None:
+        self.runtime = runtime
+        super().__init__(message, detail, *args)
+
+
+class ExecutionTimeout(ExecutionError):
+    """Indicates that the program ran into the timeout."""
+
+
+class DockerError(AlgobattleBaseException):
+    """Indicates that an issue with the docker daemon occured."""
+
+
+class ExceptionInfo(BaseModel):
+    """An exception that can be encoded into a json file."""
+
+    type: str
+    message: str
+    detail: str | None = None
+
+    @classmethod
+    def from_exception(cls, error: AlgobattleBaseException) -> Self:
+        """Constructs an instance from a raised exception."""
+        return cls(
+            type=error.__class__.__name__,
+            message=error.message,
+            detail=error.detail,
+        )
