@@ -1,5 +1,5 @@
 """Main battle script. Executes all possible types of battles, see battle --help for all options."""
-from argparse import ArgumentParser, Namespace
+from argparse import ArgumentParser
 from contextlib import ExitStack
 import curses
 from dataclasses import dataclass, field
@@ -7,7 +7,7 @@ from functools import partial
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, ClassVar, Mapping, ParamSpec, Self, TypeVar
+from typing import Any, Callable, Mapping, ParamSpec, Self, TypeVar
 import tomllib
 from importlib.metadata import version as pkg_version
 
