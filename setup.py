@@ -1,5 +1,8 @@
-# Python is a bad language actually and needs this so we can install it in editable mode
-# with future pip releases this file might be obsolete
+"""Mandatory `setup.py` file needed for pip installs.
+
+Legacy install options still need a setup.py file in addition to the pyproject.toml specification.
+With future updates this file hopefully will become completely obsolete.
+"""
 
 import setuptools
 

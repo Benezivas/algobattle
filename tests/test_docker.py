@@ -17,7 +17,7 @@ from algobattle.docker_util import (
 )
 from algobattle.util import TempDir
 from . import testsproblem
-from .testsproblem.problem import Tests as TestProblem
+from .testsproblem.problem import TestProblem as TestProblem
 
 
 class ImageTests(IsolatedAsyncioTestCase):

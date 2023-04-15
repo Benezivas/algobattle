@@ -54,7 +54,8 @@ class Problem(Encodable, ABC):
     def validate_instance(self, size: int):
         """Validates that the parsed instance is semantically correct.
 
-        Should raise a :cls:`ValidationError` if the created instance is invalid."""
+        Should raise a :cls:`ValidationError` if the created instance is invalid.
+        """
         return
 
     def calculate_score(self, solution: _Solution, generator_solution: _Solution | None, size: int) -> SupportsFloat:
@@ -160,7 +161,8 @@ class Problem(Encodable, ABC):
         def validate_solution(self, instance: _Problem, size: int):
             """Validates that the parsed instance is semantically correct.
 
-            Should raise a :cls:`ValidationError` if the created instance is invalid."""
+            Should raise a :cls:`ValidationError` if the created instance is invalid.
+            """
             return
 
         @classmethod

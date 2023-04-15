@@ -1,2 +1,1 @@
-# pyright: reportUnusedImport=false
-from .problem import Tests as Problem
+"""Module containing the test problem and programs."""

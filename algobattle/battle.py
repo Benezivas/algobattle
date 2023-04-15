@@ -175,7 +175,11 @@ class Battle(BaseModel):
 
         @classmethod
         def as_argparse_args(cls) -> list[tuple[str, dict[str, Any]]]:
-            """Constructs a list of argument names and `**kwargs` that can be passed to `ArgumentParser.add_argument()`."""
+            """Transforms the config specification into argparse arguments.
+
+            Constructs a list of argument names and `**kwargs` that can be passed
+            to `ArgumentParser.add_argument()`.
+            """
             arguments: list[tuple[str, dict[str, Any]]] = []
             resolved_annotations = get_type_hints(cls)
             for name, model_field in cls.__fields__.items():
@@ -336,7 +340,8 @@ class Averaged(Battle):
         """
         if config.instance_size < min_size:
             raise ValueError(
-                f"The problem specifies a minimum size of {min_size} but the chosen size is only {config.instance_size}!"
+                f"The problem specifies a minimum size of {min_size} "
+                "but the chosen size is only {config.instance_size}!"
             )
         for i in range(config.iterations):
             ui.update_data(self.UiData(round=i + 1))

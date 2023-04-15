@@ -284,8 +284,8 @@ class Image:
     def remove(self) -> None:
         """Removes the image from the docker daemon.
 
-        **This will not cause the python object to be deleted.** Attempting to run the image after it has been removed will
-        cause runtime errors.
+        **This will not cause the python object to be deleted.**
+        Attempting to run the image after it has been removed will cause runtime errors.
         Will not throw an error if the image has been removed already.
 
         Raises

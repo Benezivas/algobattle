@@ -8,7 +8,7 @@ from algobattle.battle import Fight, Iterated, Averaged
 from algobattle.match import MatchConfig, Match, Ui
 from algobattle.team import Team, Matchup, TeamHandler, TeamInfo
 from algobattle.docker_util import DockerConfig, ProgramRunInfo, RunParameters
-from .testsproblem import Problem as TestProblem
+from .testsproblem.problem import TestProblem
 
 
 class TestTeam(Team):
