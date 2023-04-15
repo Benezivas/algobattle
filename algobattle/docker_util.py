@@ -188,7 +188,7 @@ class Image:
         except DockerBuildError as e:
             raise BuildError(f"Building '{image_name}' did not complete successfully.", detail=e.msg) from e
         except APIError as e:
-            raise DockerError(f"Docker APIError thrown while building '{image_name}'.", detail=str(e)) from e
+            raise BuildError(f"Docker APIError thrown while building '{image_name}'.", detail=str(e)) from e
 
         return cls(image_name, cast(str, image.id), description if description is not None else image_name, path=path)
 
