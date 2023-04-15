@@ -145,12 +145,6 @@ def parse_cli_args(args: list[str]) -> tuple[Path, BattleConfig]:
     )
     parser.add_argument("--solver_cpus", type=int, help="Number of cpu cores used for solver container execution.")
 
-    # battle types have their configs automatically added to the CLI args
-    for battle_name, battle in Battle.all().items():
-        group = parser.add_argument_group(battle_name)
-        for name, kwargs in battle.BattleConfig.as_argparse_args():
-            group.add_argument(f"--{battle_name.lower()}_{name}", **kwargs)
-
     parsed = parser.parse_args(args)
     problem: Path = parsed.problem
 

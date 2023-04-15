@@ -173,32 +173,6 @@ class Battle(BaseModel):
     class BattleConfig(BaseModel):
         """Object containing the config variables the battle types use."""
 
-        @classmethod
-        def as_argparse_args(cls) -> list[tuple[str, dict[str, Any]]]:
-            """Transforms the config specification into argparse arguments.
-
-            Constructs a list of argument names and `**kwargs` that can be passed
-            to `ArgumentParser.add_argument()`.
-            """
-            arguments: list[tuple[str, dict[str, Any]]] = []
-            resolved_annotations = get_type_hints(cls)
-            for name, model_field in cls.__fields__.items():
-                kwargs = model_field.field_info.extra
-                kwargs["help"] = kwargs.get("help", "") + f" Default: {model_field.default}"
-                if resolved_annotations[name] == bool and "action" not in kwargs and "const" not in kwargs:
-                    kwargs["action"] = "store_const"
-                    kwargs["const"] = not model_field.default
-                elif get_origin(resolved_annotations[name]) == Literal and "choices" not in kwargs:
-                    kwargs["choices"] = resolved_annotations[name].__args__
-
-                arguments.append((model_field.name, kwargs))
-            return arguments
-
-        class Config(BaseModel.Config):
-            """Pydandtic config."""
-
-            validate_assignment = True
-
     class UiData(BaseModel):
         """Object containing custom diplay data."""
 
