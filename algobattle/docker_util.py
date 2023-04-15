@@ -17,7 +17,7 @@ from pydantic import Field
 from anyio.to_thread import run_sync
 from urllib3.exceptions import ReadTimeoutError
 
-from algobattle.util import AlgobattleBaseException, BuildError, DockerError, Encodable, EncodingError, ExceptionInfo, ExecutionError, ExecutionTimeout, Role, TempDir, inherit_docs, BaseModel
+from algobattle.util import AlgobattleBaseException, BuildError, DockerError, Encodable, EncodingError, ExceptionInfo, ExecutionError, ExecutionTimeout, ValidationError, Role, TempDir, inherit_docs, BaseModel
 from algobattle.problem import Problem
 
 
@@ -545,7 +545,7 @@ class Generator(Program):
         except Exception as e:
             raise EncodingError("Error thrown while decoding the problem instance.", detail=str(e)) from e
         if not problem.is_valid(size):
-            raise EncodingError("Instance is not valid.")
+            raise ValidationError("Instance is not valid.")
 
         if problem.with_solution:
             try:
@@ -555,7 +555,7 @@ class Generator(Program):
             except Exception as e:
                 raise EncodingError("Error thrown while decoding the solution.", detail=str(e)) from e
             if not solution.is_valid(problem, size):
-                raise EncodingError("Solution is not valid.")
+                raise ValidationError("Solution is not valid.")
         else:
             solution = None
         return _GenResData(problem, solution)
@@ -605,9 +605,9 @@ class Solver(Program):
         except EncodingError:
             raise
         except Exception as e:
-            raise EncodingError(f"The output of team {self.team_name}'s {self.role} can not be decoded properly!\n{e}") from e
+            raise EncodingError("Error thrown while decoding the solution.", detail=str(e)) from e
         if not solution.is_valid(instance, size):
-            raise EncodingError(f"{self.role.capitalize()} of team {self.team_name} output an invalid solution!")
+            raise ValidationError("Solution is not valid.")
         return solution
 
     async def run(
