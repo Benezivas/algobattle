@@ -1,4 +1,4 @@
-"""Central managing module for an algorithmic battle."""
+"""Module defining how a match is run."""
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -104,7 +104,18 @@ class Match(BaseModel):
         problem: type[Problem],
         ui: "Ui | None" = None,
     ) -> Self:
-        """Executes a match with the specified parameters."""
+        """Runs a match with the given config settings and problem type.
+
+        The first step is building the docker images for each team in `config.teams`. Any teams where this process fails
+        are excluded from the match and will receive zero points. Then each pair of teams will fight two battles against
+        each other, one where the first is generating and the second is solving, and one where the roles are swapped.
+        Since all of these battles are completely independent, you can set `config.parallel_battles` to have some number
+        of them run in parallel. This will speed up the exection of the match, but can also make the match unfair if the
+        hardware running it does not have the resources to adequately execute that many containers in parallel.
+
+        Returns:
+            A :cls:`Match` object with its fields populated to reflect the result of the match.
+        """
         if ui is None:
             ui = Ui()
         if config.docker.advanced_run_params is not None:
@@ -130,16 +141,24 @@ class Match(BaseModel):
 
     @overload
     def battle(self, matchup: Matchup) -> Battle | None:
-        ...
+        """Helper method to look up the battle between a specific matchup.
+        
+        Returns:
+            The battle if it has started already, otherwise `None`.
+        """
 
     @overload
     def battle(self, *, generating: Team, solving: Team) -> Battle | None:
-        ...
+        """Helper method to look up the battle between two teams.
+        
+        Returns:
+            The battle if it has started already, otherwise `None`.
+        """
+
 
     def battle(
         self, matchup: Matchup | None = None, *, generating: Team | None = None, solving: Team | None = None
     ) -> Battle | None:
-        """Returns the battle for the given matchup."""
         try:
             if matchup is not None:
                 return self.results[matchup.generator.name][matchup.solver.name]
@@ -150,12 +169,12 @@ class Match(BaseModel):
             return None
 
     @overload
-    def insert_battle(self, battle: Battle, matchup: Matchup) -> Battle | None:
-        ...
+    def insert_battle(self, battle: Battle, matchup: Matchup) -> None:
+        """Helper method to insert a new battle for a specific matchup."""
 
     @overload
-    def insert_battle(self, battle: Battle, *, generating: Team, solving: Team) -> Battle | None:
-        ...
+    def insert_battle(self, battle: Battle, *, generating: Team, solving: Team) -> None:
+        """Helper method to insert a new battle for two specific teams."""
 
     def insert_battle(
         self,
@@ -164,8 +183,7 @@ class Match(BaseModel):
         *,
         generating: Team | None = None,
         solving: Team | None = None,
-    ) -> Battle | None:
-        """Returns the battle for the given matchup."""
+    ) -> None:
         if matchup is not None:
             self.results[matchup.generator.name][matchup.solver.name] = battle
         elif generating is not None and solving is not None:
@@ -176,8 +194,10 @@ class Match(BaseModel):
     def calculate_points(self, total_points_per_team: int) -> dict[str, float]:
         """Calculate the number of points each team scored.
 
-        Each pair of teams fights for the achievable points among one another.
-        These achievable points are split over all rounds.
+        Every team scores between 0 and `total_points_per_team` points.
+        Excluded teams are considered to have lost all their battles and thus receive 0 points.
+        The other teams each get points based on how well they did against each other team compared to how well that
+        other team did against them.
         """
         points = {team: 0.0 for team in self.active_teams + self.excluded_teams}
         if len(self.active_teams) == 0:
