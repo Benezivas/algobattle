@@ -50,6 +50,7 @@ class DockerConfig(BaseModel):
     """Grouped config options that are relevant to the interaction with docker."""
 
     build_timeout: float | None = None
+    safe_build: bool = False
     generator: RunParameters = RunParameters()
     solver: RunParameters = RunParameters()
     advanced_run_params: "AdvancedRunArgs | None" = None
