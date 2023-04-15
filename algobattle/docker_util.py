@@ -119,12 +119,18 @@ class Image:
     run_kwargs: ClassVar[dict[str, Any]] = {
         "network_mode": "none",
     }
+    """Advanced docker options passed to the docker run command.
+    
+    A full description can be found at the docker api reference."""
     build_kwargs: ClassVar[dict[str, Any]] = {
         "rm": True,
         "forcerm": True,
         "quiet": True,
         "network_mode": "host",
     }
+    """Advanced docker options passed to the docker build command.
+    
+    A full description can be found at the docker api reference."""
 
     @classmethod
     def build(
@@ -132,35 +138,24 @@ class Image:
         path: Path,
         image_name: str,
         timeout: float | None = None,
-        *,
-        dockerfile: str | None = None,
     ) -> Self:
-        """Constructs the python Image object and uses the docker daemon to build the image.
+        """Builds a docker image using the dockerfile found at the provided path.
 
-        Parameters
-        ----------
-        path
-            Path to folder containing the Dockerfile
-        image_name
-            Name of the image, used both internally and for the docker image name.
-        description
-            Optional description for the image, defaults to `image_name`
-        timeout
-            Build timeout in seconds, raises DockerError if exceeded.
+        Args:
+            path: The path to the directory containing a `Dockerfile`, or a path to such a file itself.
+            image_name: The name of the built docker image, must follow the rules set out by the docker api.
+            timeout: Timeout in seconds for the build process.
 
-        Raises
-        ------
-        DockerError
-            On almost all common issues that might happen during the build, including timeouts, syntax errors,
-            OS errors, and errors thrown by the docker daemon.
+        Raises:
+            BuildError: On all errors that are expected to happen during the build process.
         """
         if not path.exists():
             raise RuntimeError
         if path.is_file():
-            if dockerfile is not None:
-                raise RuntimeError
             dockerfile = path.name
             path = path.parent
+        else:
+            dockerfile = None
         try:
             try:
                 old_image = cast(DockerImage, client().images.get(image_name))
@@ -200,38 +195,30 @@ class Image:
         self,
         input_dir: Path | None = None,
         output_dir: Path | None = None,
+        *,
         timeout: float | None = None,
         memory: int | None = None,
         cpus: int = 1,
-        *,
-        size: int = 0,
         ui: ProgramUiProxy | None = None,
     ) -> float:
-        """Runs a docker image with the provided input and returns its output.
+        """Runs a docker image.
 
-        Parameters
-        ----------
-        input_dir
-            The input folder provided to the docker container.
-        input_dir
-            The folder where the container places its output.
-        timeout
-            Timeout in seconds.
-        memory
-            Maximum memory the container will be allocated in MB.
-        cpus
-            Number of cpus the container will be allocated.
+        Args:
+            input_dir: Path to a directory containing input data for the container.
+            output_dir: Path to a directory where the container will place output data.
+            timeout: Timeout in seconds.
+            memory: Memory limit in MB.
+            cpus: Number of physical cpus the container can use.
+            ui: Interface to update the ui with new data about the executing program.
 
-        Returns
-        -------
-        Output string of the container.
+        Raises:
+            RuntimeError: If the image does not actually exist in the docker daemon.
+            ExecutionError: If the program does not execute successfully.
+            ExecutionTimeout: If the program times out.
+            DockerError: If there is some kind of error originating from the docker daemon.
 
-        Raises
-        ------
-        DockerError
-            On almost all common issues that might happen during the execution, including syntax errors,
-            OS errors, and errors thrown by the docker daemon.
-
+        Returns:
+            The runtime of the program.
         """
         name = f"algobattle_{uuid1().hex[:8]}"
         if memory is not None:
@@ -286,10 +273,8 @@ class Image:
         Attempting to run the image after it has been removed will cause runtime errors.
         Will not throw an error if the image has been removed already.
 
-        Raises
-        ------
-        DockerError
-            When removing the image fails
+        Raises:
+            DockerError: When removing the image fails.
         """
         try:
             client().images.remove(image=self.id, force=True)
@@ -335,7 +320,7 @@ class Image:
 
 
 class ProgramRunInfo(BaseModel):
-    """Metadata about a program execution."""
+    """Data about a program's execution."""
 
     params: RunParameters
     runtime: float
@@ -376,9 +361,11 @@ class Program(ABC):
     """A higher level interface for a team's programs."""
 
     image: Image
+    """The underlying docker image."""
     config: RunParameters
-    team_name: str
+    """The default config options this program will be executed with."""
     problem_class: type[Problem]
+    """The problem this program creates instances and/or solutions for."""
 
     role: ClassVar[Role]
 
@@ -395,20 +382,22 @@ class Program(ABC):
         if isinstance(image, Path):
             image = Image.build(
                 path=image,
-                image_name=f"{cls.role}-{team_name}",
+                image_name=f"{team_name}_{cls.role}",
                 timeout=timeout,
             )
         elif isinstance(image, ArchivedImage):
             image = image.restore()
 
-        return cls(image, config, team_name, problem_class)
+        return cls(image, config, problem_class)
 
     @abstractmethod
     def _setup_folders(self, input: Path, output: Path, size: int, instance: Problem | None) -> None:
+        """Sets up the i/o folders as required for the specific type of program."""
         raise NotImplementedError
 
     @abstractmethod
     def _parse_output(self, output: Path, size: int, instance: Problem | None) -> _GenResData | Problem.Solution:
+        """Parses the data in the output folder into problem instances/solutions."""
         raise NotImplementedError
 
     async def _run(
@@ -585,7 +574,20 @@ class Generator(Program):
         battle_output: type[Encodable] | None = None,
         ui: ProgramUiProxy | None = None,
     ) -> GeneratorResult:
-        """Execute the generator, passing in the size and processing the created problem instance."""
+        """Executes the generator and parses its output into a problem instance.
+
+        Args:
+            size: Size of the instance that the generator will be asked to generate.
+            timeout: Timeout in seconds.
+            space: Memory limit in MB.
+            cpus: Number of physical cpus the generator can use.
+            battle_input: Additional data that will be given to the generator.
+            battle_output: Class that will be used to parse additional data the generator outputs.
+            ui: Interface the program execution uses to update the ui.
+
+        Returns:
+            Datastructure containing all info about the generator execution and the created problem instance.
+        """
         return cast(
             GeneratorResult,
             await self._run(
@@ -640,7 +642,20 @@ class Solver(Program):
         battle_output: type[Encodable] | None = None,
         ui: ProgramUiProxy | None = None,
     ) -> SolverResult:
-        """Execute the solver, passing in the problem instance and processing the created solution."""
+        """Executes the solver on the given problem instance and parses its output into a problem solution.
+
+        Args:
+            size: Size of the instance that the solver will be asked to generate.
+            timeout: Timeout in seconds.
+            space: Memory limit in MB.
+            cpus: Number of physical cpus the solver can use.
+            battle_input: Additional data that will be given to the solver.
+            battle_output: Class that will be used to parse additional data the solver outputs.
+            ui: Interface the program execution uses to update the ui.
+
+        Returns:
+            Datastructure containing all info about the solver execution and the solution it computed.
+        """
         return cast(
             SolverResult,
             await self._run(
