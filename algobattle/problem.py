@@ -95,7 +95,7 @@ class Problem(Encodable, ABC):
         return isclass(val) and issubclass(val, Problem) and val.export
 
     @classmethod
-    def import_from_path(cls, path: Path) -> type["Problem"]:
+    def import_from_path(cls, path: Path) -> type[Self]:
         """Try to import a Problem class object from a given path.
 
         Raises
@@ -129,7 +129,7 @@ class Problem(Encodable, ABC):
             elif len(problem_classes) == 1:
                 problem_cls = problem_classes[0]
             elif hasattr(problem_classes, "Problem") and issubclass(getattr(problem_classes, "Problem"), Problem):
-                problem_cls: type[Problem] = problem_module.Problem
+                problem_cls: type[Self] = problem_module.Problem
             else:
                 raise ValueError(f"'{path}' contains {len(problem_classes)} different problem classes!")
 
