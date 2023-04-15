@@ -180,12 +180,12 @@ class Battle(BaseModel):
         for entrypoint in entry_points(group="algobattle.battle"):
             if entrypoint.name not in Battle._battle_types:
                 battle: type[Battle] = entrypoint.load()
-                Battle._battle_types[battle.name().lower()] = battle
+                Battle._battle_types[battle.name()] = battle
         return Battle._battle_types
 
     def __init_subclass__(cls) -> None:
         if cls.name() not in Battle._battle_types:
-            Battle._battle_types[cls.name().lower()] = cls
+            Battle._battle_types[cls.name()] = cls
         return super().__init_subclass__()
 
     @abstractmethod

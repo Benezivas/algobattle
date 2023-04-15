@@ -10,7 +10,7 @@ from anyio import create_task_group, CapacityLimiter, TASK_STATUS_IGNORED
 from anyio.to_thread import current_default_thread_limiter
 from anyio.abc import TaskStatus
 
-from algobattle.battle import Battle, FightHandler, FightUiProxy, Iterated, BattleUiProxy
+from algobattle.battle import Battle, FightHandler, FightUiProxy, BattleUiProxy
 from algobattle.docker_util import ProgramRunInfo, ProgramUiProxy
 from algobattle.team import Matchup, Team, TeamHandler
 from algobattle.problem import Problem
@@ -20,30 +20,17 @@ from algobattle.util import Role, TimerInfo, inherit_docs, BaseModel, str_with_t
 class MatchConfig(BaseModel):
     """Parameters determining the match execution."""
 
-    battle_type: type[Battle] = Iterated
+    battle_type: str = "Iterated"
     points: int = 100
     parallel_battles: int = 1
 
     @validator("battle_type", pre=True)
-    def parse_battle_type(cls, value):
-        """Parses the battle type class object from its name."""
-        if isinstance(value, str):
-            all = Battle.all()
-            if value in all:
-                return all[value]
-            else:
-                raise ValueError
-        elif issubclass(value, Battle):
+    def validate_battle_type(cls, value):
+        """Validates that the given battle type is a correct name of a battle class."""
+        if value in Battle.all():
             return value
         else:
-            raise TypeError
-
-    class Config(BaseModel.Config):
-        """Pydantic config."""
-
-        json_encoders = {
-            type[Battle]: lambda b: b.name().lower(),
-        }
+            raise ValueError
 
 
 class Match(BaseModel):
@@ -98,11 +85,12 @@ class Match(BaseModel):
         if ui is None:
             ui = Ui()
         ui.match = result
+        battle_cls = Battle.all()[config.battle_type]
         limiter = CapacityLimiter(config.parallel_battles)
         current_default_thread_limiter().total_tokens = config.parallel_battles
         async with create_task_group() as tg:
             for matchup in teams.matchups:
-                battle = config.battle_type()
+                battle = battle_cls()
                 result.results[matchup.generator.name][matchup.solver.name] = battle
                 await tg.start(result._run_battle, battle, matchup, battle_config, problem, ui, limiter)
             return result

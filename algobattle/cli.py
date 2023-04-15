@@ -44,7 +44,7 @@ class BattleConfig(BaseModel):
     @property
     def battle_config(self) -> Battle.BattleConfig:
         """The config object for the used battle type."""
-        return self.battle[self.match.battle_type.name().lower()]
+        return self.battle[self.match.battle_type]
 
     @validator("battle", pre=True)
     def val_battle_configs(cls, vals):

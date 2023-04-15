@@ -179,7 +179,7 @@ class Execution(IsolatedAsyncioTestCase):
     async def test_averaged(self):
         team = TeamInfo("team0", self.generator, self.solver)
         with TeamHandler.build([team], self.problem, self.docker_config, safe_build=True) as teams:
-            config = MatchConfig(battle_type=Averaged)
+            config = MatchConfig(battle_type="Averaged")
             await Match.run(config, self.avg_config, TestProblem, teams, Ui())
 
 
@@ -219,7 +219,7 @@ class Parsing(TestCase):
             BattleConfig(
                 match=MatchConfig(
                     points=10,
-                    battle_type=Averaged,
+                    battle_type="Averaged",
                 ),
                 teams=self.teams,
                 docker=DockerConfig(generator=RunParameters(space=10)),
@@ -246,7 +246,7 @@ class Parsing(TestCase):
             BattleConfig(
                 match=MatchConfig(
                     points=10,
-                    battle_type=Averaged,
+                    battle_type="Averaged",
                 ),
                 teams=self.teams,
                 docker=DockerConfig(generator=RunParameters(space=10)),
@@ -273,7 +273,7 @@ class Parsing(TestCase):
             BattleConfig(
                 match=MatchConfig(
                     points=20,
-                    battle_type=Iterated,
+                    battle_type="Iterated",
                 ),
                 teams=self.teams,
                 docker=DockerConfig(generator=RunParameters(space=10)),
