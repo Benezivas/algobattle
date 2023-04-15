@@ -12,8 +12,6 @@ from typing import (
     Protocol,
     TypeAlias,
     TypeVar,
-    get_origin,
-    get_type_hints,
     overload,
 )
 

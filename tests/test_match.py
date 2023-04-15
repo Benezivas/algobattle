@@ -3,7 +3,7 @@
 from unittest import IsolatedAsyncioTestCase, TestCase, main
 from pathlib import Path
 
-from algobattle.cli import BattleConfig, ExecutionConfig, parse_cli_args
+from algobattle.cli import BattleConfig, parse_cli_args
 from algobattle.battle import Fight, Iterated, Averaged
 from algobattle.match import MatchConfig, Match, Ui
 from algobattle.team import Team, Matchup, TeamHandler, TeamInfo
@@ -222,7 +222,6 @@ class Parsing(TestCase):
                     battle_type=Averaged,
                 ),
                 teams=self.teams,
-                execution=ExecutionConfig(safe_build=True),
                 docker=DockerConfig(generator=RunParameters(space=10)),
                 battle={
                     "averaged": Averaged.BattleConfig(iterations=1),
@@ -250,7 +249,6 @@ class Parsing(TestCase):
                     battle_type=Averaged,
                 ),
                 teams=self.teams,
-                execution=ExecutionConfig(safe_build=True),
                 docker=DockerConfig(generator=RunParameters(space=10)),
                 battle={
                     "averaged": Averaged.BattleConfig(iterations=1),
@@ -278,7 +276,6 @@ class Parsing(TestCase):
                     battle_type=Iterated,
                 ),
                 teams=self.teams,
-                execution=ExecutionConfig(safe_build=True),
                 docker=DockerConfig(generator=RunParameters(space=10)),
                 battle={
                     "averaged": Averaged.BattleConfig(iterations=1),

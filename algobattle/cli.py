@@ -23,9 +23,11 @@ from algobattle.team import Matchup, TeamHandler, TeamInfo
 from algobattle.util import Role, TimerInfo, check_path, BaseModel, flat_intersperse
 
 
-class ExecutionConfig(BaseModel):
+@dataclass
+class ExecutionConfig:
     """Config data regarding program execution."""
 
+    problem_path: Path
     silent: bool = False
     safe_build: bool = False
     result_output: Path | None = None
@@ -35,7 +37,6 @@ class BattleConfig(BaseModel):
     """Pydantic model to parse the config file."""
 
     teams: list[TeamInfo] = []
-    execution: ExecutionConfig = ExecutionConfig()
     match: MatchConfig = MatchConfig()
     docker: DockerConfig = DockerConfig()
     battle: dict[str, Battle.BattleConfig] = {n: b.BattleConfig() for n, b in Battle.all().items()}
@@ -103,7 +104,7 @@ class BattleConfig(BaseModel):
         return cls.parse_obj(config_dict)
 
 
-def parse_cli_args(args: list[str]) -> tuple[Path, BattleConfig]:
+def parse_cli_args(args: list[str]) -> tuple[ExecutionConfig, BattleConfig]:
     """Parse a given CLI arg list into config objects."""
     parser = ArgumentParser()
     parser.add_argument("problem", type=check_path, help="Path to a folder with the problem file.")
@@ -125,9 +126,7 @@ def parse_cli_args(args: list[str]) -> tuple[Path, BattleConfig]:
         " but prevents images from interfering with each other.",
     )
 
-    parser.add_argument(
-        "--battle_type", choices=[name.lower() for name in Battle.all()], help="Type of battle to be used."
-    )
+    parser.add_argument("--battle_type", choices=[name.lower() for name in Battle.all()], help="Type of battle to be used.")
     parser.add_argument(
         "--parallel_battles",
         type=int,
@@ -140,17 +139,20 @@ def parse_cli_args(args: list[str]) -> tuple[Path, BattleConfig]:
     parser.add_argument("--solver_timeout", type=float, help="Time limit for the solver execution.")
     parser.add_argument("--generator_space", type=int, help="Memory limit for the generator execution, in MB.")
     parser.add_argument("--solver_space", type=int, help="Memory limit the solver execution, in MB.")
-    parser.add_argument(
-        "--generator_cpus", type=int, help="Number of cpu cores used for generator container execution."
-    )
+    parser.add_argument("--generator_cpus", type=int, help="Number of cpu cores used for generator container execution.")
     parser.add_argument("--solver_cpus", type=int, help="Number of cpu cores used for solver container execution.")
 
     parsed = parser.parse_args(args)
-    problem: Path = parsed.problem
+    exec_config = ExecutionConfig(
+        problem_path=parsed.problem,
+        silent=parsed.silent,
+        safe_build=parsed.safe_build,
+        result_output=parsed.result_output,
+    )
 
     if parsed.battle_type is not None:
         parsed.battle_type = Battle.all()[parsed.battle_type]
-    cfg_path: Path = parsed.config or parsed.problem / "config.toml"
+    cfg_path: Path = parsed.config or exec_config.problem_path / "config.toml"
 
     if cfg_path.is_file():
         try:
@@ -166,9 +168,15 @@ def parse_cli_args(args: list[str]) -> tuple[Path, BattleConfig]:
         Image.run_kwargs = config.docker.advanced_build_params.to_docker_args()
 
     if not config.teams:
-        config.teams.append(TeamInfo(name="team_0", generator=problem / "generator", solver=problem / "solver"))
+        config.teams.append(
+            TeamInfo(
+                name="team_0",
+                generator=exec_config.problem_path / "generator",
+                solver=exec_config.problem_path / "solver",
+            )
+        )
 
-    return problem, config
+    return exec_config, config
 
 
 async def _run_with_ui(
@@ -189,17 +197,17 @@ async def _run_with_ui(
 def main():
     """Entrypoint of `algobattle` CLI."""
     try:
-        problem_path, config = parse_cli_args(sys.argv[1:])
+        exec_config, config = parse_cli_args(sys.argv[1:])
 
     except KeyboardInterrupt:
         raise SystemExit("Received keyboard interrupt, terminating execution.")
 
     try:
-        problem = Problem.import_from_path(problem_path)
+        problem = Problem.import_from_path(exec_config.problem_path)
         with TeamHandler.build(
-            config.teams, problem, config.docker, config.execution.safe_build
+            config.teams, problem, config.docker, exec_config.safe_build
         ) as teams, ExitStack() as stack:
-            if config.execution.silent:
+            if exec_config.silent:
                 ui = None
             else:
                 ui = CliUi()
@@ -211,10 +219,10 @@ def main():
                 points = result.calculate_points(config.match.points)
                 for team, pts in points.items():
                     print(f"Team {team} gained {pts:.1f} points.")
-            if config.execution.result_output:
+            if exec_config.result_output is not None:
                 t = datetime.now()
                 filename = f"{t.year:04d}-{t.month:02d}-{t.day:02d}_{t.hour:02d}-{t.minute:02d}-{t.second:02d}.json"
-                output_path = config.execution.result_output / filename
+                output_path = exec_config.result_output / filename
                 json = result.json()
                 with open(output_path, "w+") as f:
                     f.write(json)
