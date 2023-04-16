@@ -1,4 +1,7 @@
-"""Collection of utility functions."""
+"""Module containung various utility definitions.
+
+In particular, the base classes :cls:`BaseModel`, :cls:`Encodable`, :cls:`EncodableModel`, and exception classes.
+"""
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
@@ -11,8 +14,7 @@ from pydantic import BaseConfig, BaseModel, Extra, ValidationError as PydanticVa
 
 
 Role = Literal["generator", "solver"]
-
-
+"""Indicates whether the role of a program is to generate or to solve instances."""
 T = TypeVar("T")
 
 
@@ -40,7 +42,18 @@ def inherit_docs(obj: T) -> T:
 
 
 def check_path(path: str, *, type: Literal["file", "dir", "exists"] = "exists") -> Path:
-    """Parses a string into a Path. Raises a :cls:`ValueError` if it doesn't exist as the specified type."""
+    """Parses a string into a :cls:`Path` and checks that it is valid.
+    
+    Args:
+        path: The string to be parsed.
+        type: What kind of check to perform on the path.
+
+    Raises:
+        ValueError: If the path fails the check.
+
+    Returns:
+        The parsed path object.
+    """
     _path = Path(path)
     match type:
         case "file":
@@ -55,17 +68,11 @@ def check_path(path: str, *, type: Literal["file", "dir", "exists"] = "exists") 
         raise ValueError
 
 
-def getattr_set(o: object, *attrs: str) -> dict[str, Any]:
-    """Returns a dict of the given attributes and their values, if they are not `None`."""
-    return {a: getattr(o, a) for a in attrs if getattr(o, a, None) is not None}
-
-
 class TempDir(TemporaryDirectory[Any]):
-    """A :cls:`TemporaryDirecroty`, but it's enter returns a :cls:`Path`."""
+    """A :cls:`TemporaryDirecroty`, but it's context manager returns a :cls:`Path` object instead of a bare string."""
 
     def __enter__(self):
-        super().__enter__()
-        return Path(self.name)
+        return Path(super().__enter__())
 
 
 class Encodable(ABC):
@@ -73,13 +80,34 @@ class Encodable(ABC):
 
     @classmethod
     @abstractmethod
-    def decode(cls: type[Self], source_dir: Path, size: int, team: Role) -> Self:
-        """Parses the container output into a python object."""
+    def decode(cls, source_dir: Path, size: int, team: Role) -> Self:
+        """Decodes the data found in the given folder into a python object.
+
+        Args:
+            source_dir: Path to a directory containing the data that can be used to construct an instance of this class.
+            size: The size of the data to be decoded.
+            team: Role of the team that output the data.
+
+        Raises:
+            EncodingError: If the data cannot be decoded into an instance.
+
+        Returns:
+            The decoded object.
+        """
         raise NotImplementedError
 
     @abstractmethod
     def encode(self, target_dir: Path, size: int, team: Role) -> None:
-        """Encodes the data into files that can be passed to docker containers."""
+        """Encodes the object into a folder that can be passed to a program.
+
+        Args:
+            target_dir: Path to a directory that will be passed as the input of a program.
+            size: The size of the data to be encoded.
+            team: Role of the team that receives the data.
+
+        Raises:
+            EncodingError: If the data cannot be properly encoded.
+        """
         raise NotImplementedError
 
     @classmethod
@@ -101,9 +129,9 @@ class EncodableModel(BaseModel, Encodable, ABC):
 
     filename: ClassVar[str]
 
-    @inherit_docs
     @classmethod
-    def decode(cls: type[Self], source_dir: Path, size: int, team: Role) -> Self:
+    def decode(cls, source_dir: Path, size: int, team: Role) -> Self:
+        """Uses pydantic to create a python object from a json file found at `source_dir / cls.filename`."""
         try:
             return cls.parse_file(source_dir / cls.filename)
         except PydanticValidationError as e:
@@ -113,6 +141,7 @@ class EncodableModel(BaseModel, Encodable, ABC):
 
     @inherit_docs
     def encode(self, target_dir: Path, size: int, team: Role) -> None:
+        """Uses pydantic to create a json representation of the object at `target_dir / cls.filename`."""
         try:
             with open(target_dir / self.filename, "w") as f:
                 f.write(self.json(exclude=self._excludes(team)))
