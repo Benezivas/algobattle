@@ -1,10 +1,10 @@
-"""Abstract base class for problem classes used in concrete problem implementations."""
+"""Module defining the Problem and Solution base classes and related objects."""
 from abc import ABC, abstractmethod
 import importlib.util
 from inspect import isclass
 import sys
 from pathlib import Path
-from typing import Any, ClassVar, Literal, Protocol, SupportsFloat, Self, Generic, TypeAlias, TypeVar, runtime_checkable
+from typing import Any, ClassVar, Literal, Protocol, Self, Generic, TypeAlias, TypeVar, runtime_checkable
 
 from pydantic import Field
 from pydantic.generics import GenericModel
@@ -13,7 +13,21 @@ from algobattle.util import Encodable, EncodableModel, Role, inherit_docs, Valid
 
 
 _Problem: TypeAlias = Any
+"""Type alias used to generate correct typings when subclassing :cls:`Problem` and :cls:`Problem.Solution`.
+
+Each problem's and solution's methods are guaranteed to be passed a instance of the correct problem/solution objects.
+But due to limitations in the python type system we are currently not able to express this properly.
+When creating your own problem it is recommended to not use this alias and instead use the :cls:`Problem` and
+:cls:`Solution` you are creating directly.
+"""
 _Solution: TypeAlias = Any
+"""Type alias used to generate correct typings when subclassing :cls:`Problem` and :cls:`Problem.Solution`.
+
+Each problem's and solution's methods are guaranteed to be passed a instance of the correct problem/solution objects.
+But due to limitations in the python type system we are currently not able to express this properly.
+When creating your own problem it is recommended to not use this alias and instead use the :cls:`Problem` and
+:cls:`Solution` you are creating directly.
+"""
 
 
 @runtime_checkable
@@ -21,6 +35,7 @@ class Scored(Protocol):
     """A solution with an associated score."""
 
     direction: ClassVar[Literal["minimize", "maximize"]]
+    """The direction that better scores are found at."""
 
     @abstractmethod
     def score(self, instance: _Problem, size: int) -> float:
@@ -51,25 +66,33 @@ class Problem(Encodable, ABC):
             cls.export = export
         return super().__init_subclass__()
 
-    def validate_instance(self, size: int):
-        """Validates that the parsed instance is semantically correct.
+    def validate_instance(self, size: int) -> None:
+        """Confirms that the parsed instance is valid.
 
-        Should raise a :cls:`ValidationError` if the created instance is invalid.
+        Should be idempotent, but may also perform additional postprocessing such as bringing the instance
+        into a normal form.
+
+        Raises:
+            ValidationError: if the created instance is invalid.
         """
         return
 
-    def calculate_score(self, solution: _Solution, generator_solution: _Solution | None, size: int) -> SupportsFloat:
+    def calculate_score(self, solution: _Solution, generator_solution: _Solution | None, size: int) -> float:
         """Calculates how well a solution solves this problem instance.
 
-        Return values are should be inside [0, 1].
-        With a value of 0 indicating that the solver failed completely
-        and 1 that it solved the instance perfectly.
+        There is a default implementation if the solution is :cls:`Scored`. For it, the calculated score is the ratio of
+        the generator's solution score to the solver's solution score.
+
+        Args:
+            solution: The solution created by the solver.
+            generator_solution: The solution output by the generator, if any.
+            size: The instance size.
+
+        Returns:
+            The calculated score, a number in [0, 1] with a value of 0 indicating that the solver failed completely and
+            1 that it solved the instance perfectly.
         """
         if isinstance(generator_solution, self.Solution) and isinstance(generator_solution, Scored):
-            # we have a default impl if the problem comes with a generator solution and the solution type
-            # implements the Scored protocol. we can't check data protocol subclass relationships at runtime
-            # so we need to check if the solution is an instance instead.
-            # we know that the generator's and solver's solutions are of the same type so we don't need to check both.
             assert isinstance(solution, Scored)
             gen_score = generator_solution.score(self, size)
             if gen_score == 0:
@@ -87,7 +110,11 @@ class Problem(Encodable, ABC):
 
     @classmethod
     def io_schema(cls) -> str | None:
-        """Generates a schema specifying the I/O for this problem."""
+        """Generates a schema specifying the I/O for this problem.
+        
+        The schema should specify what the data found in the input/output folders should look like and what the parser
+        will accept and reject.
+        """
         return None
 
     @staticmethod
@@ -98,10 +125,16 @@ class Problem(Encodable, ABC):
     def import_from_path(cls, path: Path) -> type[Self]:
         """Try to import a Problem class object from a given path.
 
-        Raises
-        ------
-        ValueError
-            If the path doesn't point to a file containing a valid problem.
+        The specified file will be imported using the standard python loaders. If the created module contains exactly
+        one class inheriting from :cls:`Problem` with the `export` flag set, it will be imported. Otherwise, if one of
+        the classes is named `Problem` it will be imported. If neither procedure finds a unique problem class the method
+        fails.
+
+        Args:
+            path: A path to a python file or a folder containing a `__init__.py` or `problem.py` file.
+
+        Raises:
+            ValueError: If the path doesn't point to a valid file or the file cannot be imported properly.
         """
         if path.is_file():
             pass
@@ -147,27 +180,27 @@ class Problem(Encodable, ABC):
     class Solution(Encodable, ABC):
         """A proposed solution for an instance of this problem."""
 
-        @classmethod
-        @abstractmethod
-        def decode(cls: type[Self], source_dir: Path, size: int, team: Role) -> Self:
-            """Parses the container output into problem data."""
-            raise NotImplementedError
+        def validate_solution(self, instance: _Problem, size: int) -> None:
+            """Confirms that the parsed solution is valid.
 
-        @abstractmethod
-        def encode(self, target_dir: Path, size: int, team: Role) -> None:
-            """Encodes the solution into files that can be passed to docker containers."""
-            raise NotImplementedError
+            Should be idempotent, but may also perform additional postprocessing such as bringing the solution
+            into a normal form.
 
-        def validate_solution(self, instance: _Problem, size: int):
-            """Validates that the parsed instance is semantically correct.
+            Args:
+                instance: The problem instance this solution is purported to solve.
 
-            Should raise a :cls:`ValidationError` if the created instance is invalid.
+            Raises:
+                ValidationError: if the created instance is invalid.
             """
             return
 
         @classmethod
         def io_schema(cls) -> str | None:
-            """Generates a schema specifying the I/O for this solution."""
+            """Generates a schema specifying the I/O for this solution.
+            
+            The schema should specify what the data found in the input/output folders should look like and what the parser
+            will accept and reject.
+            """
             return None
 
 
@@ -219,8 +252,8 @@ class DirectedGraph(ProblemModel):
     num_vertices: int = Field(ge=0, le=2**63 - 1)
     edges: list[tuple[int, int]] = Field(ge=0, le=2**63 - 1, unique_items=True)
 
-    @inherit_docs
     def validate_instance(self, size: int):
+        """Validates that the graph contains at most `size` many vertices and all edges are well defined."""
         if self.num_vertices > size:
             raise ValidationError("Graph contains too many vertices.")
         if any(u >= self.num_vertices or v >= self.num_vertices for u, v in self.edges):
@@ -232,8 +265,12 @@ class UndirectedGraph(DirectedGraph):
 
     export: ClassVar[bool] = False
 
-    @inherit_docs
     def validate_instance(self, size: int):
+        """Validates that the graph is well formed and contains no self loops.
+        
+        Also brings it into a normal form where every edge {u, v} occurs exactly once in the list.
+        I.e. `[(0, 1), (1, 0), (1, 2)]` is accepted as valid and normalised to `[(0, 1), (1, 2)]`.
+        """
         super().validate_instance(size)
         if any(u == v for u, v in self.edges):
             raise ValidationError("Undirected graph contains self loops.")
@@ -254,8 +291,8 @@ class EdgeWeights(DirectedGraph, GenericModel, Generic[Weight]):
 
     edge_weights: list[Weight]
 
-    @inherit_docs
     def validate_instance(self, size: int):
+        """Validates that each edge has an associated weight."""
         super().validate_instance(size)
         if len(self.edge_weights) == len(self.edges):
             raise ValidationError("Number of edge weights doesn't match the number of edges.")
@@ -266,8 +303,8 @@ class VertexWeights(DirectedGraph, GenericModel, Generic[Weight]):
 
     vertex_weights: list[Weight]
 
-    @inherit_docs
     def validate_instance(self, size: int):
+        """Validates that each vertex has an associated weight."""
         super().validate_instance(size)
         if len(self.vertex_weights) == self.num_vertices:
             raise ValidationError("Number of vertex weights doesn't match the number of vertices.")
