@@ -82,6 +82,19 @@ class Encodable(ABC):
         """Encodes the data into files that can be passed to docker containers."""
         raise NotImplementedError
 
+    @classmethod
+    def io_schema(cls) -> str | None:
+        """Generates a schema specifying the I/O for this data.
+        
+        The schema should specify the structure of the data in the input and output folders.
+        In particular, the specification should match precisely what :meth`.decode` accepts, and the output of
+        :meth:`.encode` should comply with it.
+
+        Returns:
+            The schema, or `None` to indicate no information about the expected shape of the data can be provided.
+        """
+        return None
+
 
 class EncodableModel(BaseModel, Encodable, ABC):
     """Problem data that can easily be encoded into and decoded from json files."""
@@ -105,6 +118,11 @@ class EncodableModel(BaseModel, Encodable, ABC):
                 f.write(self.json(exclude=self._excludes(team)))
         except Exception as e:
             raise EncodingError("Unkown error while encoding the data.", detail=str(e))
+
+    @classmethod
+    def io_schema(cls) -> str:
+        """Uses pydantic to generate a json schema for this class."""
+        return cls.schema_json(indent=4)
 
     def _excludes(self, team: Role) -> dict[str | int, Any]:
         excludes = {}

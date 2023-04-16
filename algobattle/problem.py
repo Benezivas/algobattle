@@ -108,15 +108,6 @@ class Problem(Encodable, ABC):
         else:
             raise NotImplementedError
 
-    @classmethod
-    def io_schema(cls) -> str | None:
-        """Generates a schema specifying the I/O for this problem.
-        
-        The schema should specify what the data found in the input/output folders should look like and what the parser
-        will accept and reject.
-        """
-        return None
-
     @staticmethod
     def _is_importable(val: Any):
         return isclass(val) and issubclass(val, Problem) and val.export
@@ -194,26 +185,12 @@ class Problem(Encodable, ABC):
             """
             return
 
-        @classmethod
-        def io_schema(cls) -> str | None:
-            """Generates a schema specifying the I/O for this solution.
-            
-            The schema should specify what the data found in the input/output folders should look like and what the parser
-            will accept and reject.
-            """
-            return None
-
 
 class ProblemModel(EncodableModel, Problem, ABC):
     """A Problem that can easily be parsed to/from a json file."""
 
     filename: ClassVar[str] = "instance.json"
     export: ClassVar[bool] = False
-
-    @classmethod
-    def io_schema(cls) -> str | None:
-        """Generates the default json schema specifying the I/O for this problem."""
-        return cls.schema_json(indent=4)
 
     class Config(EncodableModel.Config):
         """Pydantic config object to hide these fields in the json if someone redeclared them incorrectly."""
@@ -232,11 +209,6 @@ class SolutionModel(EncodableModel, Problem.Solution, ABC):
     """A solution that can easily be parsed to/from a json file."""
 
     filename: ClassVar[str] = "solution.json"
-
-    @classmethod
-    def io_schema(cls) -> str | None:
-        """Generates the default json schema specifying the I/O for this solution."""
-        return cls.schema_json(indent=4)
 
     class Config(EncodableModel.Config):
         """Pydantic config object to hide these fields in the json if someone redeclared them incorrectly."""
