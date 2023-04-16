@@ -108,7 +108,9 @@ def parse_cli_args(args: list[str]) -> tuple[Path, BattleConfig]:
     parser = ArgumentParser()
     parser.add_argument("problem", type=check_path, help="Path to a folder with the problem file.")
     parser.add_argument(
-        "--config", type=partial(check_path, type="file"), help="Path to a config file, defaults to '{problem} / config.toml'."
+        "--config",
+        type=partial(check_path, type="file"),
+        help="Path to a config file, defaults to '{problem} / config.toml'.",
     )
     parser.add_argument("-s", "--silent", action="store_const", const=True, help="Disable the cli Ui.")
     parser.add_argument(
@@ -123,7 +125,9 @@ def parse_cli_args(args: list[str]) -> tuple[Path, BattleConfig]:
         " but prevents images from interfering with each other.",
     )
 
-    parser.add_argument("--battle_type", choices=[name.lower() for name in Battle.all()], help="Type of battle to be used.")
+    parser.add_argument(
+        "--battle_type", choices=[name.lower() for name in Battle.all()], help="Type of battle to be used."
+    )
     parser.add_argument(
         "--parallel_battles",
         type=int,
@@ -136,7 +140,9 @@ def parse_cli_args(args: list[str]) -> tuple[Path, BattleConfig]:
     parser.add_argument("--solver_timeout", type=float, help="Time limit for the solver execution.")
     parser.add_argument("--generator_space", type=int, help="Memory limit for the generator execution, in MB.")
     parser.add_argument("--solver_space", type=int, help="Memory limit the solver execution, in MB.")
-    parser.add_argument("--generator_cpus", type=int, help="Number of cpu cores used for generator container execution.")
+    parser.add_argument(
+        "--generator_cpus", type=int, help="Number of cpu cores used for generator container execution."
+    )
     parser.add_argument("--solver_cpus", type=int, help="Number of cpu cores used for solver container execution.")
 
     # battle types have their configs automatically added to the CLI args
@@ -172,7 +178,11 @@ def parse_cli_args(args: list[str]) -> tuple[Path, BattleConfig]:
 
 
 async def _run_with_ui(
-    match_config: MatchConfig, battle_config: Battle.BattleConfig, problem: type[Problem], teams: TeamHandler, ui: "CliUi | None"
+    match_config: MatchConfig,
+    battle_config: Battle.BattleConfig,
+    problem: type[Problem],
+    teams: TeamHandler,
+    ui: "CliUi | None",
 ) -> Match:
     async with create_task_group() as tg:
         if ui is not None:

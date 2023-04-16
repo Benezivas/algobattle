@@ -137,7 +137,12 @@ class Match(BaseModel):
         ...
 
     def insert_battle(
-        self, battle: Battle, matchup: Matchup | None = None, *, generating: Team | None = None, solving: Team | None = None
+        self,
+        battle: Battle,
+        matchup: Matchup | None = None,
+        *,
+        generating: Team | None = None,
+        solving: Team | None = None,
     ) -> Battle | None:
         """Returns the battle for the given matchup."""
         if matchup is not None:
@@ -147,19 +152,20 @@ class Match(BaseModel):
         else:
             raise TypeError
 
-    def calculate_points(self, points_per_matchup: int) -> dict[str, float]:
+    def calculate_points(self, total_points_per_team: int) -> dict[str, float]:
         """Calculate the number of points each team scored.
 
         Each pair of teams fights for the achievable points among one another.
         These achievable points are split over all rounds.
         """
-        if len(self.active_teams) == 0:
-            return {}
-        if len(self.active_teams) == 1:
-            return {self.active_teams[0]: points_per_matchup}
-
         points = {team: 0.0 for team in self.active_teams + self.excluded_teams}
-        points_per_battle = round(points_per_matchup / (len(self.active_teams) - 1), 1)
+        if len(self.active_teams) == 0:
+            return points
+        if len(self.active_teams) == 1:
+            points[self.active_teams[0]] = total_points_per_team
+            return points
+
+        points_per_matchup = round(total_points_per_team / (len(self.active_teams) - 1), 1)
 
         for first, second in combinations(self.active_teams, 2):
             try:
@@ -167,7 +173,7 @@ class Match(BaseModel):
                 second_res = self.results[first][second]
             except KeyError:
                 continue
-            total_score = first_res.score() + second_res.score()
+            total_score = max(0, first_res.score()) + max(0, second_res.score())
             if total_score == 0:
                 # Default values for proportions, assuming no team manages to solve anything
                 first_ratio = 0.5
@@ -176,13 +182,13 @@ class Match(BaseModel):
                 first_ratio = first_res.score() / total_score
                 second_ratio = second_res.score() / total_score
 
-            points[first] += round(points_per_battle * first_ratio, 1)
-            points[second] += round(points_per_battle * second_ratio, 1)
+            points[first] += round(points_per_matchup * first_ratio, 1)
+            points[second] += round(points_per_matchup * second_ratio, 1)
 
         # we need to also add the points each team would have gotten fighting the excluded teams
         # each active team would have had one set of battles against each excluded team
         for team in self.active_teams:
-            points[team] += points_per_battle * len(self.excluded_teams)
+            points[team] += points_per_matchup * len(self.excluded_teams)
 
         return points
 
@@ -191,10 +197,10 @@ class Match(BaseModel):
 class Ui:
     """Base class for a UI that observes a Match and displays its data.
 
-    The Ui object both observes the match object as it's being built and receives additional updates through method calls.
-    To do this, it provides several objects whose methods are essentially curried versions of its own methods.
-    These observer classes should generally not be subclassed, all Ui functionality can be implemented by just subclassing
-    :cls:`Ui` and implementing its methods.
+    The Ui object both observes the match object as it's being built and receives additional updates through
+    method calls. To do this, it provides several objects whose methods are essentially curried versions of
+    its own methods. These observer classes should generally not be subclassed, all Ui functionality can be implemented
+    by just subclassing :cls:`Ui` and implementing its methods.
     """
 
     match: Match = field(init=False)

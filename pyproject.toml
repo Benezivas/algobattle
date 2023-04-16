@@ -31,3 +31,6 @@ algobattle = "algobattle.cli:main"
 
 [tool.pyright]
 diagnosticMode = "workspace"
+
+[tool.black]
+line-length = 120

@@ -2,13 +2,12 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
-import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from traceback import format_exception
-from typing import Any, ClassVar, Iterable, Literal, Mapping, TypeVar, Self
+from typing import Any, ClassVar, Iterable, Literal, TypeVar, Self
 
-from pydantic import BaseConfig, BaseModel, Extra
+from pydantic import BaseConfig, BaseModel, Extra, ValidationError as PydanticValidationError
 
 
 Role = Literal["generator", "solver"]
@@ -69,77 +68,22 @@ class TempDir(TemporaryDirectory[Any]):
         return Path(self.name)
 
 
-class CustomEncodable(ABC):
-    """Represents problem data that docker containers can interact with."""
+class Encodable(ABC):
+    """Represents data that docker containers can interact with."""
 
     @classmethod
     @abstractmethod
     def decode(cls: type[Self], source_dir: Path, size: int, team: Role) -> Self:
-        """Parses the container output into problem data."""
-        ...
+        """Parses the container output into a python object."""
+        raise NotImplementedError
 
     @abstractmethod
     def encode(self, target_dir: Path, size: int, team: Role) -> None:
         """Encodes the data into files that can be passed to docker containers."""
-        ...
+        raise NotImplementedError
 
 
-Encodable = CustomEncodable | str | bytes | dict[Any, Any] | None
-
-
-def encode(data: Mapping[str, Encodable], target_dir: Path, size: int, team: Role) -> None:
-    """Encodes data into a folder.
-
-    Each element will be encoded into a file or folder named after its key. :cls:`CustomEncodables` use their own method,
-    strings will be encoded with utf8, bytes are written as is, and dictionaries will be encoded as json.
-    """
-    for name, obj in data.items():
-        try:
-            if isinstance(obj, CustomEncodable):
-                (target_dir / name).mkdir()
-                obj.encode(target_dir / name, size, team)
-            elif isinstance(obj, str):
-                with open(target_dir / name, "w+") as f:
-                    f.write(obj)
-            elif isinstance(obj, bytes):
-                with open(target_dir / name, "wb+") as f:
-                    f.write(obj)
-            elif isinstance(obj, dict):
-                with open(target_dir / name, "w+") as f:
-                    json.dump(obj, f)
-        except Exception:
-            pass
-
-
-def decode(data_spec: Mapping[str, type[Encodable]], source_dir: Path, size: int, team: Role) -> dict[str, Encodable | None]:
-    """Decodes data from a folder.
-
-    The output is a dictionary with the same keys as `data_spec` and values that are objects of the specified types.
-    :cls:`CustomEncodables` use their own method, strings will be decoded with utf8, bytes are read directly,
-    and dictionaries will be decoded from json.
-    Any :cls:`Excpeption`s are caught and the corresponding field in the dict be set to `None`.
-    """
-    out = {}
-    for name, cls in data_spec.items():
-        try:
-            if issubclass(cls, CustomEncodable):
-                (source_dir / name).mkdir()
-                out[name] = cls.decode(source_dir / name, size, team)
-            elif issubclass(cls, str):
-                with open(source_dir / name, "r") as f:
-                    out[name] = f.read()
-            elif issubclass(cls, bytes):
-                with open(source_dir / name, "rb") as f:
-                    out[name] = f.read()
-            elif issubclass(cls, dict):
-                with open(source_dir / name, "r") as f:
-                    out[name] = json.load(f)
-        except Exception:
-            out[name] = None
-    return out
-
-
-class EncodableModel(BaseModel, CustomEncodable, ABC):
+class EncodableModel(BaseModel, Encodable, ABC):
     """Problem data that can easily be encoded into and decoded from json files."""
 
     filename: ClassVar[str]
@@ -147,12 +91,20 @@ class EncodableModel(BaseModel, CustomEncodable, ABC):
     @inherit_docs
     @classmethod
     def decode(cls: type[Self], source_dir: Path, size: int, team: Role) -> Self:
-        return cls.parse_file(source_dir / cls.filename)
+        try:
+            return cls.parse_file(source_dir / cls.filename)
+        except PydanticValidationError as e:
+            raise EncodingError("Json data does not fit the schema.", detail=str(e))
+        except Exception as e:
+            raise EncodingError("Unknown error while decoding the data.", detail=str(e))
 
     @inherit_docs
     def encode(self, target_dir: Path, size: int, team: Role) -> None:
-        with open(target_dir / self.filename, "w") as f:
-            f.write(self.json(exclude=self._excludes(team)))
+        try:
+            with open(target_dir / self.filename, "w") as f:
+                f.write(self.json(exclude=self._excludes(team)))
+        except Exception as e:
+            raise EncodingError("Unkown error while encoding the data.", detail=str(e))
 
     def _excludes(self, team: Role) -> dict[str | int, Any]:
         excludes = {}
@@ -180,3 +132,57 @@ def flat_intersperse(iterable: Iterable[Iterable[T]], element: T) -> Iterable[T]
     for item in iterator:
         yield element
         yield from item
+
+
+class AlgobattleBaseException(Exception):
+    """Base exception class for errors used by the algobattle package."""
+
+    def __init__(self, message: str, *, detail: str | None = None) -> None:
+        self.message = message
+        self.detail = detail
+        super().__init__()
+
+
+class EncodingError(AlgobattleBaseException):
+    """Indicates that the given data could not be encoded or decoded properly."""
+
+
+class ValidationError(AlgobattleBaseException):
+    """Indicates that the decoded problem instance or solution is invalid."""
+
+
+class BuildError(AlgobattleBaseException):
+    """Indicates that the build process could not be completed successfully."""
+
+
+class ExecutionError(AlgobattleBaseException):
+    """Indicates that the program could not be executed successfully."""
+
+    def __init__(self, message: str, *, detail: str | None = None, runtime: float) -> None:
+        self.runtime = runtime
+        super().__init__(message, detail=detail)
+
+
+class ExecutionTimeout(ExecutionError):
+    """Indicates that the program ran into the timeout."""
+
+
+class DockerError(AlgobattleBaseException):
+    """Indicates that an issue with the docker daemon occured."""
+
+
+class ExceptionInfo(BaseModel):
+    """An exception that can be encoded into a json file."""
+
+    type: str
+    message: str
+    detail: str | None = None
+
+    @classmethod
+    def from_exception(cls, error: AlgobattleBaseException) -> Self:
+        """Constructs an instance from a raised exception."""
+        return cls(
+            type=error.__class__.__name__,
+            message=error.message,
+            detail=error.detail,
+        )

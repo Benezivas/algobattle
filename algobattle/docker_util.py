@@ -2,7 +2,7 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
 from timeit import default_timer
-from typing import Any, ClassVar, Iterator, Literal, Mapping, Protocol, Self, TypedDict, cast
+from typing import Any, ClassVar, Iterator, Protocol, Self, TypedDict, cast
 from uuid import uuid1
 import json
 from dataclasses import dataclass
@@ -17,7 +17,21 @@ from pydantic import Field
 from anyio.to_thread import run_sync
 from urllib3.exceptions import ReadTimeoutError
 
-from algobattle.util import Encodable, Role, TempDir, encode, decode, inherit_docs, BaseModel
+from algobattle.util import (
+    AlgobattleBaseException,
+    BuildError,
+    DockerError,
+    Encodable,
+    EncodingError,
+    ExceptionInfo,
+    ExecutionError,
+    ExecutionTimeout,
+    ValidationError,
+    Role,
+    TempDir,
+    inherit_docs,
+    BaseModel,
+)
 from algobattle.problem import Problem
 
 
@@ -53,66 +67,6 @@ def client() -> DockerClient:
     except (DockerException, APIError):
         raise SystemExit("Could not connect to the docker daemon. Is docker running?")
     return _client_var
-
-
-def get_os_type() -> Literal["linux", "windows"]:
-    """OS running inside docker containers."""
-    return client().info()["OSType"]
-
-
-class _BaseException(Exception):
-    def __init__(self, message: str, detail: str | None = None, *args: object) -> None:
-        self.message = message
-        self.detail = detail
-        super().__init__(*args)
-
-
-class BuildError(_BaseException):
-    """Indicates that the build process could not be completed successfully."""
-
-
-class ProgramError(_BaseException):
-    """Parent class for exceptions raised during the execution of a program."""
-
-
-class ExecutionError(ProgramError):
-    """Indicates that the program could not be executed successfully."""
-
-    def __init__(self, message: str, detail: str = "", *args: object, runtime: float) -> None:
-        self.runtime = runtime
-        super().__init__(message, detail, *args)
-
-
-class ExecutionTimeout(ExecutionError):
-    """Indicates that the program ran into the timeout."""
-
-
-class EncodingError(ProgramError):
-    """Indicates that the given data could not be encoded or decoded properly."""
-
-    def __init__(self, message: str = "", detail: str | None = None, *args: object) -> None:
-        super().__init__(message, detail, *args)
-
-
-class DockerError(ProgramError, BuildError):
-    """Indicates that an issue with the docker daemon occured."""
-
-
-class ExceptionInfo(BaseModel):
-    """An exception that can be encoded into a json file."""
-
-    type: str
-    message: str
-    detail: str | None = None
-
-    @classmethod
-    def from_exception(cls, error: _BaseException) -> Self:
-        """Constructs an instance from a raised exception."""
-        return cls(
-            type=error.__class__.__name__,
-            message=error.message,
-            detail=error.detail,
-        )
 
 
 class ProgramUiProxy(Protocol):
@@ -232,9 +186,9 @@ class Image:
         except Timeout as e:
             raise BuildError(f"Build process for '{image_name}' ran into a timeout.") from e
         except DockerBuildError as e:
-            raise BuildError(f"Building '{image_name}' did not complete successfully.", e.msg) from e
+            raise BuildError(f"Building '{image_name}' did not complete successfully.", detail=e.msg) from e
         except APIError as e:
-            raise DockerError(f"Docker APIError thrown while building '{image_name}'.", str(e)) from e
+            raise BuildError(f"Docker APIError thrown while building '{image_name}'.", detail=str(e)) from e
 
         return cls(image_name, cast(str, image.id), description if description is not None else image_name, path=path)
 
@@ -317,21 +271,21 @@ class Image:
         except ImageNotFound as e:
             raise RuntimeError(f"Image {self.name} (id={self.id}) does not exist") from e
         except APIError as e:
-            raise DockerError(f"Docker APIError thrown while running '{self.name}'.", str(e)) from e
+            raise DockerError(f"Docker APIError thrown while running '{self.name}'.", detail=str(e)) from e
         finally:
             if container is not None:
                 try:
                     container.remove(force=True)
                 except APIError as e:
-                    raise DockerError(f"Couldn't remove {name}", str(e)) from e
+                    raise DockerError(f"Couldn't remove {name}", detail=str(e)) from e
 
         return elapsed_time
 
     def remove(self) -> None:
         """Removes the image from the docker daemon.
 
-        **This will not cause the python object to be deleted.** Attempting to run the image after it has been removed will
-        cause runtime errors.
+        **This will not cause the python object to be deleted.**
+        Attempting to run the image after it has been removed will cause runtime errors.
         Will not throw an error if the image has been removed already.
 
         Raises
@@ -356,7 +310,7 @@ class Image:
                     file.write(chunk)
             image.remove(force=True)
         except APIError as e:
-            raise DockerError(f"Docker APIError thrown while archiving '{self.name}'", str(e)) from e
+            raise DockerError(f"Docker APIError thrown while archiving '{self.name}'", detail=str(e)) from e
         return ArchivedImage(path, self.name, self.id, self.description)
 
     def _run_container(self, container: DockerContainer, timeout: float | None = None) -> float:
@@ -371,7 +325,7 @@ class Image:
             else:
                 raise ExecutionError(
                     "The program executed in the container crashed.",
-                    f"exit code: {response['StatusCode']}, error message:\n{container.logs().decode()}",
+                    detail=f"exit code: {response['StatusCode']}, error message:\n{container.logs().decode()}",
                     runtime=elapsed_time,
                 )
         except (Timeout, ConnectionError) as e:
@@ -395,7 +349,7 @@ class ProgramResult:
     """The result of a program execution."""
 
     info: ProgramRunInfo
-    battle_data: dict[str, Encodable] | None = None
+    battle_data: Encodable | None = None
 
 
 @dataclass
@@ -468,8 +422,8 @@ class Program(ABC):
         timeout: float | None = ...,
         space: int | None = ...,
         cpus: int = ...,
-        battle_input: Mapping[str, Encodable] = {},
-        battle_output: Mapping[str, type[Encodable]] = {},
+        battle_input: Encodable | None = None,
+        battle_output: type[Encodable] | None = None,
         ui: ProgramUiProxy | None = None,
     ) -> GeneratorResult | SolverResult:
         """Execute the program, processing input and output data."""
@@ -485,7 +439,7 @@ class Program(ABC):
         with TempDir() as input, TempDir() as output:
             try:
                 self._setup_folders(input, output, size, input_instance)
-            except ProgramError as e:
+            except AlgobattleBaseException as e:
                 return result_class(ProgramRunInfo(params=run_params, runtime=0, error=ExceptionInfo.from_exception(e)))
             with open(input / "info.json", "w+") as f:
                 json.dump(
@@ -494,15 +448,13 @@ class Program(ABC):
                         "timeout": timeout,
                         "space": space,
                         "cpus": cpus,
-                        "battle_input": {name: obj.__class__.__name__ for name, obj in battle_input.items()},
-                        "battle_output": {name: cls.__name__ for name, cls in battle_output.items()},
                     },
                     f,
                 )
-            if battle_input:
+            if battle_input is not None:
                 (input / "battle_data").mkdir()
                 try:
-                    encode(battle_input, input / "battle_data", size, self.role)
+                    battle_input.encode(input / "battle_data", size, self.role)
                 except Exception as e:
                     return result_class(
                         ProgramRunInfo(
@@ -511,7 +463,7 @@ class Program(ABC):
                             error=ExceptionInfo(type="EncodingError", message=f"Battle data couldn't be encoded:\n{e}"),
                         )
                     )
-            if battle_output:
+            if battle_output is not None:
                 (output / "battle_data").mkdir()
 
             try:
@@ -524,7 +476,7 @@ class Program(ABC):
                         error=ExceptionInfo.from_exception(e),
                     )
                 )
-            except ProgramError as e:
+            except AlgobattleBaseException as e:
                 return result_class(
                     ProgramRunInfo(
                         params=run_params,
@@ -535,7 +487,7 @@ class Program(ABC):
 
             try:
                 output_data = self._parse_output(output, size, input_instance)
-            except ProgramError as e:
+            except AlgobattleBaseException as e:
                 return result_class(
                     ProgramRunInfo(
                         params=run_params,
@@ -545,7 +497,7 @@ class Program(ABC):
                 )
 
             if battle_output:
-                decoded_battle_output = decode(battle_output, output / "battle_data", size, self.role)
+                decoded_battle_output = battle_output.decode(output / "battle_data", size, self.role)
             else:
                 decoded_battle_output = None
 
@@ -601,8 +553,12 @@ class Generator(Program):
             raise
         except Exception as e:
             raise EncodingError("Error thrown while decoding the problem instance.", detail=str(e)) from e
-        if not problem.is_valid(size):
-            raise EncodingError("Instance is not valid.")
+        try:
+            problem.validate_instance(size)
+        except ValidationError:
+            raise
+        except Exception as e:
+            raise ValidationError("Unknown error during instance validation.", detail=str(e)) from e
 
         if problem.with_solution:
             try:
@@ -610,9 +566,13 @@ class Generator(Program):
             except EncodingError:
                 raise
             except Exception as e:
-                raise EncodingError("Error thrown while decoding the solution.", str(e)) from e
-            if not solution.is_valid(problem, size):
-                raise EncodingError("Solution is not valid.")
+                raise EncodingError("Error thrown while decoding the solution.", detail=str(e)) from e
+            try:
+                solution.validate_solution(problem, size)
+            except ValidationError:
+                raise
+            except Exception as e:
+                raise ValidationError("Unknown error during solution validation.", detail=str(e)) from e
         else:
             solution = None
         return _GenResData(problem, solution)
@@ -624,8 +584,8 @@ class Generator(Program):
         timeout: float | None = ...,
         space: int | None = ...,
         cpus: int = ...,
-        battle_input: Mapping[str, Encodable] = {},
-        battle_output: Mapping[str, type[Encodable]] = {},
+        battle_input: Encodable | None = None,
+        battle_output: type[Encodable] | None = None,
         ui: ProgramUiProxy | None = None,
     ) -> GeneratorResult:
         """Execute the generator, passing in the size and processing the created problem instance."""
@@ -662,9 +622,13 @@ class Solver(Program):
         except EncodingError:
             raise
         except Exception as e:
-            raise EncodingError(f"The output of team {self.team_name}'s {self.role} can not be decoded properly!\n{e}") from e
-        if not solution.is_valid(instance, size):
-            raise EncodingError(f"{self.role.capitalize()} of team {self.team_name} output an invalid solution!")
+            raise EncodingError("Error thrown while decoding the solution.", detail=str(e)) from e
+        try:
+            solution.validate_solution(instance, size)
+        except ValidationError:
+            raise
+        except Exception as e:
+            raise ValidationError("Unknown error during solution validation.", detail=str(e)) from e
         return solution
 
     async def run(
@@ -675,8 +639,8 @@ class Solver(Program):
         timeout: float | None = ...,
         space: int | None = ...,
         cpus: int = ...,
-        battle_input: Mapping[str, Encodable] = {},
-        battle_output: Mapping[str, type[Encodable]] = {},
+        battle_input: Encodable | None = None,
+        battle_output: type[Encodable] | None = None,
         ui: ProgramUiProxy | None = None,
     ) -> SolverResult:
         """Execute the solver, passing in the problem instance and processing the created solution."""

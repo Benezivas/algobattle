@@ -7,8 +7,8 @@ from algobattle.cli import BattleConfig, ExecutionConfig, parse_cli_args
 from algobattle.battle import Fight, Iterated, Averaged
 from algobattle.match import MatchConfig, Match, Ui
 from algobattle.team import Team, Matchup, TeamHandler, TeamInfo
-from algobattle.docker_util import DockerConfig, ProgramRunInfo, RunParameters, get_os_type
-from .testsproblem import Problem as TestProblem
+from algobattle.docker_util import DockerConfig, ProgramRunInfo, RunParameters
+from .testsproblem.problem import TestProblem
 
 
 class TestTeam(Team):
@@ -120,7 +120,7 @@ class Matchtests(TestCase):
         """Two teams should get an equal amount of points if both solved a problem equally well."""
         match = Match(**self.team_dict)
         battle = Averaged()
-        battle.fight_results = dummy_result(.5, .5, .5)
+        battle.fight_results = dummy_result(0.5, 0.5, 0.5)
         match.insert_battle(battle, self.matchup0)
         match.insert_battle(battle, self.matchup1)
         self.assertEqual(match.calculate_points(100), {self.team0.name: 50, self.team1.name: 50})
@@ -140,9 +140,9 @@ class Matchtests(TestCase):
         """One team should get more points than the other if it performed better."""
         match = Match(**self.team_dict)
         battle = Averaged()
-        battle.fight_results = dummy_result(.6, .6, .6)
+        battle.fight_results = dummy_result(0.6, 0.6, 0.6)
         battle2 = Averaged()
-        battle2.fight_results = dummy_result(.4, .4, .4)
+        battle2.fight_results = dummy_result(0.4, 0.4, 0.4)
         match.insert_battle(battle, self.matchup0)
         match.insert_battle(battle2, self.matchup1)
         self.assertEqual(match.calculate_points(100), {self.team0.name: 40, self.team1.name: 60})
@@ -164,9 +164,6 @@ class Execution(IsolatedAsyncioTestCase):
         cls.avg_config = Averaged.BattleConfig(instance_size=5, iterations=3)
         cls.generator = problem_path / "generator"
         cls.solver = problem_path / "solver"
-        if get_os_type() == "windows":
-            cls.generator /= "Dockerfile_windows"
-            cls.solver /= "Dockerfile_windows"
 
     async def test_basic(self):
         team = TeamInfo("team0", self.generator, self.solver)
@@ -194,11 +191,13 @@ class Parsing(TestCase):
         path = Path(__file__).parent
         cls.problem_path = path / "testsproblem"
         cls.configs_path = path / "configs"
-        cls.teams = [TeamInfo(
-            name="team_0",
-            generator=cls.problem_path / "generator",
-            solver=cls.problem_path / "solver",
-        )]
+        cls.teams = [
+            TeamInfo(
+                name="team_0",
+                generator=cls.problem_path / "generator",
+                solver=cls.problem_path / "solver",
+            )
+        ]
 
     def test_no_cfg_default(self):
         problem, cfg = parse_cli_args([str(self.problem_path)])
@@ -207,30 +206,29 @@ class Parsing(TestCase):
         self.assertEqual(cfg.battle_config, Iterated.BattleConfig())
 
     def test_empty_cfg(self):
-        problem, cfg = parse_cli_args(
-            [str(self.problem_path), "--config", str(self.configs_path / "empty.toml")]
-        )
+        problem, cfg = parse_cli_args([str(self.problem_path), "--config", str(self.configs_path / "empty.toml")])
         self.assertEqual(problem, self.problem_path)
         self.assertEqual(cfg, BattleConfig(teams=self.teams))
         self.assertEqual(cfg.battle_config, Iterated.BattleConfig())
 
     def test_cfg(self):
-        problem, cfg = parse_cli_args(
-            [str(self.problem_path), "--config", str(self.configs_path / "test.toml")]
-        )
+        problem, cfg = parse_cli_args([str(self.problem_path), "--config", str(self.configs_path / "test.toml")])
         self.assertEqual(problem, self.problem_path)
-        self.assertEqual(cfg, BattleConfig(
-            match=MatchConfig(
-                points=10,
-                battle_type=Averaged,
+        self.assertEqual(
+            cfg,
+            BattleConfig(
+                match=MatchConfig(
+                    points=10,
+                    battle_type=Averaged,
+                ),
+                teams=self.teams,
+                execution=ExecutionConfig(safe_build=True),
+                docker=DockerConfig(generator=RunParameters(space=10)),
+                battle={
+                    "averaged": Averaged.BattleConfig(iterations=1),
+                },
             ),
-            teams=self.teams,
-            execution=ExecutionConfig(safe_build=True),
-            docker=DockerConfig(generator=RunParameters(space=10)),
-            battle={
-                "averaged": Averaged.BattleConfig(iterations=1),
-            }
-        ))
+        )
 
     def test_cli(self):
         problem, cfg = parse_cli_args(
@@ -244,18 +242,21 @@ class Parsing(TestCase):
             ]
         )
         self.assertEqual(problem, self.problem_path)
-        self.assertEqual(cfg, BattleConfig(
-            match=MatchConfig(
-                points=10,
-                battle_type=Averaged,
+        self.assertEqual(
+            cfg,
+            BattleConfig(
+                match=MatchConfig(
+                    points=10,
+                    battle_type=Averaged,
+                ),
+                teams=self.teams,
+                execution=ExecutionConfig(safe_build=True),
+                docker=DockerConfig(generator=RunParameters(space=10)),
+                battle={
+                    "averaged": Averaged.BattleConfig(iterations=1),
+                },
             ),
-            teams=self.teams,
-            execution=ExecutionConfig(safe_build=True),
-            docker=DockerConfig(generator=RunParameters(space=10)),
-            battle={
-                "averaged": Averaged.BattleConfig(iterations=1),
-            },
-        ))
+        )
 
     def test_cli_overwrite_cfg(self):
         problem, cfg = parse_cli_args(
@@ -269,18 +270,21 @@ class Parsing(TestCase):
             ]
         )
         self.assertEqual(problem, self.problem_path)
-        self.assertEqual(cfg, BattleConfig(
-            match=MatchConfig(
-                points=20,
-                battle_type=Iterated,
+        self.assertEqual(
+            cfg,
+            BattleConfig(
+                match=MatchConfig(
+                    points=20,
+                    battle_type=Iterated,
+                ),
+                teams=self.teams,
+                execution=ExecutionConfig(safe_build=True),
+                docker=DockerConfig(generator=RunParameters(space=10)),
+                battle={
+                    "averaged": Averaged.BattleConfig(iterations=1),
+                },
             ),
-            teams=self.teams,
-            execution=ExecutionConfig(safe_build=True),
-            docker=DockerConfig(generator=RunParameters(space=10)),
-            battle={
-                "averaged": Averaged.BattleConfig(iterations=1),
-            },
-        ))
+        )
 
     def test_cli_no_problem_path(self):
         with self.assertRaises(SystemExit):
@@ -292,9 +296,9 @@ class Parsing(TestCase):
 
     def test_cfg_team(self):
         _, cfg = parse_cli_args([str(self.problem_path), f"--config={self.configs_path / 'teams.toml'}"])
-        self.assertEqual(cfg, BattleConfig(
-            teams=[TeamInfo("team 1", Path(), Path()), TeamInfo("team 2", Path(), Path())]
-        ))
+        self.assertEqual(
+            cfg, BattleConfig(teams=[TeamInfo("team 1", Path(), Path()), TeamInfo("team 2", Path(), Path())])
+        )
 
     def test_cfg_team_no_name(self):
         with self.assertRaises(ValueError):

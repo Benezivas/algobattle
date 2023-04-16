@@ -14,11 +14,10 @@ from algobattle.docker_util import (
     Solver,
     client,
     DockerImage,
-    get_os_type,
 )
 from algobattle.util import TempDir
 from . import testsproblem
-from .testsproblem.problem import Tests as TestProblem
+from .testsproblem.problem import TestProblem as TestProblem
 
 
 class ImageTests(IsolatedAsyncioTestCase):
@@ -53,7 +52,7 @@ class ImageTests(IsolatedAsyncioTestCase):
         with self.assertRaises(RuntimeError):
             nonexistent_file = None
             while nonexistent_file is None or nonexistent_file.exists():
-                nonexistent_file = Path(str(random.randint(0, 2 ** 80)))
+                nonexistent_file = Path(str(random.randint(0, 2**80)))
             with Image.build(nonexistent_file, "foo_bar"):
                 pass
 
@@ -92,10 +91,7 @@ class ProgramTests(IsolatedAsyncioTestCase):
 
     @classmethod
     def dockerfile(cls, name: str) -> tuple[Path, str]:
-        if get_os_type() == "windows":
-            return cls.problem_path / name / "Dockerfile_windows", name
-        else:
-            return cls.problem_path / name, name
+        return cls.problem_path / name, name
 
     async def test_gen_timeout(self):
         """The generator times out."""
@@ -123,7 +119,7 @@ class ProgramTests(IsolatedAsyncioTestCase):
         with Generator.build(*self.dockerfile("generator_semantics_error"), TestProblem, self.params) as gen:
             res = await gen.run(5)
             assert res.info.error is not None
-            self.assertEqual(res.info.error.type, "EncodingError")
+            self.assertEqual(res.info.error.type, "ValidationError")
 
     async def test_gen_succ(self):
         """The generator returns the fixed instance."""
@@ -158,7 +154,7 @@ class ProgramTests(IsolatedAsyncioTestCase):
         with Solver.build(*self.dockerfile("solver_semantics_error"), TestProblem, self.params) as sol:
             res = await sol.run(self.instance, 5)
             assert res.info.error is not None
-            self.assertEqual(res.info.error.type, "EncodingError")
+            self.assertEqual(res.info.error.type, "ValidationError")
 
     async def test_sol_succ(self):
         """The solver outputs a solution with a low quality."""

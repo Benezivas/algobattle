@@ -9,7 +9,6 @@ from typing import (
     Any,
     ClassVar,
     Literal,
-    Mapping,
     Protocol,
     TypeAlias,
     TypeVar,
@@ -97,10 +96,10 @@ class FightHandler:
         timeout_solver: float | None = ...,
         space_solver: int | None = ...,
         cpus_solver: int = ...,
-        generator_battle_input: Mapping[str, Encodable] = {},
-        solver_battle_input: Mapping[str, Encodable] = {},
-        generator_battle_output: Mapping[str, type[Encodable]] = {},
-        solver_battle_output: Mapping[str, type[Encodable]] = {},
+        generator_battle_input: Encodable | None = None,
+        solver_battle_input: Encodable | None = None,
+        generator_battle_output: type[Encodable] | None = None,
+        solver_battle_output: type[Encodable] | None = None,
     ) -> Fight:
         """Execute a single fight of a battle between the given programs."""
         ui = self._ui.fight_ui
@@ -176,7 +175,11 @@ class Battle(BaseModel):
 
         @classmethod
         def as_argparse_args(cls) -> list[tuple[str, dict[str, Any]]]:
-            """Constructs a list of argument names and `**kwargs` that can be passed to `ArgumentParser.add_argument()`."""
+            """Transforms the config specification into argparse arguments.
+
+            Constructs a list of argument names and `**kwargs` that can be passed
+            to `ArgumentParser.add_argument()`.
+            """
             arguments: list[tuple[str, dict[str, Any]]] = []
             resolved_annotations = get_type_hints(cls)
             for name, model_field in cls.__fields__.items():
@@ -233,10 +236,6 @@ class Battle(BaseModel):
         """Calculates the next instance size that should be fought over."""
         raise NotImplementedError
 
-    def archive(self) -> dict[str, Any]:
-        """Encodes the battle data into a jsonable dict."""
-        return {"run_exception": self.run_exception}
-
 
 class Iterated(Battle):
     """Class that executes an iterated battle."""
@@ -248,7 +247,9 @@ class Iterated(Battle):
         rounds: int = Field(default=5, help="Repeats the battle and averages the results.")
         iteration_cap: int = Field(default=50_000, help="Maximum instance size that will be tried.")
         exponent: int = Field(default=2, help="Determines how quickly the instance size grows.")
-        approximation_ratio: float = Field(default=1, help="Approximation ratio that a solver needs to achieve to pass.")
+        approximation_ratio: float = Field(
+            default=1, help="Approximation ratio that a solver needs to achieve to pass."
+        )
 
     @inherit_docs
     class UiData(Battle.UiData):
@@ -339,7 +340,8 @@ class Averaged(Battle):
         """
         if config.instance_size < min_size:
             raise ValueError(
-                f"The problem specifies a minimum size of {min_size} but the chosen size is only {config.instance_size}!"
+                f"The problem specifies a minimum size of {min_size} "
+                "but the chosen size is only {config.instance_size}!"
             )
         for i in range(config.iterations):
             ui.update_data(self.UiData(round=i + 1))
