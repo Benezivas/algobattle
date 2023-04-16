@@ -9,7 +9,7 @@ from typing import Any, ClassVar, Literal, Protocol, Self, Generic, TypeAlias, T
 from pydantic import Field
 from pydantic.generics import GenericModel
 
-from algobattle.util import Encodable, EncodableModel, Role, inherit_docs, ValidationError
+from algobattle.util import Encodable, EncodableModel, ValidationError
 
 
 _Problem: TypeAlias = Any
