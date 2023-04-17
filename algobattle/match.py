@@ -141,23 +141,20 @@ class Match(BaseModel):
 
     @overload
     def battle(self, matchup: Matchup) -> Battle | None:
+        ...
+
+    @overload
+    def battle(self, *, generating: Team, solving: Team) -> Battle | None:
+        ...
+
+    def battle(
+        self, matchup: Matchup | None = None, *, generating: Team | None = None, solving: Team | None = None
+    ) -> Battle | None:
         """Helper method to look up the battle between a specific matchup.
 
         Returns:
             The battle if it has started already, otherwise `None`.
         """
-
-    @overload
-    def battle(self, *, generating: Team, solving: Team) -> Battle | None:
-        """Helper method to look up the battle between two teams.
-
-        Returns:
-            The battle if it has started already, otherwise `None`.
-        """
-
-    def battle(
-        self, matchup: Matchup | None = None, *, generating: Team | None = None, solving: Team | None = None
-    ) -> Battle | None:
         try:
             if matchup is not None:
                 return self.results[matchup.generator.name][matchup.solver.name]
@@ -169,11 +166,11 @@ class Match(BaseModel):
 
     @overload
     def insert_battle(self, battle: Battle, matchup: Matchup) -> None:
-        """Helper method to insert a new battle for a specific matchup."""
+        ...
 
     @overload
     def insert_battle(self, battle: Battle, *, generating: Team, solving: Team) -> None:
-        """Helper method to insert a new battle for two specific teams."""
+        ...
 
     def insert_battle(
         self,
@@ -183,6 +180,7 @@ class Match(BaseModel):
         generating: Team | None = None,
         solving: Team | None = None,
     ) -> None:
+        """Helper method to insert a new battle for a specific matchup."""
         if matchup is not None:
             self.results[matchup.generator.name][matchup.solver.name] = battle
         elif generating is not None and solving is not None:
