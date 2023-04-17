@@ -43,7 +43,7 @@ def inherit_docs(obj: T) -> T:
 
 def check_path(path: str, *, type: Literal["file", "dir", "exists"] = "exists") -> Path:
     """Parses a string into a :cls:`Path` and checks that it is valid.
-    
+
     Args:
         path: The string to be parsed.
         type: What kind of check to perform on the path.
@@ -113,7 +113,7 @@ class Encodable(ABC):
     @classmethod
     def io_schema(cls) -> str | None:
         """Generates a schema specifying the I/O for this data.
-        
+
         The schema should specify the structure of the data in the input and output folders.
         In particular, the specification should match precisely what :meth`.decode` accepts, and the output of
         :meth:`.encode` should comply with it.
@@ -185,6 +185,12 @@ class AlgobattleBaseException(Exception):
     """Base exception class for errors used by the algobattle package."""
 
     def __init__(self, message: str, *, detail: str | None = None) -> None:
+        """Base exception class for errors used by the algobattle package.
+
+        Args:
+            message: Simple error message that can always be displayed.
+            detail: More detailed error message that may include sensitive information.
+        """
         self.message = message
         self.detail = detail
         super().__init__()
@@ -206,6 +212,13 @@ class ExecutionError(AlgobattleBaseException):
     """Indicates that the program could not be executed successfully."""
 
     def __init__(self, message: str, *, detail: str | None = None, runtime: float) -> None:
+        """Indicates that the program could not be executed successfully.
+
+        Args:
+            message: Simple error message that can always be displayed.
+            runtime: Runtime of the program in seconds until the error occured.
+            detail: More detailed error message that may include sensitive information.
+        """
         self.runtime = runtime
         super().__init__(message, detail=detail)
 
