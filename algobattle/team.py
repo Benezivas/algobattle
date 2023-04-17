@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 from itertools import combinations
 from pathlib import Path
-from typing import Iterable, Iterator, Self
+from typing import Iterator, Self
 
 from algobattle.docker_util import DockerConfig, DockerError, ArchivedImage, Generator, Solver
 from algobattle.problem import Problem
