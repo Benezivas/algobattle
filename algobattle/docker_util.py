@@ -120,7 +120,7 @@ class Image:
         "network_mode": "none",
     }
     """Advanced docker options passed to the docker run command.
-    
+
     A full description can be found at the docker api reference."""
     build_kwargs: ClassVar[dict[str, Any]] = {
         "rm": True,
@@ -129,7 +129,7 @@ class Image:
         "network_mode": "host",
     }
     """Advanced docker options passed to the docker build command.
-    
+
     A full description can be found at the docker api reference."""
 
     @classmethod
