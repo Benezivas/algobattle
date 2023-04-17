@@ -120,19 +120,12 @@ class Matchup:
         return f"Matchup({self.generator.name}, {self.solver.name})"
 
 
+@dataclass
 class TeamHandler:
     """Handles building teams and cleaning them up."""
 
-    def __init__(self, teams: Iterable[Team] | None = None, excluded: Iterable[TeamInfo] | None = None) -> None:
-        if teams is not None:
-            self.active = list(teams)
-        else:
-            self.active = []
-        if excluded is not None:
-            self.excluded = list(excluded)
-        else:
-            self.excluded = []
-        super().__init__()
+    active: list[Team]
+    excluded: list[TeamInfo]
 
     @classmethod
     def build(cls, infos: list[TeamInfo], problem: type[Problem], config: DockerConfig) -> Self:
