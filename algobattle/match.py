@@ -3,16 +3,18 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
 from itertools import combinations
-from typing import Self, overload
+from pathlib import Path
+import tomllib
+from typing import Mapping, Self, overload
 
 from pydantic import validator, Field
 from anyio import create_task_group, CapacityLimiter, TASK_STATUS_IGNORED
 from anyio.to_thread import current_default_thread_limiter
 from anyio.abc import TaskStatus
 
-from algobattle.battle import Battle, FightHandler, FightUiProxy, Iterated, BattleUiProxy
-from algobattle.docker_util import ProgramRunInfo, ProgramUiProxy
-from algobattle.team import Matchup, Team, TeamHandler
+from algobattle.battle import Battle, FightHandler, FightUiProxy, BattleUiProxy
+from algobattle.docker_util import DockerConfig, Image, ProgramRunInfo, ProgramUiProxy
+from algobattle.team import Matchup, Team, TeamHandler, TeamInfo
 from algobattle.problem import Problem
 from algobattle.util import Role, TimerInfo, inherit_docs, BaseModel, str_with_traceback
 
@@ -20,30 +22,44 @@ from algobattle.util import Role, TimerInfo, inherit_docs, BaseModel, str_with_t
 class MatchConfig(BaseModel):
     """Parameters determining the match execution."""
 
-    battle_type: type[Battle] = Iterated
+    battle_type: str = "Iterated"
     points: int = 100
     parallel_battles: int = 1
+    teams: list[TeamInfo] = []
+    docker: DockerConfig = DockerConfig()
+    battle: dict[str, Battle.BattleConfig] = {n: b.BattleConfig() for n, b in Battle.all().items()}
 
     @validator("battle_type", pre=True)
-    def parse_battle_type(cls, value):
-        """Parses the battle type class object from its name."""
-        if isinstance(value, str):
-            all = Battle.all()
-            if value in all:
-                return all[value]
-            else:
-                raise ValueError
-        elif issubclass(value, Battle):
+    def validate_battle_type(cls, value):
+        """Validates that the given battle type is a correct name of a battle class."""
+        if value in Battle.all():
             return value
         else:
+            raise ValueError
+
+    @validator("battle", pre=True)
+    def val_battle_configs(cls, vals):
+        """Parses the dict of battle configs into their corresponding config objects."""
+        battle_types = Battle.all()
+        if not isinstance(vals, Mapping):
             raise TypeError
+        out = {}
+        for name, battle_cls in battle_types.items():
+            data = vals.get(name, {})
+            out[name] = battle_cls.BattleConfig.parse_obj(data)
+        return out
 
-    class Config(BaseModel.Config):
-        """Pydantic config."""
-
-        json_encoders = {
-            type[Battle]: lambda b: b.name().lower(),
-        }
+    @classmethod
+    def from_file(cls, file: Path) -> Self:
+        """Parses a config object from a toml file."""
+        if not file.is_file():
+            raise ValueError("Path doesn't point to a file.")
+        with open(file, "rb") as f:
+            try:
+                config_dict = tomllib.load(f)
+            except tomllib.TOMLDecodeError as e:
+                raise ValueError(f"The config file at {file} is not a properly formatted TOML file!\n{e}")
+        return cls.parse_obj(config_dict)
 
 
 class Match(BaseModel):
@@ -85,27 +101,32 @@ class Match(BaseModel):
     async def run(
         cls,
         config: MatchConfig,
-        battle_config: Battle.BattleConfig,
         problem: type[Problem],
-        teams: TeamHandler,
         ui: "Ui | None" = None,
     ) -> Self:
         """Executes a match with the specified parameters."""
-        result = cls(
-            active_teams=[t.name for t in teams.active],
-            excluded_teams=[t.name for t in teams.excluded],
-        )
         if ui is None:
             ui = Ui()
-        ui.match = result
-        limiter = CapacityLimiter(config.parallel_battles)
-        current_default_thread_limiter().total_tokens = config.parallel_battles
-        async with create_task_group() as tg:
-            for matchup in teams.matchups:
-                battle = config.battle_type()
-                result.results[matchup.generator.name][matchup.solver.name] = battle
-                await tg.start(result._run_battle, battle, matchup, battle_config, problem, ui, limiter)
-            return result
+        if config.docker.advanced_run_params is not None:
+            Image.run_kwargs = config.docker.advanced_run_params.to_docker_args()
+        if config.docker.advanced_build_params is not None:
+            Image.run_kwargs = config.docker.advanced_build_params.to_docker_args()
+        with TeamHandler.build(config.teams, problem, config.docker) as teams:
+            result = cls(
+                active_teams=[t.name for t in teams.active],
+                excluded_teams=[t.name for t in teams.excluded],
+            )
+            ui.match = result
+            battle_cls = Battle.all()[config.battle_type]
+            battle_config = config.battle[config.battle_type]
+            limiter = CapacityLimiter(config.parallel_battles)
+            current_default_thread_limiter().total_tokens = config.parallel_battles
+            async with create_task_group() as tg:
+                for matchup in teams.matchups:
+                    battle = battle_cls()
+                    result.results[matchup.generator.name][matchup.solver.name] = battle
+                    await tg.start(result._run_battle, battle, matchup, battle_config, problem, ui, limiter)
+                return result
 
     @overload
     def battle(self, matchup: Matchup) -> Battle | None:

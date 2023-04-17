@@ -32,8 +32,8 @@ class Utiltests(unittest.TestCase):
 
     def test_default_battle_types(self):
         """Initializing an existing battle type works as expected."""
-        self.assertEqual(Battle.all()["iterated"], Iterated)
-        self.assertEqual(Battle.all()["averaged"], Averaged)
+        self.assertEqual(Battle.all()["Iterated"], Iterated)
+        self.assertEqual(Battle.all()["Averaged"], Averaged)
 
 
 if __name__ == "__main__":
