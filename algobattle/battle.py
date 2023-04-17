@@ -71,7 +71,7 @@ class FightUiProxy(Protocol):
 
     @abstractmethod
     def end(self) -> None:
-        """Informs the ui that the new fight has finished running and has been added to the battle's `.fight_results`."""
+        """Informs the ui that the fight has finished running and has been added to the battle's `.fight_results`."""
 
 
 @dataclass
@@ -216,7 +216,8 @@ class Battle(BaseModel):
         """Object containing custom diplay data.
 
         The display data object will be displayed as key-value pairs generated from the :meth:`.field` method.
-        You can use the normally available pydantic config options to customize what these will look like."""
+        You can use the normally available pydantic config options to customize what these will look like.
+        """
 
     @staticmethod
     def all() -> dict[str, type["Battle"]]:
@@ -240,7 +241,8 @@ class Battle(BaseModel):
     def score(self) -> float:
         """Calculates the score the solver has achieved during this battle.
 
-        Should always be a nonnegative float, with higher values indicating a better performance of the solver."""
+        Should always be a nonnegative float, with higher values indicating a better performance of the solver.
+        """
         raise NotImplementedError
 
     @staticmethod

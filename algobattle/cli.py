@@ -1,6 +1,7 @@
 """Cli entrypoint to execute matches.
 
-Provides a command line interface to start matches and observe them. See `battle --help` for further options."""
+Provides a command line interface to start matches and observe them. See `battle --help` for further options.
+"""
 from argparse import ArgumentParser
 from contextlib import ExitStack
 import curses
