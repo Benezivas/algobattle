@@ -184,7 +184,7 @@ class BattleUiProxy(Protocol):
     @abstractmethod
     def update_data(self, data: "Battle.UiData") -> None:
         """Passes new custom display data to the Ui.
-        
+
         See :cls:`Battle.UiData` for further details.
         """
 
@@ -206,7 +206,7 @@ class Battle(BaseModel):
 
     class BattleConfig(BaseModel):
         """Config object for each specific battle type.
-        
+
         A custom battle type can override this class to specify config options it uses. They will be parsed from a
         dictionary located at `battle.NAME` in the main config file, where NAME is the specific batle type's name.
         The created object will then be passed to the :meth:`.run` method with its fields set accordingly.
@@ -221,7 +221,7 @@ class Battle(BaseModel):
     @staticmethod
     def all() -> dict[str, type["Battle"]]:
         """Returns a dictionary mapping the names of all registered battle types to their python classes.
-        
+
         It includes all subclasses of :cls:`Battle` that have been initialized so far, including ones exposed to the
         algobattle module via the `algobattle.battle` entrypoint hook.
         """
@@ -239,14 +239,14 @@ class Battle(BaseModel):
     @abstractmethod
     def score(self) -> float:
         """Calculates the score the solver has achieved during this battle.
-        
+
         Should always be a nonnegative float, with higher values indicating a better performance of the solver."""
         raise NotImplementedError
 
     @staticmethod
     def format_score(score: float) -> str:
         """Formats a given score nicely.
-        
+
         Purely auxialiary method that can be used to customize how a score will be rendered.
         """
         return f"{score:.2f}"
@@ -254,7 +254,7 @@ class Battle(BaseModel):
     @classmethod
     def name(cls) -> str:
         """Name of this battle type.
-        
+
         Defaults to the battle class's name. Can be used to customize this behaviour if e.g. a battle type should have a
         name that is not a valid python identifier.
         """
@@ -373,9 +373,7 @@ class Averaged(Battle):
         This simple battle type just executes `iterations` many fights after each other at size `instance_size`.
         """
         if config.instance_size < min_size:
-            raise ValueError(
-                f"size {config.instance_size} is smaller than the smallest valid size, {min_size}."
-            )
+            raise ValueError(f"size {config.instance_size} is smaller than the smallest valid size, {min_size}.")
         for i in range(config.iterations):
             ui.update_data(self.UiData(round=i + 1))
             await fight.run(config.instance_size)

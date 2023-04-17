@@ -142,7 +142,7 @@ class Match(BaseModel):
     @overload
     def battle(self, matchup: Matchup) -> Battle | None:
         """Helper method to look up the battle between a specific matchup.
-        
+
         Returns:
             The battle if it has started already, otherwise `None`.
         """
@@ -150,11 +150,10 @@ class Match(BaseModel):
     @overload
     def battle(self, *, generating: Team, solving: Team) -> Battle | None:
         """Helper method to look up the battle between two teams.
-        
+
         Returns:
             The battle if it has started already, otherwise `None`.
         """
-
 
     def battle(
         self, matchup: Matchup | None = None, *, generating: Team | None = None, solving: Team | None = None
@@ -318,7 +317,7 @@ class Ui:
             data: TimerInfo | float | ProgramRunInfo | None = None,
         ) -> None:
             self.battle_ui.ui.update_curr_fight(self.battle_ui.matchup, role, data)
-        
+
         @inherit_docs
         def end(self) -> None:
             self.battle_ui.ui.update_fights(self.battle_ui.matchup)

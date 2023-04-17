@@ -239,7 +239,7 @@ class UndirectedGraph(DirectedGraph):
 
     def validate_instance(self, size: int):
         """Validates that the graph is well formed and contains no self loops.
-        
+
         Also brings it into a normal form where every edge {u, v} occurs exactly once in the list.
         I.e. `[(0, 1), (1, 0), (1, 2)]` is accepted as valid and normalised to `[(0, 1), (1, 2)]`.
         """
