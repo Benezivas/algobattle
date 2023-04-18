@@ -10,7 +10,7 @@ from tempfile import TemporaryDirectory
 from traceback import format_exception
 from typing import Any, Iterable, Literal, TypeVar, Self
 
-from pydantic import BaseConfig, BaseModel, Extra, ValidationError as PydanticValidationError
+from pydantic import BaseConfig, BaseModel as PydandticBaseModel, Extra, ValidationError as PydanticValidationError
 
 
 Role = Literal["generator", "solver"]
@@ -23,7 +23,7 @@ def str_with_traceback(exception: Exception) -> str:
     return "\n".join(format_exception(exception))
 
 
-class BaseModel(BaseModel):
+class BaseModel(PydandticBaseModel):
     """Base class for all pydantic models."""
 
     class Config(BaseConfig):
