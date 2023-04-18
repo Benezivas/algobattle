@@ -522,7 +522,7 @@ class Generator(Program):
 
     def _encode_input(self, input: Path, output: Path, size: int, instance: Problem | None) -> None:
         assert instance is None
-        with open(input / "size", "w+") as f:
+        with open(input / "size.txt", "w+") as f:
             f.write(str(size))
 
     def _parse_output(self, output: Path, size: int, instance: Problem | None) -> _GenResData:
