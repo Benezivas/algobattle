@@ -391,7 +391,7 @@ class Program(ABC):
         return cls(image, config, problem_class)
 
     @abstractmethod
-    def _setup_folders(self, input: Path, output: Path, size: int, instance: Problem | None) -> None:
+    def _encode_input(self, input: Path, output: Path, size: int, instance: Problem | None) -> None:
         """Sets up the i/o folders as required for the specific type of program."""
         raise NotImplementedError
 
@@ -424,7 +424,7 @@ class Program(ABC):
 
         with TempDir() as input, TempDir() as output:
             try:
-                self._setup_folders(input, output, size, input_instance)
+                self._encode_input(input, output, size, input_instance)
             except AlgobattleBaseException as e:
                 return result_class(ProgramRunInfo(params=run_params, runtime=0, error=ExceptionInfo.from_exception(e)))
             with open(input / "info.json", "w+") as f:
@@ -438,7 +438,6 @@ class Program(ABC):
                     f,
                 )
             if battle_input is not None:
-                (input / "battle_data").mkdir()
                 try:
                     battle_input.encode(input / "battle_data", size, self.role)
                 except Exception as e:
@@ -449,8 +448,6 @@ class Program(ABC):
                             error=ExceptionInfo(type="EncodingError", message=f"Battle data couldn't be encoded:\n{e}"),
                         )
                     )
-            if battle_output is not None:
-                (output / "battle_data").mkdir()
 
             try:
                 runtime = await self.image.run(input, output, timeout=timeout, memory=space, cpus=cpus, ui=ui)
@@ -523,13 +520,10 @@ class Generator(Program):
 
     role: ClassVar[Role] = "generator"
 
-    def _setup_folders(self, input: Path, output: Path, size: int, instance: Problem | None) -> None:
+    def _encode_input(self, input: Path, output: Path, size: int, instance: Problem | None) -> None:
         assert instance is None
-        with open(input / "size", "w+") as f:
+        with open(input / "size.txt", "w+") as f:
             f.write(str(size))
-        (output / "instance").mkdir()
-        if self.problem_class.with_solution:
-            (output / "solution").mkdir()
 
     def _parse_output(self, output: Path, size: int, instance: Problem | None) -> _GenResData:
         assert instance is None
@@ -608,11 +602,9 @@ class Solver(Program):
 
     role: ClassVar[Role] = "solver"
 
-    def _setup_folders(self, input: Path, output: Path, size: int, instance: Problem | None) -> None:
+    def _encode_input(self, input: Path, output: Path, size: int, instance: Problem | None) -> None:
         assert instance is not None
-        (input / "instance").mkdir()
         instance.encode(input / "instance", size, self.role)
-        (output / "solution").mkdir()
 
     def _parse_output(self, output: Path, size: int, instance: Problem | None) -> Problem.Solution:
         assert instance is not None

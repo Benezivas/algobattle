@@ -8,9 +8,9 @@ from datetime import datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from traceback import format_exception
-from typing import Any, ClassVar, Iterable, Literal, TypeVar, Self
+from typing import Any, Iterable, Literal, TypeVar, Self
 
-from pydantic import BaseConfig, BaseModel, Extra, ValidationError as PydanticValidationError
+from pydantic import BaseConfig, BaseModel as PydandticBaseModel, Extra, ValidationError as PydanticValidationError
 
 
 Role = Literal["generator", "solver"]
@@ -23,7 +23,7 @@ def str_with_traceback(exception: Exception) -> str:
     return "\n".join(format_exception(exception))
 
 
-class BaseModel(BaseModel):
+class BaseModel(PydandticBaseModel):
     """Base class for all pydantic models."""
 
     class Config(BaseConfig):
@@ -80,12 +80,13 @@ class Encodable(ABC):
 
     @classmethod
     @abstractmethod
-    def decode(cls, source_dir: Path, size: int, team: Role) -> Self:
-        """Decodes the data found in the given folder into a python object.
+    def decode(cls, source: Path, size: int, team: Role) -> Self:
+        """Decodes the data found at the given path into a python object.
 
         Args:
-            source_dir: Path to a directory containing the data that can be used to construct an instance of this class.
-            size: The size of the data to be decoded.
+            source: Path to data that can be used to construct an instance of this class. May either point to a folder
+                or a single file. The expected type of path should be consistent with the result of :meth:`.encode`.
+            size: The size of the fight for which this data is being decoded.
             team: Role of the team that output the data.
 
         Raises:
@@ -97,11 +98,13 @@ class Encodable(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def encode(self, target_dir: Path, size: int, team: Role) -> None:
-        """Encodes the object into a folder that can be passed to a program.
+    def encode(self, target: Path, size: int, team: Role) -> None:
+        """Encodes the object onto the file system so that it can be passed to a program.
 
         Args:
-            target_dir: Path to a directory that will be passed as the input of a program.
+            target: Path to the location where the program expects the encoded data. :meth:`.encode` may either create
+                a single file at the target location, or an entire folder. If creating a single file, it may append a
+                file type ending to the path. It should not affect any other files or directories.
             size: The size of the data to be encoded.
             team: Role of the team that receives the data.
 
@@ -114,7 +117,7 @@ class Encodable(ABC):
     def io_schema(cls) -> str | None:
         """Generates a schema specifying the I/O for this data.
 
-        The schema should specify the structure of the data in the input and output folders.
+        The schema should specify the structure of the data in the input and output files or folders.
         In particular, the specification should match precisely what :meth`.decode` accepts, and the output of
         :meth:`.encode` should comply with it.
 
@@ -127,23 +130,20 @@ class Encodable(ABC):
 class EncodableModel(BaseModel, Encodable, ABC):
     """Problem data that can easily be encoded into and decoded from json files."""
 
-    filename: ClassVar[str]
-
     @classmethod
-    def decode(cls, source_dir: Path, size: int, team: Role) -> Self:
-        """Uses pydantic to create a python object from a json file found at `source_dir / cls.filename`."""
+    def decode(cls, source: Path, size: int, team: Role) -> Self:
+        """Uses pydantic to create a python object from a `.json` file."""
         try:
-            return cls.parse_file(source_dir / cls.filename)
+            return cls.parse_file(source.with_suffix(".json"))
         except PydanticValidationError as e:
             raise EncodingError("Json data does not fit the schema.", detail=str(e))
         except Exception as e:
             raise EncodingError("Unknown error while decoding the data.", detail=str(e))
 
-    @inherit_docs
-    def encode(self, target_dir: Path, size: int, team: Role) -> None:
-        """Uses pydantic to create a json representation of the object at `target_dir / cls.filename`."""
+    def encode(self, target: Path, size: int, team: Role) -> None:
+        """Uses pydantic to create a json representation of the object at the targeted file."""
         try:
-            with open(target_dir / self.filename, "w") as f:
+            with open(target.with_suffix(".json"), "w") as f:
                 f.write(self.json(exclude=self._excludes(team)))
         except Exception as e:
             raise EncodingError("Unkown error while encoding the data.", detail=str(e))
