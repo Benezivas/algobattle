@@ -130,23 +130,20 @@ class Encodable(ABC):
 class EncodableModel(BaseModel, Encodable, ABC):
     """Problem data that can easily be encoded into and decoded from json files."""
 
-    filename: ClassVar[str]
-
     @classmethod
-    def decode(cls, source_dir: Path, size: int, team: Role) -> Self:
-        """Uses pydantic to create a python object from a json file found at `source_dir / cls.filename`."""
+    def decode(cls, source: Path, size: int, team: Role) -> Self:
+        """Uses pydantic to create a python object from a `.json` file."""
         try:
-            return cls.parse_file(source_dir / cls.filename)
+            return cls.parse_file(source.with_suffix(".json"))
         except PydanticValidationError as e:
             raise EncodingError("Json data does not fit the schema.", detail=str(e))
         except Exception as e:
             raise EncodingError("Unknown error while decoding the data.", detail=str(e))
 
-    @inherit_docs
-    def encode(self, target_dir: Path, size: int, team: Role) -> None:
-        """Uses pydantic to create a json representation of the object at `target_dir / cls.filename`."""
+    def encode(self, target: Path, size: int, team: Role) -> None:
+        """Uses pydantic to create a json representation of the object at the targeted file."""
         try:
-            with open(target_dir / self.filename, "w") as f:
+            with open(target.with_suffix(".json"), "w") as f:
                 f.write(self.json(exclude=self._excludes(team)))
         except Exception as e:
             raise EncodingError("Unkown error while encoding the data.", detail=str(e))

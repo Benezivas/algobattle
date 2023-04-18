@@ -189,7 +189,6 @@ class Problem(Encodable, ABC):
 class ProblemModel(EncodableModel, Problem, ABC):
     """A Problem that can easily be parsed to/from a json file."""
 
-    filename: ClassVar[str] = "instance.json"
     export: ClassVar[bool] = False
 
     class Config(EncodableModel.Config):
@@ -207,8 +206,6 @@ class ProblemModel(EncodableModel, Problem, ABC):
 
 class SolutionModel(EncodableModel, Problem.Solution, ABC):
     """A solution that can easily be parsed to/from a json file."""
-
-    filename: ClassVar[str] = "solution.json"
 
     class Config(EncodableModel.Config):
         """Pydantic config object to hide these fields in the json if someone redeclared them incorrectly."""
