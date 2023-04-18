@@ -391,7 +391,7 @@ class Program(ABC):
         return cls(image, config, problem_class)
 
     @abstractmethod
-    def _setup_folders(self, input: Path, output: Path, size: int, instance: Problem | None) -> None:
+    def _encode_input(self, input: Path, output: Path, size: int, instance: Problem | None) -> None:
         """Sets up the i/o folders as required for the specific type of program."""
         raise NotImplementedError
 
@@ -424,7 +424,7 @@ class Program(ABC):
 
         with TempDir() as input, TempDir() as output:
             try:
-                self._setup_folders(input, output, size, input_instance)
+                self._encode_input(input, output, size, input_instance)
             except AlgobattleBaseException as e:
                 return result_class(ProgramRunInfo(params=run_params, runtime=0, error=ExceptionInfo.from_exception(e)))
             with open(input / "info.json", "w+") as f:
@@ -520,7 +520,7 @@ class Generator(Program):
 
     role: ClassVar[Role] = "generator"
 
-    def _setup_folders(self, input: Path, output: Path, size: int, instance: Problem | None) -> None:
+    def _encode_input(self, input: Path, output: Path, size: int, instance: Problem | None) -> None:
         assert instance is None
         with open(input / "size", "w+") as f:
             f.write(str(size))
@@ -602,7 +602,7 @@ class Solver(Program):
 
     role: ClassVar[Role] = "solver"
 
-    def _setup_folders(self, input: Path, output: Path, size: int, instance: Problem | None) -> None:
+    def _encode_input(self, input: Path, output: Path, size: int, instance: Problem | None) -> None:
         assert instance is not None
         instance.encode(input / "instance", size, self.role)
 
