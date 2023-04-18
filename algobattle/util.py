@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from traceback import format_exception
-from typing import Any, ClassVar, Iterable, Literal, TypeVar, Self
+from typing import Any, Iterable, Literal, TypeVar, Self
 
 from pydantic import BaseConfig, BaseModel, Extra, ValidationError as PydanticValidationError
 
