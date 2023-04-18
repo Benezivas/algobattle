@@ -1,5 +1,5 @@
 """Problem class built for tests."""
-from typing import ClassVar, SupportsFloat
+from typing import ClassVar
 
 from algobattle.problem import ProblemModel, SolutionModel
 from algobattle.util import ValidationError
@@ -27,5 +27,5 @@ class TestProblem(ProblemModel):
         if not self.semantics:
             raise ValidationError("")
 
-    def calculate_score(self, solution: Solution, generator_solution: Solution | None, size: int) -> SupportsFloat:
+    def calculate_score(self, solution: Solution, generator_solution: Solution | None, size: int) -> float:
         return solution.quality

@@ -1,8 +1,8 @@
-"""Team class, stores necessary information about a Team, such as their associated solver and generator."""
+"""Module containing helper classes related to teams."""
 from dataclasses import dataclass
 from itertools import combinations
 from pathlib import Path
-from typing import Iterable, Iterator, Self
+from typing import Iterator, Self
 
 from algobattle.docker_util import DockerConfig, DockerError, ArchivedImage, Generator, Solver
 from algobattle.problem import Problem
@@ -23,12 +23,9 @@ class TeamInfo:
     def build(self, problem: type[Problem], config: DockerConfig) -> "Team":
         """Builds the specified docker files into images and return the corresponding team.
 
-        Raises
-        ------
-        ValueError
-            If the team name is already in use.
-        DockerError
-            If the docker build fails for some reason
+        Raises:
+            ValueError: If the team name is already in use.
+            DockerError: If the docker build fails for some reason
         """
         name = self.name.replace(" ", "_").lower()  # Lower case needed for docker tag created from name
         if name in _team_names:
@@ -53,10 +50,8 @@ class Team:
     def __post_init__(self) -> None:
         """Creates a team object.
 
-        Raises
-        ------
-        ValueError
-            If the team name is already in use.
+        Raises:
+            ValueError: If the team name is already in use.
         """
         super().__init__()
         self.name = self.name.replace(" ", "_").lower()  # Lower case needed for docker tag created from name
@@ -125,23 +120,31 @@ class Matchup:
         return f"Matchup({self.generator.name}, {self.solver.name})"
 
 
+@dataclass
 class TeamHandler:
     """Handles building teams and cleaning them up."""
 
-    def __init__(self, teams: Iterable[Team] | None = None, excluded: Iterable[TeamInfo] | None = None) -> None:
-        if teams is not None:
-            self.active = list(teams)
-        else:
-            self.active = []
-        if excluded is not None:
-            self.excluded = list(excluded)
-        else:
-            self.excluded = []
-        super().__init__()
+    active: list[Team]
+    excluded: list[TeamInfo]
 
     @classmethod
     def build(cls, infos: list[TeamInfo], problem: type[Problem], config: DockerConfig) -> Self:
-        """Builds the specified team objects."""
+        """Builds the programs of every team.
+
+        Attempts to build the programs of every team. If any build fails, that team will be excluded and all its
+        programs cleaned up.
+        If `config.safe_build` is set, then each team's images will be archived before the other team's images are
+        built. This prevents teams to be able to see already built images during their build process and thus see data
+        they are not entitled to.
+
+        Args:
+            infos: Teams that participate in the match.
+            problem: Problem class that the match will be fought with.
+            config: Config options.
+
+        Returns:
+            :cls:`TeamHandler` containing the info about the participating teams.
+        """
         excluded: list[TeamInfo] = []
         if config.safe_build:
             with TempDir() as folder:

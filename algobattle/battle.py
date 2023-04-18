@@ -1,6 +1,7 @@
-"""Module that handles the execution of each battle.
+"""A Battle is the portion of a match where a specific team generates instances and another one solves them.
 
-The battle class is a base class for specific type of battle that can be executed.
+This module contains the :cls:`Battle` class, which speciefies how each type of battle is fought and scored,
+some basic battle types, and related classed.
 """
 from dataclasses import dataclass
 from importlib.metadata import entry_points
@@ -8,11 +9,9 @@ from abc import abstractmethod
 from typing import (
     Any,
     ClassVar,
-    Literal,
     Protocol,
     TypeAlias,
     TypeVar,
-    overload,
 )
 
 from pydantic import Field
@@ -26,62 +25,67 @@ from algobattle.docker_util import (
 from algobattle.util import Encodable, Role, TimerInfo, inherit_docs, BaseModel
 
 
-_Config: TypeAlias = Any
+_BattleConfig: TypeAlias = Any
+"""Type alias used to generate correct typings when subclassing :cls:`Battle`.
+
+Each battle type's :meth:`run` method is guaranteed to be passed an instance of its own :cls:`BattleConfig` object.
+But due to limitations in the python type system we are currently not able to express this properly.
+When creating your own battle type it is recommended to not use this alias and instead use the :cls:`BattleConfig` of
+the new battle type directly.
+"""
 T = TypeVar("T")
 
 
 class Fight(BaseModel):
-    """The result of one execution of the generator and the solver with the generated instance."""
+    """The result of one fight between the participating teams.
+
+    For a more detailed description of what each fight looks like, see :meth:`FightHandler.run`.
+    """
 
     score: float
+    """The solving Team's score.
+
+    Always a number in [0, 1]. 0 indicates a total failure of the solver, 1 that it succeeded perfectly.
+    """
     size: int
+    """The size the fight was executed at."""
     generator: ProgramRunInfo
+    """Data about the generator's execution."""
     solver: ProgramRunInfo | None
+    """Data about the solver's execution."""
 
 
 class FightUiProxy(Protocol):
-    """Provides an interface for :cls:`Fight` to update the Ui."""
+    """Provides an interface for :cls:`Fight` to update the ui."""
 
     generator: ProgramUiProxy
     solver: ProgramUiProxy
 
+    @abstractmethod
     def start(self, size: int) -> None:
-        """Informs the Ui of a newly started fight."""
-
-    @overload
-    @abstractmethod
-    def update(self, role: Literal["generator", "solver"], data: ProgramRunInfo) -> None:
-        ...
-
-    @overload
-    @abstractmethod
-    def update(self, role: None = None, data: None = None) -> None:
-        ...
+        """Informs the ui that a new fight has been started."""
 
     @abstractmethod
-    def update(
-        self,
-        role: Role | None = None,
-        data: ProgramRunInfo | None = None,
-    ) -> None:
-        """Updates the ui with info about the current fight.
+    def update(self, role: Role, data: ProgramRunInfo) -> None:
+        """Updates the ui's current fight section with new data about a program."""
 
-        `data` is either the starting time of the
-        """
+    @abstractmethod
+    def end(self) -> None:
+        """Informs the ui that the fight has finished running and has been added to the battle's `.fight_results`."""
 
 
 @dataclass
 class FightHandler:
-    """Helper class to run fights of a given matchup."""
+    """Helper class to run fights of a given battle."""
 
     _generator: Generator
     _solver: Solver
     _battle: "Battle"
-    _ui: "BattleUiProxy"
+    _ui: FightUiProxy
 
     def _saved(self, fight: Fight) -> Fight:
         self._battle.fight_results.append(fight)
-        self._ui.update_fights()
+        self._ui.end()
         return fight
 
     async def run(
@@ -99,8 +103,34 @@ class FightHandler:
         generator_battle_output: type[Encodable] | None = None,
         solver_battle_output: type[Encodable] | None = None,
     ) -> Fight:
-        """Execute a single fight of a battle between the given programs."""
-        ui = self._ui.fight_ui
+        """Execute a single fight of a battle.
+
+        First the generator will be run and its output parsed. Then the solver will be given the created instance
+        and run. Its output gets parsed into a solution, which will then be scored.
+        The timeout, space, and cpu arguments each override the corresponding match config options if set. Leaving them
+        unset results in the config options being used.
+
+        Args:
+            size: The instance size the fight is fought at.
+            timeout_generator: Timeout in seconds for the generator to finish running. `None` means it is given an
+                unlimited amount of time.
+            space_generator: Memory space in MB the generator has access to. `None` means it is given an unlimited
+                amount of space.
+            cpus_generator: Number of physical cpu cores the generator can use.
+            timeout_solver: Timeout in seconds for the solver to finish running. `None` means it is given an unlimited
+                amount of time.
+            space_solver: Memory space in MB the solver has access to. `None` means it is given
+                an unlimited amount of space.
+            cpus_solver: Number of physical cpu cores the solver can use.
+            generator_battle_input: Additional data the generator will be provided with.
+            solver_battle_input: Additional data the solver will be provided with.
+            generator_battle_output: Class used to parse additional data the generator outputs into a python object.
+            solver_battle_output: Class used to parse additional data the solver outputs into a python object.
+
+        Returns:
+            The resulting info about the executed fight.
+        """
+        ui = self._ui
         ui.start(size)
         gen_result = await self._generator.run(
             size=size,
@@ -153,30 +183,49 @@ class BattleUiProxy(Protocol):
 
     @abstractmethod
     def update_data(self, data: "Battle.UiData") -> None:
-        """Passes new custom display data to the Ui."""
+        """Passes new custom display data to the Ui.
 
-    @abstractmethod
-    def update_fights(self) -> None:
-        """Notifies the Ui to update the display of fight results for this battle."""
+        See :cls:`Battle.UiData` for further details.
+        """
 
 
 class Battle(BaseModel):
-    """Abstract Base class for classes that execute a specific kind of battle."""
+    """Base for classes that execute a specific kind of battle.
+
+    Each battle type determines what parameters each fight will be fought with, how many fights are fought, and how
+    they will ultimately be scored.
+    """
 
     fight_results: list[Fight] = Field(default_factory=list)
+    """The list of fights that have been fought in this battle."""
     run_exception: str | None = None
+    """The description of an otherwise unhandeled exception that occured during the execution of :meth:`.run`."""
 
     _battle_types: ClassVar[dict[str, type["Battle"]]] = {}
+    """Dictionary mapping the names of all registered battle types to their python classes."""
 
     class BattleConfig(BaseModel):
-        """Object containing the config variables the battle types use."""
+        """Config object for each specific battle type.
+
+        A custom battle type can override this class to specify config options it uses. They will be parsed from a
+        dictionary located at `battle.NAME` in the main config file, where NAME is the specific batle type's name.
+        The created object will then be passed to the :meth:`.run` method with its fields set accordingly.
+        """
 
     class UiData(BaseModel):
-        """Object containing custom diplay data."""
+        """Object containing custom diplay data.
+
+        The display data object will be displayed as key-value pairs generated from the :meth:`.field` method.
+        You can use the normally available pydantic config options to customize what these will look like.
+        """
 
     @staticmethod
     def all() -> dict[str, type["Battle"]]:
-        """Returns a list of all registered battle types."""
+        """Returns a dictionary mapping the names of all registered battle types to their python classes.
+
+        It includes all subclasses of :cls:`Battle` that have been initialized so far, including ones exposed to the
+        algobattle module via the `algobattle.battle` entrypoint hook.
+        """
         for entrypoint in entry_points(group="algobattle.battle"):
             if entrypoint.name not in Battle._battle_types:
                 battle: type[Battle] = entrypoint.load()
@@ -190,22 +239,42 @@ class Battle(BaseModel):
 
     @abstractmethod
     def score(self) -> float:
-        """The score achieved by the scored team during this battle."""
+        """Calculates the score the solver has achieved during this battle.
+
+        Should always be a nonnegative float, with higher values indicating a better performance of the solver.
+        """
         raise NotImplementedError
 
     @staticmethod
     def format_score(score: float) -> str:
-        """Formats a score nicely."""
+        """Formats a given score nicely.
+
+        Purely auxialiary method that can be used to customize how a score will be rendered.
+        """
         return f"{score:.2f}"
 
     @classmethod
     def name(cls) -> str:
-        """Name of the type of this battle."""
+        """Name of this battle type.
+
+        Defaults to the battle class's name. Can be used to customize this behaviour if e.g. a battle type should have a
+        name that is not a valid python identifier.
+        """
         return cls.__name__
 
     @abstractmethod
-    async def run_battle(self, fight: FightHandler, config: BattleConfig, min_size: int, ui: BattleUiProxy) -> None:
-        """Calculates the next instance size that should be fought over."""
+    async def run_battle(self, fight: FightHandler, config: _BattleConfig, min_size: int, ui: BattleUiProxy) -> None:
+        """Executes one battle.
+
+        Args:
+            fight: The :cls:`FightHandler` used to run each fight of this battle. It already contains information about
+                the participating teams, default config settings, etc. Each fight can be executed using its :meth:`.run`
+                method.
+            config: An instance of this battle type's :cls:`BattleConfig` class, parsed from the corresponding section
+                of the config file.
+            min_size: The minimum size valid for this problem.
+            ui: An interface to interact with the ui.
+        """
         raise NotImplementedError
 
 
@@ -216,36 +285,31 @@ class Iterated(Battle):
 
     @inherit_docs
     class BattleConfig(Battle.BattleConfig):
-        rounds: int = Field(default=5, help="Repeats the battle and averages the results.")
-        iteration_cap: int = Field(default=50_000, help="Maximum instance size that will be tried.")
-        exponent: int = Field(default=2, help="Determines how quickly the instance size grows.")
-        approximation_ratio: float = Field(
-            default=1, help="Approximation ratio that a solver needs to achieve to pass."
-        )
+        rounds: int = 5
+        """Number of times the instance size will be increased until the solver fails to produce correct solutions."""
+        iteration_cap: int = 50_000
+        """Maximum instance size that will be tried."""
+        exponent: int = 2
+        """Determines how quickly the instance size grows."""
+        approximation_ratio: float = 1
+        """Approximation ratio that a solver needs to achieve to pass."""
 
     @inherit_docs
     class UiData(Battle.UiData):
         reached: list[int]
         cap: int
 
-    async def run_battle(self, fight: FightHandler, config: _Config, min_size: int, ui: BattleUiProxy) -> None:
-        """Execute one iterative battle between a generating and a solving team.
+    async def run_battle(self, fight: FightHandler, config: BattleConfig, min_size: int, ui: BattleUiProxy) -> None:
+        """Execute an iterated battle.
 
-        Incrementally try to search for the highest n for which the solver is
-        still able to solve instances.  The base increment value is multiplied
-        with the power of iterations since the last unsolvable instance to the
-        given exponent.
-        Only once the solver fails after the multiplier is reset, it counts as
-        failed. Since this would heavily favour probabilistic algorithms (That
-        may have only failed by chance and are able to solve a certain instance
-        size on a second try), we cap the maximum solution size by the last
-        value that an algorithm has failed on.
+        Incrementally tries to search for the highest n for which the solver is still able to solve instances.
+        The base increment value is multiplied with the number of iterations since the last unsolvable instance to the
+        given exponent. Only once the solver fails directly after the multiplier is reset, it counts as failed. Since
+        this would heavily favour probabilistic algorithms (That may have only failed by chance and are able to solve a
+        certain instance size on a second try), we cap the maximum solution size by the last value that an algorithm
+        has failed on. If the solver never stops, the battle will run until the instance size reaches `iteration_cap`.
 
-        The battle automatically ends once the iteration cap is reached with
-        the solver being declared the winner.
-
-        During execution, this function updates the self.round_data dict,
-        which automatically notifies all observers subscribed to this object.s
+        This process is repeated `rounds` many times, with each round being completely independent of each other.
         """
         for _ in range(config.rounds):
             base_increment = 0
@@ -284,6 +348,7 @@ class Iterated(Battle):
 
     @inherit_docs
     def score(self) -> float:
+        """Averages the highest instance size reached in each round."""
         return 0 if len(self.results) == 0 else sum(self.results) / len(self.results)
 
     @inherit_docs
@@ -304,23 +369,20 @@ class Averaged(Battle):
     class UiData(Battle.UiData):
         round: int
 
-    async def run_battle(self, fight: FightHandler, config: _Config, min_size: int, ui: BattleUiProxy) -> None:
-        """Execute one averaged battle between a generating and a solving team.
+    async def run_battle(self, fight: FightHandler, config: BattleConfig, min_size: int, ui: BattleUiProxy) -> None:
+        """Execute an averaged battle.
 
-        Execute several fights between two teams on a fixed instance size
-        and determine the average solution quality.
+        This simple battle type just executes `iterations` many fights after each other at size `instance_size`.
         """
         if config.instance_size < min_size:
-            raise ValueError(
-                f"The problem specifies a minimum size of {min_size} "
-                "but the chosen size is only {config.instance_size}!"
-            )
+            raise ValueError(f"size {config.instance_size} is smaller than the smallest valid size, {min_size}.")
         for i in range(config.iterations):
             ui.update_data(self.UiData(round=i + 1))
             await fight.run(config.instance_size)
 
     @inherit_docs
     def score(self) -> float:
+        """Averages the score of each fight."""
         if len(self.fight_results) == 0:
             return 0
         else:

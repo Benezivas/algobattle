@@ -51,7 +51,7 @@ class Matchtests(TestCase):
             "active_teams": [cls.team0.name, cls.team1.name],
             "excluded_teams": [],
         }
-        cls.teams = TeamHandler((cls.team0, cls.team1))
+        cls.teams = TeamHandler([cls.team0, cls.team1], [])
 
     def test_all_battle_pairs_two_teams(self):
         """Two teams both generate and solve one time each."""
@@ -59,7 +59,7 @@ class Matchtests(TestCase):
 
     def test_all_battle_pairs_single_player(self):
         """A team playing against itself is the only battle pair in single player."""
-        teams = TeamHandler((self.team0,))
+        teams = TeamHandler([self.team0], [])
         self.assertEqual(teams.matchups, [Matchup(self.team0, self.team0)])
 
     def test_calculate_points_zero_rounds(self):

@@ -1,4 +1,7 @@
-"""Main battle script. Executes all possible types of battles, see battle --help for all options."""
+"""Cli entrypoint to execute matches.
+
+Provides a command line interface to start matches and observe them. See `battle --help` for further options.
+"""
 from argparse import ArgumentParser
 from contextlib import ExitStack
 import curses
@@ -23,7 +26,7 @@ from algobattle.util import Role, TimerInfo, check_path, flat_intersperse
 
 @dataclass
 class CliOptions:
-    """Config data regarding program execution."""
+    """Options used by the cli."""
 
     problem_path: Path = Path()
     silent: bool = False
@@ -138,7 +141,10 @@ def check_for_terminal(function: Callable[P, R]) -> Callable[P, R | None]:
 
 @dataclass
 class CliUi(Ui):
-    """A Ui displaying the data to the cli."""
+    """A :cls:`Ui` displaying the data to the cli.
+
+    Uses curses to continually draw a basic text based ui to the terminal.
+    """
 
     battle_data: dict[Matchup, Battle.UiData] = field(default_factory=dict, init=False)
     fight_data: dict[Matchup, FightUiData] = field(default_factory=dict, init=False)
