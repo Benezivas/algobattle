@@ -438,7 +438,6 @@ class Program(ABC):
                     f,
                 )
             if battle_input is not None:
-                (input / "battle_data").mkdir()
                 try:
                     battle_input.encode(input / "battle_data", size, self.role)
                 except Exception as e:
@@ -449,8 +448,6 @@ class Program(ABC):
                             error=ExceptionInfo(type="EncodingError", message=f"Battle data couldn't be encoded:\n{e}"),
                         )
                     )
-            if battle_output is not None:
-                (output / "battle_data").mkdir()
 
             try:
                 runtime = await self.image.run(input, output, timeout=timeout, memory=space, cpus=cpus, ui=ui)
@@ -527,9 +524,6 @@ class Generator(Program):
         assert instance is None
         with open(input / "size", "w+") as f:
             f.write(str(size))
-        (output / "instance").mkdir()
-        if self.problem_class.with_solution:
-            (output / "solution").mkdir()
 
     def _parse_output(self, output: Path, size: int, instance: Problem | None) -> _GenResData:
         assert instance is None
@@ -610,9 +604,7 @@ class Solver(Program):
 
     def _setup_folders(self, input: Path, output: Path, size: int, instance: Problem | None) -> None:
         assert instance is not None
-        (input / "instance").mkdir()
         instance.encode(input / "instance", size, self.role)
-        (output / "solution").mkdir()
 
     def _parse_output(self, output: Path, size: int, instance: Problem | None) -> Problem.Solution:
         assert instance is not None
