@@ -51,6 +51,7 @@ class DockerConfig(BaseModel):
 
     build_timeout: float | None = None
     safe_build: bool = False
+    set_cpus: str | list[str] | None = None
     generator: RunParameters = RunParameters()
     solver: RunParameters = RunParameters()
     advanced_run_params: "AdvancedRunArgs | None" = None
