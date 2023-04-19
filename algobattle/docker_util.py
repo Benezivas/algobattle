@@ -602,6 +602,7 @@ class Generator(Program):
                 cpus=cpus,
                 battle_input=battle_input,
                 battle_output=battle_output,
+                set_cpus=set_cpus,
                 ui=ui,
             ),
         )
@@ -671,6 +672,7 @@ class Solver(Program):
                 cpus=cpus,
                 battle_input=battle_input,
                 battle_output=battle_output,
+                set_cpus=set_cpus,
                 ui=ui,
             ),
         )
