@@ -414,6 +414,7 @@ class Program(ABC):
         cpus: int = ...,
         battle_input: Encodable | None = None,
         battle_output: type[Encodable] | None = None,
+        set_cpus: str | None = None,
         ui: ProgramUiProxy | None = None,
     ) -> GeneratorResult | SolverResult:
         """Execute the program, processing input and output data."""
@@ -454,7 +455,9 @@ class Program(ABC):
                     )
 
             try:
-                runtime = await self.image.run(input, output, timeout=timeout, memory=space, cpus=cpus, ui=ui)
+                runtime = await self.image.run(
+                    input, output, timeout=timeout, memory=space, cpus=cpus, ui=ui, set_cpus=set_cpus
+                )
             except ExecutionError as e:
                 return result_class(
                     ProgramRunInfo(
@@ -570,6 +573,7 @@ class Generator(Program):
         cpus: int = ...,
         battle_input: Encodable | None = None,
         battle_output: type[Encodable] | None = None,
+        set_cpus: str | None = None,
         ui: ProgramUiProxy | None = None,
     ) -> GeneratorResult:
         """Executes the generator and parses its output into a problem instance.
@@ -581,6 +585,8 @@ class Generator(Program):
             cpus: Number of physical cpus the generator can use.
             battle_input: Additional data that will be given to the generator.
             battle_output: Class that will be used to parse additional data the generator outputs.
+            set_cpus: Which cpus to execute the container on. Either a comma separated list or a hyphen-separated range.
+                A value of `None` means the container can use any core (but still only `cpus` many of them).
             ui: Interface the program execution uses to update the ui.
 
         Returns:
@@ -636,6 +642,7 @@ class Solver(Program):
         cpus: int = ...,
         battle_input: Encodable | None = None,
         battle_output: type[Encodable] | None = None,
+        set_cpus: str | None = None,
         ui: ProgramUiProxy | None = None,
     ) -> SolverResult:
         """Executes the solver on the given problem instance and parses its output into a problem solution.
@@ -647,6 +654,8 @@ class Solver(Program):
             cpus: Number of physical cpus the solver can use.
             battle_input: Additional data that will be given to the solver.
             battle_output: Class that will be used to parse additional data the solver outputs.
+            set_cpus: Which cpus to execute the container on. Either a comma separated list or a hyphen-separated range.
+                A value of `None` means the container can use any core (but still only `cpus` many of them).
             ui: Interface the program execution uses to update the ui.
 
         Returns:
