@@ -199,6 +199,7 @@ class Image:
         timeout: float | None = None,
         memory: int | None = None,
         cpus: int = 1,
+        set_cpus: str | None = None,
         ui: ProgramUiProxy | None = None,
     ) -> float:
         """Runs a docker image.
@@ -209,6 +210,8 @@ class Image:
             timeout: Timeout in seconds.
             memory: Memory limit in MB.
             cpus: Number of physical cpus the container can use.
+            set_cpus: Which cpus to execute the container on. Either a comma separated list or a hyphen-separated range.
+                A value of `None` means the container can use any core (but still only `cpus` many of them).
             ui: Interface to update the ui with new data about the executing program.
 
         Raises:
@@ -222,8 +225,8 @@ class Image:
         """
         name = f"algobattle_{uuid1().hex[:8]}"
         if memory is not None:
-            memory = int(memory * 1000000)
-        cpus = int(cpus * 1000000000)
+            memory = memory * 1_000_000
+        cpus = cpus * 1_000_000_000
 
         mounts = []
         if input_dir is not None:
@@ -243,6 +246,7 @@ class Image:
                     nano_cpus=cpus,
                     detach=True,
                     mounts=mounts,
+                    cpuset_cpus=set_cpus,
                     **self.run_kwargs,
                 ),
             )
@@ -710,7 +714,6 @@ class AdvancedRunArgs(BaseModel):
     cpu_rt_period: int | None = None
     cpu_rt_runtime: int | None = None
     cpu_shares: int | None = None
-    cpuset_cpus: str | None = None
     cpuset_mems: str | None = None
     device_cgroup_rules: list[str] | None = None
     device_read_bps: list[_DeviceRate] | None = None
