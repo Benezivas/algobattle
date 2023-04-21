@@ -3,7 +3,6 @@
 Provides a command line interface to start matches and observe them. See `battle --help` for further options.
 """
 from argparse import ArgumentParser
-from contextlib import ExitStack
 import curses
 from dataclasses import dataclass, field
 from functools import partial
@@ -78,11 +77,10 @@ def parse_cli_args(args: list[str]) -> tuple[CliOptions, MatchConfig]:
 async def _run_with_ui(
     match_config: MatchConfig,
     problem: type[Problem],
-    ui: "CliUi | None",
+    ui: "CliUi",
 ) -> Match:
     async with create_task_group() as tg:
-        if ui is not None:
-            tg.start_soon(ui.loop)
+        tg.start_soon(ui.loop)
         result = await Match.run(match_config, problem, ui)
         tg.cancel_scope.cancel()
         return result
@@ -93,26 +91,24 @@ def main():
     try:
         exec_config, config = parse_cli_args(sys.argv[1:])
         problem = Problem.import_from_path(exec_config.problem_path)
-        with ExitStack() as stack:
-            if exec_config.silent:
-                ui = None
-            else:
-                ui = CliUi()
-                stack.enter_context(ui)
 
-            result = run(_run_with_ui, config, problem, ui)
-            print("\n".join(CliUi.display_match(result)))
+        if exec_config.silent:
+            result = run(Match.run, config, problem)
+        else:
+            with CliUi() as ui:
+                result = run(_run_with_ui, config, problem, ui)
+        print("\n".join(CliUi.display_match(result)))
 
-            if config.points > 0:
-                points = result.calculate_points(config.points)
-                for team, pts in points.items():
-                    print(f"Team {team} gained {pts:.1f} points.")
+        if config.points > 0:
+            points = result.calculate_points(config.points)
+            for team, pts in points.items():
+                print(f"Team {team} gained {pts:.1f} points.")
 
-            if exec_config.result_output is not None:
-                t = datetime.now()
-                filename = f"{t.year:04d}-{t.month:02d}-{t.day:02d}_{t.hour:02d}-{t.minute:02d}-{t.second:02d}.json"
-                with open(exec_config.result_output / filename, "w+") as f:
-                    f.write(result.json())
+        if exec_config.result_output is not None:
+            t = datetime.now()
+            filename = f"{t.year:04d}-{t.month:02d}-{t.day:02d}_{t.hour:02d}-{t.minute:02d}-{t.second:02d}.json"
+            with open(exec_config.result_output / filename, "w+") as f:
+                f.write(result.json())
 
     except KeyboardInterrupt:
         raise SystemExit("Received keyboard interrupt, terminating execution.")
