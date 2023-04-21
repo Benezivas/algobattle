@@ -22,7 +22,7 @@ from algobattle.docker_util import (
     ProgramUiProxy,
     Solver,
 )
-from algobattle.util import Encodable, Role, TimerInfo, inherit_docs, BaseModel
+from algobattle.util import Encodable, Role, inherit_docs, BaseModel
 
 
 _BattleConfig: TypeAlias = Any
