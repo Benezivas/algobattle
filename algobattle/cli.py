@@ -92,11 +92,6 @@ def main():
     """Entrypoint of `algobattle` CLI."""
     try:
         exec_config, config = parse_cli_args(sys.argv[1:])
-
-    except KeyboardInterrupt:
-        raise SystemExit("Received keyboard interrupt, terminating execution.")
-
-    try:
         problem = Problem.import_from_path(exec_config.problem_path)
         with ExitStack() as stack:
             if exec_config.silent:
@@ -120,7 +115,7 @@ def main():
                     f.write(result.json())
 
     except KeyboardInterrupt:
-        print("Received keyboard interrupt, terminating execution.")
+        raise SystemExit("Received keyboard interrupt, terminating execution.")
 
 
 P = ParamSpec("P")
