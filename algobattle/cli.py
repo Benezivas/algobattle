@@ -207,7 +207,8 @@ class CliUi(Ui):
         terminal_height, _ = self.stdscr.getmaxyx()
         out: list[str] = []
         out.append(f"Algobattle version {pkg_version(__package__)}")
-        out += self.display_match(self.match)
+        if self.match is not None:
+            out += self.display_match(self.match)
         for matchup in self.active_battles:
             out += [
                 "",
@@ -299,6 +300,8 @@ class CliUi(Ui):
 
     def display_battle(self, matchup: Matchup) -> list[str]:
         """Formats the battle data into a string that can be printed to the terminal."""
+        if self.match is None:
+            return []
         battle = self.match.results[matchup.generator.name][matchup.solver.name]
         fights = battle.fight_results[-3:] if len(battle.fight_results) >= 3 else battle.fight_results
         sections: list[list[str]] = []

@@ -241,7 +241,7 @@ class Ui:
     by just subclassing :cls:`Ui` and implementing its methods.
     """
 
-    match: Match = field(init=False)
+    match: Match | None = field(default=None, init=False)
     active_battles: list[Matchup] = field(default_factory=list, init=False)
 
     def get_battle_observer(self, matchup: Matchup) -> "BattleObserver":
