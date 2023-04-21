@@ -118,7 +118,7 @@ class Match(BaseModel):
             Image.run_kwargs = config.docker.advanced_run_params.to_docker_args()
         if config.docker.advanced_build_params is not None:
             Image.run_kwargs = config.docker.advanced_build_params.to_docker_args()
-        with TeamHandler.build(config.teams, problem, config.docker, ui) as teams:
+        with await TeamHandler.build(config.teams, problem, config.docker, ui) as teams:
             result = cls(
                 active_teams=[t.name for t in teams.active],
                 excluded_teams=[t.name for t in teams.excluded],

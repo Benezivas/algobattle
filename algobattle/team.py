@@ -37,7 +37,7 @@ class TeamInfo:
     generator: Path
     solver: Path
 
-    def build(self, problem: type[Problem], config: DockerConfig, ui: BuildUiProxy) -> "Team":
+    async def build(self, problem: type[Problem], config: DockerConfig, ui: BuildUiProxy) -> "Team":
         """Builds the specified docker files into images and return the corresponding team.
 
         Raises:
@@ -48,11 +48,11 @@ class TeamInfo:
         if name in _team_names:
             raise ValueError
         ui.start(name, "generator", config.build_timeout)
-        generator = Generator.build(self.generator, self.name, problem, config.generator, config.build_timeout)
+        generator = await Generator.build(self.generator, self.name, problem, config.generator, config.build_timeout)
         ui.finish()
         try:
             ui.start(name, "solver", config.build_timeout)
-            solver = Solver.build(self.solver, self.name, problem, config.solver, config.build_timeout)
+            solver = await Solver.build(self.solver, self.name, problem, config.solver, config.build_timeout)
             ui.finish()
         except Exception:
             generator.remove()
@@ -149,7 +149,7 @@ class TeamHandler:
     excluded: list[TeamInfo]
 
     @classmethod
-    def build(
+    async def build(
         cls, infos: list[TeamInfo], problem: type[Problem], config: DockerConfig, ui: BuildUiProxy,
     ) -> Self:
         """Builds the programs of every team.
@@ -174,7 +174,7 @@ class TeamHandler:
                 archives: list[_ArchivedTeam] = []
                 for info in infos:
                     try:
-                        team = info.build(problem, config, ui)
+                        team = await info.build(problem, config, ui)
                         team = team.archive(folder)
                         archives.append(team)
                     except Exception:
@@ -185,7 +185,7 @@ class TeamHandler:
             teams: list[Team] = []
             for info in infos:
                 try:
-                    team = info.build(problem, config, ui)
+                    team = await info.build(problem, config, ui)
                     teams.append(team)
                 except (ValueError, DockerError):
                     excluded.append(info)
