@@ -83,13 +83,14 @@ class Match(BaseModel):
         matchup: Matchup,
         config: Battle.BattleConfig,
         problem: type[Problem],
-        set_cpus: str | None,
+        cpus: list[str | None],
         ui: "Ui",
         limiter: CapacityLimiter,
         *,
         task_status: TaskStatus = TASK_STATUS_IGNORED,
     ) -> None:
         async with limiter:
+            set_cpus = cpus.pop()
             ui.start_battle(matchup)
             task_status.started()
             battle_ui = ui.get_battle_observer(matchup)
@@ -105,6 +106,7 @@ class Match(BaseModel):
                 )
             except Exception as e:
                 battle.run_exception = str_with_traceback(e)
+            cpus.append(set_cpus)
             ui.battle_completed(matchup)
 
     @classmethod
@@ -152,11 +154,7 @@ class Match(BaseModel):
                 for matchup in teams.matchups:
                     battle = battle_cls()
                     result.results[matchup.generator.name][matchup.solver.name] = battle
-                    battle_cpus = match_cpus.pop()
-                    await tg.start(
-                        result._run_battle, battle, matchup, battle_config, problem, battle_cpus, ui, limiter
-                    )
-                    match_cpus.append(battle_cpus)
+                    await tg.start(result._run_battle, battle, matchup, battle_config, problem, match_cpus, ui, limiter)
                 return result
 
     @overload
