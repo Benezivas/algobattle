@@ -9,11 +9,12 @@ from functools import partial
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, ParamSpec, Self, TypeVar
+from typing import Callable, ParamSpec, Self, TypeVar
 from importlib.metadata import version as pkg_version
 
 from prettytable import DOUBLE_BORDER, PrettyTable
 from anyio import create_task_group, run, sleep
+from anyio.abc import TaskGroup
 
 from algobattle.battle import Battle, Fight, FightUiData
 from algobattle.docker_util import GeneratorResult, ProgramRunInfo, SolverResult
@@ -77,13 +78,9 @@ def parse_cli_args(args: list[str]) -> tuple[CliOptions, MatchConfig]:
 async def _run_with_ui(
     match_config: MatchConfig,
     problem: type[Problem],
-    ui: "CliUi",
 ) -> Match:
-    async with create_task_group() as tg:
-        tg.start_soon(ui.loop)
-        result = await Match.run(match_config, problem, ui)
-        tg.cancel_scope.cancel()
-        return result
+    async with CliUi() as ui:
+        return await Match.run(match_config, problem, ui)
 
 
 def main():
@@ -95,8 +92,7 @@ def main():
         if exec_config.silent:
             result = run(Match.run, config, problem)
         else:
-            with CliUi() as ui:
-                result = run(_run_with_ui, config, problem, ui)
+            result = run(_run_with_ui, config, problem)
         print("\n".join(CliUi.display_match(result)))
 
         if config.points > 0:
@@ -139,20 +135,26 @@ class CliUi(Ui):
 
     battle_data: dict[Matchup, Battle.UiData] = field(default_factory=dict, init=False)
     fight_data: dict[Matchup, FightUiData] = field(default_factory=dict, init=False)
+    task_group: TaskGroup | None = None
 
-    @check_for_terminal
-    def __enter__(self) -> Self:
-        self.match_result: Any = None
-        self.battle_info: Any = None
+    async def __aenter__(self) -> Self:
         self.stdscr = curses.initscr()
         curses.cbreak()
         curses.noecho()
         self.stdscr.keypad(True)
+
+        self.task_group = create_task_group()
+        await self.task_group.__aenter__()
+        self.task_group.start_soon(self.loop)
+
         return self
 
-    @check_for_terminal
-    def __exit__(self, _type, _value, _traceback):
+    async def __aexit__(self, _type, _value, _traceback) -> None:
         """Restore the console."""
+        if self.task_group is not None:
+            self.task_group.cancel_scope.cancel()
+            await self.task_group.__aexit__(_type, _value, _traceback)
+
         curses.nocbreak()
         self.stdscr.keypad(False)
         curses.echo()
