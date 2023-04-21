@@ -1,15 +1,32 @@
 """Module containing helper classes related to teams."""
+from abc import abstractmethod
 from dataclasses import dataclass
 from itertools import combinations
 from pathlib import Path
-from typing import Iterator, Self
+from typing import Iterator, Protocol, Self
 
 from algobattle.docker_util import DockerConfig, DockerError, ArchivedImage, Generator, Solver
 from algobattle.problem import Problem
-from algobattle.util import TempDir
+from algobattle.util import Role, TempDir
 
 
 _team_names: set[str] = set()
+
+
+class BuildUiProxy(Protocol):
+    """Provides and interface for the build process to update the ui."""
+
+    @abstractmethod
+    def start(self, team: str, role: Role, timeout: float | None) -> None:
+        """Informs the ui that a new program is being built."""
+
+    @abstractmethod
+    def finish(self) -> None:
+        """Informs the ui that the current build has been finished."""
+
+    @abstractmethod
+    def initialize(self) -> None:
+        """Informs the ui that the programs are being initialized."""
 
 
 @dataclass
@@ -20,7 +37,7 @@ class TeamInfo:
     generator: Path
     solver: Path
 
-    def build(self, problem: type[Problem], config: DockerConfig) -> "Team":
+    def build(self, problem: type[Problem], config: DockerConfig, ui: BuildUiProxy) -> "Team":
         """Builds the specified docker files into images and return the corresponding team.
 
         Raises:
@@ -30,9 +47,13 @@ class TeamInfo:
         name = self.name.replace(" ", "_").lower()  # Lower case needed for docker tag created from name
         if name in _team_names:
             raise ValueError
+        ui.start(name, "generator", config.build_timeout)
         generator = Generator.build(self.generator, self.name, problem, config.generator, config.build_timeout)
+        ui.finish()
         try:
+            ui.start(name, "solver", config.build_timeout)
             solver = Solver.build(self.solver, self.name, problem, config.solver, config.build_timeout)
+            ui.finish()
         except Exception:
             generator.remove()
             raise
@@ -128,7 +149,9 @@ class TeamHandler:
     excluded: list[TeamInfo]
 
     @classmethod
-    def build(cls, infos: list[TeamInfo], problem: type[Problem], config: DockerConfig) -> Self:
+    def build(
+        cls, infos: list[TeamInfo], problem: type[Problem], config: DockerConfig, ui: BuildUiProxy,
+    ) -> Self:
         """Builds the programs of every team.
 
         Attempts to build the programs of every team. If any build fails, that team will be excluded and all its
@@ -151,18 +174,18 @@ class TeamHandler:
                 archives: list[_ArchivedTeam] = []
                 for info in infos:
                     try:
-                        team = info.build(problem, config)
+                        team = info.build(problem, config, ui)
                         team = team.archive(folder)
                         archives.append(team)
                     except Exception:
                         excluded.append(info)
-
+                ui.initialize()
                 return cls([team.restore() for team in archives], excluded)
         else:
             teams: list[Team] = []
             for info in infos:
                 try:
-                    team = info.build(problem, config)
+                    team = info.build(problem, config, ui)
                     teams.append(team)
                 except (ValueError, DockerError):
                     excluded.append(info)

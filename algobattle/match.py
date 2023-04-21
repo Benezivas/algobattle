@@ -79,7 +79,7 @@ class Match(BaseModel):
     ) -> None:
         async with limiter:
             ui.start_battle(matchup)
-            battle_ui = ui.get_battle_observer(matchup)
+            battle_ui = ui.BattleObserver(ui, matchup)
             handler = FightHandler(matchup.generator.generator, matchup.solver.solver, battle, battle_ui.fight_ui)
             try:
                 await battle.run_battle(
@@ -118,7 +118,7 @@ class Match(BaseModel):
             Image.run_kwargs = config.docker.advanced_run_params.to_docker_args()
         if config.docker.advanced_build_params is not None:
             Image.run_kwargs = config.docker.advanced_build_params.to_docker_args()
-        with TeamHandler.build(config.teams, problem, config.docker) as teams:
+        with TeamHandler.build(config.teams, problem, config.docker, ui) as teams:
             result = cls(
                 active_teams=[t.name for t in teams.active],
                 excluded_teams=[t.name for t in teams.excluded],
@@ -240,9 +240,17 @@ class Ui:
     match: Match | None = field(default=None, init=False)
     active_battles: list[Matchup] = field(default_factory=list, init=False)
 
-    def get_battle_observer(self, matchup: Matchup) -> "BattleObserver":
-        """Creates an observer for a specifc battle."""
-        return self.BattleObserver(self, matchup)
+    def start(self, team: str, role: Role, timeout: float | None) -> None:
+        """Informs the ui that a new program is being built."""
+        return
+
+    def finish(self) -> None:
+        """Informs the ui that the current build has been finished."""
+        return
+
+    def initialize(self) -> None:
+        """Informs the ui that the programs are being initialized."""
+        return
 
     def start_battle(self, matchup: Matchup) -> None:
         """Notifies the Ui that a battle has been started."""
