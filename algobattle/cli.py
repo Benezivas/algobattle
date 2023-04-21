@@ -172,6 +172,7 @@ class CliUi(Ui):
         """Notifies the Ui that a specific battle has been completed."""
         self.battle_data.pop(matchup, None)
         self.fight_data.pop(matchup, None)
+        super().battle_completed(matchup)
 
     def update_battle_data(self, matchup: Matchup, data: Battle.UiData) -> None:
         """Passes new custom battle data to the Ui."""
