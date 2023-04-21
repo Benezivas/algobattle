@@ -16,7 +16,7 @@ from prettytable import DOUBLE_BORDER, PrettyTable
 from anyio import create_task_group, run, sleep
 from anyio.abc import TaskGroup
 
-from algobattle.battle import Battle, Fight, FightUiData
+from algobattle.battle import Battle, Fight
 from algobattle.docker_util import GeneratorResult, ProgramRunInfo, SolverResult
 from algobattle.match import MatchConfig, Match, Ui
 from algobattle.problem import Problem
@@ -135,6 +135,13 @@ class _BuildInfo:
 
 
 @dataclass
+class _FightUiData:
+    size: int
+    generator: TimerInfo | float | ProgramRunInfo | None = None
+    solver: TimerInfo | float | ProgramRunInfo | None = None
+
+
+@dataclass
 class CliUi(Ui):
     """A :cls:`Ui` displaying the data to the cli.
 
@@ -142,7 +149,7 @@ class CliUi(Ui):
     """
 
     battle_data: dict[Matchup, Battle.UiData] = field(default_factory=dict, init=False)
-    fight_data: dict[Matchup, FightUiData] = field(default_factory=dict, init=False)
+    fight_data: dict[Matchup, _FightUiData] = field(default_factory=dict, init=False)
     task_group: TaskGroup | None = field(default=None, init=False)
     build_status: _BuildInfo | str | None = field(default=None, init=False)
 
@@ -194,7 +201,7 @@ class CliUi(Ui):
 
     def start_fight(self, matchup: Matchup, size: int) -> None:
         """Informs the Ui of a newly started fight."""
-        self.fight_data[matchup] = FightUiData(size, None, None)
+        self.fight_data[matchup] = _FightUiData(size, None, None)
 
     def update_curr_fight(
         self,

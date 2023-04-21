@@ -166,15 +166,6 @@ class FightHandler:
         return self._saved(Fight(score=score, size=size, generator=gen_result.info, solver=sol_result.info))
 
 
-@dataclass
-class FightUiData:
-    """Holds display data about the currently executing fight."""
-
-    size: int
-    generator: TimerInfo | float | ProgramRunInfo | None = None
-    solver: TimerInfo | float | ProgramRunInfo | None = None
-
-
 # We need this to be here to prevent an import cycle between match.py and battle.py
 class BattleUiProxy(Protocol):
     """Provides an interface for :cls:`Battle`s to update the Ui."""
