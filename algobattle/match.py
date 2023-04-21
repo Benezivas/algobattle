@@ -8,9 +8,8 @@ import tomllib
 from typing import Mapping, Self, overload
 
 from pydantic import validator, Field
-from anyio import create_task_group, CapacityLimiter, TASK_STATUS_IGNORED
+from anyio import create_task_group, CapacityLimiter
 from anyio.to_thread import current_default_thread_limiter
-from anyio.abc import TaskStatus
 
 from algobattle.battle import Battle, FightHandler, FightUiProxy, BattleUiProxy
 from algobattle.docker_util import DockerConfig, Image, ProgramRunInfo, ProgramUiProxy
@@ -77,12 +76,9 @@ class Match(BaseModel):
         problem: type[Problem],
         ui: "Ui",
         limiter: CapacityLimiter,
-        *,
-        task_status: TaskStatus = TASK_STATUS_IGNORED,
     ) -> None:
         async with limiter:
             ui.start_battle(matchup)
-            task_status.started()
             battle_ui = ui.get_battle_observer(matchup)
             handler = FightHandler(matchup.generator.generator, matchup.solver.solver, battle, battle_ui.fight_ui)
             try:
@@ -136,7 +132,7 @@ class Match(BaseModel):
                 for matchup in teams.matchups:
                     battle = battle_cls()
                     result.results[matchup.generator.name][matchup.solver.name] = battle
-                    await tg.start(result._run_battle, battle, matchup, battle_config, problem, ui, limiter)
+                    tg.start_soon(result._run_battle, battle, matchup, battle_config, problem, ui, limiter)
                 return result
 
     @overload
