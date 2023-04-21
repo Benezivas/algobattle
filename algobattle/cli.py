@@ -127,6 +127,14 @@ def check_for_terminal(function: Callable[P, R]) -> Callable[P, R | None]:
 
 
 @dataclass
+class _BuildInfo:
+    team: str
+    role: Role
+    timeout: float | None
+    start: datetime
+
+
+@dataclass
 class CliUi(Ui):
     """A :cls:`Ui` displaying the data to the cli.
 
@@ -135,7 +143,8 @@ class CliUi(Ui):
 
     battle_data: dict[Matchup, Battle.UiData] = field(default_factory=dict, init=False)
     fight_data: dict[Matchup, FightUiData] = field(default_factory=dict, init=False)
-    task_group: TaskGroup | None = None
+    task_group: TaskGroup | None = field(default=None, init=False)
+    build_status: _BuildInfo | str | None = field(default=None, init=False)
 
     async def __aenter__(self) -> Self:
         self.stdscr = curses.initscr()
@@ -159,6 +168,18 @@ class CliUi(Ui):
         self.stdscr.keypad(False)
         curses.echo()
         curses.endwin()
+
+    def start(self, team: str, role: Role, timeout: float | None) -> None:
+        """Informs the ui that a new program is being built."""
+        self.build_status = _BuildInfo(team, role, timeout, datetime.now())
+
+    def finish(self) -> None:
+        """Informs the ui that the current build has been finished."""
+        self.build_status = None
+
+    def initialize(self) -> None:
+        """Informs the ui that the programs are being initialized."""
+        self.build_status = "Initializing programs..."
 
     @check_for_terminal
     def battle_completed(self, matchup: Matchup) -> None:
@@ -201,6 +222,16 @@ class CliUi(Ui):
         terminal_height, _ = self.stdscr.getmaxyx()
         out: list[str] = []
         out.append(f"Algobattle version {pkg_version(__package__)}")
+        status = self.build_status
+        if isinstance(status, str):
+            out.append(status)
+        elif isinstance(status, _BuildInfo):
+            runtime = (datetime.now() - status.start).total_seconds()
+            status_str = f"Building {status.role} of team {status.team}: {runtime:3.1f}s"
+            if status.timeout is not None:
+                out += f" / {status.timeout:3.1f}s"
+            out.append(status_str)
+
         if self.match is not None:
             out += self.display_match(self.match)
         for matchup in self.active_battles:
