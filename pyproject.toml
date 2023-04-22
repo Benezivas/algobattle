@@ -22,7 +22,7 @@ dependencies = [
     "windows-curses; os_name == 'nt'",
 
     "prettytable",
-    "pydantic",
+    "pydantic < 2",
     "anyio",
 ]
 
