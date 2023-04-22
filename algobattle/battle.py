@@ -131,6 +131,12 @@ class FightHandler:
         Returns:
             The resulting info about the executed fight.
         """
+        min_size = self._generator.problem_class.min_size
+        if size < min_size:
+            raise ValueError(
+                f"Cannot run battle at size {size} since it is smaller than the smallest "
+                "size the problem allows ({min_size})."
+            )
         ui = self._ui
         ui.start(size)
         gen_result = await self._generator.run(
