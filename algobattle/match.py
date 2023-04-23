@@ -5,7 +5,7 @@ from datetime import datetime
 from itertools import combinations
 from pathlib import Path
 import tomllib
-from typing import Mapping, Self, overload
+from typing import Mapping, Self, cast, overload
 
 from pydantic import validator, Field
 from anyio import create_task_group, CapacityLimiter
@@ -48,6 +48,14 @@ class MatchConfig(BaseModel):
             out[name] = battle_cls.BattleConfig.parse_obj(data)
         return out
 
+    @validator("docker")
+    def val_set_cpus(cls, v: DockerConfig, values) -> DockerConfig:
+        """Validates that each battle that is being executed is assigned some cpu cores."""
+        if isinstance(v.set_cpus, list) and values["parallel_battles"] > len(v.set_cpus):
+            raise ValueError("Number of parallel battles exceeds the number of set_cpu specifier strings.")
+        else:
+            return v
+
     @classmethod
     def from_file(cls, file: Path) -> Self:
         """Parses a config object from a toml file."""
@@ -74,13 +82,17 @@ class Match(BaseModel):
         matchup: Matchup,
         config: Battle.BattleConfig,
         problem: type[Problem],
+        cpus: list[str | None],
         ui: "Ui",
         limiter: CapacityLimiter,
     ) -> None:
         async with limiter:
+            set_cpus = cpus.pop()
             ui.start_battle(matchup)
             battle_ui = ui.BattleObserver(ui, matchup)
-            handler = FightHandler(matchup.generator.generator, matchup.solver.solver, battle, battle_ui.fight_ui)
+            handler = FightHandler(
+                matchup.generator.generator, matchup.solver.solver, battle, battle_ui.fight_ui, set_cpus
+            )
             try:
                 await battle.run_battle(
                     handler,
@@ -90,8 +102,8 @@ class Match(BaseModel):
                 )
             except Exception as e:
                 battle.run_exception = str_with_traceback(e)
-            finally:
-                ui.battle_completed(matchup)
+            cpus.append(set_cpus)
+            ui.battle_completed(matchup)
 
     @classmethod
     async def run(
@@ -118,6 +130,7 @@ class Match(BaseModel):
             Image.run_kwargs = config.docker.advanced_run_params.to_docker_args()
         if config.docker.advanced_build_params is not None:
             Image.run_kwargs = config.docker.advanced_build_params.to_docker_args()
+
         with await TeamHandler.build(config.teams, problem, config.docker, ui) as teams:
             result = cls(
                 active_teams=[t.name for t in teams.active],
@@ -128,11 +141,16 @@ class Match(BaseModel):
             battle_config = config.battle[config.battle_type]
             limiter = CapacityLimiter(config.parallel_battles)
             current_default_thread_limiter().total_tokens = config.parallel_battles
+            set_cpus = config.docker.set_cpus
+            if isinstance(set_cpus, list):
+                match_cpus = cast(list[str | None], set_cpus[: config.parallel_battles])
+            else:
+                match_cpus = [set_cpus] * config.parallel_battles
             async with create_task_group() as tg:
                 for matchup in teams.matchups:
                     battle = battle_cls()
                     result.results[matchup.generator.name][matchup.solver.name] = battle
-                    tg.start_soon(result._run_battle, battle, matchup, battle_config, problem, ui, limiter)
+                    tg.start_soon(result._run_battle, battle, matchup, battle_config, problem, match_cpus, ui, limiter)
                 return result
 
     @overload

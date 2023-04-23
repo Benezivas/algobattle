@@ -82,6 +82,7 @@ class FightHandler:
     _solver: Solver
     _battle: "Battle"
     _ui: FightUiProxy
+    _set_cpus: str | None = None
 
     def _saved(self, fight: Fight) -> Fight:
         self._battle.fight_results.append(fight)
@@ -130,6 +131,12 @@ class FightHandler:
         Returns:
             The resulting info about the executed fight.
         """
+        min_size = self._generator.problem_class.min_size
+        if size < min_size:
+            raise ValueError(
+                f"Cannot run battle at size {size} since it is smaller than the smallest "
+                "size the problem allows ({min_size})."
+            )
         ui = self._ui
         ui.start(size)
         gen_result = await self._generator.run(
@@ -139,6 +146,7 @@ class FightHandler:
             cpus=cpus_generator,
             battle_input=generator_battle_input,
             battle_output=generator_battle_output,
+            set_cpus=self._set_cpus,
             ui=ui.generator,
         )
         ui.update("generator", gen_result.info)
@@ -153,6 +161,7 @@ class FightHandler:
             cpus=cpus_solver,
             battle_input=solver_battle_input,
             battle_output=solver_battle_output,
+            set_cpus=self._set_cpus,
             ui=ui.solver,
         )
         ui.update("solver", sol_result.info)

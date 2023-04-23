@@ -51,6 +51,7 @@ class DockerConfig(BaseModel):
 
     build_timeout: float | None = None
     safe_build: bool = False
+    set_cpus: str | list[str] | None = None
     generator: RunParameters = RunParameters()
     solver: RunParameters = RunParameters()
     advanced_run_params: "AdvancedRunArgs | None" = None
@@ -204,6 +205,7 @@ class Image:
         timeout: float | None = None,
         memory: int | None = None,
         cpus: int = 1,
+        set_cpus: str | None = None,
         ui: ProgramUiProxy | None = None,
     ) -> float:
         """Runs a docker image.
@@ -214,6 +216,8 @@ class Image:
             timeout: Timeout in seconds.
             memory: Memory limit in MB.
             cpus: Number of physical cpus the container can use.
+            set_cpus: Which cpus to execute the container on. Either a comma separated list or a hyphen-separated range.
+                A value of `None` means the container can use any core (but still only `cpus` many of them).
             ui: Interface to update the ui with new data about the executing program.
 
         Raises:
@@ -227,8 +231,8 @@ class Image:
         """
         name = f"algobattle_{uuid1().hex[:8]}"
         if memory is not None:
-            memory = int(memory * 1000000)
-        cpus = int(cpus * 1000000000)
+            memory = memory * 1_000_000
+        cpus = cpus * 1_000_000_000
 
         mounts = []
         if input_dir is not None:
@@ -248,6 +252,7 @@ class Image:
                     nano_cpus=cpus,
                     detach=True,
                     mounts=mounts,
+                    cpuset_cpus=set_cpus,
                     **self.run_kwargs,
                 ),
             )
@@ -415,6 +420,7 @@ class Program(ABC):
         cpus: int = ...,
         battle_input: Encodable | None = None,
         battle_output: type[Encodable] | None = None,
+        set_cpus: str | None = None,
         ui: ProgramUiProxy | None = None,
     ) -> GeneratorResult | SolverResult:
         """Execute the program, processing input and output data."""
@@ -455,7 +461,9 @@ class Program(ABC):
                     )
 
             try:
-                runtime = await self.image.run(input, output, timeout=timeout, memory=space, cpus=cpus, ui=ui)
+                runtime = await self.image.run(
+                    input, output, timeout=timeout, memory=space, cpus=cpus, ui=ui, set_cpus=set_cpus
+                )
             except ExecutionError as e:
                 return result_class(
                     ProgramRunInfo(
@@ -571,6 +579,7 @@ class Generator(Program):
         cpus: int = ...,
         battle_input: Encodable | None = None,
         battle_output: type[Encodable] | None = None,
+        set_cpus: str | None = None,
         ui: ProgramUiProxy | None = None,
     ) -> GeneratorResult:
         """Executes the generator and parses its output into a problem instance.
@@ -582,6 +591,8 @@ class Generator(Program):
             cpus: Number of physical cpus the generator can use.
             battle_input: Additional data that will be given to the generator.
             battle_output: Class that will be used to parse additional data the generator outputs.
+            set_cpus: Which cpus to execute the container on. Either a comma separated list or a hyphen-separated range.
+                A value of `None` means the container can use any core (but still only `cpus` many of them).
             ui: Interface the program execution uses to update the ui.
 
         Returns:
@@ -597,6 +608,7 @@ class Generator(Program):
                 cpus=cpus,
                 battle_input=battle_input,
                 battle_output=battle_output,
+                set_cpus=set_cpus,
                 ui=ui,
             ),
         )
@@ -637,6 +649,7 @@ class Solver(Program):
         cpus: int = ...,
         battle_input: Encodable | None = None,
         battle_output: type[Encodable] | None = None,
+        set_cpus: str | None = None,
         ui: ProgramUiProxy | None = None,
     ) -> SolverResult:
         """Executes the solver on the given problem instance and parses its output into a problem solution.
@@ -648,6 +661,8 @@ class Solver(Program):
             cpus: Number of physical cpus the solver can use.
             battle_input: Additional data that will be given to the solver.
             battle_output: Class that will be used to parse additional data the solver outputs.
+            set_cpus: Which cpus to execute the container on. Either a comma separated list or a hyphen-separated range.
+                A value of `None` means the container can use any core (but still only `cpus` many of them).
             ui: Interface the program execution uses to update the ui.
 
         Returns:
@@ -663,6 +678,7 @@ class Solver(Program):
                 cpus=cpus,
                 battle_input=battle_input,
                 battle_output=battle_output,
+                set_cpus=set_cpus,
                 ui=ui,
             ),
         )
@@ -715,7 +731,6 @@ class AdvancedRunArgs(BaseModel):
     cpu_rt_period: int | None = None
     cpu_rt_runtime: int | None = None
     cpu_shares: int | None = None
-    cpuset_cpus: str | None = None
     cpuset_mems: str | None = None
     device_cgroup_rules: list[str] | None = None
     device_read_bps: list[_DeviceRate] | None = None
