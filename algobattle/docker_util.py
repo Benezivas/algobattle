@@ -149,11 +149,11 @@ class Image:
             image = await run_sync(cls._build_image, str(path), timeout, dockerfile)
 
         except Timeout as e:
-            raise BuildError(f"Build ran into a timeout.") from e
+            raise BuildError("Build ran into a timeout.") from e
         except DockerBuildError as e:
-            raise BuildError(f"Build did not complete successfully.", detail=e.msg) from e
+            raise BuildError("Build did not complete successfully.", detail=e.msg) from e
         except APIError as e:
-            raise BuildError(f"Docker APIError thrown while building.", detail=str(e)) from e
+            raise BuildError("Docker APIError thrown while building.", detail=str(e)) from e
 
         return cls(cast(str, image.id), path=path)
 
@@ -230,15 +230,15 @@ class Image:
                 ui.stop(elapsed_time)
 
         except ImageNotFound as e:
-            raise RuntimeError(f"Image (id: {self.id}) does not exist.") from e
+            raise RuntimeError("Image (id: {self.id}) does not exist.") from e
         except APIError as e:
-            raise DockerError(f"Docker APIError thrown while running container.", detail=str(e)) from e
+            raise DockerError("Docker APIError thrown while running container.", detail=str(e)) from e
         finally:
             if container is not None:
                 try:
                     container.remove(force=True)
                 except APIError as e:
-                    raise DockerError(f"Couldn't remove container.", detail=str(e)) from e
+                    raise DockerError("Couldn't remove container.", detail=str(e)) from e
 
         return elapsed_time
 
@@ -257,7 +257,7 @@ class Image:
         except ImageNotFound:
             pass
         except APIError as e:
-            raise DockerError(f"Docker APIError thrown while removing image.", detail=str(e)) from e
+            raise DockerError("Docker APIError thrown while removing image.", detail=str(e)) from e
 
     def _run_container(self, container: DockerContainer, timeout: float | None = None) -> float:
         container.start()

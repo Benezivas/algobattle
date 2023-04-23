@@ -124,9 +124,7 @@ class TeamHandler:
     excluded: dict[str, ExceptionInfo] = field(default_factory=dict)
 
     @classmethod
-    async def build(
-        cls, infos: list[TeamInfo], problem: type[Problem], config: DockerConfig, ui: BuildUiProxy,
-    ) -> Self:
+    async def build(cls, infos: list[TeamInfo], problem: type[Problem], config: DockerConfig, ui: BuildUiProxy) -> Self:
         """Builds the programs of every team.
 
         Attempts to build the programs of every team. If any build fails, that team will be excluded and all its
