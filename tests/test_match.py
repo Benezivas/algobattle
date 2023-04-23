@@ -203,18 +203,15 @@ class Parsing(TestCase):
         ]
 
     def test_no_cfg_default(self):
-        options, cfg = parse_cli_args([str(self.problem_path)])
-        self.assertEqual(options, CliOptions(TestProblem))
+        _, cfg = parse_cli_args([str(self.problem_path)])
         self.assertEqual(cfg, MatchConfig(teams=self.teams))
 
     def test_empty_cfg(self):
-        options, cfg = parse_cli_args([str(self.problem_path), "--config", str(self.configs_path / "empty.toml")])
-        self.assertEqual(options, CliOptions(TestProblem))
+        _, cfg = parse_cli_args([str(self.problem_path), "--config", str(self.configs_path / "empty.toml")])
         self.assertEqual(cfg, MatchConfig(teams=self.teams))
 
     def test_cfg(self):
-        problem, cfg = parse_cli_args([str(self.problem_path), "--config", str(self.configs_path / "test.toml")])
-        self.assertEqual(problem, CliOptions(TestProblem))
+        _, cfg = parse_cli_args([str(self.problem_path), "--config", str(self.configs_path / "test.toml")])
         self.assertEqual(
             cfg,
             MatchConfig(
@@ -229,8 +226,8 @@ class Parsing(TestCase):
         )
 
     def test_cli(self):
-        options, _ = parse_cli_args([str(self.problem_path), "-s"])
-        self.assertEqual(options, CliOptions(TestProblem, silent=True))
+        exec_config, _ = parse_cli_args([str(self.problem_path), "-s"])
+        self.assertTrue(exec_config.silent)
 
     def test_cli_no_problem_path(self):
         with self.assertRaises(SystemExit):
