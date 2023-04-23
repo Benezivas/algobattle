@@ -336,7 +336,6 @@ class Program(ABC):
     async def build(
         cls,
         image: Path | Image,
-        team_name: str,
         problem_class: type[Problem],
         config: RunParameters,
         timeout: float | None = None,

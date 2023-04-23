@@ -52,11 +52,11 @@ class TeamInfo:
         if name in _team_names:
             raise ValueError
         ui.start_build(name, "generator", config.build_timeout)
-        generator = await Generator.build(self.generator, self.name, problem, config.generator, config.build_timeout)
+        generator = await Generator.build(self.generator, problem, config.generator, config.build_timeout)
         ui.finish_build()
         try:
             ui.start_build(name, "solver", config.build_timeout)
-            solver = await Solver.build(self.solver, self.name, problem, config.solver, config.build_timeout)
+            solver = await Solver.build(self.solver, problem, config.solver, config.build_timeout)
             ui.finish_build()
         except Exception:
             generator.remove()
