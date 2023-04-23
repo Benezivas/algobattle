@@ -283,6 +283,8 @@ Weight = TypeVar("Weight")
 class EdgeWeights(DirectedGraph, GenericModel, Generic[Weight]):
     """Mixin for graphs with weighted edges."""
 
+    export: ClassVar[bool] = False
+
     edge_weights: list[Weight]
 
     def validate_instance(self, size: int):
@@ -294,6 +296,8 @@ class EdgeWeights(DirectedGraph, GenericModel, Generic[Weight]):
 
 class VertexWeights(DirectedGraph, GenericModel, Generic[Weight]):
     """Mixin for graphs with weighted vertices."""
+
+    export: ClassVar[bool] = False
 
     vertex_weights: list[Weight]
 
