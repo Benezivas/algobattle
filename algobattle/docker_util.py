@@ -50,6 +50,7 @@ class DockerConfig(BaseModel):
     """Config options relevant to the way programs are run and built."""
 
     build_timeout: float | None = None
+    strict_timeouts: bool = False
     set_cpus: str | list[str] | None = None
     generator: RunParameters = RunParameters()
     solver: RunParameters = RunParameters()
@@ -428,6 +429,17 @@ class Program(ABC):
                 runtime = await self.image.run(
                     input, output, timeout=timeout, memory=space, cpus=cpus, ui=ui, set_cpus=set_cpus
                 )
+            except ExecutionTimeout as e:
+                if self.docker_config.strict_timeouts:
+                    return result_class(
+                        ProgramRunInfo(
+                            params=run_params,
+                            runtime=e.runtime,
+                            error=ExceptionInfo.from_exception(e)
+                        )
+                    )
+                else:
+                    runtime = e.runtime
             except ExecutionError as e:
                 return result_class(
                     ProgramRunInfo(
