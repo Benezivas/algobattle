@@ -25,22 +25,22 @@ class ImageTests(IsolatedAsyncioTestCase):
         cls.problem_path = Path(testsproblem.__file__).parent
 
     @classmethod
-    def dockerfile(cls, name: str) -> tuple[Path, str]:
-        return cls.problem_path / name, name
+    def dockerfile(cls, name: str) -> Path:
+        return cls.problem_path / name
 
     async def test_build_timeout(self):
         """Raises an error if building a container runs into a timeout."""
-        with self.assertRaises(BuildError), await Image.build(*self.dockerfile("build_timeout"), timeout=0.5):
+        with self.assertRaises(BuildError), await Image.build(self.problem_path / "build_timeout", timeout=0.5):
             pass
 
     async def test_build_failed(self):
         """Raises an error if building a docker container fails for any reason other than a timeout."""
-        with self.assertRaises(BuildError), await Image.build(*self.dockerfile("build_error")):
+        with self.assertRaises(BuildError), await Image.build(self.problem_path / "build_error"):
             pass
 
     async def test_build_successful(self):
         """Runs successfully if a docker container builds successfully."""
-        with await Image.build(*self.dockerfile("generator")):
+        with await Image.build(self.problem_path / "generator"):
             pass
 
     async def test_build_nonexistant_path(self):
@@ -49,19 +49,19 @@ class ImageTests(IsolatedAsyncioTestCase):
             nonexistent_file = None
             while nonexistent_file is None or nonexistent_file.exists():
                 nonexistent_file = Path(str(random.randint(0, 2**80)))
-            with await Image.build(nonexistent_file, "foo_bar"):
+            with await Image.build(nonexistent_file):
                 pass
 
     async def test_run_timeout(self):
         """`Image.run()` raises an error when the container times out."""
-        with await Image.build(*self.dockerfile("generator_timeout")) as image, self.assertRaises(ExecutionTimeout):
+        with await Image.build(self.problem_path / "generator_timeout") as image, self.assertRaises(ExecutionTimeout):
             await image.run(timeout=1.0)
 
     async def test_run_error(self):
         """Raises an error if the container doesn't run successfully."""
         with (
             self.assertRaises(ExecutionError),
-            await Image.build(*self.dockerfile("generator_execution_error")) as image,
+            await Image.build(self.problem_path / "generator_execution_error") as image,
         ):
             await image.run(timeout=10.0)
 

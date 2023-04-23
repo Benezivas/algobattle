@@ -90,7 +90,6 @@ class Image:
     To prevent this don't use the object after calling `.remove()`.
     """
 
-    name: str
     id: str
     path: Path
 
@@ -111,12 +110,11 @@ class Image:
     A full description can be found at the docker api reference."""
 
     @classmethod
-    def _build_image(cls, path: str, tag: str, timeout: float | None, dockerfile: str | None) -> DockerImage:
+    def _build_image(cls, path: str, timeout: float | None, dockerfile: str | None) -> DockerImage:
         image, _logs = cast(
             tuple[DockerImage, Iterator[Any]],
             client().images.build(
                 path=str(path),
-                tag=tag,
                 timeout=timeout,
                 dockerfile=dockerfile,
                 **cls.build_kwargs,
@@ -128,7 +126,6 @@ class Image:
     async def build(
         cls,
         path: Path,
-        image_name: str,
         timeout: float | None = None,
     ) -> Self:
         """Builds a docker image using the dockerfile found at the provided path.
@@ -149,24 +146,16 @@ class Image:
         else:
             dockerfile = None
         try:
-            try:
-                old_image = cast(DockerImage, client().images.get(image_name))
-            except ImageNotFound:
-                old_image = None
-            image = await run_sync(cls._build_image, str(path), image_name, timeout, dockerfile)
-            if old_image is not None:
-                old_image.reload()
-                if len(old_image.tags) == 0:
-                    old_image.remove(force=True)
+            image = await run_sync(cls._build_image, str(path), timeout, dockerfile)
 
         except Timeout as e:
-            raise BuildError(f"Build process for '{image_name}' ran into a timeout.") from e
+            raise BuildError(f"Build ran into a timeout.") from e
         except DockerBuildError as e:
-            raise BuildError(f"Building '{image_name}' did not complete successfully.", detail=e.msg) from e
+            raise BuildError(f"Build did not complete successfully.", detail=e.msg) from e
         except APIError as e:
-            raise BuildError(f"Docker APIError thrown while building '{image_name}'.", detail=str(e)) from e
+            raise BuildError(f"Docker APIError thrown while building.", detail=str(e)) from e
 
-        return cls(image_name, cast(str, image.id), path=path)
+        return cls(cast(str, image.id), path=path)
 
     def __enter__(self):
         return self
@@ -241,9 +230,9 @@ class Image:
                 ui.stop(elapsed_time)
 
         except ImageNotFound as e:
-            raise RuntimeError(f"Image {self.name} (id={self.id}) does not exist") from e
+            raise RuntimeError(f"Image (id: {self.id}) does not exist.") from e
         except APIError as e:
-            raise DockerError(f"Docker APIError thrown while running '{self.name}'.", detail=str(e)) from e
+            raise DockerError(f"Docker APIError thrown while running container.", detail=str(e)) from e
         finally:
             if container is not None:
                 try:
@@ -268,7 +257,7 @@ class Image:
         except ImageNotFound:
             pass
         except APIError as e:
-            raise DockerError(f"Docker APIError thrown while removing '{self.name}'") from e
+            raise DockerError(f"Docker APIError thrown while removing image.", detail=str(e)) from e
 
     def _run_container(self, container: DockerContainer, timeout: float | None = None) -> float:
         container.start()
@@ -356,7 +345,6 @@ class Program(ABC):
         if isinstance(image, Path):
             image = await Image.build(
                 path=image,
-                image_name=f"{team_name}_{cls.role}",
                 timeout=timeout,
             )
 
