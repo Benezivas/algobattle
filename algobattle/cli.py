@@ -48,10 +48,11 @@ def parse_cli_args(args: list[str]) -> tuple[CliOptions, MatchConfig]:
     )
 
     parsed = parser.parse_args(args)
-    try:
-        problem = Problem.all()[parsed.problem]
+    installed_problems = Problem.all()
+    if parsed.problem in installed_problems:
+        problem = installed_problems[parsed.problem]
         base_path = Path()
-    except KeyError:
+    else:
         problem_path = Path(parsed.problem)
         if not problem_path.exists():
             raise ValueError(
