@@ -3,7 +3,7 @@
 from unittest import IsolatedAsyncioTestCase, TestCase, main
 from pathlib import Path
 
-from algobattle.cli import CliOptions, parse_cli_args
+from algobattle.cli import parse_cli_args
 from algobattle.battle import Fight, Iterated, Averaged
 from algobattle.match import MatchConfig, Match
 from algobattle.team import Team, Matchup, TeamHandler, TeamInfo
