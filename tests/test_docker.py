@@ -1,5 +1,4 @@
 """Tests for all docker functions."""
-from typing import cast
 from unittest import IsolatedAsyncioTestCase, main as run_tests
 import random
 from pathlib import Path
@@ -12,10 +11,7 @@ from algobattle.docker_util import (
     Image,
     RunParameters,
     Solver,
-    client,
-    DockerImage,
 )
-from algobattle.util import TempDir
 from . import testsproblem
 from .testsproblem.problem import TestProblem as TestProblem
 
@@ -68,17 +64,6 @@ class ImageTests(IsolatedAsyncioTestCase):
             await Image.build(*self.dockerfile("generator_execution_error")) as image,
         ):
             await image.run(timeout=10.0)
-
-    async def test_archive(self):
-        """Raises an error if the image can't be archived and restored properly."""
-        with await Image.build(*self.dockerfile("generator")) as image, TempDir() as folder:
-            original_tag = cast(DockerImage, client().images.get(image.id)).tags[0]
-            archived = image.archive(folder)
-            assert (folder / "generator-archive.tar").is_file()
-            restored = archived.restore()
-            docker_image = cast(DockerImage, client().images.get(restored.id))
-            assert docker_image.id == image.id
-            assert docker_image.tags == [original_tag]
 
 
 class ProgramTests(IsolatedAsyncioTestCase):

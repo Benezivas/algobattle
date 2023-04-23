@@ -50,7 +50,6 @@ class DockerConfig(BaseModel):
     """Config options relevant to the way programs are run and built."""
 
     build_timeout: float | None = None
-    safe_build: bool = False
     set_cpus: str | list[str] | None = None
     generator: RunParameters = RunParameters()
     solver: RunParameters = RunParameters()
@@ -81,28 +80,6 @@ class ProgramUiProxy(Protocol):
     @abstractmethod
     def stop(self, runtime: float) -> None:
         """Signals that the program execution has been finished."""
-
-
-@dataclass
-class ArchivedImage:
-    """Defines an archived docker image."""
-
-    path: Path
-    name: str
-    id: str
-
-    def restore(self) -> "Image":
-        """Restores a docker image from an archive."""
-        try:
-            with open(self.path, "rb") as file:
-                data = file.read()
-            images = cast(list[DockerImage], client().images.load(data))
-            if self.id not in (i.id for i in images):
-                raise KeyError
-            self.path.unlink()
-        except APIError as e:
-            raise DockerError(f"Docker APIError thrown while restoring '{self.name}'") from e
-        return Image(self.name, self.id, self.path)
 
 
 @dataclass
@@ -293,19 +270,6 @@ class Image:
         except APIError as e:
             raise DockerError(f"Docker APIError thrown while removing '{self.name}'") from e
 
-    def archive(self, dir: Path) -> ArchivedImage:
-        """Archives the image into a .tar file at the targeted directory."""
-        path = dir / f"{self.name}-archive.tar"
-        try:
-            image = cast(DockerImage, client().images.get(self.name))
-            with open(path, "wb") as file:
-                for chunk in image.save(named=True):
-                    file.write(chunk)
-            image.remove(force=True)
-        except APIError as e:
-            raise DockerError(f"Docker APIError thrown while archiving '{self.name}'", detail=str(e)) from e
-        return ArchivedImage(path, self.name, self.id)
-
     def _run_container(self, container: DockerContainer, timeout: float | None = None) -> float:
         container.start()
         start_time = default_timer()
@@ -382,7 +346,7 @@ class Program(ABC):
     @classmethod
     async def build(
         cls,
-        image: Path | Image | ArchivedImage,
+        image: Path | Image,
         team_name: str,
         problem_class: type[Problem],
         config: RunParameters,
@@ -395,8 +359,6 @@ class Program(ABC):
                 image_name=f"{team_name}_{cls.role}",
                 timeout=timeout,
             )
-        elif isinstance(image, ArchivedImage):
-            image = image.restore()
 
         return cls(image, config, problem_class)
 

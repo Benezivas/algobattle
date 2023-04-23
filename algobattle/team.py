@@ -5,9 +5,9 @@ from itertools import combinations
 from pathlib import Path
 from typing import Iterator, Protocol, Self
 
-from algobattle.docker_util import DockerConfig, ArchivedImage, Generator, Solver
+from algobattle.docker_util import DockerConfig, Generator, Solver
 from algobattle.problem import Problem
-from algobattle.util import ExceptionInfo, Role, TempDir
+from algobattle.util import ExceptionInfo, Role
 
 
 _team_names: set[str] = set()
@@ -108,27 +108,6 @@ class Team:
         self.solver.remove()
         _team_names.remove(self.name)
 
-    def archive(self, dir: Path) -> "_ArchivedTeam":
-        """Archives the images this team uses."""
-        gen = self.generator.image.archive(dir)
-        sol = self.solver.image.archive(dir)
-        return _ArchivedTeam(gen, sol, self)
-
-
-@dataclass
-class _ArchivedTeam:
-    """A team whose images have been archived."""
-
-    generator: ArchivedImage
-    solver: ArchivedImage
-    team: Team
-
-    def restore(self) -> Team:
-        """Restores the archived docker images."""
-        self.generator.restore()
-        self.solver.restore()
-        return self.team
-
 
 @dataclass(frozen=True)
 class Matchup:
@@ -173,25 +152,12 @@ class TeamHandler:
             :cls:`TeamHandler` containing the info about the participating teams.
         """
         handler = cls()
-        if config.safe_build:
-            with TempDir() as folder:
-                archives: list[_ArchivedTeam] = []
-                for info in infos:
-                    try:
-                        team = await info.build(problem, config, ui)
-                        team = team.archive(folder)
-                        archives.append(team)
-                    except Exception as e:
-                        handler.excluded[info.name] = ExceptionInfo.from_exception(e)
-                ui.initialize_programs()
-                handler.active = [team.restore() for team in archives]
-        else:
-            for info in infos:
-                try:
-                    team = await info.build(problem, config, ui)
-                    handler.active.append(team)
-                except Exception as e:
-                    handler.excluded[info.name] = ExceptionInfo.from_exception(e)
+        for info in infos:
+            try:
+                team = await info.build(problem, config, ui)
+                handler.active.append(team)
+            except Exception as e:
+                handler.excluded[info.name] = ExceptionInfo.from_exception(e)
         return handler
 
     def __enter__(self) -> Self:
