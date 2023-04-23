@@ -176,15 +176,15 @@ class CliUi(Ui):
         curses.echo()
         curses.endwin()
 
-    def start(self, team: str, role: Role, timeout: float | None) -> None:
+    def start_build(self, team: str, role: Role, timeout: float | None) -> None:
         """Informs the ui that a new program is being built."""
         self.build_status = _BuildInfo(team, role, timeout, datetime.now())
 
-    def finish(self) -> None:
+    def finish_build(self) -> None:
         """Informs the ui that the current build has been finished."""
         self.build_status = None
 
-    def initialize(self) -> None:
+    def initialize_programs(self) -> None:
         """Informs the ui that the programs are being initialized."""
         self.build_status = "Initializing programs..."
 

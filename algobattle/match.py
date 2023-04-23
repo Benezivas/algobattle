@@ -258,15 +258,15 @@ class Ui:
     match: Match | None = field(default=None, init=False)
     active_battles: list[Matchup] = field(default_factory=list, init=False)
 
-    def start(self, team: str, role: Role, timeout: float | None) -> None:
+    def start_build(self, team: str, role: Role, timeout: float | None) -> None:
         """Informs the ui that a new program is being built."""
         return
 
-    def finish(self) -> None:
+    def finish_build(self) -> None:
         """Informs the ui that the current build has been finished."""
         return
 
-    def initialize(self) -> None:
+    def initialize_programs(self) -> None:
         """Informs the ui that the programs are being initialized."""
         return
 

@@ -17,15 +17,15 @@ class BuildUiProxy(Protocol):
     """Provides and interface for the build process to update the ui."""
 
     @abstractmethod
-    def start(self, team: str, role: Role, timeout: float | None) -> None:
+    def start_build(self, team: str, role: Role, timeout: float | None) -> None:
         """Informs the ui that a new program is being built."""
 
     @abstractmethod
-    def finish(self) -> None:
+    def finish_build(self) -> None:
         """Informs the ui that the current build has been finished."""
 
     @abstractmethod
-    def initialize(self) -> None:
+    def initialize_programs(self) -> None:
         """Informs the ui that the programs are being initialized."""
 
 
@@ -47,13 +47,13 @@ class TeamInfo:
         name = self.name.replace(" ", "_").lower()  # Lower case needed for docker tag created from name
         if name in _team_names:
             raise ValueError
-        ui.start(name, "generator", config.build_timeout)
+        ui.start_build(name, "generator", config.build_timeout)
         generator = await Generator.build(self.generator, self.name, problem, config.generator, config.build_timeout)
-        ui.finish()
+        ui.finish_build()
         try:
-            ui.start(name, "solver", config.build_timeout)
+            ui.start_build(name, "solver", config.build_timeout)
             solver = await Solver.build(self.solver, self.name, problem, config.solver, config.build_timeout)
-            ui.finish()
+            ui.finish_build()
         except Exception:
             generator.remove()
             raise
@@ -179,7 +179,7 @@ class TeamHandler:
                         archives.append(team)
                     except Exception as e:
                         handler.excluded[info.name] = ExceptionInfo.from_exception(e)
-                ui.initialize()
+                ui.initialize_programs()
                 handler.active = [team.restore() for team in archives]
         else:
             for info in infos:
