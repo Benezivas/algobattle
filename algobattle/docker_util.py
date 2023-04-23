@@ -104,6 +104,7 @@ class Image:
         "forcerm": True,
         "quiet": True,
         "network_mode": "host",
+        "pull": True,
     }
     """Advanced docker options passed to the docker build command.
 
@@ -772,7 +773,7 @@ class AdvancedBuildArgs(BaseModel):
     nocache: bool | None = None
     rm: bool = True
     encoding: str | None = None
-    pull: bool | None = None
+    pull: bool | None = True
     forcerm: bool = True
     buildargs: dict[Any, Any] | None = None
     container_limits: _ContainerLimits | None = None
