@@ -1,4 +1,5 @@
 FROM alpine
 
 # causes an execution timeout.
-ENTRYPOINT sleep 6000
+COPY solution.json /solution.json
+ENTRYPOINT mv /solution.json /output/solution.json && sleep 6000

@@ -77,8 +77,16 @@ class ProgramTests(IsolatedAsyncioTestCase):
         cls.params_short = RunParameters(timeout=2)
         cls.instance = TestProblem(semantics=True)
 
-    async def test_gen_timeout(self):
+    async def test_gen_lax_timeout(self):
+        """The generator times out but still outputs a valid instance."""
+        Generator.docker_config.strict_timeouts = False
+        with await Generator.build(self.problem_path / "generator_timeout", TestProblem, self.params_short) as gen:
+            res = await gen.run(5)
+            self.assertIsNone(res.info.error)
+
+    async def test_gen_strict_timeout(self):
         """The generator times out."""
+        Generator.docker_config.strict_timeouts = True
         with await Generator.build(self.problem_path / "generator_timeout", TestProblem, self.params_short) as gen:
             res = await gen.run(5)
             assert res.info.error is not None
@@ -112,12 +120,20 @@ class ProgramTests(IsolatedAsyncioTestCase):
             correct = TestProblem(semantics=True)
             self.assertEqual(res.instance, correct)
 
-    async def test_sol_timeout(self):
+    async def test_sol_strict_timeout(self):
         """The solver times out."""
+        Solver.docker_config.strict_timeouts = True
         with await Solver.build(self.problem_path / "solver_timeout", TestProblem, self.params_short) as sol:
             res = await sol.run(self.instance, 5)
             assert res.info.error is not None
             self.assertEqual(res.info.error.type, "ExecutionTimeout")
+
+    async def test_sol_lax_timeout(self):
+        """The solver times out but still outputs a correct solution."""
+        Solver.docker_config.strict_timeouts = False
+        with await Solver.build(self.problem_path / "solver_timeout", TestProblem, self.params_short) as sol:
+            res = await sol.run(self.instance, 5)
+            self.assertIsNone(res.info.error)
 
     async def test_sol_exec_err(self):
         """The solver doesn't execute properly."""
