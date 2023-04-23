@@ -134,8 +134,6 @@ class Problem(Encodable, ABC):
         """
         if path.is_file():
             pass
-        elif (path / "__init__.py").is_file():
-            path /= "__init__.py"
         elif (path / "problem.py").is_file():
             path /= "problem.py"
         else:
