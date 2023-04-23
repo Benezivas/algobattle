@@ -270,6 +270,10 @@ class Ui:
         """Informs the ui that the programs are being initialized."""
         return
 
+    def finish_init_programs(self) -> None:
+        """Informs the ui that all programs have been initialized."""
+        return
+
     def start_battle(self, matchup: Matchup) -> None:
         """Notifies the Ui that a battle has been started."""
         self.active_battles.append(matchup)

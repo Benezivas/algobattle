@@ -187,6 +187,12 @@ class CliUi(Ui):
     def initialize_programs(self) -> None:
         """Informs the ui that the programs are being initialized."""
         self.build_status = "Initializing programs..."
+        self.update()
+
+    def finish_init_programs(self) -> None:
+        """Informs the ui that all programs have been initialized."""
+        self.build_status = None
+        self.update()
 
     @check_for_terminal
     def battle_completed(self, matchup: Matchup) -> None:

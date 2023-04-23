@@ -28,6 +28,10 @@ class BuildUiProxy(Protocol):
     def initialize_programs(self) -> None:
         """Informs the ui that the programs are being initialized."""
 
+    @abstractmethod
+    def finish_init_programs(self) -> None:
+        """Informs the ui that all programs have been initialized."""
+
 
 @dataclass
 class TeamInfo:
