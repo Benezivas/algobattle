@@ -28,7 +28,7 @@ from algobattle.util import Role, TimerInfo, check_path, flat_intersperse
 class CliOptions:
     """Options used by the cli."""
 
-    problem_path: Path = Path()
+    problem: type[Problem]
     silent: bool = False
     result_output: Path | None = None
 
@@ -36,7 +36,7 @@ class CliOptions:
 def parse_cli_args(args: list[str]) -> tuple[CliOptions, MatchConfig]:
     """Parse a given CLI arg list into config objects."""
     parser = ArgumentParser()
-    parser.add_argument("problem", type=check_path, help="Path to a folder with the problem file.")
+    parser.add_argument("problem", help="Either the name of an installed problem, or a path to a problem file.")
     parser.add_argument(
         "--config",
         type=partial(check_path, type="file"),
@@ -48,12 +48,23 @@ def parse_cli_args(args: list[str]) -> tuple[CliOptions, MatchConfig]:
     )
 
     parsed = parser.parse_args(args)
+    try:
+        problem = Problem.all()[parsed.problem]
+        base_path = Path()
+    except KeyError:
+        problem_path = Path(parsed.problem)
+        if not problem_path.exists():
+            raise ValueError(f"Passed problem option '{parsed.problem}' is neither the name of an installed problem "
+                             "nor a path to one.")
+        problem = Problem.import_from_path(problem_path)
+        base_path = problem_path
+
     exec_config = CliOptions(
-        problem_path=parsed.problem,
+        problem=problem,
         silent=parsed.silent,
         result_output=parsed.result_output,
     )
-    cfg_path: Path = parsed.config or exec_config.problem_path / "config.toml"
+    cfg_path: Path = parsed.config or base_path / "config.toml"
 
     if cfg_path.is_file():
         try:
@@ -67,8 +78,8 @@ def parse_cli_args(args: list[str]) -> tuple[CliOptions, MatchConfig]:
         config.teams.append(
             TeamInfo(
                 name="team_0",
-                generator=exec_config.problem_path / "generator",
-                solver=exec_config.problem_path / "solver",
+                generator=base_path / "generator",
+                solver=base_path / "solver",
             )
         )
 
@@ -87,12 +98,11 @@ def main():
     """Entrypoint of `algobattle` CLI."""
     try:
         exec_config, config = parse_cli_args(sys.argv[1:])
-        problem = Problem.import_from_path(exec_config.problem_path)
 
         if exec_config.silent:
-            result = run(Match.run, config, problem)
+            result = run(Match.run, config, exec_config.problem)
         else:
-            result = run(_run_with_ui, config, problem)
+            result = run(_run_with_ui, config, exec_config.problem)
         print("\n".join(CliUi.display_match(result)))
 
         if config.points > 0:
