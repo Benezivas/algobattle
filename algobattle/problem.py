@@ -168,8 +168,6 @@ class Problem(Encodable, ABC):
                 problem_cls.Solution.update_forward_refs()
             return problem_cls
 
-        except Exception as e:
-            raise ValueError from e
         finally:
             sys.modules.pop("_problem")
 
