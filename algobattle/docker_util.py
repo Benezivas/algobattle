@@ -132,7 +132,6 @@ class Image:
 
         Args:
             path: The path to the directory containing a `Dockerfile`, or a path to such a file itself.
-            image_name: The name of the built docker image, must follow the rules set out by the docker api.
             timeout: Timeout in seconds for the build process.
 
         Raises:
