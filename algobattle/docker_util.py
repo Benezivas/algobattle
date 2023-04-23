@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from timeit import default_timer
 from typing import Any, ClassVar, Iterator, Protocol, Self, TypedDict, cast
-from uuid import uuid1
+from uuid import uuid1, uuid4
 import json
 from dataclasses import dataclass
 
@@ -115,6 +115,7 @@ class Image:
             tuple[DockerImage, Iterator[Any]],
             client().images.build(
                 path=str(path),
+                tag=f"algobattle_{uuid4().hex[:8]}",
                 timeout=timeout,
                 dockerfile=dockerfile,
                 **cls.build_kwargs,
