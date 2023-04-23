@@ -73,7 +73,7 @@ def client() -> DockerClient:
 
 def set_docker_config(config: DockerConfig) -> None:
     """Sets up the static docker config attributes.
-    
+
     Various classes in the docker_util module need statically set config options, e.g. advanced build/run arguments or
     the strict_timeout option. This function propagates initializes all of these correctly.
     """
@@ -432,11 +432,7 @@ class Program(ABC):
             except ExecutionTimeout as e:
                 if self.docker_config.strict_timeouts:
                     return result_class(
-                        ProgramRunInfo(
-                            params=run_params,
-                            runtime=e.runtime,
-                            error=ExceptionInfo.from_exception(e)
-                        )
+                        ProgramRunInfo(params=run_params, runtime=e.runtime, error=ExceptionInfo.from_exception(e))
                     )
                 else:
                     runtime = e.runtime

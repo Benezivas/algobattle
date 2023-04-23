@@ -54,8 +54,9 @@ def parse_cli_args(args: list[str]) -> tuple[CliOptions, MatchConfig]:
     except KeyError:
         problem_path = Path(parsed.problem)
         if not problem_path.exists():
-            raise ValueError(f"Passed problem option '{parsed.problem}' is neither the name of an installed problem "
-                             "nor a path to one.")
+            raise ValueError(
+                f"Passed argument '{parsed.problem}' is neither the name of an installed problem nor a path to one."
+            )
         problem = Problem.import_from_path(problem_path)
         base_path = problem_path
 
