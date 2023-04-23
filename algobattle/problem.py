@@ -1,5 +1,6 @@
 """Module defining the Problem and Solution base classes and related objects."""
 from abc import ABC, abstractmethod
+from importlib.metadata import entry_points
 import importlib.util
 from inspect import isclass
 import sys
@@ -61,9 +62,13 @@ class Problem(Encodable, ABC):
     Helps with uniquely specifying a class to be executed in a problem file. For more details view the documentation.
     """
 
+    _installed: ClassVar[dict[str, type["Problem"]]] = {}
+
     def __init_subclass__(cls, export: bool = True) -> None:
         if "export" not in cls.__dict__:
             cls.export = export
+        if cls.export and cls.name not in Problem._installed:
+            Problem._installed[cls.name] = cls
         return super().__init_subclass__()
 
     def validate_instance(self, size: int) -> None:
@@ -167,6 +172,26 @@ class Problem(Encodable, ABC):
             raise ValueError from e
         finally:
             sys.modules.pop("_problem")
+
+    @classmethod
+    def all(cls) -> dict[str, type[Self]]:
+        """Returns a dictionary mapping the names of all installed problems to their python classes.
+
+        It includes all subclasses of :cls:`Problem` that have been initialized so far, including ones exposed to the
+        algobattle module via the `algobattle.problem` entrypoint hook.
+
+        Raises:
+            RuntimeError: If an entrypoint is not a problem class.
+        """
+        for entrypoint in entry_points(group="algobattle.problem"):
+            if entrypoint.name not in Problem._installed:
+                problem = entrypoint.load()
+                if not issubclass(problem, cls):
+                    raise RuntimeError(
+                        f"The entrypoint '{entrypoint.name}' doesn't point to a problem class but rather: {problem}."
+                    )
+                cls._installed[entrypoint.name] = problem
+        return cls._installed
 
     class Solution(Encodable, ABC):
         """A proposed solution for an instance of this problem."""
