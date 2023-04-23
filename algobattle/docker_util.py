@@ -70,6 +70,19 @@ def client() -> DockerClient:
     return _client_var
 
 
+def set_docker_config(config: DockerConfig) -> None:
+    """Sets up the static docker config attributes.
+    
+    Various classes in the docker_util module need statically set config options, e.g. advanced build/run arguments or
+    the strict_timeout option. This function propagates initializes all of these correctly.
+    """
+    if config.advanced_run_params is not None:
+        Image.run_kwargs = config.advanced_run_params.to_docker_args()
+    if config.advanced_build_params is not None:
+        Image.build_kwargs = config.advanced_build_params.to_docker_args()
+    Program.docker_config = config
+
+
 class ProgramUiProxy(Protocol):
     """Provides an interface for :cls:`Program`s to update the Ui."""
 
@@ -332,6 +345,7 @@ class Program(ABC):
     """The problem this program creates instances and/or solutions for."""
 
     role: ClassVar[Role]
+    docker_config: ClassVar[DockerConfig] = DockerConfig()
 
     @classmethod
     async def build(
