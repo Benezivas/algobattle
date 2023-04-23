@@ -12,7 +12,7 @@ from anyio import create_task_group, CapacityLimiter
 from anyio.to_thread import current_default_thread_limiter
 
 from algobattle.battle import Battle, FightHandler, FightUiProxy, BattleUiProxy
-from algobattle.docker_util import DockerConfig, Image, ProgramRunInfo, ProgramUiProxy, set_docker_config
+from algobattle.docker_util import DockerConfig, ProgramRunInfo, ProgramUiProxy, set_docker_config
 from algobattle.team import Matchup, Team, TeamHandler, TeamInfo
 from algobattle.problem import Problem
 from algobattle.util import Role, TimerInfo, inherit_docs, BaseModel, str_with_traceback
