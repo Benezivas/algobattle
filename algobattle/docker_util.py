@@ -52,6 +52,7 @@ class DockerConfig(BaseModel):
     build_timeout: float | None = None
     strict_timeouts: bool = False
     set_cpus: str | list[str] | None = None
+    image_size: int | None = None
     generator: RunParameters = RunParameters()
     solver: RunParameters = RunParameters()
     advanced_run_params: "AdvancedRunArgs | None" = None
@@ -82,6 +83,7 @@ def set_docker_config(config: DockerConfig) -> None:
     if config.advanced_build_params is not None:
         Image.build_kwargs = config.advanced_build_params.to_docker_args()
     Program.docker_config = config
+    Image.docker_config = config
 
 
 class ProgramUiProxy(Protocol):
@@ -106,6 +108,8 @@ class Image:
 
     id: str
     path: Path
+
+    docker_config: ClassVar[DockerConfig] = DockerConfig()
 
     run_kwargs: ClassVar[dict[str, Any]] = {
         "network_mode": "none",
@@ -169,6 +173,11 @@ class Image:
             raise BuildError("Build did not complete successfully.", detail=e.msg) from e
         except APIError as e:
             raise BuildError("Docker APIError thrown while building.", detail=str(e)) from e
+
+        size_limit = cls.docker_config.image_size
+        used_size = cast(dict[str, Any], image.attrs).get("Size", 0)
+        if size_limit is not None and used_size > size_limit:
+            raise BuildError("Built image is too large.", detail=f"Built size: {used_size}, limit: {size_limit}.")
 
         return cls(cast(str, image.id), path=path)
 
