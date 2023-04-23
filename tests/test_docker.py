@@ -63,7 +63,10 @@ class ImageTests(IsolatedAsyncioTestCase):
 
     async def test_run_error(self):
         """Raises an error if the container doesn't run successfully."""
-        with self.assertRaises(ExecutionError), await Image.build(*self.dockerfile("generator_execution_error")) as image:
+        with (
+            self.assertRaises(ExecutionError),
+            await Image.build(*self.dockerfile("generator_execution_error")) as image,
+        ):
             await image.run(timeout=10.0)
 
     async def test_archive(self):
