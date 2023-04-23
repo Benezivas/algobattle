@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from timeit import default_timer
 from typing import Any, ClassVar, Iterator, Protocol, Self, TypedDict, cast
-from uuid import uuid1, uuid4
+from uuid import uuid4
 import json
 from dataclasses import dataclass
 
@@ -195,7 +195,7 @@ class Image:
         Returns:
             The runtime of the program.
         """
-        name = f"algobattle_{uuid1().hex[:8]}"
+        name = f"algobattle_{uuid4().hex[:8]}"
         if memory is not None:
             memory = memory * 1_000_000
         cpus = cpus * 1_000_000_000
@@ -238,7 +238,7 @@ class Image:
                 try:
                     container.remove(force=True)
                 except APIError as e:
-                    raise DockerError(f"Couldn't remove {name}", detail=str(e)) from e
+                    raise DockerError(f"Couldn't remove container.", detail=str(e)) from e
 
         return elapsed_time
 
