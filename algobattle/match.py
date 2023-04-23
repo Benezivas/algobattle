@@ -134,7 +134,7 @@ class Match(BaseModel):
         with await TeamHandler.build(config.teams, problem, config.docker, ui) as teams:
             result = cls(
                 active_teams=[t.name for t in teams.active],
-                excluded_teams=[t.name for t in teams.excluded],
+                excluded_teams=[t for t in teams.excluded],
             )
             ui.match = result
             battle_cls = Battle.all()[config.battle_type]

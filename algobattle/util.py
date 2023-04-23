@@ -239,10 +239,17 @@ class ExceptionInfo(BaseModel):
     detail: str | None = None
 
     @classmethod
-    def from_exception(cls, error: AlgobattleBaseException) -> Self:
+    def from_exception(cls, error: Exception) -> Self:
         """Constructs an instance from a raised exception."""
-        return cls(
-            type=error.__class__.__name__,
-            message=error.message,
-            detail=error.detail,
-        )
+        if isinstance(error, AlgobattleBaseException):
+            return cls(
+                type=error.__class__.__name__,
+                message=error.message,
+                detail=error.detail,
+            )
+        else:
+            return cls(
+                type=error.__class__.__name__,
+                message=str(error),
+                detail=str_with_traceback(error),
+            )

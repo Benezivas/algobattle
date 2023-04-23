@@ -1,13 +1,13 @@
 """Module containing helper classes related to teams."""
 from abc import abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from itertools import combinations
 from pathlib import Path
 from typing import Iterator, Protocol, Self
 
-from algobattle.docker_util import DockerConfig, DockerError, ArchivedImage, Generator, Solver
+from algobattle.docker_util import DockerConfig, ArchivedImage, Generator, Solver
 from algobattle.problem import Problem
-from algobattle.util import Role, TempDir
+from algobattle.util import ExceptionInfo, Role, TempDir
 
 
 _team_names: set[str] = set()
@@ -145,8 +145,8 @@ class Matchup:
 class TeamHandler:
     """Handles building teams and cleaning them up."""
 
-    active: list[Team]
-    excluded: list[TeamInfo]
+    active: list[Team] = field(default_factory=list)
+    excluded: dict[str, ExceptionInfo] = field(default_factory=dict)
 
     @classmethod
     async def build(
@@ -168,7 +168,7 @@ class TeamHandler:
         Returns:
             :cls:`TeamHandler` containing the info about the participating teams.
         """
-        excluded: list[TeamInfo] = []
+        handler = cls()
         if config.safe_build:
             with TempDir() as folder:
                 archives: list[_ArchivedTeam] = []
@@ -177,19 +177,18 @@ class TeamHandler:
                         team = await info.build(problem, config, ui)
                         team = team.archive(folder)
                         archives.append(team)
-                    except Exception:
-                        excluded.append(info)
+                    except Exception as e:
+                        handler.excluded[info.name] = ExceptionInfo.from_exception(e)
                 ui.initialize()
-                return cls([team.restore() for team in archives], excluded)
+                handler.active = [team.restore() for team in archives]
         else:
-            teams: list[Team] = []
             for info in infos:
                 try:
                     team = await info.build(problem, config, ui)
-                    teams.append(team)
-                except (ValueError, DockerError):
-                    excluded.append(info)
-            return cls(teams, excluded)
+                    handler.active.append(team)
+                except Exception as e:
+                    handler.excluded[info.name] = ExceptionInfo.from_exception(e)
+        return handler
 
     def __enter__(self) -> Self:
         return self
