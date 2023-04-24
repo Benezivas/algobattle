@@ -139,7 +139,7 @@ class TeamHandler:
             config: Config options.
 
         Returns:
-            :cls:`TeamHandler` containing the info about the participating teams.
+            :class:`TeamHandler` containing the info about the participating teams.
         """
         handler = cls()
         for info in infos:

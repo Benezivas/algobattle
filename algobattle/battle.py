@@ -1,6 +1,6 @@
 """A Battle is the portion of a match where a specific team generates instances and another one solves them.
 
-This module contains the :cls:`Battle` class, which speciefies how each type of battle is fought and scored,
+This module contains the :class:`Battle` class, which speciefies how each type of battle is fought and scored,
 some basic battle types, and related classed.
 """
 from dataclasses import dataclass
@@ -26,11 +26,11 @@ from algobattle.util import Encodable, Role, inherit_docs, BaseModel
 
 
 _BattleConfig: TypeAlias = Any
-"""Type alias used to generate correct typings when subclassing :cls:`Battle`.
+"""Type alias used to generate correct typings when subclassing :class:`Battle`.
 
-Each battle type's :meth:`run` method is guaranteed to be passed an instance of its own :cls:`BattleConfig` object.
+Each battle type's :meth:`run` method is guaranteed to be passed an instance of its own :class:`BattleConfig` object.
 But due to limitations in the python type system we are currently not able to express this properly.
-When creating your own battle type it is recommended to not use this alias and instead use the :cls:`BattleConfig` of
+When creating your own battle type it is recommended to not use this alias and instead use the :class:`BattleConfig` of
 the new battle type directly.
 """
 T = TypeVar("T")
@@ -56,7 +56,7 @@ class Fight(BaseModel):
 
 
 class FightUiProxy(Protocol):
-    """Provides an interface for :cls:`Fight` to update the ui."""
+    """Provides an interface for :class:`Fight` to update the ui."""
 
     generator: ProgramUiProxy
     solver: ProgramUiProxy
@@ -177,7 +177,7 @@ class FightHandler:
 
 # We need this to be here to prevent an import cycle between match.py and battle.py
 class BattleUiProxy(Protocol):
-    """Provides an interface for :cls:`Battle`s to update the Ui."""
+    """Provides an interface for :class:`Battle` to update the Ui."""
 
     fight_ui: FightUiProxy
 
@@ -185,7 +185,7 @@ class BattleUiProxy(Protocol):
     def update_data(self, data: "Battle.UiData") -> None:
         """Passes new custom display data to the Ui.
 
-        See :cls:`Battle.UiData` for further details.
+        See :class:`Battle.UiData` for further details.
         """
 
 
@@ -223,7 +223,7 @@ class Battle(BaseModel):
     def all() -> dict[str, type["Battle"]]:
         """Returns a dictionary mapping the names of all registered battle types to their python classes.
 
-        It includes all subclasses of :cls:`Battle` that have been initialized so far, including ones exposed to the
+        It includes all subclasses of :class:`Battle` that have been initialized so far, including ones exposed to the
         algobattle module via the `algobattle.battle` entrypoint hook.
         """
         for entrypoint in entry_points(group="algobattle.battle"):
@@ -267,10 +267,10 @@ class Battle(BaseModel):
         """Executes one battle.
 
         Args:
-            fight: The :cls:`FightHandler` used to run each fight of this battle. It already contains information about
+            fight: The :class:`FightHandler` used to run each fight of this battle. It already contains information about
                 the participating teams, default config settings, etc. Each fight can be executed using its :meth:`.run`
                 method.
-            config: An instance of this battle type's :cls:`BattleConfig` class, parsed from the corresponding section
+            config: An instance of this battle type's :class:`BattleConfig` class, parsed from the corresponding section
                 of the config file.
             min_size: The minimum size valid for this problem.
             ui: An interface to interact with the ui.

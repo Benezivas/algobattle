@@ -155,7 +155,7 @@ class _FightUiData:
 
 @dataclass
 class CliUi(Ui):
-    """A :cls:`Ui` displaying the data to the cli.
+    """A :class:`Ui` displaying the data to the cli.
 
     Uses curses to continually draw a basic text based ui to the terminal.
     """

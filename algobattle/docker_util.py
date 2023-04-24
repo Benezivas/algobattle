@@ -85,7 +85,7 @@ def set_docker_config(config: DockerConfig) -> None:
 
 
 class ProgramUiProxy(Protocol):
-    """Provides an interface for :cls:`Program`s to update the Ui."""
+    """Provides an interface for :class:`Program`s to update the Ui."""
 
     @abstractmethod
     def start(self, timeout: float | None) -> None:

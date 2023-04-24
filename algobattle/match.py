@@ -122,7 +122,7 @@ class Match(BaseModel):
         hardware running it does not have the resources to adequately execute that many containers in parallel.
 
         Returns:
-            A :cls:`Match` object with its fields populated to reflect the result of the match.
+            A :class:`Match` object with its fields populated to reflect the result of the match.
         """
         if ui is None:
             ui = Ui()
@@ -249,7 +249,7 @@ class Ui:
     The Ui object both observes the match object as it's being built and receives additional updates through
     method calls. To do this, it provides several objects whose methods are essentially curried versions of
     its own methods. These observer classes should generally not be subclassed, all Ui functionality can be implemented
-    by just subclassing :cls:`Ui` and implementing its methods.
+    by just subclassing :class:`Ui` and implementing its methods.
     """
 
     match: Match | None = field(default=None, init=False)

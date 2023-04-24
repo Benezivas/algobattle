@@ -14,20 +14,20 @@ from algobattle.util import Encodable, EncodableModel, ValidationError
 
 
 _Problem: TypeAlias = Any
-"""Type alias used to generate correct typings when subclassing :cls:`Problem` and :cls:`Problem.Solution`.
+"""Type alias used to generate correct typings when subclassing :class:`Problem` and :class:`Problem.Solution`.
 
 Each problem's and solution's methods are guaranteed to be passed a instance of the correct problem/solution objects.
 But due to limitations in the python type system we are currently not able to express this properly.
-When creating your own problem it is recommended to not use this alias and instead use the :cls:`Problem` and
-:cls:`Solution` you are creating directly.
+When creating your own problem it is recommended to not use this alias and instead use the :class:`Problem` and
+:class:`Solution` you are creating directly.
 """
 _Solution: TypeAlias = Any
-"""Type alias used to generate correct typings when subclassing :cls:`Problem` and :cls:`Problem.Solution`.
+"""Type alias used to generate correct typings when subclassing :class:`Problem` and :class:`Problem.Solution`.
 
 Each problem's and solution's methods are guaranteed to be passed a instance of the correct problem/solution objects.
 But due to limitations in the python type system we are currently not able to express this properly.
-When creating your own problem it is recommended to not use this alias and instead use the :cls:`Problem` and
-:cls:`Solution` you are creating directly.
+When creating your own problem it is recommended to not use this alias and instead use the :class:`Problem` and
+:class:`Solution` you are creating directly.
 """
 
 
@@ -85,7 +85,7 @@ class Problem(Encodable, ABC):
     def calculate_score(self, solution: _Solution, generator_solution: _Solution | None, size: int) -> float:
         """Calculates how well a solution solves this problem instance.
 
-        There is a default implementation if the solution is :cls:`Scored`. For it, the calculated score is the ratio of
+        There is a default implementation if the solution is :class:`Scored`. For it, the calculated score is the ratio of
         the generator's solution score to the solver's solution score.
 
         Args:
@@ -122,7 +122,7 @@ class Problem(Encodable, ABC):
         """Try to import a Problem class object from a given path.
 
         The specified file will be imported using the standard python loaders. If the created module contains exactly
-        one class inheriting from :cls:`Problem` with the `export` flag set, it will be imported. Otherwise, if one of
+        one class inheriting from :class:`Problem` with the `export` flag set, it will be imported. Otherwise, if one of
         the classes is named `Problem` it will be imported. If neither procedure finds a unique problem class the method
         fails.
 
@@ -173,7 +173,7 @@ class Problem(Encodable, ABC):
     def all(cls) -> dict[str, type[Self]]:
         """Returns a dictionary mapping the names of all installed problems to their python classes.
 
-        It includes all subclasses of :cls:`Problem` that have been initialized so far, including ones exposed to the
+        It includes all subclasses of :class:`Problem` that have been initialized so far, including ones exposed to the
         algobattle module via the `algobattle.problem` entrypoint hook.
 
         Raises:
