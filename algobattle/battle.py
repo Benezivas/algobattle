@@ -199,7 +199,7 @@ class Battle(BaseModel):
     fight_results: list[Fight] = Field(default_factory=list)
     """The list of fights that have been fought in this battle."""
     run_exception: str | None = None
-    """The description of an otherwise unhandeled exception that occured during the execution of :meth:`.run`."""
+    """The description of an otherwise unhandeled exception that occured during the execution of :meth:`Battle.run`."""
 
     _battle_types: ClassVar[dict[str, type["Battle"]]] = {}
     """Dictionary mapping the names of all registered battle types to their python classes."""
@@ -209,7 +209,7 @@ class Battle(BaseModel):
 
         A custom battle type can override this class to specify config options it uses. They will be parsed from a
         dictionary located at `battle.NAME` in the main config file, where NAME is the specific batle type's name.
-        The created object will then be passed to the :meth:`.run` method with its fields set accordingly.
+        The created object will then be passed to the :meth:`Battle.run` method with its fields set accordingly.
         """
 
     class UiData(BaseModel):
@@ -268,8 +268,8 @@ class Battle(BaseModel):
 
         Args:
             fight: The :class:`FightHandler` used to run each fight of this battle. It already contains information about
-                the participating teams, default config settings, etc. Each fight can be executed using its :meth:`.run`
-                method.
+                the participating teams, default config settings, etc. Each fight can be executed using the
+                :meth:`FightHandler.run` method.
             config: An instance of this battle type's :class:`BattleConfig` class, parsed from the corresponding section
                 of the config file.
             min_size: The minimum size valid for this problem.
