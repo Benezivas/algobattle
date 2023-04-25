@@ -1,6 +1,5 @@
 site_name: Algobattle
 site_description: Algobattle framework, an interactive, easy to use computer science lab course
-site_url: null
 repo_name: benezivas/algobattle
 repo_url: https://github.com/Benezivas/algobattle
 edit_uri: ""
@@ -38,17 +37,13 @@ markdown_extensions:
   - toc:
       permalink: true
   - admonition
-  - codehilite:
-      guess_lang: false
-  - extra
-  - pymdownx.superfences
+  - pymdownx.extra
+  - pymdownx.highlight
   - pymdownx.blocks.tab:
       alternate_style: true
-  - pymdownx.blocks.admonition:
+  - pymdownx.blocks.admonition
 extra_css:
   - css/termynal.css
-  - css/custom.css
 extra_javascript:
   - js/termynal.js
-  - js/custom.js
 
