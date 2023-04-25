@@ -33,6 +33,7 @@ dev = [
     "mkdocs",
     "mkdocs-material",
     "pymdown-extensions",
+    "mkdocstrings[python]",
 ]
 
 [project.scripts]

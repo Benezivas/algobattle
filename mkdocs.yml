@@ -7,6 +7,12 @@ edit_uri: ""
 plugins:
   - search
 
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            members_order: "source"
+
 theme:
   name: material
 
@@ -43,13 +49,6 @@ theme:
     - content.tabs.link
   language: en
 
-nav:
-  - Algobattle: index.md
-  - Student Guide:
-    - student/index.md
-  - Instructor Guide:
-    - instructor/index.md
-
 markdown_extensions:
   - toc:
       permalink: true
@@ -62,7 +61,18 @@ markdown_extensions:
 
 extra_css:
   - css/termynal.css
+  - css/custom.css
 
 extra_javascript:
   - js/termynal.js
+
+nav:
+  - Algobattle: index.md
+  - Student Guide:
+    - student/index.md
+  - Instructor Guide:
+    - instructor/index.md
+  - Full API Reference:
+    - api/index.md
+    - api/match.md
 
