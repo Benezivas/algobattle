@@ -1,15 +1,8 @@
-##########
-Algobattle
-##########
 
-.. toctree::
-   :hidden:
-
-   guide
-   api
+# Algobattle
 
 Algobattle is a framework that lets you run tournaments where teams compete to solve algorithmic problems.
-It is being developed by the `Computer Science Theory group of RWTH Aachen University <https://tcs.rwth-aachen.de/>`_,
+It is being developed by the [Computer Science Theory group of RWTH Aachen University](https://tcs.rwth-aachen.de/),
 which also offers a lab course based on it since 2019. This repository contains the code that instructors and students
 need to run the tournament itself. In addition to that, we also develop `Algobattle Web`, a web server providing an easy
 to use interface to manage the overall structure of such a course.
@@ -20,34 +13,35 @@ The teams then battle against each other, generating instances for other teams, 
 generated for them. Each team then is evaluated on its performance and is awarded points.
 
 
-User guide
-==========
+## User guide
+
 If you are a student participating in an Algobattle course you can find the information most relevant to you in our
-:ref:`student-guide`.
+[student guide](guide/student.md).
 
-If you are an instructor looking to run a course, the :ref:`instructor-guide` is best suited for you.
+If you are an instructor looking to run a course, the [instructor guide](guide/instructor.md) is best suited for you.
 
 
-Requirements
-============
+## Requirements
+
 This project is being developed and tested on both Windows and Linux, MacOS support is being worked on but still is
 tentative.
 
-Algobattle requires python version ``3.11`` or higher and docker.
+Algobattle requires python version `3.11` or higher and docker.
 
 
-Usage
-=====
+## Usage
+
 You can install the algobattle package with any standard python package manager. For example:
 
-.. code-block:: console
+``` bash
+pip install . --user
+```
 
-   pip install . --user
 
 You can then run matches using the command line interface. Run
 
-.. code-block:: console
-
+```bash
    algobattle --help
+```
 
-to see all options, or read the :ref:`cli-guide` tutorial.
+to see all options, or read the [cli tutorial](guide/cli.md).

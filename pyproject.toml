@@ -27,10 +27,10 @@ dependencies = [
 ]
 [project.optional-dependencies]
 build = [
-    "sphinx-rtd-theme",
     "black",
     "flake8",
     "flake8-docstrings",
+    "mkdocs",
 ]
 
 [project.scripts]
