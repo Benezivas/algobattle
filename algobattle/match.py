@@ -8,9 +8,8 @@ import tomllib
 from typing import Mapping, Self, cast, overload
 
 from pydantic import validator, Field
-from anyio import create_task_group, CapacityLimiter, TASK_STATUS_IGNORED
+from anyio import create_task_group, CapacityLimiter
 from anyio.to_thread import current_default_thread_limiter
-from anyio.abc import TaskStatus
 
 from algobattle.battle import Battle, FightHandler, FightUiProxy, BattleUiProxy
 from algobattle.docker_util import DockerConfig, Image, ProgramRunInfo, ProgramUiProxy
@@ -86,14 +85,11 @@ class Match(BaseModel):
         cpus: list[str | None],
         ui: "Ui",
         limiter: CapacityLimiter,
-        *,
-        task_status: TaskStatus = TASK_STATUS_IGNORED,
     ) -> None:
         async with limiter:
             set_cpus = cpus.pop()
             ui.start_battle(matchup)
-            task_status.started()
-            battle_ui = ui.get_battle_observer(matchup)
+            battle_ui = ui.BattleObserver(ui, matchup)
             handler = FightHandler(
                 matchup.generator.generator, matchup.solver.solver, battle, battle_ui.fight_ui, set_cpus
             )
@@ -135,10 +131,10 @@ class Match(BaseModel):
         if config.docker.advanced_build_params is not None:
             Image.run_kwargs = config.docker.advanced_build_params.to_docker_args()
 
-        with TeamHandler.build(config.teams, problem, config.docker) as teams:
+        with await TeamHandler.build(config.teams, problem, config.docker, ui) as teams:
             result = cls(
                 active_teams=[t.name for t in teams.active],
-                excluded_teams=[t.name for t in teams.excluded],
+                excluded_teams=[t for t in teams.excluded],
             )
             ui.match = result
             battle_cls = Battle.all()[config.battle_type]
@@ -154,7 +150,7 @@ class Match(BaseModel):
                 for matchup in teams.matchups:
                     battle = battle_cls()
                     result.results[matchup.generator.name][matchup.solver.name] = battle
-                    await tg.start(result._run_battle, battle, matchup, battle_config, problem, match_cpus, ui, limiter)
+                    tg.start_soon(result._run_battle, battle, matchup, battle_config, problem, match_cpus, ui, limiter)
                 return result
 
     @overload
@@ -259,12 +255,24 @@ class Ui:
     by just subclassing :cls:`Ui` and implementing its methods.
     """
 
-    match: Match = field(init=False)
+    match: Match | None = field(default=None, init=False)
     active_battles: list[Matchup] = field(default_factory=list, init=False)
 
-    def get_battle_observer(self, matchup: Matchup) -> "BattleObserver":
-        """Creates an observer for a specifc battle."""
-        return self.BattleObserver(self, matchup)
+    def start_build(self, team: str, role: Role, timeout: float | None) -> None:
+        """Informs the ui that a new program is being built."""
+        return
+
+    def finish_build(self) -> None:
+        """Informs the ui that the current build has been finished."""
+        return
+
+    def initialize_programs(self) -> None:
+        """Informs the ui that the programs are being initialized."""
+        return
+
+    def finish_init_programs(self) -> None:
+        """Informs the ui that all programs have been initialized."""
+        return
 
     def start_battle(self, matchup: Matchup) -> None:
         """Notifies the Ui that a battle has been started."""

@@ -22,7 +22,7 @@ from algobattle.docker_util import (
     ProgramUiProxy,
     Solver,
 )
-from algobattle.util import Encodable, Role, TimerInfo, inherit_docs, BaseModel
+from algobattle.util import Encodable, Role, inherit_docs, BaseModel
 
 
 _BattleConfig: TypeAlias = Any
@@ -173,15 +173,6 @@ class FightHandler:
         )
         score = max(0, min(1, float(score)))
         return self._saved(Fight(score=score, size=size, generator=gen_result.info, solver=sol_result.info))
-
-
-@dataclass
-class FightUiData:
-    """Holds display data about the currently executing fight."""
-
-    size: int
-    generator: TimerInfo | float | ProgramRunInfo | None = None
-    solver: TimerInfo | float | ProgramRunInfo | None = None
 
 
 # We need this to be here to prevent an import cycle between match.py and battle.py

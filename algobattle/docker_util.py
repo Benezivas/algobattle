@@ -134,7 +134,21 @@ class Image:
     A full description can be found at the docker api reference."""
 
     @classmethod
-    def build(
+    def _build_image(cls, path: str, tag: str, timeout: float | None, dockerfile: str | None) -> DockerImage:
+        image, _logs = cast(
+            tuple[DockerImage, Iterator[Any]],
+            client().images.build(
+                path=str(path),
+                tag=tag,
+                timeout=timeout,
+                dockerfile=dockerfile,
+                **cls.build_kwargs,
+            ),
+        )
+        return image
+
+    @classmethod
+    async def build(
         cls,
         path: Path,
         image_name: str,
@@ -162,16 +176,7 @@ class Image:
                 old_image = cast(DockerImage, client().images.get(image_name))
             except ImageNotFound:
                 old_image = None
-            image, _logs = cast(
-                tuple[DockerImage, Iterator[Any]],
-                client().images.build(
-                    path=str(path),
-                    tag=image_name,
-                    timeout=timeout,
-                    dockerfile=dockerfile,
-                    **cls.build_kwargs,
-                ),
-            )
+            image = await run_sync(cls._build_image, str(path), image_name, timeout, dockerfile)
             if old_image is not None:
                 old_image.reload()
                 if len(old_image.tags) == 0:
@@ -375,7 +380,7 @@ class Program(ABC):
     role: ClassVar[Role]
 
     @classmethod
-    def build(
+    async def build(
         cls,
         image: Path | Image | ArchivedImage,
         team_name: str,
@@ -385,7 +390,7 @@ class Program(ABC):
     ) -> Self:
         """Creates a program by building the specified docker image."""
         if isinstance(image, Path):
-            image = Image.build(
+            image = await Image.build(
                 path=image,
                 image_name=f"{team_name}_{cls.role}",
                 timeout=timeout,

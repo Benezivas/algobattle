@@ -3,20 +3,20 @@
 Provides a command line interface to start matches and observe them. See `battle --help` for further options.
 """
 from argparse import ArgumentParser
-from contextlib import ExitStack
 import curses
 from dataclasses import dataclass, field
 from functools import partial
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, ParamSpec, Self, TypeVar
+from typing import Callable, ParamSpec, Self, TypeVar
 from importlib.metadata import version as pkg_version
 
 from prettytable import DOUBLE_BORDER, PrettyTable
 from anyio import create_task_group, run, sleep
+from anyio.abc import TaskGroup
 
-from algobattle.battle import Battle, Fight, FightUiData
+from algobattle.battle import Battle, Fight
 from algobattle.docker_util import GeneratorResult, ProgramRunInfo, SolverResult
 from algobattle.match import MatchConfig, Match, Ui
 from algobattle.problem import Problem
@@ -78,49 +78,36 @@ def parse_cli_args(args: list[str]) -> tuple[CliOptions, MatchConfig]:
 async def _run_with_ui(
     match_config: MatchConfig,
     problem: type[Problem],
-    ui: "CliUi | None",
 ) -> Match:
-    async with create_task_group() as tg:
-        if ui is not None:
-            tg.start_soon(ui.loop)
-        result = await Match.run(match_config, problem, ui)
-        tg.cancel_scope.cancel()
-        return result
+    async with CliUi() as ui:
+        return await Match.run(match_config, problem, ui)
 
 
 def main():
     """Entrypoint of `algobattle` CLI."""
     try:
         exec_config, config = parse_cli_args(sys.argv[1:])
+        problem = Problem.import_from_path(exec_config.problem_path)
+
+        if exec_config.silent:
+            result = run(Match.run, config, problem)
+        else:
+            result = run(_run_with_ui, config, problem)
+        print("\n".join(CliUi.display_match(result)))
+
+        if config.points > 0:
+            points = result.calculate_points(config.points)
+            for team, pts in points.items():
+                print(f"Team {team} gained {pts:.1f} points.")
+
+        if exec_config.result_output is not None:
+            t = datetime.now()
+            filename = f"{t.year:04d}-{t.month:02d}-{t.day:02d}_{t.hour:02d}-{t.minute:02d}-{t.second:02d}.json"
+            with open(exec_config.result_output / filename, "w+") as f:
+                f.write(result.json())
 
     except KeyboardInterrupt:
         raise SystemExit("Received keyboard interrupt, terminating execution.")
-
-    try:
-        problem = Problem.import_from_path(exec_config.problem_path)
-        with ExitStack() as stack:
-            if exec_config.silent:
-                ui = None
-            else:
-                ui = CliUi()
-                stack.enter_context(ui)
-
-            result = run(_run_with_ui, config, problem, ui)
-            print("\n".join(CliUi.display_match(result)))
-
-            if config.points > 0:
-                points = result.calculate_points(config.points)
-                for team, pts in points.items():
-                    print(f"Team {team} gained {pts:.1f} points.")
-
-            if exec_config.result_output is not None:
-                t = datetime.now()
-                filename = f"{t.year:04d}-{t.month:02d}-{t.day:02d}_{t.hour:02d}-{t.minute:02d}-{t.second:02d}.json"
-                with open(exec_config.result_output / filename, "w+") as f:
-                    f.write(result.json())
-
-    except KeyboardInterrupt:
-        print("Received keyboard interrupt, terminating execution.")
 
 
 P = ParamSpec("P")
@@ -140,6 +127,21 @@ def check_for_terminal(function: Callable[P, R]) -> Callable[P, R | None]:
 
 
 @dataclass
+class _BuildInfo:
+    team: str
+    role: Role
+    timeout: float | None
+    start: datetime
+
+
+@dataclass
+class _FightUiData:
+    size: int
+    generator: TimerInfo | float | ProgramRunInfo | None = None
+    solver: TimerInfo | float | ProgramRunInfo | None = None
+
+
+@dataclass
 class CliUi(Ui):
     """A :cls:`Ui` displaying the data to the cli.
 
@@ -147,31 +149,57 @@ class CliUi(Ui):
     """
 
     battle_data: dict[Matchup, Battle.UiData] = field(default_factory=dict, init=False)
-    fight_data: dict[Matchup, FightUiData] = field(default_factory=dict, init=False)
+    fight_data: dict[Matchup, _FightUiData] = field(default_factory=dict, init=False)
+    task_group: TaskGroup | None = field(default=None, init=False)
+    build_status: _BuildInfo | str | None = field(default=None, init=False)
 
-    @check_for_terminal
-    def __enter__(self) -> Self:
-        self.match_result: Any = None
-        self.battle_info: Any = None
+    async def __aenter__(self) -> Self:
         self.stdscr = curses.initscr()
         curses.cbreak()
         curses.noecho()
         self.stdscr.keypad(True)
+
+        self.task_group = create_task_group()
+        await self.task_group.__aenter__()
+        self.task_group.start_soon(self.loop)
+
         return self
 
-    @check_for_terminal
-    def __exit__(self, _type, _value, _traceback):
+    async def __aexit__(self, _type, _value, _traceback) -> None:
         """Restore the console."""
+        if self.task_group is not None:
+            self.task_group.cancel_scope.cancel()
+            await self.task_group.__aexit__(_type, _value, _traceback)
+
         curses.nocbreak()
         self.stdscr.keypad(False)
         curses.echo()
         curses.endwin()
+
+    def start_build(self, team: str, role: Role, timeout: float | None) -> None:
+        """Informs the ui that a new program is being built."""
+        self.build_status = _BuildInfo(team, role, timeout, datetime.now())
+
+    def finish_build(self) -> None:
+        """Informs the ui that the current build has been finished."""
+        self.build_status = None
+
+    def initialize_programs(self) -> None:
+        """Informs the ui that the programs are being initialized."""
+        self.build_status = "Initializing programs..."
+        self.update()
+
+    def finish_init_programs(self) -> None:
+        """Informs the ui that all programs have been initialized."""
+        self.build_status = None
+        self.update()
 
     @check_for_terminal
     def battle_completed(self, matchup: Matchup) -> None:
         """Notifies the Ui that a specific battle has been completed."""
         self.battle_data.pop(matchup, None)
         self.fight_data.pop(matchup, None)
+        super().battle_completed(matchup)
 
     def update_battle_data(self, matchup: Matchup, data: Battle.UiData) -> None:
         """Passes new custom battle data to the Ui."""
@@ -179,7 +207,7 @@ class CliUi(Ui):
 
     def start_fight(self, matchup: Matchup, size: int) -> None:
         """Informs the Ui of a newly started fight."""
-        self.fight_data[matchup] = FightUiData(size, None, None)
+        self.fight_data[matchup] = _FightUiData(size, None, None)
 
     def update_curr_fight(
         self,
@@ -207,7 +235,18 @@ class CliUi(Ui):
         terminal_height, _ = self.stdscr.getmaxyx()
         out: list[str] = []
         out.append(f"Algobattle version {pkg_version(__package__)}")
-        out += self.display_match(self.match)
+        status = self.build_status
+        if isinstance(status, str):
+            out.append(status)
+        elif isinstance(status, _BuildInfo):
+            runtime = (datetime.now() - status.start).total_seconds()
+            status_str = f"Building {status.role} of team {status.team}: {runtime:3.1f}s"
+            if status.timeout is not None:
+                status_str += f" / {status.timeout:3.1f}s"
+            out.append(status_str)
+
+        if self.match is not None:
+            out += self.display_match(self.match)
         for matchup in self.active_battles:
             out += [
                 "",
@@ -299,6 +338,8 @@ class CliUi(Ui):
 
     def display_battle(self, matchup: Matchup) -> list[str]:
         """Formats the battle data into a string that can be printed to the terminal."""
+        if self.match is None:
+            return []
         battle = self.match.results[matchup.generator.name][matchup.solver.name]
         fights = battle.fight_results[-3:] if len(battle.fight_results) >= 3 else battle.fight_results
         sections: list[list[str]] = []
