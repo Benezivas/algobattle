@@ -1,0 +1,54 @@
+site_name: Algobattle
+site_description: Algobattle framework, an interactive, easy to use computer science lab course
+site_url: null
+repo_name: benezivas/algobattle
+repo_url: https://github.com/Benezivas/algobattle
+edit_uri: ""
+plugins:
+  - search
+theme:
+  name: material
+  palette:
+  - media: '(prefers-color-scheme: light)'
+    scheme: default
+    primary: teal
+    accent: amber
+    toggle:
+      icon: material/lightbulb
+      name: Switch to light mode
+  - media: '(prefers-color-scheme: dark)'
+    scheme: slate
+    primary: teal
+    accent: amber
+    toggle:
+      icon: material/lightbulb-outline
+      name: Switch to dark mode
+  features:
+  - search.suggest
+  - search.highlight
+  - content.tabs.link
+  language: en
+nav:
+  - Algobattle: index.md
+  - Student Guide:
+    - student/index.md
+  - Instructor Guide:
+    - instructor/index.md
+markdown_extensions:
+  - toc:
+      permalink: true
+  - admonition
+  - codehilite:
+      guess_lang: false
+  - extra
+  - pymdownx.superfences
+  - pymdownx.blocks.tab:
+      alternate_style: true
+  - pymdownx.blocks.admonition:
+extra_css:
+  - css/termynal.css
+  - css/custom.css
+extra_javascript:
+  - js/termynal.js
+  - js/custom.js
+
