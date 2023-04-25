@@ -16,9 +16,9 @@ generated for them. Each team then is evaluated on its performance and is awarde
 ## User guide
 
 If you are a student participating in an Algobattle course you can find the information most relevant to you in our
-[student guide](guide/student.md).
+[student guide](student/index.md).
 
-If you are an instructor looking to run a course, the [instructor guide](guide/instructor.md) is best suited for you.
+If you are an instructor looking to run a course, the [instructor guide](instructor/index.md) is best suited for you.
 
 
 ## Requirements
@@ -26,7 +26,7 @@ If you are an instructor looking to run a course, the [instructor guide](guide/i
 This project is being developed and tested on both Windows and Linux, MacOS support is being worked on but still is
 tentative.
 
-Algobattle requires python version `3.11` or higher and docker.
+Algobattle requires python version 3.11 or higher and docker.
 
 
 ## Usage
@@ -44,4 +44,4 @@ You can then run matches using the command line interface. Run
    algobattle --help
 ```
 
-to see all options, or read the [cli tutorial](guide/cli.md).
+to see all options.
