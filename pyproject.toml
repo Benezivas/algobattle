@@ -26,12 +26,13 @@ dependencies = [
     "anyio",
 ]
 [project.optional-dependencies]
-build = [
+dev = [
     "black",
     "flake8",
     "flake8-docstrings",
     "mkdocs",
     "mkdocs-material",
+    "pymdown-extensions",
 ]
 
 [project.scripts]
