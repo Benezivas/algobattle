@@ -356,7 +356,7 @@ class Program(ABC):
         team_name: str | None = None,
     ) -> Self:
         """Creates a program by building the specified docker image.
-        
+
         Args:
             image: Path to a Dockerfile (or folder containing one) from which to build the image.
                 Or an already built image.

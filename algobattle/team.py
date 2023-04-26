@@ -33,7 +33,9 @@ class TeamInfo:
     generator: Path
     solver: Path
 
-    async def build(self, problem: type[Problem], config: DockerConfig, name_programs: bool, ui: BuildUiProxy) -> "Team":
+    async def build(
+        self, problem: type[Problem], config: DockerConfig, name_programs: bool, ui: BuildUiProxy
+    ) -> "Team":
         """Builds the specified docker files into images and return the corresponding team.
 
         Args:
