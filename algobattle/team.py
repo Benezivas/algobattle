@@ -122,20 +122,21 @@ class TeamHandler:
 
     active: list[Team] = field(default_factory=list)
     excluded: dict[str, ExceptionInfo] = field(default_factory=dict)
+    cleanup: bool = True
 
     @classmethod
-    async def build(cls, infos: list[TeamInfo], problem: type[Problem], config: DockerConfig, ui: BuildUiProxy) -> Self:
+    async def build(
+        cls, infos: list[TeamInfo], problem: type[Problem], cleanup: bool, config: DockerConfig, ui: BuildUiProxy
+    ) -> Self:
         """Builds the programs of every team.
 
         Attempts to build the programs of every team. If any build fails, that team will be excluded and all its
         programs cleaned up.
-        If `config.safe_build` is set, then each team's images will be archived before the other team's images are
-        built. This prevents teams to be able to see already built images during their build process and thus see data
-        they are not entitled to.
 
         Args:
             infos: Teams that participate in the match.
             problem: Problem class that the match will be fought with.
+            cleanup: If set, will clean up all images when exiting the context manager.
             config: Config options.
 
         Returns:
@@ -154,8 +155,9 @@ class TeamHandler:
         return self
 
     def __exit__(self, _type, _value_, _traceback):
-        for team in self.active:
-            team.cleanup()
+        if self.cleanup:
+            for team in self.active:
+                team.cleanup()
 
     @property
     def grouped_matchups(self) -> list[tuple[Matchup, Matchup]]:
