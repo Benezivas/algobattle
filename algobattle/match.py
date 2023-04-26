@@ -5,7 +5,7 @@ from datetime import datetime
 from itertools import combinations
 from pathlib import Path
 import tomllib
-from typing import Literal, Mapping, Self, cast, overload
+from typing import Mapping, Self, cast, overload
 
 from pydantic import validator, Field
 from anyio import create_task_group, CapacityLimiter
@@ -15,7 +15,7 @@ from algobattle.battle import Battle, FightHandler, FightUiProxy, BattleUiProxy
 from algobattle.docker_util import DockerConfig, Image, ProgramRunInfo, ProgramUiProxy
 from algobattle.team import Matchup, Team, TeamHandler, TeamInfo
 from algobattle.problem import Problem
-from algobattle.util import Role, TimerInfo, inherit_docs, BaseModel, str_with_traceback
+from algobattle.util import MatchMode, Role, TimerInfo, inherit_docs, BaseModel, str_with_traceback
 
 
 class MatchConfig(BaseModel):
@@ -24,7 +24,7 @@ class MatchConfig(BaseModel):
     battle_type: str = "Iterated"
     points: int = 100
     parallel_battles: int = 1
-    mode: Literal["tournament", "testing"] = "tournament"
+    mode: MatchMode = "tournament"
     teams: list[TeamInfo] = []
     docker: DockerConfig = DockerConfig()
     battle: dict[str, Battle.BattleConfig] = {n: b.BattleConfig() for n, b in Battle.all().items()}
@@ -132,7 +132,7 @@ class Match(BaseModel):
         if config.docker.advanced_build_params is not None:
             Image.run_kwargs = config.docker.advanced_build_params.to_docker_args()
 
-        with await TeamHandler.build(config.teams, problem, config.mode == "tournament", config.docker, ui) as teams:
+        with await TeamHandler.build(config.teams, problem, config.mode, config.docker, ui) as teams:
             result = cls(
                 active_teams=[t.name for t in teams.active],
                 excluded_teams=[t for t in teams.excluded],

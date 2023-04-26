@@ -7,7 +7,7 @@ from typing import Iterator, Protocol, Self
 
 from algobattle.docker_util import DockerConfig, Generator, Solver
 from algobattle.problem import Problem
-from algobattle.util import ExceptionInfo, Role
+from algobattle.util import ExceptionInfo, MatchMode, Role
 
 
 _team_names: set[str] = set()
@@ -33,8 +33,16 @@ class TeamInfo:
     generator: Path
     solver: Path
 
-    async def build(self, problem: type[Problem], config: DockerConfig, ui: BuildUiProxy) -> "Team":
+    async def build(self, problem: type[Problem], config: DockerConfig, name_programs: bool, ui: BuildUiProxy) -> "Team":
         """Builds the specified docker files into images and return the corresponding team.
+
+        Args:
+            problem: The problem class the current match is fought over.
+            config: Config for the current match.
+            name_programs: Whether the programs should be given deterministic names.
+
+        Returns:
+            The built team.
 
         Raises:
             ValueError: If the team name is already in use.
@@ -43,12 +51,13 @@ class TeamInfo:
         name = self.name.replace(" ", "_").lower()  # Lower case needed for docker tag created from name
         if name in _team_names:
             raise ValueError
+        image_name = name if name_programs else None
         ui.start_build(name, "generator", config.build_timeout)
-        generator = await Generator.build(self.generator, problem, config.generator, config.build_timeout)
+        generator = await Generator.build(self.generator, problem, config.generator, config.build_timeout, image_name)
         ui.finish_build()
         try:
             ui.start_build(name, "solver", config.build_timeout)
-            solver = await Solver.build(self.solver, problem, config.solver, config.build_timeout)
+            solver = await Solver.build(self.solver, problem, config.solver, config.build_timeout, image_name)
             ui.finish_build()
         except Exception:
             generator.remove()
@@ -126,7 +135,7 @@ class TeamHandler:
 
     @classmethod
     async def build(
-        cls, infos: list[TeamInfo], problem: type[Problem], cleanup: bool, config: DockerConfig, ui: BuildUiProxy
+        cls, infos: list[TeamInfo], problem: type[Problem], mode: MatchMode, config: DockerConfig, ui: BuildUiProxy
     ) -> Self:
         """Builds the programs of every team.
 
@@ -136,16 +145,16 @@ class TeamHandler:
         Args:
             infos: Teams that participate in the match.
             problem: Problem class that the match will be fought with.
-            cleanup: If set, will clean up all images when exiting the context manager.
+            mode: Mode of the current match.
             config: Config options.
 
         Returns:
             :cls:`TeamHandler` containing the info about the participating teams.
         """
-        handler = cls()
+        handler = cls(cleanup=mode == "tournament")
         for info in infos:
             try:
-                team = await info.build(problem, config, ui)
+                team = await info.build(problem, config, mode == "testing", ui)
                 handler.active.append(team)
             except Exception as e:
                 handler.excluded[info.name] = ExceptionInfo.from_exception(e)

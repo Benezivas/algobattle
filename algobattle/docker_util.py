@@ -111,12 +111,12 @@ class Image:
     A full description can be found at the docker api reference."""
 
     @classmethod
-    def _build_image(cls, path: str, timeout: float | None, dockerfile: str | None) -> DockerImage:
+    def _build_image(cls, path: str, tag: str | None, timeout: float | None, dockerfile: str | None) -> DockerImage:
         image, _logs = cast(
             tuple[DockerImage, Iterator[Any]],
             client().images.build(
                 path=str(path),
-                tag=f"algobattle_{uuid4().hex[:8]}",
+                tag=tag,
                 timeout=timeout,
                 dockerfile=dockerfile,
                 **cls.build_kwargs,
@@ -128,12 +128,14 @@ class Image:
     async def build(
         cls,
         path: Path,
+        name: str | None = None,
         timeout: float | None = None,
     ) -> Self:
         """Builds a docker image using the dockerfile found at the provided path.
 
         Args:
             path: The path to the directory containing a `Dockerfile`, or a path to such a file itself.
+            name: A tag assigned to the docker image, if set to `None` the image will receive no tag.
             timeout: Timeout in seconds for the build process.
 
         Raises:
@@ -147,7 +149,18 @@ class Image:
         else:
             dockerfile = None
         try:
-            image = await run_sync(cls._build_image, str(path), timeout, dockerfile)
+            if name is not None:
+                try:
+                    old_image = cast(DockerImage, client().images.get(name))
+                except ImageNotFound:
+                    old_image = None
+            else:
+                old_image = None
+            image = await run_sync(cls._build_image, str(path), name, timeout, dockerfile)
+            if old_image is not None:
+                old_image.reload()
+                if len(old_image.tags) == 0:
+                    old_image.remove(force=True)
 
         except Timeout as e:
             raise BuildError("Build ran into a timeout.") from e
@@ -340,11 +353,28 @@ class Program(ABC):
         problem_class: type[Problem],
         config: RunParameters,
         timeout: float | None = None,
+        team_name: str | None = None,
     ) -> Self:
-        """Creates a program by building the specified docker image."""
+        """Creates a program by building the specified docker image.
+        
+        Args:
+            image: Path to a Dockerfile (or folder containing one) from which to build the image.
+                Or an already built image.
+            problem_class: Problem class this program is solving/generating instances for.
+            config: Config options for this program.
+            team_name: If set the image will be given a descriptive name.
+
+        Returns:
+            The built Program.
+        """
         if isinstance(image, Path):
+            if team_name is not None:
+                name = f"algobattle_{team_name}_{cls.role}"
+            else:
+                name = None
             image = await Image.build(
                 path=image,
+                name=name,
                 timeout=timeout,
             )
 
