@@ -78,4 +78,5 @@ nav:
     - api/index.md
     - api/battle.md
     - api/problem.md
+    - api/util.md
 
