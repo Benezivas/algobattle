@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from timeit import default_timer
 from typing import Any, ClassVar, Iterator, Protocol, Self, TypedDict, cast
-from uuid import uuid1
+from uuid import uuid4
 import json
 from dataclasses import dataclass
 
@@ -50,7 +50,6 @@ class DockerConfig(BaseModel):
     """Config options relevant to the way programs are run and built."""
 
     build_timeout: float | None = None
-    safe_build: bool = False
     set_cpus: str | list[str] | None = None
     generator: RunParameters = RunParameters()
     solver: RunParameters = RunParameters()
@@ -84,28 +83,6 @@ class ProgramUiProxy(Protocol):
 
 
 @dataclass
-class ArchivedImage:
-    """Defines an archived docker image."""
-
-    path: Path
-    name: str
-    id: str
-
-    def restore(self) -> "Image":
-        """Restores a docker image from an archive."""
-        try:
-            with open(self.path, "rb") as file:
-                data = file.read()
-            images = cast(list[DockerImage], client().images.load(data))
-            if self.id not in (i.id for i in images):
-                raise KeyError
-            self.path.unlink()
-        except APIError as e:
-            raise DockerError(f"Docker APIError thrown while restoring '{self.name}'") from e
-        return Image(self.name, self.id, self.path)
-
-
-@dataclass
 class Image:
     """Class defining a docker image.
 
@@ -113,7 +90,6 @@ class Image:
     To prevent this don't use the object after calling `.remove()`.
     """
 
-    name: str
     id: str
     path: Path
 
@@ -128,13 +104,14 @@ class Image:
         "forcerm": True,
         "quiet": True,
         "network_mode": "host",
+        "pull": True,
     }
     """Advanced docker options passed to the docker build command.
 
     A full description can be found at the docker api reference."""
 
     @classmethod
-    def _build_image(cls, path: str, tag: str, timeout: float | None, dockerfile: str | None) -> DockerImage:
+    def _build_image(cls, path: str, tag: str | None, timeout: float | None, dockerfile: str | None) -> DockerImage:
         image, _logs = cast(
             tuple[DockerImage, Iterator[Any]],
             client().images.build(
@@ -151,14 +128,14 @@ class Image:
     async def build(
         cls,
         path: Path,
-        image_name: str,
+        name: str | None = None,
         timeout: float | None = None,
     ) -> Self:
         """Builds a docker image using the dockerfile found at the provided path.
 
         Args:
             path: The path to the directory containing a `Dockerfile`, or a path to such a file itself.
-            image_name: The name of the built docker image, must follow the rules set out by the docker api.
+            name: A tag assigned to the docker image, if set to `None` the image will receive no tag.
             timeout: Timeout in seconds for the build process.
 
         Raises:
@@ -172,24 +149,27 @@ class Image:
         else:
             dockerfile = None
         try:
-            try:
-                old_image = cast(DockerImage, client().images.get(image_name))
-            except ImageNotFound:
+            if name is not None:
+                try:
+                    old_image = cast(DockerImage, client().images.get(name))
+                except ImageNotFound:
+                    old_image = None
+            else:
                 old_image = None
-            image = await run_sync(cls._build_image, str(path), image_name, timeout, dockerfile)
+            image = await run_sync(cls._build_image, str(path), name, timeout, dockerfile)
             if old_image is not None:
                 old_image.reload()
                 if len(old_image.tags) == 0:
                     old_image.remove(force=True)
 
         except Timeout as e:
-            raise BuildError(f"Build process for '{image_name}' ran into a timeout.") from e
+            raise BuildError("Build ran into a timeout.") from e
         except DockerBuildError as e:
-            raise BuildError(f"Building '{image_name}' did not complete successfully.", detail=e.msg) from e
+            raise BuildError("Build did not complete successfully.", detail=e.msg) from e
         except APIError as e:
-            raise BuildError(f"Docker APIError thrown while building '{image_name}'.", detail=str(e)) from e
+            raise BuildError("Docker APIError thrown while building.", detail=str(e)) from e
 
-        return cls(image_name, cast(str, image.id), path=path)
+        return cls(cast(str, image.id), path=path)
 
     def __enter__(self):
         return self
@@ -229,7 +209,7 @@ class Image:
         Returns:
             The runtime of the program.
         """
-        name = f"algobattle_{uuid1().hex[:8]}"
+        name = f"algobattle_{uuid4().hex[:8]}"
         if memory is not None:
             memory = memory * 1_000_000
         cpus = cpus * 1_000_000_000
@@ -264,15 +244,15 @@ class Image:
                 ui.stop(elapsed_time)
 
         except ImageNotFound as e:
-            raise RuntimeError(f"Image {self.name} (id={self.id}) does not exist") from e
+            raise RuntimeError("Image (id: {self.id}) does not exist.") from e
         except APIError as e:
-            raise DockerError(f"Docker APIError thrown while running '{self.name}'.", detail=str(e)) from e
+            raise DockerError("Docker APIError thrown while running container.", detail=str(e)) from e
         finally:
             if container is not None:
                 try:
                     container.remove(force=True)
                 except APIError as e:
-                    raise DockerError(f"Couldn't remove {name}", detail=str(e)) from e
+                    raise DockerError("Couldn't remove container.", detail=str(e)) from e
 
         return elapsed_time
 
@@ -291,20 +271,7 @@ class Image:
         except ImageNotFound:
             pass
         except APIError as e:
-            raise DockerError(f"Docker APIError thrown while removing '{self.name}'") from e
-
-    def archive(self, dir: Path) -> ArchivedImage:
-        """Archives the image into a .tar file at the targeted directory."""
-        path = dir / f"{self.name}-archive.tar"
-        try:
-            image = cast(DockerImage, client().images.get(self.name))
-            with open(path, "wb") as file:
-                for chunk in image.save(named=True):
-                    file.write(chunk)
-            image.remove(force=True)
-        except APIError as e:
-            raise DockerError(f"Docker APIError thrown while archiving '{self.name}'", detail=str(e)) from e
-        return ArchivedImage(path, self.name, self.id)
+            raise DockerError("Docker APIError thrown while removing image.", detail=str(e)) from e
 
     def _run_container(self, container: DockerContainer, timeout: float | None = None) -> float:
         container.start()
@@ -382,21 +349,34 @@ class Program(ABC):
     @classmethod
     async def build(
         cls,
-        image: Path | Image | ArchivedImage,
-        team_name: str,
+        image: Path | Image,
         problem_class: type[Problem],
         config: RunParameters,
         timeout: float | None = None,
+        team_name: str | None = None,
     ) -> Self:
-        """Creates a program by building the specified docker image."""
+        """Creates a program by building the specified docker image.
+
+        Args:
+            image: Path to a Dockerfile (or folder containing one) from which to build the image.
+                Or an already built image.
+            problem_class: Problem class this program is solving/generating instances for.
+            config: Config options for this program.
+            team_name: If set the image will be given a descriptive name.
+
+        Returns:
+            The built Program.
+        """
         if isinstance(image, Path):
+            if team_name is not None:
+                name = f"algobattle_{team_name}_{cls.role}"
+            else:
+                name = None
             image = await Image.build(
                 path=image,
-                image_name=f"{team_name}_{cls.role}",
+                name=name,
                 timeout=timeout,
             )
-        elif isinstance(image, ArchivedImage):
-            image = image.restore()
 
         return cls(image, config, problem_class)
 
@@ -823,7 +803,7 @@ class AdvancedBuildArgs(BaseModel):
     nocache: bool | None = None
     rm: bool = True
     encoding: str | None = None
-    pull: bool | None = None
+    pull: bool | None = True
     forcerm: bool = True
     buildargs: dict[Any, Any] | None = None
     container_limits: _ContainerLimits | None = None

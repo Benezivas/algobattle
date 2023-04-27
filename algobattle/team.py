@@ -5,9 +5,9 @@ from itertools import combinations
 from pathlib import Path
 from typing import Iterator, Protocol, Self
 
-from algobattle.docker_util import DockerConfig, ArchivedImage, Generator, Solver
+from algobattle.docker_util import DockerConfig, Generator, Solver
 from algobattle.problem import Problem
-from algobattle.util import ExceptionInfo, Role, TempDir
+from algobattle.util import ExceptionInfo, MatchMode, Role
 
 
 _team_names: set[str] = set()
@@ -24,14 +24,6 @@ class BuildUiProxy(Protocol):
     def finish_build(self) -> None:
         """Informs the ui that the current build has been finished."""
 
-    @abstractmethod
-    def initialize_programs(self) -> None:
-        """Informs the ui that the programs are being initialized."""
-
-    @abstractmethod
-    def finish_init_programs(self) -> None:
-        """Informs the ui that all programs have been initialized."""
-
 
 @dataclass
 class TeamInfo:
@@ -41,8 +33,18 @@ class TeamInfo:
     generator: Path
     solver: Path
 
-    async def build(self, problem: type[Problem], config: DockerConfig, ui: BuildUiProxy) -> "Team":
+    async def build(
+        self, problem: type[Problem], config: DockerConfig, name_programs: bool, ui: BuildUiProxy
+    ) -> "Team":
         """Builds the specified docker files into images and return the corresponding team.
+
+        Args:
+            problem: The problem class the current match is fought over.
+            config: Config for the current match.
+            name_programs: Whether the programs should be given deterministic names.
+
+        Returns:
+            The built team.
 
         Raises:
             ValueError: If the team name is already in use.
@@ -51,12 +53,13 @@ class TeamInfo:
         name = self.name.replace(" ", "_").lower()  # Lower case needed for docker tag created from name
         if name in _team_names:
             raise ValueError
+        image_name = name if name_programs else None
         ui.start_build(name, "generator", config.build_timeout)
-        generator = await Generator.build(self.generator, self.name, problem, config.generator, config.build_timeout)
+        generator = await Generator.build(self.generator, problem, config.generator, config.build_timeout, image_name)
         ui.finish_build()
         try:
             ui.start_build(name, "solver", config.build_timeout)
-            solver = await Solver.build(self.solver, self.name, problem, config.solver, config.build_timeout)
+            solver = await Solver.build(self.solver, problem, config.solver, config.build_timeout, image_name)
             ui.finish_build()
         except Exception:
             generator.remove()
@@ -108,27 +111,6 @@ class Team:
         self.solver.remove()
         _team_names.remove(self.name)
 
-    def archive(self, dir: Path) -> "_ArchivedTeam":
-        """Archives the images this team uses."""
-        gen = self.generator.image.archive(dir)
-        sol = self.solver.image.archive(dir)
-        return _ArchivedTeam(gen, sol, self)
-
-
-@dataclass
-class _ArchivedTeam:
-    """A team whose images have been archived."""
-
-    generator: ArchivedImage
-    solver: ArchivedImage
-    team: Team
-
-    def restore(self) -> Team:
-        """Restores the archived docker images."""
-        self.generator.restore()
-        self.solver.restore()
-        return self.team
-
 
 @dataclass(frozen=True)
 class Matchup:
@@ -151,55 +133,42 @@ class TeamHandler:
 
     active: list[Team] = field(default_factory=list)
     excluded: dict[str, ExceptionInfo] = field(default_factory=dict)
+    cleanup: bool = True
 
     @classmethod
     async def build(
-        cls, infos: list[TeamInfo], problem: type[Problem], config: DockerConfig, ui: BuildUiProxy,
+        cls, infos: list[TeamInfo], problem: type[Problem], mode: MatchMode, config: DockerConfig, ui: BuildUiProxy
     ) -> Self:
         """Builds the programs of every team.
 
         Attempts to build the programs of every team. If any build fails, that team will be excluded and all its
         programs cleaned up.
-        If `config.safe_build` is set, then each team's images will be archived before the other team's images are
-        built. This prevents teams to be able to see already built images during their build process and thus see data
-        they are not entitled to.
 
         Args:
             infos: Teams that participate in the match.
             problem: Problem class that the match will be fought with.
+            mode: Mode of the current match.
             config: Config options.
 
         Returns:
             :cls:`TeamHandler` containing the info about the participating teams.
         """
-        handler = cls()
-        if config.safe_build:
-            with TempDir() as folder:
-                archives: list[_ArchivedTeam] = []
-                for info in infos:
-                    try:
-                        team = await info.build(problem, config, ui)
-                        team = team.archive(folder)
-                        archives.append(team)
-                    except Exception as e:
-                        handler.excluded[info.name] = ExceptionInfo.from_exception(e)
-                ui.initialize_programs()
-                handler.active = [team.restore() for team in archives]
-        else:
-            for info in infos:
-                try:
-                    team = await info.build(problem, config, ui)
-                    handler.active.append(team)
-                except Exception as e:
-                    handler.excluded[info.name] = ExceptionInfo.from_exception(e)
+        handler = cls(cleanup=mode == "tournament")
+        for info in infos:
+            try:
+                team = await info.build(problem, config, mode == "testing", ui)
+                handler.active.append(team)
+            except Exception as e:
+                handler.excluded[info.name] = ExceptionInfo.from_exception(e)
         return handler
 
     def __enter__(self) -> Self:
         return self
 
     def __exit__(self, _type, _value_, _traceback):
-        for team in self.active:
-            team.cleanup()
+        if self.cleanup:
+            for team in self.active:
+                team.cleanup()
 
     @property
     def grouped_matchups(self) -> list[tuple[Matchup, Matchup]]:
