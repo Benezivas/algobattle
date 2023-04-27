@@ -12,6 +12,8 @@ plugins:
         python:
           options:
             members_order: "source"
+            show_root_heading: true
+            show_root_path: false
 
 theme:
   name: material
@@ -74,5 +76,5 @@ nav:
     - instructor/index.md
   - API Reference:
     - api/index.md
-    - api/match.md
+    - api/battle.md
 
