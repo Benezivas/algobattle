@@ -72,7 +72,7 @@ nav:
     - student/index.md
   - Instructor Guide:
     - instructor/index.md
-  - Full API Reference:
+  - API Reference:
     - api/index.md
     - api/match.md
 
