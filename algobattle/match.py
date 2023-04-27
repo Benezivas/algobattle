@@ -19,14 +19,25 @@ from algobattle.util import Role, TimerInfo, inherit_docs, BaseModel, str_with_t
 
 
 class MatchConfig(BaseModel):
-    """Parameters determining the match execution."""
+    """Parameters determining the match execution.
+
+    It will be parsed from the given config file and contains all settings that specify how the match is run.
+    """
 
     battle_type: str = "Iterated"
+    """Name of the battle type used for the match."""
     points: int = 100
+    """Highest number of points each team can achieve."""
     parallel_battles: int = 1
+    """Number of battles that are executed in parallel."""
     teams: list[TeamInfo] = []
+    """List of objects specifying the team names and where their dockerfiles can be found."""
     docker: DockerConfig = DockerConfig()
-    battle: dict[str, Battle.BattleConfig] = {n: b.BattleConfig() for n, b in Battle.all().items()}
+    """Docker config settings."""
+    battle: dict[str, Battle.BattleConfig] = {
+        name: battle_type.BattleConfig() for name, battle_type in Battle.all().items()
+    }
+    """Battle specific config options."""
 
     @validator("battle_type", pre=True)
     def validate_battle_type(cls, value):
