@@ -1,7 +1,7 @@
 
 # Battle
 
-The `battle.py` module defines the `Battle` class and thus what each battle type can do to customize how it runs and
+This module defines the `Battle` class and thus what each battle type can do to customize how it runs and
 scores the programs. If you are implementing your own custom battle types, make sure they adhere to the api
 specifications laid out here.
 
