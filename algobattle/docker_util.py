@@ -174,12 +174,15 @@ class Image:
         except APIError as e:
             raise BuildError("Docker APIError thrown while building.", detail=str(e)) from e
 
+        self = cls(cast(str, image.id), path=path)
         size_limit = cls.docker_config.image_size
         used_size = cast(dict[str, Any], image.attrs).get("Size", 0)
         if size_limit is not None and used_size > size_limit:
-            raise BuildError("Built image is too large.", detail=f"Built size: {used_size}, limit: {size_limit}.")
-
-        return cls(cast(str, image.id), path=path)
+            try:
+                self.remove()
+            finally:
+                raise BuildError("Built image is too large.", detail=f"Built size: {used_size}, limit: {size_limit}.")
+        return self
 
     def __enter__(self):
         return self
