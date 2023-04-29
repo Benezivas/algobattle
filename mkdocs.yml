@@ -86,9 +86,9 @@ extra_javascript:
 nav:
   - Home: index.md
   - Tutorial:
-    - overview/index.md
-    - overview/installation.md
-    - overview/match.md
+    - tutorial/index.md
+    - tutorial/installation.md
+    - tutorial/match.md
   - Student Guide:
     - student/index.md
   - Instructor Guide:
