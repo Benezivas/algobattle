@@ -18,8 +18,10 @@ generated for them. Each team then is evaluated on its performance and is awarde
 The best place to start learning more about Algobattle is by reading through [the tutorial](tutorial/index.md).
 
 Once you're done with that you'll be ready for the more advanced user guides:  
-* If you are a student participating in an Algobattle course you can find the information most relevant to you in our
+
+* If you are a student in a course, you can find the information most relevant to you in our
 [student guide](student/index.md).
+
 * If you are an instructor looking to run a course, the [instructor guide](instructor/index.md) is best suited for you.
 
 
@@ -27,6 +29,11 @@ Once you're done with that you'll be ready for the more advanced user guides:
 
 This project is being developed and tested on both Windows and Linux, MacOS support is being worked on but still is
 tentative. We require python version 3.11 or higher and Docker.
+
+/// note
+You can find more detailed information on this, including how to install everything, in
+[the tutorial](tutorial/installation.md).
+///
 
 ## License
 
