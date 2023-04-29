@@ -1,5 +1,6 @@
 """Module defining the Problem and Solution base classes and related objects."""
 from abc import ABC, abstractmethod
+from importlib.metadata import entry_points
 import importlib.util
 from inspect import isclass
 import sys
@@ -61,9 +62,13 @@ class Problem(Encodable, ABC):
     Helps with uniquely specifying a class to be executed in a problem file. For more details view the documentation.
     """
 
+    _installed: ClassVar[dict[str, type["Problem"]]] = {}
+
     def __init_subclass__(cls, export: bool = True) -> None:
         if "export" not in cls.__dict__:
             cls.export = export
+        if cls.export and cls.name not in Problem._installed:
+            Problem._installed[cls.name] = cls
         return super().__init_subclass__()
 
     def validate_instance(self, size: int) -> None:
@@ -129,8 +134,6 @@ class Problem(Encodable, ABC):
         """
         if path.is_file():
             pass
-        elif (path / "__init__.py").is_file():
-            path /= "__init__.py"
         elif (path / "problem.py").is_file():
             path /= "problem.py"
         else:
@@ -163,10 +166,28 @@ class Problem(Encodable, ABC):
                 problem_cls.Solution.update_forward_refs()
             return problem_cls
 
-        except Exception as e:
-            raise ValueError from e
         finally:
             sys.modules.pop("_problem")
+
+    @classmethod
+    def all(cls) -> dict[str, type[Self]]:
+        """Returns a dictionary mapping the names of all installed problems to their python classes.
+
+        It includes all subclasses of :cls:`Problem` that have been initialized so far, including ones exposed to the
+        algobattle module via the `algobattle.problem` entrypoint hook.
+
+        Raises:
+            RuntimeError: If an entrypoint is not a problem class.
+        """
+        for entrypoint in entry_points(group="algobattle.problem"):
+            if entrypoint.name not in Problem._installed:
+                problem = entrypoint.load()
+                if not issubclass(problem, cls):
+                    raise RuntimeError(
+                        f"The entrypoint '{entrypoint.name}' doesn't point to a problem class but rather: {problem}."
+                    )
+                cls._installed[entrypoint.name] = problem
+        return cls._installed
 
     class Solution(Encodable, ABC):
         """A proposed solution for an instance of this problem."""
@@ -258,6 +279,8 @@ Weight = TypeVar("Weight")
 class EdgeWeights(DirectedGraph, GenericModel, Generic[Weight]):
     """Mixin for graphs with weighted edges."""
 
+    export: ClassVar[bool] = False
+
     edge_weights: list[Weight]
 
     def validate_instance(self, size: int):
@@ -269,6 +292,8 @@ class EdgeWeights(DirectedGraph, GenericModel, Generic[Weight]):
 
 class VertexWeights(DirectedGraph, GenericModel, Generic[Weight]):
     """Mixin for graphs with weighted vertices."""
+
+    export: ClassVar[bool] = False
 
     vertex_weights: list[Weight]
 
