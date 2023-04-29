@@ -4,7 +4,7 @@
 Algobattle is a framework that lets you run tournaments where teams compete to solve algorithmic problems.
 It is being developed by the [Computer Science Theory group of RWTH Aachen University](https://tcs.rwth-aachen.de/),
 which also offers a lab course based on it since 2019. This repository contains the code that instructors and students
-need to run the tournament itself. In addition to that, we also develop `Algobattle Web`, a web server providing an easy
+need to run the tournament itself. In addition to that, we also develop Algobattle Web, a web server providing an easy
 to use interface to manage the overall structure of such a course.
 
 The idea of the lab is to pose several, usually NP-complete problems over the course of the semester. Teams of students
@@ -13,35 +13,21 @@ The teams then battle against each other, generating instances for other teams, 
 generated for them. Each team then is evaluated on its performance and is awarded points.
 
 
-## User guide
+## How to use it
 
-If you are a student participating in an Algobattle course you can find the information most relevant to you in our
+The best place to start learning more about Algobattle is by reading through [the tutorial](tutorial/index.md).
+
+Once you're done with that you'll be ready for the more advanced user guides:  
+* If you are a student participating in an Algobattle course you can find the information most relevant to you in our
 [student guide](student/index.md).
-
-If you are an instructor looking to run a course, the [instructor guide](instructor/index.md) is best suited for you.
+* If you are an instructor looking to run a course, the [instructor guide](instructor/index.md) is best suited for you.
 
 
 ## Requirements
 
 This project is being developed and tested on both Windows and Linux, MacOS support is being worked on but still is
-tentative.
+tentative. We require python version 3.11 or higher and Docker.
 
-Algobattle requires python version 3.11 or higher and docker.
+## License
 
-
-## Usage
-
-You can install the algobattle package with any standard python package manager. For example:
-
-``` bash
-pip install . --user
-```
-
-
-You can then run matches using the command line interface. Run
-
-```bash
-   algobattle --help
-```
-
-to see all options.
+This project is freely available under the MIT license.
