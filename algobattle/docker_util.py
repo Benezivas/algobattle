@@ -50,6 +50,7 @@ class DockerConfig(BaseModel):
     """Config options relevant to the way programs are run and built."""
 
     build_timeout: float | None = None
+    strict_timeouts: bool = False
     set_cpus: str | list[str] | None = None
     generator: RunParameters = RunParameters()
     solver: RunParameters = RunParameters()
@@ -68,6 +69,19 @@ def client() -> DockerClient:
     except (DockerException, APIError):
         raise SystemExit("Could not connect to the docker daemon. Is docker running?")
     return _client_var
+
+
+def set_docker_config(config: DockerConfig) -> None:
+    """Sets up the static docker config attributes.
+
+    Various classes in the docker_util module need statically set config options, e.g. advanced build/run arguments or
+    the strict_timeout option. This function propagates initializes all of these correctly.
+    """
+    if config.advanced_run_params is not None:
+        Image.run_kwargs = config.advanced_run_params.to_docker_args()
+    if config.advanced_build_params is not None:
+        Image.build_kwargs = config.advanced_build_params.to_docker_args()
+    Program.docker_config = config
 
 
 class ProgramUiProxy(Protocol):
@@ -345,6 +359,7 @@ class Program(ABC):
     """The problem this program creates instances and/or solutions for."""
 
     role: ClassVar[Role]
+    docker_config: ClassVar[DockerConfig] = DockerConfig()
 
     @classmethod
     async def build(
@@ -444,6 +459,13 @@ class Program(ABC):
                 runtime = await self.image.run(
                     input, output, timeout=timeout, memory=space, cpus=cpus, ui=ui, set_cpus=set_cpus
                 )
+            except ExecutionTimeout as e:
+                if self.docker_config.strict_timeouts:
+                    return result_class(
+                        ProgramRunInfo(params=run_params, runtime=e.runtime, error=ExceptionInfo.from_exception(e))
+                    )
+                else:
+                    runtime = e.runtime
             except ExecutionError as e:
                 return result_class(
                     ProgramRunInfo(
