@@ -13,7 +13,7 @@ Algobattle is a python package, so the first step is to make sure we have a rece
 In particular, we need Python 3.11 or higher. If you already have that installed you can skip to the
 [next section](#installing-docker).
 
-/// question | Not sure if and what python you have?
+/// question | Not sure if you've already got python 3.11?
 You can check if you've already installed Python and what version it is by running `python --version`.
 ///
 
