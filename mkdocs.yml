@@ -59,7 +59,22 @@ markdown_extensions:
   - pymdownx.highlight
   - pymdownx.blocks.tab:
       alternate_style: true
-  - pymdownx.blocks.admonition
+  - pymdownx.blocks.admonition:
+      types:
+      - note
+      - abstract
+      - info
+      - tip
+      - success
+      - question
+      - warning
+      - failure
+      - danger
+      - bug
+      - example
+      - quote
+      - new
+      - settings
 
 extra_css:
   - css/termynal.css
@@ -69,7 +84,11 @@ extra_javascript:
   - js/termynal.js
 
 nav:
-  - Algobattle: index.md
+  - Home: index.md
+  - Tutorial:
+    - overview/index.md
+    - overview/installation.md
+    - overview/match.md
   - Student Guide:
     - student/index.md
   - Instructor Guide:
