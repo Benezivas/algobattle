@@ -1,8 +1,9 @@
 
 # Installing Algobattle
 
-There are various ways to install Algobattle. Which one you choose is entirely up to you and generally will not result
-in a significantly different user experience.
+The first thing we'll need to do is install the Algobattle package. There's several different ways to do this.
+Which one you choose is entirely up to you and won't change the way the package behaves. For each step we've outlined
+what we think is the easiest option and also outlined some alternatives.
 
 
 ## Setting up your environment
