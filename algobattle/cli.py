@@ -59,7 +59,7 @@ def parse_cli_args(args: list[str]) -> tuple[CliOptions, MatchConfig]:
                 f"Passed argument '{parsed.problem}' is neither the name of an installed problem nor a path to one."
             )
         problem = Problem.import_from_path(problem_path)
-        base_path = problem_path
+        base_path = problem_path if problem_path.is_dir() else problem_path.parent
 
     exec_config = CliOptions(
         problem=problem,
