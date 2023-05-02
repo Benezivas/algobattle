@@ -15,7 +15,7 @@ from algobattle.battle import Battle, FightHandler, FightUiProxy, BattleUiProxy
 from algobattle.docker_util import DockerConfig, ProgramRunInfo, ProgramUiProxy, set_docker_config
 from algobattle.team import Matchup, Team, TeamHandler, TeamInfo
 from algobattle.problem import Problem
-from algobattle.util import Role, TimerInfo, inherit_docs, BaseModel, str_with_traceback
+from algobattle.util import MatchMode, Role, TimerInfo, inherit_docs, BaseModel, str_with_traceback
 
 
 class MatchConfig(BaseModel):
@@ -30,6 +30,8 @@ class MatchConfig(BaseModel):
     """Highest number of points each team can achieve."""
     parallel_battles: int = 1
     """Number of battles that are executed in parallel."""
+    mode: MatchMode = "tournament"
+    """Whether the match is part of a tournament or just for testing purposes."""
     teams: list[TeamInfo] = []
     """List of objects specifying the team names and where their dockerfiles can be found."""
     docker: DockerConfig = DockerConfig()
@@ -139,7 +141,7 @@ class Match(BaseModel):
             ui = Ui()
         set_docker_config(config.docker)
 
-        with await TeamHandler.build(config.teams, problem, config.docker, ui) as teams:
+        with await TeamHandler.build(config.teams, problem, config.mode, config.docker, ui) as teams:
             result = cls(
                 active_teams=[t.name for t in teams.active],
                 excluded_teams=[t for t in teams.excluded],

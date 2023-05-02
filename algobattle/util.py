@@ -15,6 +15,8 @@ from pydantic import BaseConfig, BaseModel as PydandticBaseModel, Extra, Validat
 
 Role = Literal["generator", "solver"]
 """Indicates whether the role of a program is to generate or to solve instances."""
+MatchMode = Literal["tournament", "testing"]
+"""Indicates what type of match is being fought."""
 T = TypeVar("T")
 
 
