@@ -120,3 +120,8 @@ score would then be 50.
 Each of these cycles of one team's generator creating an instance of a specific size and the other team's solver trying
 to calculate a valid solution is called a _fight_. Each fight is run with some set of parameters determined by the
 battle and uses these to control how the programs are run.
+
+The result of a fight is summarized by its _score_. This is a real number between 0 and 1 (inclusive) that indicates how
+well the solver did. A score of 0 means it did not provide a valid solution, and 1 that it solved it perfectly.
+Fractional scores can happen when for instance the problem is to find the biggest vertex cover and the solver finds one
+that is 80% of the size of the optimal one. In this case, the fight would have a score of 0.8.
