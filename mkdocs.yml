@@ -78,6 +78,9 @@ markdown_extensions:
       - quote
       - new
       - settings
+  - mdx_include:
+      base_path: docs/src
+
 
 extra_css:
   - css/termynal.css
@@ -93,6 +96,7 @@ nav:
     - tutorial/overview.md
     - tutorial/installation.md
     - tutorial/match.md
+    - tutorial/programs.md
   - Student Guide:
     - student/index.md
   - Instructor Guide:

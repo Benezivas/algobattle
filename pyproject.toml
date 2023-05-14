@@ -34,6 +34,7 @@ dev = [
     "mkdocs-material",
     "pymdown-extensions",
     "mkdocstrings[python]",
+    "mdx_include",
 ]
 
 [project.scripts]

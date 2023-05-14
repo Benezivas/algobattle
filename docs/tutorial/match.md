@@ -68,35 +68,7 @@ displayed, so let's go through each of them on its own:
 ### Battle overview
 
 ```console hl_lines="2-11"
-Algobattle version 4.0.0
-╔═══════════╦═════════╦════════╗
-║ Generator ║  Solver ║ Result ║
-╠═══════════╬═════════╬════════╣
-║    dogs   ║   cats  ║     12 ║
-║    dogs   ║ otters  ║      0 ║
-║    cats   ║   dogs  ║      0 ║
-║    cats   ║ otters  ║      0 ║
-║  otters   ║   dogs  ║      0 ║
-║  otters   ║   cats  ║      0 ║
-╚═══════════╩═════════╩════════╝
-
-Battle dogs vs cats:
-reached: [12, 0]
-cap: 12
-
-Current fight at size 5:
-Generator: 0.9s / 30.0s ✓
-Solver:    0.5s / 30.0s …
-
-Most recent fights:
-Fight 5 at size 12:
-Score: 1.0
-
-Fight 4 at size 11:
-Score: 1.0
-
-Fight 3 at size 10:
-Score: 1.0
+{!> match_cli.txt!}
 ```
 
 Right at the top you will see an overview over all battles in this match. Normally this includes every combination of
@@ -112,35 +84,7 @@ battle specific measure of how well the solving team performed in it. The final 
 ### Battle data
 
 ```console hl_lines="14-15"
-Algobattle version 4.0.0
-╔═══════════╦═════════╦════════╗
-║ Generator ║  Solver ║ Result ║
-╠═══════════╬═════════╬════════╣
-║    dogs   ║   cats  ║     12 ║
-║    dogs   ║ otters  ║      0 ║
-║    cats   ║   dogs  ║      0 ║
-║    cats   ║ otters  ║      0 ║
-║  otters   ║   dogs  ║      0 ║
-║  otters   ║   cats  ║      0 ║
-╚═══════════╩═════════╩════════╝
-
-Battle dogs vs cats:
-reached: [12, 0]
-cap: 12
-
-Current fight at size 5:
-Generator: 0.9s / 30.0s ✓
-Solver:    0.5s / 30.0s …
-
-Most recent fights:
-Fight 5 at size 12:
-Score: 1.0
-
-Fight 4 at size 11:
-Score: 1.0
-
-Fight 3 at size 10:
-Score: 1.0
+{!> match_cli.txt!}
 ```
 
 Each battle also has its own specific data it will display. In our example, we are using the Iterated battle type which
@@ -153,35 +97,7 @@ has currently not executed any fights. The `cap` field is a bit more intricate a
 ### Current fight
 
 ```console hl_lines="17-19"
-Algobattle version 4.0.0
-╔═══════════╦═════════╦════════╗
-║ Generator ║  Solver ║ Result ║
-╠═══════════╬═════════╬════════╣
-║    dogs   ║   cats  ║     12 ║
-║    dogs   ║ otters  ║      0 ║
-║    cats   ║   dogs  ║      0 ║
-║    cats   ║ otters  ║      0 ║
-║  otters   ║   dogs  ║      0 ║
-║  otters   ║   cats  ║      0 ║
-╚═══════════╩═════════╩════════╝
-
-Battle dogs vs cats:
-reached: [12, 0]
-cap: 12
-
-Current fight at size 5:
-Generator: 0.9s / 30.0s ✓
-Solver:    0.5s / 30.0s …
-
-Most recent fights:
-Fight 5 at size 12:
-Score: 1.0
-
-Fight 4 at size 11:
-Score: 1.0
-
-Fight 3 at size 10:
-Score: 1.0
+{!> match_cli.txt!}
 ```
 
 The fight that is currently being executed displays what size it is being fought at and timing data about each program
@@ -190,35 +106,7 @@ execution.
 ### Most recent fights
 
 ```console hl_lines="21-29"
-Algobattle version 4.0.0
-╔═══════════╦═════════╦════════╗
-║ Generator ║  Solver ║ Result ║
-╠═══════════╬═════════╬════════╣
-║    dogs   ║   cats  ║     12 ║
-║    dogs   ║ otters  ║      0 ║
-║    cats   ║   dogs  ║      0 ║
-║    cats   ║ otters  ║      0 ║
-║  otters   ║   dogs  ║      0 ║
-║  otters   ║   cats  ║      0 ║
-╚═══════════╩═════════╩════════╝
-
-Battle dogs vs cats:
-reached: [12, 0]
-cap: 12
-
-Current fight at size 5:
-Generator: 0.9s / 30.0s ✓
-Solver:    0.5s / 30.0s …
-
-Most recent fights:
-Fight 5 at size 12:
-Score: 1.0
-
-Fight 4 at size 11:
-Score: 1.0
-
-Fight 3 at size 10:
-Score: 1.0
+{!> match_cli.txt!}
 ```
 
 Lastly, the three most recent fights have their score displayed.
