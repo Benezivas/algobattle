@@ -56,6 +56,14 @@ When the problem is specified via a path, Algobattle defaults to searching for t
 `/solver` subfolders of the directory the problem is in. If you provide the name of a program, it will look for those
 folders in the current instead.
 
+/// note
+The problems in the Algobattle Problems repository all have dummy programs at the required paths. If you are using
+different problems you will need to write your own programs before you can run a match.
+
+Since these dummy programs are located in the package folders, you will need to specify the program with a path to it to
+use them.
+///
+
 These folders should contain Dockerfiles that build into the team's programs. The first thing that happens during a
 match is that Algobattle builds the containers. During this the terminal will tell you whose programs are being build,
 how long this is taking, and what the timeout is set to.
