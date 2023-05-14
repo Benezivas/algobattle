@@ -50,6 +50,9 @@ theme:
     - search.share
     - content.tabs.link
   language: en
+  font:
+    text: Roboto
+    code: monospace
 
 markdown_extensions:
   - toc:
