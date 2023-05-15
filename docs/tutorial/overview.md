@@ -79,11 +79,11 @@ will always generate instances that other teams' solvers then attempt to solve, 
 against their generator in order to practice and debug.
 
 We use docker to provide each team with a fair and controlled environment to execute their code in. A program really
-just is a docker image that we then run as a new image every time a new instance is to be generated or solved. This lets
-students choose their approach and tools incredibly freely, there is no constraint to specific programming languages,
-system setups, libraries used, etc. On the other side, we maintain total control over the runtime environment. Because
-all student code is executed inside a container there is no danger of it manipulating the host system maliciously and
-its resource use and runtime can be easily limited.
+just is a docker image that we then run as a new container every time a new instance is to be generated or solved. This
+lets students choose their approach and tools incredibly freely, there is no constraint to specific programming
+languages, system setups, libraries used, etc. On the other side, we maintain total control over the runtime
+environment. Because all student code is executed inside a container there is no danger of it manipulating the host
+system maliciously and its resource use and runtime can be easily limited.
 
 
 /// abstract | Docker basics
