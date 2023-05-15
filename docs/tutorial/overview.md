@@ -35,17 +35,13 @@ problem instance and solution looks like. Since Pairsum only uses simple numeric
 example instance then looks like this:
 
 ```json
-{
-    "numbers": [1, 2, 3, 4, 5],
-}
+{!> pairsum_instance.json!}
 ```
 
 And its solution is:
 
 ```json
-{
-    "indices": [1, 4, 2, 3],
-}
+{!> pairsum_solution.json!}
 ```
 
 /// note
