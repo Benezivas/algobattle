@@ -1,7 +1,8 @@
-use std::{io::{BufReader, BufWriter, Write}, fs::File};
 use itertools::Itertools;
 use serde::Deserialize;
 use serde_json::{from_reader, json, to_writer};
+use std::fs::File;
+use std::io::{BufReader, BufWriter, Write};
 
 #[derive(Deserialize)] // (1)!
 struct Instance {
@@ -18,14 +19,12 @@ fn main() -> Result<(), std::io::Error> {
         let second = numbers[indices[2]] + numbers[indices[3]];
 
         if first == second { // (4)!
-            let solution = json!({
-                "indices": indices
-            });
+            let solution = json!({ "indices": indices });
             let file = File::create("output/solution.json")?;
             let mut writer = BufWriter::new(file);
             to_writer(&mut writer, &solution)?;
             writer.flush()?;
-            return Ok(())
+            return Ok(());
         }
     }
     Ok(())
