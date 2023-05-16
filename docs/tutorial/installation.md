@@ -29,7 +29,7 @@ They let you create _virtual environments_ and easily install specific Python ve
 dependencies in them. This means you need to install the environment manager first, but will save you some hassle in
 the long run.
 
-We recommend using [Conda](https://anaconda.org/anaconda/conda). You can install it on all major operating systems and
+We recommend using [Conda](https://anaconda.org/anaconda/conda). You can install it on all major operating systems, and
 it will take care of most things for you. On Linux, you can also use [pyenv](https://github.com/pyenv/pyenv). It's a
 bit smaller but also requires a bit more care taken manually.
 
@@ -66,13 +66,13 @@ You won't need to rerun this command before every time you use Algobattle, only 
 #### Globally
 
 If you don't want to deal with yet another program you can also just install python globally on your computer.
-[The official python wiki](https://wiki.python.org/moin/BeginnersGuide/Download) has donwload links and instructions
+[The official python wiki](https://wiki.python.org/moin/BeginnersGuide/Download) has download links and instructions
 specific to your operating system.
 
 ### Installing Docker
 
-We use Docker to easily manage and run the code students write, so you'll need to grab a fresh install of it too.
-You can get the latest version from the offical site [here](https://www.docker.com/).
+We use Docker to easily manage and run the code students write, so you'll need to grab a fresh installation of it too.
+You can get the latest version from the official site [here](https://www.docker.com/).
 
 /// tip
 If you're using Linux you have the choice between Docker desktop and the Linux Docker Engine. If you're unsure what to
