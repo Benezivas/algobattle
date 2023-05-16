@@ -161,8 +161,8 @@ class Execution(IsolatedAsyncioTestCase):
         cls.config = BaseConfig(
             program=ProgramConfig(generator=run_params, solver=run_params),
             battle={
-                "Iterated": Iterated.BattleConfig(iteration_cap=10, rounds=2),
-                "Averaged": Averaged.BattleConfig(instance_size=5, iterations=3),
+                "Iterated": Iterated.BattleConfig(maximum_size=10, rounds=2),
+                "Averaged": Averaged.BattleConfig(instance_size=5, num_fights=3),
             },
         )
         cls.generator = problem_path / "generator"
@@ -222,7 +222,7 @@ class Parsing(TestCase):
                 ),
                 program=ProgramConfig(generator=RunParameters(space=10)),
                 battle={
-                    "Averaged": Averaged.BattleConfig(iterations=1),
+                    "Averaged": Averaged.BattleConfig(num_fights=1),
                 },
             ),
         )

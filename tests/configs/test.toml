@@ -4,5 +4,5 @@ battle_type = "Averaged"
 [program.generator]
 space = 10
 
-[program.Averaged]
-iterations = 1
+[battle.Averaged]
+num_fights = 1
