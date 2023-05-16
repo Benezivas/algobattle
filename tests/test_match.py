@@ -170,19 +170,19 @@ class Execution(IsolatedAsyncioTestCase):
 
     async def test_basic(self):
         self.config.teams = [TeamInfo("team_0", self.generator, self.solver)]
-        self.config.battle_type = "Iterated"
+        self.config.match.battle_type = "Iterated"
         await Match.run(self.config, TestProblem)
 
     async def test_multi_team(self):
         team0 = TeamInfo("team_0", self.generator, self.solver)
         team1 = TeamInfo("team_1", self.generator, self.solver)
         self.config.teams = [team0, team1]
-        self.config.battle_type = "Iterated"
+        self.config.match.battle_type = "Iterated"
         await Match.run(self.config, TestProblem)
 
     async def test_averaged(self):
         self.config.teams = [TeamInfo("team_0", self.generator, self.solver)]
-        self.config.battle_type = "Averaged"
+        self.config.match.battle_type = "Averaged"
         await Match.run(self.config, TestProblem)
 
 
