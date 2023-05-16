@@ -103,6 +103,7 @@ nav:
     - tutorial/match.md
     - tutorial/programs.md
     - tutorial/battle_types.md
+    - tutorial/config.md
   - Advanced Guides:
     - advanced/index.md
   - API Reference:
