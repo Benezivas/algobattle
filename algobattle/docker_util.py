@@ -46,6 +46,165 @@ class RunParameters(BaseModel):
     cpus: int = 1
 
 
+class AdvancedRunArgs(BaseModel):
+    """Advanced docker run options.
+
+    Contains all options exposed on the python docker run api, except `device_requests`
+    and those set by :meth:`Image.run` itself.
+    """
+
+    class _BlockIOWeight(TypedDict):
+        Path: str
+        Weight: int
+
+    class _DeviceRate(TypedDict):
+        Path: str
+        Rate: int
+
+    class _HealthCheck(TypedDict):
+        test: list[str] | str
+        interval: int
+        timeout: int
+        retries: int
+        start_period: int
+
+    class _LogConfigArgs(TypedDict):
+        type: str
+        conifg: dict[Any, Any]
+
+    class _UlimitArgs(TypedDict):
+        name: str
+        soft: int
+        hard: int
+
+    network_mode: str = "none"
+    command: str | list[str] | None = None
+    auto_remove: bool | None = None
+    blkio_weight_device: list[_BlockIOWeight] | None = None
+    blkio_weight: int | None = Field(default=None, ge=10, le=1000)
+    cap_add: list[str] | None = None
+    cap_drop: list[str] | None = None
+    cgroup_parent: str | None = None
+    cgroupns: str | None = None
+    cpu_count: int | None = None
+    cpu_percent: int | None = None
+    cpu_period: int | None = None
+    cpu_quota: int | None = None
+    cpu_rt_period: int | None = None
+    cpu_rt_runtime: int | None = None
+    cpu_shares: int | None = None
+    cpuset_mems: str | None = None
+    device_cgroup_rules: list[str] | None = None
+    device_read_bps: list[_DeviceRate] | None = None
+    device_read_iops: list[_DeviceRate] | None = None
+    device_write_bps: list[_DeviceRate] | None = None
+    device_write_iops: list[_DeviceRate] | None = None
+    devices: list[str] | None = None
+    dns: list[str] | None = None
+    dns_opt: list[str] | None = None
+    dns_search: list[str] | None = None
+    domainname: str | list[str] | None = None
+    entrypoint: str | list[str] | None = None
+    environment: dict[str, str] | list[str] | None = None
+    extra_hosts: dict[str, str] | None = None
+    group_add: list[str] | None = None
+    healthcheck: _HealthCheck | None = None
+    hostname: str | None = None
+    init: bool | None = None
+    init_path: str | None = None
+    ipc_mode: str | None = None
+    isolation: str | None = None
+    kernel_memory: int | str | None = None
+    labels: dict[str, str] | list[str] | None = None
+    links: dict[str, str] | None = None
+    log_config: _LogConfigArgs | None = None
+    lxc_conf: dict[Any, Any] | None = None
+    mac_address: str | None = None
+    mem_limit: int | str | None = None
+    mem_reservation: int | str | None = None
+    mem_swappiness: int | None = None
+    memswap_limit: str | int | None = None
+    network: str | None = None
+    network_disabled: bool | None = None
+    oom_kill_disable: bool | None = None
+    oom_score_adj: int | None = None
+    pid_mode: str | None = None
+    pids_limit: int | None = None
+    platform: str | None = None
+    ports: dict[Any, Any] | None = None
+    privileged: bool | None = None
+    publish_all_ports: bool | None = None
+    read_only: bool | None = None
+    restart_policy: dict[Any, Any] | None = None
+    runtime: str | None = None
+    security_opt: list[str] | None = None
+    shm_size: str | int | None = None
+    stdin_open: bool | None = None
+    stdout: bool | None = None
+    stderr: bool | None = None
+    stop_signal: str | None = None
+    storage_opt: dict[Any, Any] | None = None
+    stream: bool | None = None
+    sysctls: dict[Any, Any] | None = None
+    tmpfs: dict[Any, Any] | None = None
+    tty: bool | None = None
+    ulimits: list[_UlimitArgs] | None = None
+    use_config_proxy: bool | None = None
+    user: str | int | None = None
+    userns_mode: str | None = None
+    uts_mode: str | None = None
+    version: str | None = None
+    volume_driver: str | None = None
+    volumes: dict[Any, Any] | list[Any] | None = None
+    volumes_from: list[Any] | None = None
+    working_dir: str | None = None
+
+    def to_docker_args(self) -> dict[str, Any]:
+        """Transforms the object into :meth:`client.containers.run` kwargs."""
+        kwargs = self.dict(exclude_none=True)
+        if "log_config" in kwargs:
+            kwargs["log_config"] = LogConfig(**kwargs["log_config"])
+        if "ulimits" in kwargs:
+            kwargs["ulimits"] = Ulimit(**kwargs["ulimits"])
+        return kwargs
+
+
+class AdvancedBuildArgs(BaseModel):
+    """Advanced docker build options.
+
+    Contains all options exposed on the python docker build api, except those set by :meth:`Image.build` itself.
+    """
+
+    class _ContainerLimits(TypedDict):
+        memory: int
+        memswap: int
+        cpushares: int
+        cpusetcpus: str
+
+    quiet: bool = True
+    nocache: bool | None = None
+    rm: bool = True
+    encoding: str | None = None
+    pull: bool | None = True
+    forcerm: bool = True
+    buildargs: dict[Any, Any] | None = None
+    container_limits: _ContainerLimits | None = None
+    shmsize: int | None = None
+    labels: dict[Any, Any] | None = None
+    cache_from: list[Any] | None = None
+    target: str | None = None
+    network_mode: str = "host"
+    squash: bool | None = None
+    extra_hosts: dict[Any, Any] | None = None
+    platform: str | None = None
+    isolation: str | None = None
+    use_config_proxy: bool | None = None
+
+    def to_docker_args(self) -> dict[str, Any]:
+        """Transforms the object into :meth:`client.images.build` kwargs."""
+        return self.dict(exclude_none=True)
+
+
 class DockerConfig(BaseModel):
     """Config options relevant to the way programs are run and built."""
 
@@ -55,8 +214,8 @@ class DockerConfig(BaseModel):
     image_size: int | None = None
     generator: RunParameters = RunParameters()
     solver: RunParameters = RunParameters()
-    advanced_run_params: "AdvancedRunArgs | None" = None
-    advanced_build_params: "AdvancedBuildArgs | None" = None
+    advanced_build_params: AdvancedBuildArgs = AdvancedBuildArgs()
+    advanced_run_params: AdvancedRunArgs = AdvancedRunArgs()
 
 
 def client() -> DockerClient:
@@ -78,10 +237,8 @@ def set_docker_config(config: DockerConfig) -> None:
     Various classes in the docker_util module need statically set config options, e.g. advanced build/run arguments or
     the strict_timeout option. This function propagates initializes all of these correctly.
     """
-    if config.advanced_run_params is not None:
-        Image.run_kwargs = config.advanced_run_params.to_docker_args()
-    if config.advanced_build_params is not None:
-        Image.build_kwargs = config.advanced_build_params.to_docker_args()
+    Image.build_kwargs = config.advanced_build_params.to_docker_args()
+    Image.run_kwargs = config.advanced_run_params.to_docker_args()
     Program.docker_config = config
     Image.docker_config = config
 
@@ -696,165 +853,3 @@ class Solver(Program):
                 ui=ui,
             ),
         )
-
-
-class AdvancedRunArgs(BaseModel):
-    """Advanced docker run options.
-
-    Contains all options exposed on the python docker run api, except `device_requests`
-    and those set by :meth:`Image.run` itself.
-    """
-
-    class _BlockIOWeight(TypedDict):
-        Path: str
-        Weight: int
-
-    class _DeviceRate(TypedDict):
-        Path: str
-        Rate: int
-
-    class _HealthCheck(TypedDict):
-        test: list[str] | str
-        interval: int
-        timeout: int
-        retries: int
-        start_period: int
-
-    class _LogConfigArgs(TypedDict):
-        type: str
-        conifg: dict[Any, Any]
-
-    class _UlimitArgs(TypedDict):
-        name: str
-        soft: int
-        hard: int
-
-    network_mode: str = "none"
-    command: str | list[str] | None = None
-    auto_remove: bool | None = None
-    blkio_weight_device: list[_BlockIOWeight] | None = None
-    blkio_weight: int | None = Field(default=None, ge=10, le=1000)
-    cap_add: list[str] | None = None
-    cap_drop: list[str] | None = None
-    cgroup_parent: str | None = None
-    cgroupns: str | None = None
-    cpu_count: int | None = None
-    cpu_percent: int | None = None
-    cpu_period: int | None = None
-    cpu_quota: int | None = None
-    cpu_rt_period: int | None = None
-    cpu_rt_runtime: int | None = None
-    cpu_shares: int | None = None
-    cpuset_mems: str | None = None
-    device_cgroup_rules: list[str] | None = None
-    device_read_bps: list[_DeviceRate] | None = None
-    device_read_iops: list[_DeviceRate] | None = None
-    device_write_bps: list[_DeviceRate] | None = None
-    device_write_iops: list[_DeviceRate] | None = None
-    devices: list[str] | None = None
-    dns: list[str] | None = None
-    dns_opt: list[str] | None = None
-    dns_search: list[str] | None = None
-    domainname: str | list[str] | None = None
-    entrypoint: str | list[str] | None = None
-    environment: dict[str, str] | list[str] | None = None
-    extra_hosts: dict[str, str] | None = None
-    group_add: list[str] | None = None
-    healthcheck: _HealthCheck | None = None
-    hostname: str | None = None
-    init: bool | None = None
-    init_path: str | None = None
-    ipc_mode: str | None = None
-    isolation: str | None = None
-    kernel_memory: int | str | None = None
-    labels: dict[str, str] | list[str] | None = None
-    links: dict[str, str] | None = None
-    log_config: _LogConfigArgs | None = None
-    lxc_conf: dict[Any, Any] | None = None
-    mac_address: str | None = None
-    mem_limit: int | str | None = None
-    mem_reservation: int | str | None = None
-    mem_swappiness: int | None = None
-    memswap_limit: str | int | None = None
-    network: str | None = None
-    network_disabled: bool | None = None
-    oom_kill_disable: bool | None = None
-    oom_score_adj: int | None = None
-    pid_mode: str | None = None
-    pids_limit: int | None = None
-    platform: str | None = None
-    ports: dict[Any, Any] | None = None
-    privileged: bool | None = None
-    publish_all_ports: bool | None = None
-    read_only: bool | None = None
-    restart_policy: dict[Any, Any] | None = None
-    runtime: str | None = None
-    security_opt: list[str] | None = None
-    shm_size: str | int | None = None
-    stdin_open: bool | None = None
-    stdout: bool | None = None
-    stderr: bool | None = None
-    stop_signal: str | None = None
-    storage_opt: dict[Any, Any] | None = None
-    stream: bool | None = None
-    sysctls: dict[Any, Any] | None = None
-    tmpfs: dict[Any, Any] | None = None
-    tty: bool | None = None
-    ulimits: list[_UlimitArgs] | None = None
-    use_config_proxy: bool | None = None
-    user: str | int | None = None
-    userns_mode: str | None = None
-    uts_mode: str | None = None
-    version: str | None = None
-    volume_driver: str | None = None
-    volumes: dict[Any, Any] | list[Any] | None = None
-    volumes_from: list[Any] | None = None
-    working_dir: str | None = None
-
-    def to_docker_args(self) -> dict[str, Any]:
-        """Transforms the object into :meth:`client.containers.run` kwargs."""
-        kwargs = self.dict(exclude_none=True)
-        if "log_config" in kwargs:
-            kwargs["log_config"] = LogConfig(**kwargs["log_config"])
-        if "ulimits" in kwargs:
-            kwargs["ulimits"] = Ulimit(**kwargs["ulimits"])
-        return kwargs
-
-
-class AdvancedBuildArgs(BaseModel):
-    """Advanced docker build options.
-
-    Contains all options exposed on the python docker build api, except those set by :meth:`Image.build` itself.
-    """
-
-    class _ContainerLimits(TypedDict):
-        memory: int
-        memswap: int
-        cpushares: int
-        cpusetcpus: str
-
-    quiet: bool = True
-    nocache: bool | None = None
-    rm: bool = True
-    encoding: str | None = None
-    pull: bool | None = True
-    forcerm: bool = True
-    buildargs: dict[Any, Any] | None = None
-    container_limits: _ContainerLimits | None = None
-    shmsize: int | None = None
-    labels: dict[Any, Any] | None = None
-    cache_from: list[Any] | None = None
-    target: str | None = None
-    network_mode: str = "host"
-    squash: bool | None = None
-    extra_hosts: dict[Any, Any] | None = None
-    platform: str | None = None
-    isolation: str | None = None
-    use_config_proxy: bool | None = None
-
-    def to_docker_args(self) -> dict[str, Any]:
-        """Transforms the object into :meth:`client.images.build` kwargs."""
-        return self.dict(exclude_none=True)
-
-
-DockerConfig.update_forward_refs()
