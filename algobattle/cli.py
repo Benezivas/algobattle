@@ -39,12 +39,13 @@ def parse_cli_args(args: list[str]) -> tuple[CliOptions, BaseConfig]:
     parser.add_argument("problem", help="Either the name of an installed problem, or a path to a problem file.")
     parser.add_argument(
         "--config",
+        "-c",
         type=partial(check_path, type="file"),
         help="Path to a config file, defaults to '{problem} / config.toml'.",
     )
-    parser.add_argument("-s", "--silent", action="store_true", help="Disable the cli Ui.")
+    parser.add_argument("--silent", "-s", action="store_true", help="Disable the cli Ui.")
     parser.add_argument(
-        "--result_output", type=check_path, help="If set, the match result object will be saved to the specified file."
+        "--result", "-r", type=check_path, help="If set, the match result object will be saved to the specified file."
     )
 
     parsed = parser.parse_args(args)
