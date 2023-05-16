@@ -56,7 +56,7 @@ class BaseConfig(BaseModel):
     @validator("program")
     def val_set_cpus(cls, v: ProgramConfig, values) -> ProgramConfig:
         """Validates that each battle that is being executed is assigned some cpu cores."""
-        if isinstance(v.set_cpus, list) and values["parallel_battles"] > len(v.set_cpus):
+        if isinstance(v.set_cpus, list) and values["match"]["parallel_battles"] > len(v.set_cpus):
             raise ValueError("Number of parallel battles exceeds the number of set_cpu specifier strings.")
         else:
             return v
