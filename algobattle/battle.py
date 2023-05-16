@@ -362,8 +362,10 @@ class Averaged(Battle):
 
     @inherit_docs
     class BattleConfig(Battle.BattleConfig):
-        instance_size: int = Field(default=10, help="Instance size that will be fought at.")
-        num_fights: int = Field(default=10, help="Number of iterations in each round.")
+        instance_size: int = 10
+        """Instance size that will be fought at."""
+        num_fights: int = 10
+        """Number of iterations in each round."""
 
     @inherit_docs
     class UiData(Battle.UiData):
