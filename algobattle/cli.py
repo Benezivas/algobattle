@@ -30,7 +30,7 @@ class CliOptions:
 
     problem: type[Problem]
     silent: bool = False
-    result_output: Path | None = None
+    result: Path | None = None
 
 
 def parse_cli_args(args: list[str]) -> tuple[CliOptions, BaseConfig]:
@@ -65,7 +65,7 @@ def parse_cli_args(args: list[str]) -> tuple[CliOptions, BaseConfig]:
     exec_config = CliOptions(
         problem=problem,
         silent=parsed.silent,
-        result_output=parsed.result_output,
+        result=parsed.result,
     )
     cfg_path: Path = parsed.config or base_path / "config.toml"
 
@@ -107,10 +107,10 @@ def main():
             for team, pts in points.items():
                 print(f"Team {team} gained {pts:.1f} points.")
 
-        if exec_config.result_output is not None:
+        if exec_config.result is not None:
             t = datetime.now()
             filename = f"{t.year:04d}-{t.month:02d}-{t.day:02d}_{t.hour:02d}-{t.minute:02d}-{t.second:02d}.json"
-            with open(exec_config.result_output / filename, "w+") as f:
+            with open(exec_config.result / filename, "w+") as f:
                 f.write(result.json())
 
     except KeyboardInterrupt:
