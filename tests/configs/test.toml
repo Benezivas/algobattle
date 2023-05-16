@@ -1,3 +1,4 @@
+[match]
 points = 10
 battle_type = "Averaged"
 
