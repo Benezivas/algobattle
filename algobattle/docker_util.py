@@ -13,7 +13,7 @@ from docker.models.images import Image as DockerImage
 from docker.models.containers import Container as DockerContainer
 from docker.types import Mount, LogConfig, Ulimit
 from requests import Timeout, ConnectionError
-from pydantic import Field
+from pydantic import Field, validator
 from anyio.to_thread import run_sync
 from urllib3.exceptions import ReadTimeoutError
 
@@ -38,12 +38,20 @@ from algobattle.problem import Problem
 _client_var: DockerClient | None = None
 
 
+def parse_zero_to_none(cls, value):
+    """Used as a validator to parse 0 values into Python None objects."""
+
+    return None if value == 0 else value
+
+
 class RunParameters(BaseModel):
     """The parameters determining how a program is run."""
 
     timeout: float | None = 30
     space: int | None = None
     cpus: int = 1
+
+    _parse_zero = validator("timeout", "space", allow_reuse=True)(parse_zero_to_none)
 
 
 class AdvancedRunArgs(BaseModel):
@@ -217,6 +225,11 @@ class ProgramConfig(BaseModel):
     advanced_build_params: AdvancedBuildArgs = AdvancedBuildArgs()
     advanced_run_params: AdvancedRunArgs = AdvancedRunArgs()
 
+    _parse_zero = validator("build_timeout", "image_size", allow_reuse=True)(parse_zero_to_none)
+
+    @validator("set_cpus")
+    def _parse_empty_str(cls, value):
+        return None if value == "" else value
 
 def client() -> DockerClient:
     """Returns the docker api client, checking that it's still responsive."""
