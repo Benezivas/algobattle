@@ -15,7 +15,7 @@ from algobattle.battle import Battle, FightHandler, FightUiProxy, BattleUiProxy
 from algobattle.docker_util import DockerConfig, ProgramRunInfo, ProgramUiProxy, set_docker_config
 from algobattle.team import Matchup, Team, TeamHandler, TeamInfo
 from algobattle.problem import Problem
-from algobattle.util import MatchMode, Role, TimerInfo, inherit_docs, BaseModel, str_with_traceback
+from algobattle.util import ExceptionInfo, MatchMode, Role, TimerInfo, inherit_docs, BaseModel, str_with_traceback
 
 
 class MatchConfig(BaseModel):
@@ -74,7 +74,7 @@ class Match(BaseModel):
     """The Result of a whole Match."""
 
     active_teams: list[str]
-    excluded_teams: list[str]
+    excluded_teams: dict[str, ExceptionInfo]
     results: defaultdict[str, dict[str, Battle]] = Field(default_factory=lambda: defaultdict(dict), init=False)
 
     async def _run_battle(
@@ -132,7 +132,7 @@ class Match(BaseModel):
         with await TeamHandler.build(config.teams, problem, config.mode, config.docker, ui) as teams:
             result = cls(
                 active_teams=[t.name for t in teams.active],
-                excluded_teams=[t for t in teams.excluded],
+                excluded_teams=teams.excluded,
             )
             ui.match = result
             battle_cls = Battle.all()[config.battle_type]
@@ -208,7 +208,7 @@ class Match(BaseModel):
         The other teams each get points based on how well they did against each other team compared to how well that
         other team did against them.
         """
-        points = {team: 0.0 for team in self.active_teams + self.excluded_teams}
+        points = {team: 0.0 for team in self.active_teams + list(self.excluded_teams)}
         if len(self.active_teams) == 0:
             return points
         if len(self.active_teams) == 1:

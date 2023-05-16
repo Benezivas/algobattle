@@ -234,7 +234,7 @@ class DockerError(AlgobattleBaseException):
 
 
 class ExceptionInfo(BaseModel):
-    """An exception that can be encoded into a json file."""
+    """Details about an exception that was raised."""
 
     type: str
     message: str
