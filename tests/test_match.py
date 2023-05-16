@@ -169,19 +169,19 @@ class Execution(IsolatedAsyncioTestCase):
         cls.solver = problem_path / "solver"
 
     async def test_basic(self):
-        self.config.teams = [TeamInfo("team_0", self.generator, self.solver)]
+        self.config.teams = {"team_0": TeamInfo(generator=self.generator, solver=self.solver)}
         self.config.match.battle_type = "Iterated"
         await Match.run(self.config, TestProblem)
 
     async def test_multi_team(self):
-        team0 = TeamInfo("team_0", self.generator, self.solver)
-        team1 = TeamInfo("team_1", self.generator, self.solver)
-        self.config.teams = [team0, team1]
+        team0 = TeamInfo(generator=self.generator, solver=self.solver)
+        team1 = TeamInfo(generator=self.generator, solver=self.solver)
+        self.config.teams = {"team_0": team0, "team_1": team1}
         self.config.match.battle_type = "Iterated"
         await Match.run(self.config, TestProblem)
 
     async def test_averaged(self):
-        self.config.teams = [TeamInfo("team_0", self.generator, self.solver)]
+        self.config.teams = {"team_0": TeamInfo(generator=self.generator, solver=self.solver)}
         self.config.match.battle_type = "Averaged"
         await Match.run(self.config, TestProblem)
 
@@ -194,13 +194,9 @@ class Parsing(TestCase):
         path = Path(__file__).parent
         cls.problem_path = path / "testsproblem"
         cls.configs_path = path / "configs"
-        cls.teams = [
-            TeamInfo(
-                name="team_0",
-                generator=cls.problem_path / "generator",
-                solver=cls.problem_path / "solver",
-            )
-        ]
+        cls.teams = {
+            "team_0": TeamInfo(generator=cls.problem_path / "generator", solver=cls.problem_path / "solver")
+        }
 
     def test_no_cfg_default(self):
         _, cfg = parse_cli_args([str(self.problem_path)])
@@ -238,7 +234,10 @@ class Parsing(TestCase):
     def test_cfg_team(self):
         _, cfg = parse_cli_args([str(self.problem_path), f"--config={self.configs_path / 'teams.toml'}"])
         self.assertEqual(
-            cfg, BaseConfig(teams=[TeamInfo("team 1", Path(), Path()), TeamInfo("team 2", Path(), Path())])
+            cfg, BaseConfig(teams={
+                "team 1": TeamInfo(generator=Path(), solver=Path()),
+                "team 2": TeamInfo(generator=Path(), solver=Path()),
+            })
         )
 
     def test_cfg_team_no_name(self):

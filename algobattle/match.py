@@ -13,7 +13,7 @@ from anyio.to_thread import current_default_thread_limiter
 
 from algobattle.battle import Battle, FightHandler, FightUiProxy, BattleUiProxy
 from algobattle.docker_util import ProgramConfig, ProgramRunInfo, ProgramUiProxy, set_docker_config
-from algobattle.team import Matchup, Team, TeamHandler, TeamInfo
+from algobattle.team import Matchup, Team, TeamHandler, TeamInfos
 from algobattle.problem import Problem
 from algobattle.util import MatchMode, Role, TimerInfo, inherit_docs, BaseModel, str_with_traceback
 
@@ -38,7 +38,7 @@ class MatchConfig(BaseModel):
 class BaseConfig(BaseModel):
     """Base that contains all config options and can be parsed from config files."""
 
-    teams: list[TeamInfo] = []
+    teams: TeamInfos = {}
     match: MatchConfig = MatchConfig()
     program: ProgramConfig = ProgramConfig()
     battle: dict[str, Battle.BattleConfig] = {n: b.BattleConfig() for n, b in Battle.all().items()}

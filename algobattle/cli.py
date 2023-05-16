@@ -77,13 +77,7 @@ def parse_cli_args(args: list[str]) -> tuple[CliOptions, BaseConfig]:
         config = BaseConfig()
 
     if not config.teams:
-        config.teams.append(
-            TeamInfo(
-                name="team_0",
-                generator=base_path / "generator",
-                solver=base_path / "solver",
-            )
-        )
+        config.teams["team_0"] = TeamInfo(generator=base_path / "generator", solver=base_path / "solver")
 
     return exec_config, config
 
