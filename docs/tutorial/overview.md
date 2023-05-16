@@ -1,9 +1,5 @@
 # Overview
 
-This is the Algobattle tutorial. It's the best starting place to learn more about what the package does and how you can
-use it. It's designed to require as little background knowledge as possible, but it's best if you are familiar with
-basic ideas of computer science, object-oriented programming, and Python in particular.
-
 First, we'll take a look at the broad structure of everything and the terms we use. The following pages then build on
 each other to delve deeper into each concept. At the end you'll be ready to use the package to either participate in
 a lab course or organize one. Not everything is covered in it though, optional topics that not everyone needs to

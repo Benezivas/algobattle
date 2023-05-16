@@ -97,11 +97,12 @@ extra_javascript:
 nav:
   - Home: index.md
   - Tutorial:
+    - tutorial/index.md
     - tutorial/overview.md
     - tutorial/installation.md
     - tutorial/match.md
     - tutorial/programs.md
-  - Advanced Guide:
+  - Advanced Guides:
     - advanced/index.md
   - API Reference:
     - api/index.md
