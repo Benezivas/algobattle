@@ -39,7 +39,7 @@ class TeamInfo(BaseModel):
         """Builds the specified docker files into images and return the corresponding team.
 
         Args:
-            name: Name of the team. Will be normalized to fit docker tag requirements.
+            name: Name of the team.
             problem: The problem class the current match is fought over.
             config: Config for the current match.
             name_programs: Whether the programs should be given deterministic names.
@@ -53,13 +53,13 @@ class TeamInfo(BaseModel):
         """
         if name in _team_names:
             raise ValueError
-        image_name = name if name_programs else None
+        tag_name = name.lower().replace(" ", "_") if name_programs else None
         ui.start_build(name, "generator", config.build_timeout)
-        generator = await Generator.build(self.generator, problem, config.generator, config.build_timeout, image_name)
+        generator = await Generator.build(self.generator, problem, config.generator, config.build_timeout, tag_name)
         ui.finish_build()
         try:
             ui.start_build(name, "solver", config.build_timeout)
-            solver = await Solver.build(self.solver, problem, config.solver, config.build_timeout, image_name)
+            solver = await Solver.build(self.solver, problem, config.solver, config.build_timeout, tag_name)
             ui.finish_build()
         except Exception:
             generator.remove()
