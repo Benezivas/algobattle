@@ -23,7 +23,7 @@ class MatchConfig(BaseModel):
     battle_type: str = "Iterated"
     points: int = 100
     parallel_battles: int = 1
-    mode: MatchMode = "tournament"
+    mode: MatchMode = "testing"
 
     @validator("battle_type", pre=True)
     def validate_battle_type(cls, value):
