@@ -18,7 +18,7 @@ from anyio.abc import TaskGroup
 
 from algobattle.battle import Battle, Fight
 from algobattle.docker_util import GeneratorResult, ProgramRunInfo, SolverResult
-from algobattle.match import MatchConfig, Match, Ui
+from algobattle.match import BaseConfig, Match, Ui
 from algobattle.problem import Problem
 from algobattle.team import Matchup, TeamInfo
 from algobattle.util import Role, TimerInfo, check_path, flat_intersperse
@@ -33,7 +33,7 @@ class CliOptions:
     result_output: Path | None = None
 
 
-def parse_cli_args(args: list[str]) -> tuple[CliOptions, MatchConfig]:
+def parse_cli_args(args: list[str]) -> tuple[CliOptions, BaseConfig]:
     """Parse a given CLI arg list into config objects."""
     parser = ArgumentParser()
     parser.add_argument("problem", help="Either the name of an installed problem, or a path to a problem file.")
@@ -70,11 +70,11 @@ def parse_cli_args(args: list[str]) -> tuple[CliOptions, MatchConfig]:
 
     if cfg_path.is_file():
         try:
-            config = MatchConfig.from_file(cfg_path)
+            config = BaseConfig.from_file(cfg_path)
         except Exception as e:
             raise ValueError(f"Invalid config file, terminating execution.\n{e}")
     else:
-        config = MatchConfig()
+        config = BaseConfig()
 
     if not config.teams:
         config.teams.append(
@@ -89,7 +89,7 @@ def parse_cli_args(args: list[str]) -> tuple[CliOptions, MatchConfig]:
 
 
 async def _run_with_ui(
-    match_config: MatchConfig,
+    match_config: BaseConfig,
     problem: type[Problem],
 ) -> Match:
     async with CliUi() as ui:
@@ -107,8 +107,8 @@ def main():
             result = run(_run_with_ui, config, exec_config.problem)
         print("\n".join(CliUi.display_match(result)))
 
-        if config.points > 0:
-            points = result.calculate_points(config.points)
+        if config.match.points > 0:
+            points = result.calculate_points(config.match.points)
             for team, pts in points.items():
                 print(f"Team {team} gained {pts:.1f} points.")
 

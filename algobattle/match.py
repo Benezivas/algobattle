@@ -17,7 +17,6 @@ from algobattle.team import Matchup, Team, TeamHandler, TeamInfo
 from algobattle.problem import Problem
 from algobattle.util import MatchMode, Role, TimerInfo, inherit_docs, BaseModel, str_with_traceback
 
-
 class MatchConfig(BaseModel):
     """Parameters determining the match execution."""
 
@@ -25,9 +24,6 @@ class MatchConfig(BaseModel):
     points: int = 100
     parallel_battles: int = 1
     mode: MatchMode = "tournament"
-    teams: list[TeamInfo] = []
-    docker: DockerConfig = DockerConfig()
-    battle: dict[str, Battle.BattleConfig] = {n: b.BattleConfig() for n, b in Battle.all().items()}
 
     @validator("battle_type", pre=True)
     def validate_battle_type(cls, value):
@@ -36,6 +32,14 @@ class MatchConfig(BaseModel):
             return value
         else:
             raise ValueError
+
+class BaseConfig(BaseModel):
+    """Base that contains all config options and can be parsed from config files."""
+
+    teams: list[TeamInfo] = []
+    match: MatchConfig = MatchConfig()
+    docker: DockerConfig = DockerConfig()
+    battle: dict[str, Battle.BattleConfig] = {n: b.BattleConfig() for n, b in Battle.all().items()}
 
     @validator("battle", pre=True)
     def val_battle_configs(cls, vals):
@@ -109,7 +113,7 @@ class Match(BaseModel):
     @classmethod
     async def run(
         cls,
-        config: MatchConfig,
+        config: BaseConfig,
         problem: type[Problem],
         ui: "Ui | None" = None,
     ) -> Self:
@@ -129,21 +133,21 @@ class Match(BaseModel):
             ui = Ui()
         set_docker_config(config.docker)
 
-        with await TeamHandler.build(config.teams, problem, config.mode, config.docker, ui) as teams:
+        with await TeamHandler.build(config.teams, problem, config.match.mode, config.docker, ui) as teams:
             result = cls(
                 active_teams=[t.name for t in teams.active],
                 excluded_teams=[t for t in teams.excluded],
             )
             ui.match = result
-            battle_cls = Battle.all()[config.battle_type]
-            battle_config = config.battle[config.battle_type]
-            limiter = CapacityLimiter(config.parallel_battles)
-            current_default_thread_limiter().total_tokens = config.parallel_battles
+            battle_cls = Battle.all()[config.match.battle_type]
+            battle_config = config.battle[config.match.battle_type]
+            limiter = CapacityLimiter(config.match.parallel_battles)
+            current_default_thread_limiter().total_tokens = config.match.parallel_battles
             set_cpus = config.docker.set_cpus
             if isinstance(set_cpus, list):
-                match_cpus = cast(list[str | None], set_cpus[: config.parallel_battles])
+                match_cpus = cast(list[str | None], set_cpus[: config.match.parallel_battles])
             else:
-                match_cpus = [set_cpus] * config.parallel_battles
+                match_cpus = [set_cpus] * config.match.parallel_battles
             async with create_task_group() as tg:
                 for matchup in teams.matchups:
                     battle = battle_cls()
