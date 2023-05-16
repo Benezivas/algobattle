@@ -149,3 +149,19 @@ battle scores are only compared between two particular teams, not over the whole
 points.
 
 In total, dogs win this match with 41.6 points, cats are second with 33.3, and the otters are third with 25.
+
+## Save match results
+
+Algobattle keeps a detailed log of everything that happens during a match, including many things that are not displayed
+to the terminal during execution. This is especially useful during development since it includes error messages of
+programs that failed to run. All you need to do to enable this is passing a path to a folder where you want them to be
+saved when running the match
+
+<div class="termy">
+
+```console
+$ algobattle .\algobattle_problems\pairsum --result_output=.\algobattle_logs
+```
+
+</div>
+
