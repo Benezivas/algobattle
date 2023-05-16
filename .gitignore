@@ -2,3 +2,5 @@
 algobattle.egg-info/*
 .vscode/*
 site/
+docs/src/pairsum_solver/target
+docs/src/pairsum_solver/Cargo.lock

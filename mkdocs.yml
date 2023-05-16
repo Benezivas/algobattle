@@ -49,6 +49,8 @@ theme:
     - search.highlight
     - search.share
     - content.tabs.link
+    - content.code.annotate
+    - content.code.copy
   language: en
   font:
     text: Roboto
@@ -58,6 +60,7 @@ markdown_extensions:
   - toc:
       permalink: true
   - admonition
+  - def_list
   - pymdownx.extra
   - pymdownx.highlight
   - pymdownx.inlinehilite
