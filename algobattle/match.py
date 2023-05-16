@@ -17,6 +17,7 @@ from algobattle.team import Matchup, Team, TeamHandler, TeamInfo
 from algobattle.problem import Problem
 from algobattle.util import MatchMode, Role, TimerInfo, inherit_docs, BaseModel, str_with_traceback
 
+
 class MatchConfig(BaseModel):
     """Parameters determining the match execution."""
 
@@ -32,6 +33,7 @@ class MatchConfig(BaseModel):
             return value
         else:
             raise ValueError
+
 
 class BaseConfig(BaseModel):
     """Base that contains all config options and can be parsed from config files."""

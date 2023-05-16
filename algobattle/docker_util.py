@@ -40,7 +40,6 @@ _client_var: DockerClient | None = None
 
 def parse_zero_to_none(cls, value):
     """Used as a validator to parse 0 values into Python None objects."""
-
     return None if value == 0 else value
 
 
@@ -230,6 +229,7 @@ class ProgramConfig(BaseModel):
     @validator("set_cpus")
     def _parse_empty_str(cls, value):
         return None if value == "" else value
+
 
 def client() -> DockerClient:
     """Returns the docker api client, checking that it's still responsive."""
