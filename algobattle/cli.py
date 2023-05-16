@@ -325,18 +325,15 @@ class CliUi(Ui):
         ]
 
     @staticmethod
-    def display_fight(fight: Fight, index: int) -> list[str]:
+    def display_fight(fight: Fight, index: int) -> str:
         """Formats a completed fight into a compact overview."""
-        out = [f"Fight {index} at size {fight.size}:"]
         if fight.generator.error is not None:
-            out.append("Generator failed!")
-            return out
-        assert fight.solver is not None
-        if fight.solver.error is not None:
-            out.append("Solver failed!")
-            return out
-        out.append(f"Score: {fight.score}")
-        return out
+            exec_info = ", generator failed!"
+        elif fight.solver is not None and fight.solver.error is not None:
+            exec_info = ", solver failed!"
+        else:
+            exec_info = ""
+        return f"Fight {index} at size {fight.size}: {fight.score}{exec_info}"
 
     def display_battle(self, matchup: Matchup) -> list[str]:
         """Formats the battle data into a string that can be printed to the terminal."""
@@ -353,13 +350,12 @@ class CliUi(Ui):
             sections.append(self.display_current_fight(matchup))
 
         if fights:
-            fight_history: list[list[str]] = []
+            fight_history: list[str] = []
             for i, fight in enumerate(fights, max(len(battle.fight_results) - 2, 1)):
                 fight_history.append(self.display_fight(fight, i))
-            fight_history = fight_history[::-1]
             fight_display = [
-                "Most recent fights:",
-            ] + list(flat_intersperse(fight_history, ""))
+                "Most recent fight results:",
+            ] + fight_history[::-1]
             sections.append(fight_display)
 
         combined_sections = list(flat_intersperse(sections, ""))
