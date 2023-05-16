@@ -194,9 +194,7 @@ class Parsing(TestCase):
         path = Path(__file__).parent
         cls.problem_path = path / "testsproblem"
         cls.configs_path = path / "configs"
-        cls.teams = {
-            "team_0": TeamInfo(generator=cls.problem_path / "generator", solver=cls.problem_path / "solver")
-        }
+        cls.teams = {"team_0": TeamInfo(generator=cls.problem_path / "generator", solver=cls.problem_path / "solver")}
 
     def test_no_cfg_default(self):
         _, cfg = parse_cli_args([str(self.problem_path)])
@@ -234,10 +232,13 @@ class Parsing(TestCase):
     def test_cfg_team(self):
         _, cfg = parse_cli_args([str(self.problem_path), f"--config={self.configs_path / 'teams.toml'}"])
         self.assertEqual(
-            cfg, BaseConfig(teams={
-                "team 1": TeamInfo(generator=Path(), solver=Path()),
-                "team 2": TeamInfo(generator=Path(), solver=Path()),
-            })
+            cfg,
+            BaseConfig(
+                teams={
+                    "team 1": TeamInfo(generator=Path(), solver=Path()),
+                    "team 2": TeamInfo(generator=Path(), solver=Path()),
+                }
+            ),
         )
 
     def test_cfg_team_no_name(self):
