@@ -12,7 +12,7 @@ from anyio import create_task_group, CapacityLimiter
 from anyio.to_thread import current_default_thread_limiter
 
 from algobattle.battle import Battle, FightHandler, FightUiProxy, BattleUiProxy
-from algobattle.docker_util import DockerConfig, ProgramRunInfo, ProgramUiProxy, set_docker_config
+from algobattle.docker_util import ProgramConfig, ProgramRunInfo, ProgramUiProxy, set_docker_config
 from algobattle.team import Matchup, Team, TeamHandler, TeamInfo
 from algobattle.problem import Problem
 from algobattle.util import MatchMode, Role, TimerInfo, inherit_docs, BaseModel, str_with_traceback
@@ -38,7 +38,7 @@ class BaseConfig(BaseModel):
 
     teams: list[TeamInfo] = []
     match: MatchConfig = MatchConfig()
-    docker: DockerConfig = DockerConfig()
+    program: ProgramConfig = ProgramConfig()
     battle: dict[str, Battle.BattleConfig] = {n: b.BattleConfig() for n, b in Battle.all().items()}
 
     @validator("battle", pre=True)
@@ -53,8 +53,8 @@ class BaseConfig(BaseModel):
             out[name] = battle_cls.BattleConfig.parse_obj(data)
         return out
 
-    @validator("docker")
-    def val_set_cpus(cls, v: DockerConfig, values) -> DockerConfig:
+    @validator("program")
+    def val_set_cpus(cls, v: ProgramConfig, values) -> ProgramConfig:
         """Validates that each battle that is being executed is assigned some cpu cores."""
         if isinstance(v.set_cpus, list) and values["parallel_battles"] > len(v.set_cpus):
             raise ValueError("Number of parallel battles exceeds the number of set_cpu specifier strings.")
@@ -131,9 +131,9 @@ class Match(BaseModel):
         """
         if ui is None:
             ui = Ui()
-        set_docker_config(config.docker)
+        set_docker_config(config.program)
 
-        with await TeamHandler.build(config.teams, problem, config.match.mode, config.docker, ui) as teams:
+        with await TeamHandler.build(config.teams, problem, config.match.mode, config.program, ui) as teams:
             result = cls(
                 active_teams=[t.name for t in teams.active],
                 excluded_teams=[t for t in teams.excluded],
@@ -143,7 +143,7 @@ class Match(BaseModel):
             battle_config = config.battle[config.match.battle_type]
             limiter = CapacityLimiter(config.match.parallel_battles)
             current_default_thread_limiter().total_tokens = config.match.parallel_battles
-            set_cpus = config.docker.set_cpus
+            set_cpus = config.program.set_cpus
             if isinstance(set_cpus, list):
                 match_cpus = cast(list[str | None], set_cpus[: config.match.parallel_battles])
             else:

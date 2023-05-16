@@ -205,7 +205,7 @@ class AdvancedBuildArgs(BaseModel):
         return self.dict(exclude_none=True)
 
 
-class DockerConfig(BaseModel):
+class ProgramConfig(BaseModel):
     """Config options relevant to the way programs are run and built."""
 
     build_timeout: float | None = None
@@ -231,7 +231,7 @@ def client() -> DockerClient:
     return _client_var
 
 
-def set_docker_config(config: DockerConfig) -> None:
+def set_docker_config(config: ProgramConfig) -> None:
     """Sets up the static docker config attributes.
 
     Various classes in the docker_util module need statically set config options, e.g. advanced build/run arguments or
@@ -266,7 +266,7 @@ class Image:
     id: str
     path: Path
 
-    docker_config: ClassVar[DockerConfig] = DockerConfig()
+    docker_config: ClassVar[ProgramConfig] = ProgramConfig()
 
     run_kwargs: ClassVar[dict[str, Any]] = {
         "network_mode": "none",
@@ -528,7 +528,7 @@ class Program(ABC):
     """The problem this program creates instances and/or solutions for."""
 
     role: ClassVar[Role]
-    docker_config: ClassVar[DockerConfig] = DockerConfig()
+    docker_config: ClassVar[ProgramConfig] = ProgramConfig()
 
     @classmethod
     async def build(

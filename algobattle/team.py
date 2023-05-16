@@ -5,7 +5,7 @@ from itertools import combinations
 from pathlib import Path
 from typing import Iterator, Protocol, Self
 
-from algobattle.docker_util import DockerConfig, Generator, Solver
+from algobattle.docker_util import ProgramConfig, Generator, Solver
 from algobattle.problem import Problem
 from algobattle.util import ExceptionInfo, MatchMode, Role
 
@@ -34,7 +34,7 @@ class TeamInfo:
     solver: Path
 
     async def build(
-        self, problem: type[Problem], config: DockerConfig, name_programs: bool, ui: BuildUiProxy
+        self, problem: type[Problem], config: ProgramConfig, name_programs: bool, ui: BuildUiProxy
     ) -> "Team":
         """Builds the specified docker files into images and return the corresponding team.
 
@@ -137,7 +137,7 @@ class TeamHandler:
 
     @classmethod
     async def build(
-        cls, infos: list[TeamInfo], problem: type[Problem], mode: MatchMode, config: DockerConfig, ui: BuildUiProxy
+        cls, infos: list[TeamInfo], problem: type[Problem], mode: MatchMode, config: ProgramConfig, ui: BuildUiProxy
     ) -> Self:
         """Builds the programs of every team.
 

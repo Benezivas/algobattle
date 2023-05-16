@@ -7,7 +7,7 @@ from algobattle.cli import parse_cli_args
 from algobattle.battle import Fight, Iterated, Averaged
 from algobattle.match import BaseConfig, Match, MatchConfig
 from algobattle.team import Team, Matchup, TeamHandler, TeamInfo
-from algobattle.docker_util import DockerConfig, ProgramRunInfo, RunParameters
+from algobattle.docker_util import ProgramConfig, ProgramRunInfo, RunParameters
 from .testsproblem.problem import TestProblem
 
 
@@ -159,7 +159,7 @@ class Execution(IsolatedAsyncioTestCase):
         cls.problem = TestProblem
         run_params = RunParameters(timeout=2)
         cls.config = BaseConfig(
-            docker=DockerConfig(generator=run_params, solver=run_params),
+            program=ProgramConfig(generator=run_params, solver=run_params),
             battle={
                 "Iterated": Iterated.BattleConfig(iteration_cap=10, rounds=2),
                 "Averaged": Averaged.BattleConfig(instance_size=5, iterations=3),
@@ -220,7 +220,7 @@ class Parsing(TestCase):
                     points=10,
                     battle_type="Averaged",
                 ),
-                docker=DockerConfig(generator=RunParameters(space=10)),
+                program=ProgramConfig(generator=RunParameters(space=10)),
                 battle={
                     "Averaged": Averaged.BattleConfig(iterations=1),
                 },

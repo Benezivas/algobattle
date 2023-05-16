@@ -1,8 +1,8 @@
 points = 10
 battle_type = "Averaged"
 
-[docker.generator]
+[program.generator]
 space = 10
 
-[battle.Averaged]
+[program.Averaged]
 iterations = 1
