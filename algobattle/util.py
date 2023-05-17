@@ -135,6 +135,8 @@ class EncodableModel(BaseModel, Encodable, ABC):
     @classmethod
     def decode(cls, source: Path, size: int, team: Role) -> Self:
         """Uses pydantic to create a python object from a `.json` file."""
+        if not source.with_suffix(".json").is_file():
+            raise EncodingError("The json file does not exist.")
         try:
             return cls.parse_file(source.with_suffix(".json"))
         except PydanticValidationError as e:
