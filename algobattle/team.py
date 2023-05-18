@@ -3,9 +3,11 @@ from abc import abstractmethod
 from dataclasses import dataclass, field
 from itertools import combinations
 from pathlib import Path
-from typing import Iterator, Protocol, Self
+from typing import Iterator, Protocol, Self, TypeAlias
 
-from algobattle.docker_util import DockerConfig, Generator, Solver
+from pydantic import BaseModel
+
+from algobattle.docker_util import ProgramConfig, Generator, Solver
 from algobattle.problem import Problem
 from algobattle.util import ExceptionInfo, MatchMode, Role
 
@@ -25,20 +27,19 @@ class BuildUiProxy(Protocol):
         """Informs the ui that the current build has been finished."""
 
 
-@dataclass
-class TeamInfo:
+class TeamInfo(BaseModel):
     """The config parameters defining a team."""
 
-    name: str
     generator: Path
     solver: Path
 
     async def build(
-        self, problem: type[Problem], config: DockerConfig, name_programs: bool, ui: BuildUiProxy
+        self, name: str, problem: type[Problem], config: ProgramConfig, name_programs: bool, ui: BuildUiProxy
     ) -> "Team":
         """Builds the specified docker files into images and return the corresponding team.
 
         Args:
+            name: Name of the team.
             problem: The problem class the current match is fought over.
             config: Config for the current match.
             name_programs: Whether the programs should be given deterministic names.
@@ -50,21 +51,23 @@ class TeamInfo:
             ValueError: If the team name is already in use.
             DockerError: If the docker build fails for some reason
         """
-        name = self.name.replace(" ", "_").lower()  # Lower case needed for docker tag created from name
         if name in _team_names:
             raise ValueError
-        image_name = name if name_programs else None
+        tag_name = name.lower().replace(" ", "_") if name_programs else None
         ui.start_build(name, "generator", config.build_timeout)
-        generator = await Generator.build(self.generator, problem, config.generator, config.build_timeout, image_name)
+        generator = await Generator.build(self.generator, problem, config.generator, config.build_timeout, tag_name)
         ui.finish_build()
         try:
             ui.start_build(name, "solver", config.build_timeout)
-            solver = await Solver.build(self.solver, problem, config.solver, config.build_timeout, image_name)
+            solver = await Solver.build(self.solver, problem, config.solver, config.build_timeout, tag_name)
             ui.finish_build()
         except Exception:
             generator.remove()
             raise
         return Team(name, generator, solver)
+
+
+TeamInfos: TypeAlias = dict[str, TeamInfo]
 
 
 @dataclass
@@ -137,7 +140,7 @@ class TeamHandler:
 
     @classmethod
     async def build(
-        cls, infos: list[TeamInfo], problem: type[Problem], mode: MatchMode, config: DockerConfig, ui: BuildUiProxy
+        cls, infos: TeamInfos, problem: type[Problem], mode: MatchMode, config: ProgramConfig, ui: BuildUiProxy
     ) -> Self:
         """Builds the programs of every team.
 
@@ -154,12 +157,12 @@ class TeamHandler:
             :cls:`TeamHandler` containing the info about the participating teams.
         """
         handler = cls(cleanup=mode == "tournament")
-        for info in infos:
+        for name, info in infos.items():
             try:
-                team = await info.build(problem, config, mode == "testing", ui)
+                team = await info.build(name, problem, config, mode == "testing", ui)
                 handler.active.append(team)
             except Exception as e:
-                handler.excluded[info.name] = ExceptionInfo.from_exception(e)
+                handler.excluded[name] = ExceptionInfo.from_exception(e)
         return handler
 
     def __enter__(self) -> Self:
