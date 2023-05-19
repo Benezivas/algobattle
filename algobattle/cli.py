@@ -328,7 +328,7 @@ class CliUi(Ui):
             exec_info = ", solver failed!"
         else:
             exec_info = ""
-        return f"Fight {index} at size {fight.size}: {fight.score}{exec_info}"
+        return f"Fight {index} at size {fight.max_size}: {fight.score}{exec_info}"
 
     def display_battle(self, matchup: Matchup) -> list[str]:
         """Formats the battle data into a string that can be printed to the terminal."""

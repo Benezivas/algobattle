@@ -47,8 +47,8 @@ class Fight(BaseModel):
 
     Always a number in [0, 1]. 0 indicates a total failure of the solver, 1 that it succeeded perfectly.
     """
-    size: int
-    """The size the fight was executed at."""
+    max_size: int
+    """The maximum size of an instance the generator was allowed to create."""
     generator: ProgramRunInfo
     """Data about the generator's execution."""
     solver: ProgramRunInfo | None
@@ -151,7 +151,7 @@ class FightHandler:
         )
         ui.update("generator", gen_result.info)
         if gen_result.instance is None:
-            return self._saved(Fight(score=1, size=size, generator=gen_result.info, solver=None))
+            return self._saved(Fight(score=1, max_size=size, generator=gen_result.info, solver=None))
 
         sol_result = await self._solver.run(
             gen_result.instance,
@@ -166,13 +166,13 @@ class FightHandler:
         )
         ui.update("solver", sol_result.info)
         if sol_result.solution is None:
-            return self._saved(Fight(score=0, size=size, generator=gen_result.info, solver=sol_result.info))
+            return self._saved(Fight(score=0, max_size=size, generator=gen_result.info, solver=sol_result.info))
 
         score = gen_result.instance.calculate_score(
             solution=sol_result.solution, generator_solution=gen_result.solution, size=size
         )
         score = max(0, min(1, float(score)))
-        return self._saved(Fight(score=score, size=size, generator=gen_result.info, solver=sol_result.info))
+        return self._saved(Fight(score=score, max_size=size, generator=gen_result.info, solver=sol_result.info))
 
 
 # We need this to be here to prevent an import cycle between match.py and battle.py
