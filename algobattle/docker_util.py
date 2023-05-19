@@ -578,18 +578,18 @@ class Program(ABC):
         return cls(image, config, problem_class)
 
     @abstractmethod
-    def _encode_input(self, input: Path, output: Path, size: int, instance: Problem | None) -> None:
+    def _encode_input(self, input: Path, output: Path, max_size: int, instance: Problem | None) -> None:
         """Sets up the i/o folders as required for the specific type of program."""
         raise NotImplementedError
 
     @abstractmethod
-    def _parse_output(self, output: Path, size: int, instance: Problem | None) -> _GenResData | Problem.Solution:
+    def _parse_output(self, output: Path, max_size: int, instance: Problem | None) -> _GenResData | Problem.Solution:
         """Parses the data in the output folder into problem instances/solutions."""
         raise NotImplementedError
 
     async def _run(
         self,
-        size: int,
+        max_size: int,
         input_instance: Problem | None = None,
         *,
         timeout: float | None = ...,
@@ -612,13 +612,13 @@ class Program(ABC):
 
         with TempDir() as input, TempDir() as output:
             try:
-                self._encode_input(input, output, size, input_instance)
+                self._encode_input(input, output, max_size, input_instance)
             except AlgobattleBaseException as e:
                 return result_class(ProgramRunInfo(params=run_params, runtime=0, error=ExceptionInfo.from_exception(e)))
             with open(input / "info.json", "w+") as f:
                 json.dump(
                     {
-                        "size": size,
+                        "max_size": max_size,
                         "timeout": timeout,
                         "space": space,
                         "cpus": cpus,
@@ -627,7 +627,7 @@ class Program(ABC):
                 )
             if battle_input is not None:
                 try:
-                    battle_input.encode(input / "battle_data", size, self.role)
+                    battle_input.encode(input / "battle_data", max_size, self.role)
                 except Exception as e:
                     return result_class(
                         ProgramRunInfo(
@@ -666,7 +666,7 @@ class Program(ABC):
                 )
 
             try:
-                output_data = self._parse_output(output, size, input_instance)
+                output_data = self._parse_output(output, max_size, input_instance)
             except AlgobattleBaseException as e:
                 return result_class(
                     ProgramRunInfo(
@@ -677,7 +677,7 @@ class Program(ABC):
                 )
 
             if battle_output:
-                decoded_battle_output = battle_output.decode(output / "battle_data", size, self.role)
+                decoded_battle_output = battle_output.decode(output / "battle_data", max_size, self.role)
             else:
                 decoded_battle_output = None
 
@@ -717,21 +717,21 @@ class Generator(Program):
 
     role: ClassVar[Role] = "generator"
 
-    def _encode_input(self, input: Path, output: Path, size: int, instance: Problem | None) -> None:
+    def _encode_input(self, input: Path, output: Path, max_size: int, instance: Problem | None) -> None:
         assert instance is None
-        with open(input / "size.txt", "w+") as f:
-            f.write(str(size))
+        with open(input / "max_size.txt", "w+") as f:
+            f.write(str(max_size))
 
-    def _parse_output(self, output: Path, size: int, instance: Problem | None) -> _GenResData:
+    def _parse_output(self, output: Path, max_size: int, instance: Problem | None) -> _GenResData:
         assert instance is None
         try:
-            problem = self.problem_class.decode(output / "instance", size, self.role)
+            problem = self.problem_class.decode(output / "instance", max_size, self.role)
         except EncodingError:
             raise
         except Exception as e:
             raise EncodingError("Error thrown while decoding the problem instance.", detail=str(e)) from e
         try:
-            problem.validate_instance(size)
+            problem.validate_instance(max_size)
         except ValidationError:
             raise
         except Exception as e:
@@ -739,13 +739,13 @@ class Generator(Program):
 
         if problem.with_solution:
             try:
-                solution = problem.Solution.decode(output / "solution", size, self.role)
+                solution = problem.Solution.decode(output / "solution", max_size, self.role)
             except EncodingError:
                 raise
             except Exception as e:
                 raise EncodingError("Error thrown while decoding the solution.", detail=str(e)) from e
             try:
-                solution.validate_solution(problem, size)
+                solution.validate_solution(problem, max_size)
             except ValidationError:
                 raise
             except Exception as e:
@@ -756,7 +756,7 @@ class Generator(Program):
 
     async def run(
         self,
-        size: int,
+        max_size: int,
         *,
         timeout: float | None = ...,
         space: int | None = ...,
@@ -769,7 +769,7 @@ class Generator(Program):
         """Executes the generator and parses its output into a problem instance.
 
         Args:
-            size: Size of the instance that the generator will be asked to generate.
+            max_size: Maximum size of the instance that the generator is allowed to generate.
             timeout: Timeout in seconds.
             space: Memory limit in MB.
             cpus: Number of physical cpus the generator can use.
@@ -785,7 +785,7 @@ class Generator(Program):
         return cast(
             GeneratorResult,
             await self._run(
-                size=size,
+                max_size=max_size,
                 input_instance=None,
                 timeout=timeout,
                 space=space,
@@ -803,20 +803,20 @@ class Solver(Program):
 
     role: ClassVar[Role] = "solver"
 
-    def _encode_input(self, input: Path, output: Path, size: int, instance: Problem | None) -> None:
+    def _encode_input(self, input: Path, output: Path, max_size: int, instance: Problem | None) -> None:
         assert instance is not None
-        instance.encode(input / "instance", size, self.role)
+        instance.encode(input / "instance", max_size, self.role)
 
-    def _parse_output(self, output: Path, size: int, instance: Problem | None) -> Problem.Solution:
+    def _parse_output(self, output: Path, max_size: int, instance: Problem | None) -> Problem.Solution:
         assert instance is not None
         try:
-            solution = self.problem_class.Solution.decode(output / "solution", size, self.role)
+            solution = self.problem_class.Solution.decode(output / "solution", max_size, self.role)
         except EncodingError:
             raise
         except Exception as e:
             raise EncodingError("Error thrown while decoding the solution.", detail=str(e)) from e
         try:
-            solution.validate_solution(instance, size)
+            solution.validate_solution(instance, max_size)
         except ValidationError:
             raise
         except Exception as e:
@@ -826,7 +826,7 @@ class Solver(Program):
     async def run(
         self,
         instance: Problem,
-        size: int,
+        max_size: int,
         *,
         timeout: float | None = ...,
         space: int | None = ...,
@@ -839,7 +839,7 @@ class Solver(Program):
         """Executes the solver on the given problem instance and parses its output into a problem solution.
 
         Args:
-            size: Size of the instance that the solver will be asked to generate.
+            max_size: Maximum size of the instance that the generator is allowed to generate.
             timeout: Timeout in seconds.
             space: Memory limit in MB.
             cpus: Number of physical cpus the solver can use.
@@ -855,7 +855,7 @@ class Solver(Program):
         return cast(
             SolverResult,
             await self._run(
-                size=size,
+                max_size=max_size,
                 input_instance=instance,
                 timeout=timeout,
                 space=space,

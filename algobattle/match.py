@@ -286,7 +286,7 @@ class Ui:
         """Passes new custom battle data to the Ui."""
         return
 
-    def start_fight(self, matchup: Matchup, size: int) -> None:
+    def start_fight(self, matchup: Matchup, max_size: int) -> None:
         """Informs the Ui of a newly started fight."""
         return
 
@@ -327,8 +327,8 @@ class Ui:
             self.solver = Ui.ProgramObserver(self.battle_ui, "solver")
 
         @inherit_docs
-        def start(self, size: int) -> None:
-            self.battle_ui.ui.start_fight(self.battle_ui.matchup, size)
+        def start(self, max_size: int) -> None:
+            self.battle_ui.ui.start_fight(self.battle_ui.matchup, max_size)
 
         @inherit_docs
         def update(
