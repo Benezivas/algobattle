@@ -62,9 +62,6 @@ class Problem(Encodable, ABC):
     Helps with uniquely specifying a class to be executed in a problem file. For more details view the documentation.
     """
 
-    size: int
-    """Determines the size of a problem instance."""
-
     _installed: ClassVar[dict[str, type["Problem"]]] = {}
 
     def __init_subclass__(cls, export: bool = True) -> None:
