@@ -82,14 +82,14 @@ class Problem(Encodable, ABC):
         """
         return
 
-    def calculate_score(self, solution: _Solution, generator_solution: _Solution | None, size: int) -> float:
+    def score(self, solver_solution: _Solution, generator_solution: _Solution | None, size: int) -> float:
         """Calculates how well a solution solves this problem instance.
 
         There is a default implementation if the solution is :cls:`Scored`. For it, the calculated score is the ratio of
         the generator's solution score to the solver's solution score.
 
         Args:
-            solution: The solution created by the solver.
+            solver_solution: The solution created by the solver.
             generator_solution: The solution output by the generator, if any.
             size: The instance size.
 
@@ -98,11 +98,11 @@ class Problem(Encodable, ABC):
             1 that it solved the instance perfectly.
         """
         if isinstance(generator_solution, self.Solution) and isinstance(generator_solution, Scored):
-            assert isinstance(solution, Scored)
+            assert isinstance(solver_solution, Scored)
             gen_score = generator_solution.score(self, size)
             if gen_score == 0:
                 return 1
-            sol_score = solution.score(self, size)
+            sol_score = solver_solution.score(self, size)
             if sol_score == 0:
                 return 0
 

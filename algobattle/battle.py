@@ -168,8 +168,8 @@ class FightHandler:
         if sol_result.solution is None:
             return self._saved(Fight(score=0, size=size, generator=gen_result.info, solver=sol_result.info))
 
-        score = gen_result.instance.calculate_score(
-            solution=sol_result.solution, generator_solution=gen_result.solution, size=size
+        score = gen_result.instance.score(
+            solver_solution=sol_result.solution, generator_solution=gen_result.solution, size=size
         )
         score = max(0, min(1, float(score)))
         return self._saved(Fight(score=score, size=size, generator=gen_result.info, solver=sol_result.info))
