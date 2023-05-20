@@ -62,6 +62,9 @@ class Problem(Encodable, ABC):
     Helps with uniquely specifying a class to be executed in a problem file. For more details view the documentation.
     """
 
+    size: int
+    """Determines the size of a problem instance."""
+
     _installed: ClassVar[dict[str, type["Problem"]]] = {}
 
     def __init_subclass__(cls, export: bool = True) -> None:
@@ -210,6 +213,8 @@ class Problem(Encodable, ABC):
 class ProblemModel(EncodableModel, Problem, ABC):
     """A Problem that can easily be parsed to/from a json file."""
 
+    size: int
+
     export: ClassVar[bool] = False
 
     class Config(EncodableModel.Config):
@@ -239,14 +244,14 @@ class DirectedGraph(ProblemModel):
 
     export: ClassVar[bool] = False
 
-    num_vertices: int = Field(ge=0, le=2**63 - 1)
+    size: int = Field(ge=0, le=2**63 - 1)
     edges: list[tuple[int, int]] = Field(ge=0, le=2**63 - 1, unique_items=True)
 
     def validate_instance(self, max_size: int):
         """Validates that the graph contains at most `size` many vertices and all edges are well defined."""
-        if self.num_vertices > max_size:
+        if self.size > max_size:
             raise ValidationError("Graph contains too many vertices.")
-        if any(u >= self.num_vertices or v >= self.num_vertices for u, v in self.edges):
+        if any(u >= self.size for edge in self.edges for u in edge):
             raise ValidationError("Graph contains edges whose endpoints aren't valid vertices")
 
 
@@ -286,7 +291,7 @@ class EdgeWeights(DirectedGraph, GenericModel, Generic[Weight]):
     def validate_instance(self, max_size: int):
         """Validates that each edge has an associated weight."""
         super().validate_instance(max_size)
-        if len(self.edge_weights) == len(self.edges):
+        if len(self.edge_weights) != len(self.edges):
             raise ValidationError("Number of edge weights doesn't match the number of edges.")
 
 
@@ -300,5 +305,5 @@ class VertexWeights(DirectedGraph, GenericModel, Generic[Weight]):
     def validate_instance(self, max_size: int):
         """Validates that each vertex has an associated weight."""
         super().validate_instance(max_size)
-        if len(self.vertex_weights) == self.num_vertices:
+        if len(self.vertex_weights) != self.size:
             raise ValidationError("Number of vertex weights doesn't match the number of vertices.")
