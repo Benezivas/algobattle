@@ -23,7 +23,11 @@ class TestProblem(ProblemModel):
 
     semantics: bool
 
-    def validate_instance(self, max_size: int):
+    @property
+    def size(self) -> int:
+        return 0
+
+    def validate_instance(self):
         if not self.semantics:
             raise ValidationError("")
 

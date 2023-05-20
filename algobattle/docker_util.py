@@ -730,8 +730,10 @@ class Generator(Program):
             raise
         except Exception as e:
             raise EncodingError("Error thrown while decoding the problem instance.", detail=str(e)) from e
+        if problem.size > max_size:
+            raise EncodingError("Instance is too large.", detail=f"Generated: {problem.size}, maximum: {max_size}")
         try:
-            problem.validate_instance(max_size)
+            problem.validate_instance()
         except ValidationError:
             raise
         except Exception as e:
