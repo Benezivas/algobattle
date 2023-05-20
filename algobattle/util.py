@@ -5,6 +5,7 @@ In particular, the base classes :cls:`BaseModel`, :cls:`Encodable`, :cls:`Encoda
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
+from enum import Enum
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from traceback import format_exception
@@ -13,8 +14,13 @@ from typing import Any, Iterable, Literal, TypeVar, Self
 from pydantic import BaseConfig, BaseModel as PydandticBaseModel, Extra, ValidationError as PydanticValidationError
 
 
-Role = Literal["generator", "solver"]
-"""Indicates whether the role of a program is to generate or to solve instances."""
+class Role(Enum):
+    """Indicates whether the role of a program is to generate or to solve instances."""
+
+    generator = "generator"
+    solver = "solver"
+
+
 MatchMode = Literal["tournament", "testing"]
 """Indicates what type of match is being fought."""
 T = TypeVar("T")

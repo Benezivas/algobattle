@@ -323,8 +323,8 @@ class Ui:
         solver: "Ui.ProgramObserver" = field(init=False)
 
         def __post_init__(self) -> None:
-            self.generator = Ui.ProgramObserver(self.battle_ui, "generator")
-            self.solver = Ui.ProgramObserver(self.battle_ui, "solver")
+            self.generator = Ui.ProgramObserver(self.battle_ui, Role.generator)
+            self.solver = Ui.ProgramObserver(self.battle_ui, Role.solver)
 
         @inherit_docs
         def start(self, size: int) -> None:

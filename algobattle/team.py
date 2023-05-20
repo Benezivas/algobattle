@@ -54,11 +54,11 @@ class TeamInfo(BaseModel):
         if name in _team_names:
             raise ValueError
         tag_name = name.lower().replace(" ", "_") if name_programs else None
-        ui.start_build(name, "generator", config.build_timeout)
+        ui.start_build(name, Role.generator, config.build_timeout)
         generator = await Generator.build(self.generator, problem, config.generator, config.build_timeout, tag_name)
         ui.finish_build()
         try:
-            ui.start_build(name, "solver", config.build_timeout)
+            ui.start_build(name, Role.solver, config.build_timeout)
             solver = await Solver.build(self.solver, problem, config.solver, config.build_timeout, tag_name)
             ui.finish_build()
         except Exception:

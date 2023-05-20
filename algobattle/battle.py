@@ -149,7 +149,7 @@ class FightHandler:
             set_cpus=self._set_cpus,
             ui=ui.generator,
         )
-        ui.update("generator", gen_result.info)
+        ui.update(Role.generator, gen_result.info)
         if gen_result.instance is None:
             return self._saved(Fight(score=1, size=size, generator=gen_result.info, solver=None))
 
@@ -164,7 +164,7 @@ class FightHandler:
             set_cpus=self._set_cpus,
             ui=ui.solver,
         )
-        ui.update("solver", sol_result.info)
+        ui.update(Role.solver, sol_result.info)
         if sol_result.solution is None:
             return self._saved(Fight(score=0, size=size, generator=gen_result.info, solver=sol_result.info))
 
