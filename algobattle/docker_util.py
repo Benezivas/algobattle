@@ -627,7 +627,7 @@ class Program(ABC):
                 )
             if battle_input is not None:
                 try:
-                    battle_input.encode(input / "battle_data", max_size, self.role)
+                    battle_input.encode(input / "battle_data", self.role)
                 except Exception as e:
                     return result_class(
                         ProgramRunInfo(
@@ -731,7 +731,7 @@ class Generator(Program):
         except Exception as e:
             raise EncodingError("Error thrown while decoding the problem instance.", detail=str(e)) from e
         try:
-            problem.validate_instance(max_size)
+            problem.validate_instance()
         except ValidationError:
             raise
         except Exception as e:
@@ -745,7 +745,7 @@ class Generator(Program):
             except Exception as e:
                 raise EncodingError("Error thrown while decoding the solution.", detail=str(e)) from e
             try:
-                solution.validate_solution(problem, max_size)
+                solution.validate_solution(problem)
             except ValidationError:
                 raise
             except Exception as e:
@@ -805,7 +805,7 @@ class Solver(Program):
 
     def _encode_input(self, input: Path, output: Path, max_size: int, instance: Problem | None) -> None:
         assert instance is not None
-        instance.encode(input / "instance", max_size, self.role)
+        instance.encode(input / "instance", self.role)
 
     def _parse_output(self, output: Path, max_size: int, instance: Problem | None) -> Problem.Solution:
         assert instance is not None
@@ -816,7 +816,7 @@ class Solver(Program):
         except Exception as e:
             raise EncodingError("Error thrown while decoding the solution.", detail=str(e)) from e
         try:
-            solution.validate_solution(instance, max_size)
+            solution.validate_solution(instance)
         except ValidationError:
             raise
         except Exception as e:
