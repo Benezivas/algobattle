@@ -97,7 +97,6 @@ class Problem(Encodable, ABC):
         Args:
             solution: The solution created by the solver.
             generator_solution: The solution output by the generator, if any.
-            max_size: The instance size.
 
         Returns:
             The calculated score, a number in [0, 1] with a value of 0 indicating that the solver failed completely and
