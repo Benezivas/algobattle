@@ -8,9 +8,15 @@ from datetime import datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from traceback import format_exception
-from typing import Any, Iterable, Literal, TypeVar, Self
+from typing import Annotated, Any, Iterable, Literal, TypeVar, Self
 
-from pydantic import BaseConfig, BaseModel as PydandticBaseModel, Extra, ValidationError as PydanticValidationError
+from pydantic import (
+    BaseConfig,
+    BaseModel as PydandticBaseModel,
+    Extra,
+    ValidationError as PydanticValidationError,
+    conint,
+)
 
 
 Role = Literal["generator", "solver"]
@@ -33,6 +39,12 @@ class BaseModel(PydandticBaseModel):
 
         extra = Extra.forbid
         underscore_attrs_are_private = False
+
+
+u64 = Annotated[conint(ge=0, le=2**64 - 1), ...]
+"""Helper type to easily define model fields that fit into a 64 bit unsigned int."""
+i64 = Annotated[conint(ge=-(2**63), le=2**63 - 1), ...]
+"""Helper type to easily define model fields that fit into a 64 bit signed int."""
 
 
 def inherit_docs(obj: T) -> T:
