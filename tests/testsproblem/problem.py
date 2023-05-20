@@ -17,7 +17,7 @@ class TestProblem(ProblemModel):
         semantics: bool
         quality: bool
 
-        def validate_solution(self, instance: "TestProblem", max_size: int):
+        def validate_solution(self, instance: "TestProblem"):
             if not self.semantics:
                 raise ValidationError("")
 
@@ -27,5 +27,5 @@ class TestProblem(ProblemModel):
         if not self.semantics:
             raise ValidationError("")
 
-    def calculate_score(self, solution: Solution, generator_solution: Solution | None, max_size: int) -> float:
+    def calculate_score(self, solution: Solution, generator_solution: Solution | None) -> float:
         return solution.quality

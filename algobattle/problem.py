@@ -10,7 +10,7 @@ from typing import Any, ClassVar, Literal, Protocol, Self, Generic, TypeAlias, T
 from pydantic import Field
 from pydantic.generics import GenericModel
 
-from algobattle.util import Encodable, EncodableModel, Role, ValidationError
+from algobattle.util import Encodable, EncodableModel, ValidationError
 
 
 _Problem: TypeAlias = Any
@@ -74,7 +74,7 @@ class Problem(Encodable, ABC):
             Problem._installed[cls.name] = cls
         return super().__init_subclass__()
 
-    def validate_instance(self) -> None:
+    def validate_instance(self, max_size: int) -> None:
         """Confirms that the parsed instance is valid.
 
         Should be idempotent, but may also perform additional postprocessing such as bringing the instance
@@ -213,8 +213,6 @@ class Problem(Encodable, ABC):
 class ProblemModel(EncodableModel, Problem, ABC):
     """A Problem that can easily be parsed to/from a json file."""
 
-    size: int
-
     export: ClassVar[bool] = False
 
     class Config(EncodableModel.Config):
@@ -228,14 +226,6 @@ class ProblemModel(EncodableModel, Problem, ABC):
             "Solution": {"exclude": True},
             "export": {"exclude": True},
         }
-
-    @classmethod
-    def decode(cls, source: Path, max_size: int, team: Role) -> Self:
-        """Decodes the instance as json and checks the size limit."""
-        parsed = super().decode(source, max_size, team)
-        if parsed.size > max_size:
-            raise ValidationError("Problem instance contains too many vertices.")
-        return parsed
 
 
 class SolutionModel(EncodableModel, Problem.Solution, ABC):
@@ -255,8 +245,10 @@ class DirectedGraph(ProblemModel):
     size: int = Field(ge=0, le=2**63 - 1)
     edges: list[tuple[int, int]] = Field(ge=0, le=2**63 - 1, unique_items=True)
 
-    def validate_instance(self):
+    def validate_instance(self, max_size: int):
         """Validates that the graph contains at most `size` many vertices and all edges are well defined."""
+        if self.size > max_size:
+            raise ValidationError("Graph contains too many vertices.")
         if any(u >= self.size for edge in self.edges for u in edge):
             raise ValidationError("Graph contains edges whose endpoints aren't valid vertices")
 
@@ -266,13 +258,13 @@ class UndirectedGraph(DirectedGraph):
 
     export: ClassVar[bool] = False
 
-    def validate_instance(self):
+    def validate_instance(self, max_size: int):
         """Validates that the graph is well formed and contains no self loops.
 
         Also brings it into a normal form where every edge {u, v} occurs exactly once in the list.
         I.e. `[(0, 1), (1, 0), (1, 2)]` is accepted as valid and normalised to `[(0, 1), (1, 2)]`.
         """
-        super().validate_instance()
+        super().validate_instance(max_size)
         if any(u == v for u, v in self.edges):
             raise ValidationError("Undirected graph contains self loops.")
 
@@ -294,9 +286,9 @@ class EdgeWeights(DirectedGraph, GenericModel, Generic[Weight]):
 
     edge_weights: list[Weight]
 
-    def validate_instance(self):
+    def validate_instance(self, max_size: int):
         """Validates that each edge has an associated weight."""
-        super().validate_instance()
+        super().validate_instance(max_size)
         if len(self.edge_weights) != len(self.edges):
             raise ValidationError("Number of edge weights doesn't match the number of edges.")
 
@@ -308,8 +300,8 @@ class VertexWeights(DirectedGraph, GenericModel, Generic[Weight]):
 
     vertex_weights: list[Weight]
 
-    def validate_instance(self):
+    def validate_instance(self, max_size: int):
         """Validates that each vertex has an associated weight."""
-        super().validate_instance()
+        super().validate_instance(max_size)
         if len(self.vertex_weights) != self.size:
             raise ValidationError("Number of vertex weights doesn't match the number of vertices.")
