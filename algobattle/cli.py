@@ -237,7 +237,7 @@ class CliUi(Ui):
             out.append(status)
         elif isinstance(status, _BuildInfo):
             runtime = (datetime.now() - status.start).total_seconds()
-            status_str = f"Building {status.role} of team {status.team}: {runtime:3.1f}s"
+            status_str = f"Building {status.role.name} of team {status.team}: {runtime:3.1f}s"
             if status.timeout is not None:
                 status_str += f" / {status.timeout:3.1f}s"
             out.append(status_str)
