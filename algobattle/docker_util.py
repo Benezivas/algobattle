@@ -566,7 +566,7 @@ class Program(ABC):
         """
         if isinstance(image, Path):
             if team_name is not None:
-                name = f"algobattle_{team_name}_{cls.role}"
+                name = f"algobattle_{team_name}_{cls.role.name}"
             else:
                 name = None
             image = await Image.build(
