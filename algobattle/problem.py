@@ -39,7 +39,7 @@ class Scored(Protocol):
     """The direction that better scores are found at."""
 
     @abstractmethod
-    def score(self, instance: _Problem, size: int) -> float:
+    def score(self, instance: _Problem) -> float:
         """Calculate the score of this solution for the given problem instance."""
         raise NotImplementedError
 
@@ -71,7 +71,13 @@ class Problem(Encodable, ABC):
             Problem._installed[cls.name] = cls
         return super().__init_subclass__()
 
-    def validate_instance(self, size: int) -> None:
+    @property
+    @abstractmethod
+    def size(self) -> int:
+        """The instance's size."""
+        raise NotImplementedError
+
+    def validate_instance(self) -> None:
         """Confirms that the parsed instance is valid.
 
         Should be idempotent, but may also perform additional postprocessing such as bringing the instance
@@ -82,7 +88,7 @@ class Problem(Encodable, ABC):
         """
         return
 
-    def calculate_score(self, solution: _Solution, generator_solution: _Solution | None, size: int) -> float:
+    def calculate_score(self, solution: _Solution, generator_solution: _Solution | None) -> float:
         """Calculates how well a solution solves this problem instance.
 
         There is a default implementation if the solution is :cls:`Scored`. For it, the calculated score is the ratio of
@@ -91,7 +97,6 @@ class Problem(Encodable, ABC):
         Args:
             solution: The solution created by the solver.
             generator_solution: The solution output by the generator, if any.
-            size: The instance size.
 
         Returns:
             The calculated score, a number in [0, 1] with a value of 0 indicating that the solver failed completely and
@@ -99,10 +104,10 @@ class Problem(Encodable, ABC):
         """
         if isinstance(generator_solution, self.Solution) and isinstance(generator_solution, Scored):
             assert isinstance(solution, Scored)
-            gen_score = generator_solution.score(self, size)
+            gen_score = generator_solution.score(self)
             if gen_score == 0:
                 return 1
-            sol_score = solution.score(self, size)
+            sol_score = solution.score(self)
             if sol_score == 0:
                 return 0
 
@@ -192,7 +197,7 @@ class Problem(Encodable, ABC):
     class Solution(Encodable, ABC):
         """A proposed solution for an instance of this problem."""
 
-        def validate_solution(self, instance: _Problem, size: int) -> None:
+        def validate_solution(self, instance: _Problem) -> None:
             """Confirms that the parsed solution is valid.
 
             Should be idempotent, but may also perform additional postprocessing such as bringing the solution
@@ -242,11 +247,14 @@ class DirectedGraph(ProblemModel):
     num_vertices: int = Field(ge=0, le=2**63 - 1)
     edges: list[tuple[int, int]] = Field(ge=0, le=2**63 - 1, unique_items=True)
 
-    def validate_instance(self, size: int):
+    @property
+    def size(self) -> int:
+        """A graph's size is the number of vertices in it."""
+        return self.num_vertices
+
+    def validate_instance(self):
         """Validates that the graph contains at most `size` many vertices and all edges are well defined."""
-        if self.num_vertices > size:
-            raise ValidationError("Graph contains too many vertices.")
-        if any(u >= self.num_vertices or v >= self.num_vertices for u, v in self.edges):
+        if any(u >= self.num_vertices for edge in self.edges for u in edge):
             raise ValidationError("Graph contains edges whose endpoints aren't valid vertices")
 
 
@@ -255,13 +263,13 @@ class UndirectedGraph(DirectedGraph):
 
     export: ClassVar[bool] = False
 
-    def validate_instance(self, size: int):
+    def validate_instance(self):
         """Validates that the graph is well formed and contains no self loops.
 
         Also brings it into a normal form where every edge {u, v} occurs exactly once in the list.
         I.e. `[(0, 1), (1, 0), (1, 2)]` is accepted as valid and normalised to `[(0, 1), (1, 2)]`.
         """
-        super().validate_instance(size)
+        super().validate_instance()
         if any(u == v for u, v in self.edges):
             raise ValidationError("Undirected graph contains self loops.")
 
@@ -283,10 +291,10 @@ class EdgeWeights(DirectedGraph, GenericModel, Generic[Weight]):
 
     edge_weights: list[Weight]
 
-    def validate_instance(self, size: int):
+    def validate_instance(self):
         """Validates that each edge has an associated weight."""
-        super().validate_instance(size)
-        if len(self.edge_weights) == len(self.edges):
+        super().validate_instance()
+        if len(self.edge_weights) != len(self.edges):
             raise ValidationError("Number of edge weights doesn't match the number of edges.")
 
 
@@ -297,8 +305,8 @@ class VertexWeights(DirectedGraph, GenericModel, Generic[Weight]):
 
     vertex_weights: list[Weight]
 
-    def validate_instance(self, size: int):
+    def validate_instance(self):
         """Validates that each vertex has an associated weight."""
-        super().validate_instance(size)
-        if len(self.vertex_weights) == self.num_vertices:
+        super().validate_instance()
+        if len(self.vertex_weights) != self.num_vertices:
             raise ValidationError("Number of vertex weights doesn't match the number of vertices.")
