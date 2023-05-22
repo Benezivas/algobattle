@@ -15,13 +15,12 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "docker",
-    "prettytable",
-    "pydantic < 2",
-    "anyio",
-
+    "docker>=6.1.2",
+    "prettytable>=3.7.0",
+    "pydantic~=1.10",
+    "anyio>=3.6.2",
     # on windows, we need to manually install curses bindings
-    "windows-curses; os_name == 'nt'",
+    "windows-curses>=2.3.1; os_name == 'nt'",
 ]
 
 [project.scripts]
