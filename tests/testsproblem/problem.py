@@ -17,15 +17,19 @@ class TestProblem(ProblemModel):
         semantics: bool
         quality: bool
 
-        def validate_solution(self, instance: "TestProblem", size: int):
+        def validate_solution(self, instance: "TestProblem"):
             if not self.semantics:
                 raise ValidationError("")
 
     semantics: bool
 
-    def validate_instance(self, size: int):
+    @property
+    def size(self) -> int:
+        return 0
+
+    def validate_instance(self):
         if not self.semantics:
             raise ValidationError("")
 
-    def score(self, solver_solution: Solution, generator_solution: Solution | None, size: int) -> float:
+    def score(self, solver_solution: Solution, generator_solution: Solution | None) -> float:
         return solver_solution.quality

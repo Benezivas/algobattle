@@ -47,8 +47,8 @@ class Fight(BaseModel):
 
     Always a number in [0, 1]. 0 indicates a total failure of the solver, 1 that it succeeded perfectly.
     """
-    size: int
-    """The size the fight was executed at."""
+    max_size: int
+    """The maximum size of an instance the generator was allowed to create."""
     generator: ProgramRunInfo
     """Data about the generator's execution."""
     solver: ProgramRunInfo | None
@@ -62,7 +62,7 @@ class FightUiProxy(Protocol):
     solver: ProgramUiProxy
 
     @abstractmethod
-    def start(self, size: int) -> None:
+    def start(self, max_size: int) -> None:
         """Informs the ui that a new fight has been started."""
 
     @abstractmethod
@@ -91,7 +91,7 @@ class FightHandler:
 
     async def run(
         self,
-        size: int,
+        max_size: int,
         *,
         timeout_generator: float | None = ...,
         space_generator: int | None = ...,
@@ -112,7 +112,7 @@ class FightHandler:
         unset results in the config options being used.
 
         Args:
-            size: The instance size the fight is fought at.
+            max_size: The maximum instance size the generator is allowed to create.
             timeout_generator: Timeout in seconds for the generator to finish running. `None` means it is given an
                 unlimited amount of time.
             space_generator: Memory space in MB the generator has access to. `None` means it is given an unlimited
@@ -132,15 +132,15 @@ class FightHandler:
             The resulting info about the executed fight.
         """
         min_size = self._generator.problem_class.min_size
-        if size < min_size:
+        if max_size < min_size:
             raise ValueError(
-                f"Cannot run battle at size {size} since it is smaller than the smallest "
+                f"Cannot run battle at size {max_size} since it is smaller than the smallest "
                 "size the problem allows ({min_size})."
             )
         ui = self._ui
-        ui.start(size)
+        ui.start(max_size)
         gen_result = await self._generator.run(
-            size=size,
+            max_size=max_size,
             timeout=timeout_generator,
             space=space_generator,
             cpus=cpus_generator,
@@ -151,11 +151,11 @@ class FightHandler:
         )
         ui.update("generator", gen_result.info)
         if gen_result.instance is None:
-            return self._saved(Fight(score=1, size=size, generator=gen_result.info, solver=None))
+            return self._saved(Fight(score=1, max_size=max_size, generator=gen_result.info, solver=None))
 
         sol_result = await self._solver.run(
             gen_result.instance,
-            size=size,
+            max_size=max_size,
             timeout=timeout_solver,
             space=space_solver,
             cpus=cpus_solver,
@@ -166,13 +166,13 @@ class FightHandler:
         )
         ui.update("solver", sol_result.info)
         if sol_result.solution is None:
-            return self._saved(Fight(score=0, size=size, generator=gen_result.info, solver=sol_result.info))
+            return self._saved(Fight(score=0, max_size=max_size, generator=gen_result.info, solver=sol_result.info))
 
         score = gen_result.instance.score(
-            solver_solution=sol_result.solution, generator_solution=gen_result.solution, size=size
+            solution=sol_result.solution, generator_solution=gen_result.solution
         )
         score = max(0, min(1, float(score)))
-        return self._saved(Fight(score=score, size=size, generator=gen_result.info, solver=sol_result.info))
+        return self._saved(Fight(score=score, max_size=max_size, generator=gen_result.info, solver=sol_result.info))
 
 
 # We need this to be here to prevent an import cycle between match.py and battle.py
