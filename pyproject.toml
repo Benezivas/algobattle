@@ -3,7 +3,7 @@ requires = ["pdm-backend"]
 build-backend = "pdm.backend"
 
 [project]
-name = "algobattle"
+name = "algobattle-base"
 version = "4.0.0-rc1"
 description = "The Algobattle lab course package."
 readme = "README.md"
