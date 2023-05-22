@@ -23,7 +23,7 @@ def dummy_result(*score: float) -> list[Fight]:
     return [
         Fight(
             score=s,
-            size=0,
+            max_size=0,
             generator=ProgramRunInfo(
                 params=RunParameters(),
                 runtime=0,

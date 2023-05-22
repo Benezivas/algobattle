@@ -143,7 +143,7 @@ class _BuildInfo:
 
 @dataclass
 class _FightUiData:
-    size: int
+    max_size: int
     generator: TimerInfo | float | ProgramRunInfo | None = None
     solver: TimerInfo | float | ProgramRunInfo | None = None
 
@@ -202,9 +202,9 @@ class CliUi(Ui):
         """Passes new custom battle data to the Ui."""
         self.battle_data[matchup] = data
 
-    def start_fight(self, matchup: Matchup, size: int) -> None:
+    def start_fight(self, matchup: Matchup, max_size: int) -> None:
         """Informs the Ui of a newly started fight."""
-        self.fight_data[matchup] = _FightUiData(size, None, None)
+        self.fight_data[matchup] = _FightUiData(max_size, None, None)
 
     def update_curr_fight(
         self,
@@ -314,7 +314,7 @@ class CliUi(Ui):
         """Formats the current fight of a battle into a compact overview."""
         fight = self.fight_data[matchup]
         return [
-            f"Current fight at size {fight.size}:",
+            f"Current fight at size {fight.max_size}:",
             self.display_program(Role.generator, fight.generator),
             self.display_program(Role.solver, fight.solver),
         ]
@@ -328,7 +328,7 @@ class CliUi(Ui):
             exec_info = ", solver failed!"
         else:
             exec_info = ""
-        return f"Fight {index} at size {fight.size}: {fight.score}{exec_info}"
+        return f"Fight {index} at size {fight.max_size}: {fight.score}{exec_info}"
 
     def display_battle(self, matchup: Matchup) -> list[str]:
         """Formats the battle data into a string that can be printed to the terminal."""
