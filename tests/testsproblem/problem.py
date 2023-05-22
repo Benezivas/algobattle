@@ -31,5 +31,5 @@ class TestProblem(ProblemModel):
         if not self.semantics:
             raise ValidationError("")
 
-    def calculate_score(self, solution: Solution, generator_solution: Solution | None) -> float:
-        return solution.quality
+    def score(self, solver_solution: Solution, generator_solution: Solution | None) -> float:
+        return solver_solution.quality

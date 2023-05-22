@@ -88,14 +88,14 @@ class Problem(Encodable, ABC):
         """
         return
 
-    def calculate_score(self, solution: _Solution, generator_solution: _Solution | None) -> float:
+    def score(self, solver_solution: _Solution, generator_solution: _Solution | None) -> float:
         """Calculates how well a solution solves this problem instance.
 
-        There is a default implementation if the solution is :cls:`Scored`. For it, the calculated score is the ratio of
-        the generator's solution score to the solver's solution score.
+        If the solution is :cls:`Scored` the score is the ratio of the generator's solution score to the solver's
+        solution score. Otherwise, it simply defaults to 1 since the solver generated a valid solution.
 
         Args:
-            solution: The solution created by the solver.
+            solver_solution: The solution created by the solver.
             generator_solution: The solution output by the generator, if any.
 
         Returns:
@@ -103,11 +103,11 @@ class Problem(Encodable, ABC):
             1 that it solved the instance perfectly.
         """
         if isinstance(generator_solution, self.Solution) and isinstance(generator_solution, Scored):
-            assert isinstance(solution, Scored)
+            assert isinstance(solver_solution, Scored)
             gen_score = generator_solution.score(self)
             if gen_score == 0:
                 return 1
-            sol_score = solution.score(self)
+            sol_score = solver_solution.score(self)
             if sol_score == 0:
                 return 0
 
@@ -116,7 +116,7 @@ class Problem(Encodable, ABC):
             else:
                 return sol_score / gen_score
         else:
-            raise NotImplementedError
+            return 1
 
     @staticmethod
     def _is_importable(val: Any):
