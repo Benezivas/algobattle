@@ -12,10 +12,10 @@ from anyio import create_task_group, CapacityLimiter
 from anyio.to_thread import current_default_thread_limiter
 
 from algobattle.battle import Battle, FightHandler, FightUiProxy, BattleUiProxy
-from algobattle.docker_util import DockerConfig, ProgramRunInfo, ProgramUiProxy, set_docker_config
-from algobattle.team import Matchup, Team, TeamHandler, TeamInfo
+from algobattle.docker_util import ProgramConfig, ProgramRunInfo, ProgramUiProxy, set_docker_config
+from algobattle.team import Matchup, Team, TeamHandler, TeamInfos
 from algobattle.problem import Problem
-from algobattle.util import MatchMode, Role, TimerInfo, inherit_docs, BaseModel, str_with_traceback
+from algobattle.util import ExceptionInfo, MatchMode, Role, TimerInfo, inherit_docs, BaseModel, str_with_traceback
 
 
 class MatchConfig(BaseModel):
@@ -29,17 +29,7 @@ class MatchConfig(BaseModel):
     points: int = 100
     """Highest number of points each team can achieve."""
     parallel_battles: int = 1
-    """Number of battles that are executed in parallel."""
-    mode: MatchMode = "tournament"
-    """Whether the match is part of a tournament or just for testing purposes."""
-    teams: list[TeamInfo] = []
-    """List of objects specifying the team names and where their dockerfiles can be found."""
-    docker: DockerConfig = DockerConfig()
-    """Docker config settings."""
-    battle: dict[str, Battle.BattleConfig] = {
-        name: battle_type.BattleConfig() for name, battle_type in Battle.all().items()
-    }
-    """Battle specific config options."""
+    mode: MatchMode = "testing"
 
     @validator("battle_type", pre=True)
     def validate_battle_type(cls, value):
@@ -48,6 +38,15 @@ class MatchConfig(BaseModel):
             return value
         else:
             raise ValueError
+
+
+class BaseConfig(BaseModel):
+    """Base that contains all config options and can be parsed from config files."""
+
+    teams: TeamInfos = {}
+    match: MatchConfig = MatchConfig()
+    program: ProgramConfig = ProgramConfig()
+    battle: dict[str, Battle.BattleConfig] = {n: b.BattleConfig() for n, b in Battle.all().items()}
 
     @validator("battle", pre=True)
     def val_battle_configs(cls, vals):
@@ -61,10 +60,10 @@ class MatchConfig(BaseModel):
             out[name] = battle_cls.BattleConfig.parse_obj(data)
         return out
 
-    @validator("docker")
-    def val_set_cpus(cls, v: DockerConfig, values) -> DockerConfig:
+    @validator("program")
+    def val_set_cpus(cls, v: ProgramConfig, values) -> ProgramConfig:
         """Validates that each battle that is being executed is assigned some cpu cores."""
-        if isinstance(v.set_cpus, list) and values["parallel_battles"] > len(v.set_cpus):
+        if isinstance(v.set_cpus, list) and values["match"]["parallel_battles"] > len(v.set_cpus):
             raise ValueError("Number of parallel battles exceeds the number of set_cpu specifier strings.")
         else:
             return v
@@ -86,7 +85,7 @@ class Match(BaseModel):
     """The Result of a whole Match."""
 
     active_teams: list[str]
-    excluded_teams: list[str]
+    excluded_teams: dict[str, ExceptionInfo]
     results: defaultdict[str, dict[str, Battle]] = Field(default_factory=lambda: defaultdict(dict), init=False)
 
     async def _run_battle(
@@ -121,7 +120,7 @@ class Match(BaseModel):
     @classmethod
     async def run(
         cls,
-        config: MatchConfig,
+        config: BaseConfig,
         problem: type[Problem],
         ui: "Ui | None" = None,
     ) -> Self:
@@ -139,23 +138,23 @@ class Match(BaseModel):
         """
         if ui is None:
             ui = Ui()
-        set_docker_config(config.docker)
+        set_docker_config(config.program)
 
-        with await TeamHandler.build(config.teams, problem, config.mode, config.docker, ui) as teams:
+        with await TeamHandler.build(config.teams, problem, config.match.mode, config.program, ui) as teams:
             result = cls(
                 active_teams=[t.name for t in teams.active],
-                excluded_teams=[t for t in teams.excluded],
+                excluded_teams=teams.excluded,
             )
             ui.match = result
-            battle_cls = Battle.all()[config.battle_type]
-            battle_config = config.battle[config.battle_type]
-            limiter = CapacityLimiter(config.parallel_battles)
-            current_default_thread_limiter().total_tokens = config.parallel_battles
-            set_cpus = config.docker.set_cpus
+            battle_cls = Battle.all()[config.match.battle_type]
+            battle_config = config.battle[config.match.battle_type]
+            limiter = CapacityLimiter(config.match.parallel_battles)
+            current_default_thread_limiter().total_tokens = config.match.parallel_battles
+            set_cpus = config.program.set_cpus
             if isinstance(set_cpus, list):
-                match_cpus = cast(list[str | None], set_cpus[: config.parallel_battles])
+                match_cpus = cast(list[str | None], set_cpus[: config.match.parallel_battles])
             else:
-                match_cpus = [set_cpus] * config.parallel_battles
+                match_cpus = [set_cpus] * config.match.parallel_battles
             async with create_task_group() as tg:
                 for matchup in teams.matchups:
                     battle = battle_cls()
@@ -220,7 +219,7 @@ class Match(BaseModel):
         The other teams each get points based on how well they did against each other team compared to how well that
         other team did against them.
         """
-        points = {team: 0.0 for team in self.active_teams + self.excluded_teams}
+        points = {team: 0.0 for team in self.active_teams + list(self.excluded_teams)}
         if len(self.active_teams) == 0:
             return points
         if len(self.active_teams) == 1:
@@ -292,7 +291,7 @@ class Ui:
         """Passes new custom battle data to the Ui."""
         return
 
-    def start_fight(self, matchup: Matchup, size: int) -> None:
+    def start_fight(self, matchup: Matchup, max_size: int) -> None:
         """Informs the Ui of a newly started fight."""
         return
 
@@ -329,12 +328,12 @@ class Ui:
         solver: "Ui.ProgramObserver" = field(init=False)
 
         def __post_init__(self) -> None:
-            self.generator = Ui.ProgramObserver(self.battle_ui, "generator")
-            self.solver = Ui.ProgramObserver(self.battle_ui, "solver")
+            self.generator = Ui.ProgramObserver(self.battle_ui, Role.generator)
+            self.solver = Ui.ProgramObserver(self.battle_ui, Role.solver)
 
         @inherit_docs
-        def start(self, size: int) -> None:
-            self.battle_ui.ui.start_fight(self.battle_ui.matchup, size)
+        def start(self, max_size: int) -> None:
+            self.battle_ui.ui.start_fight(self.battle_ui.matchup, max_size)
 
         @inherit_docs
         def update(

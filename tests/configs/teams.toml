@@ -1,9 +1,7 @@
-[[teams]]
-name = "team 1"
+[teams."team 1"]
 generator = "."
 solver = "."
 
-[[teams]]
-name = "team 2"
+[teams."team 2"]
 generator = "."
 solver = "."

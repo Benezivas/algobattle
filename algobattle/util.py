@@ -5,16 +5,28 @@ In particular, the base classes :class:`BaseModel`, :class:`Encodable`, :class:`
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
+from enum import Enum
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from traceback import format_exception
-from typing import Any, Iterable, Literal, TypeVar, Self
+from typing import Annotated, Any, Iterable, Literal, LiteralString, TypeVar, Self
 
-from pydantic import BaseConfig, BaseModel as PydandticBaseModel, Extra, ValidationError as PydanticValidationError
+from pydantic import (
+    BaseConfig,
+    BaseModel as PydandticBaseModel,
+    Extra,
+    ValidationError as PydanticValidationError,
+    conint,
+)
 
 
-Role = Literal["generator", "solver"]
-"""Indicates whether the role of a program is to generate or to solve instances."""
+class Role(Enum):
+    """Indicates whether the role of a program is to generate or to solve instances."""
+
+    generator = "generator"
+    solver = "solver"
+
+
 MatchMode = Literal["tournament", "testing"]
 """Indicates what type of match is being fought."""
 T = TypeVar("T")
@@ -33,6 +45,12 @@ class BaseModel(PydandticBaseModel):
 
         extra = Extra.forbid
         underscore_attrs_are_private = False
+
+
+u64 = Annotated[conint(ge=0, le=2**64 - 1), ...]
+"""Helper type to easily define model fields that fit into a 64 bit unsigned int."""
+i64 = Annotated[conint(ge=-(2**63), le=2**63 - 1), ...]
+"""Helper type to easily define model fields that fit into a 64 bit signed int."""
 
 
 def inherit_docs(obj: T) -> T:
@@ -82,13 +100,13 @@ class Encodable(ABC):
 
     @classmethod
     @abstractmethod
-    def decode(cls, source: Path, size: int, team: Role) -> Self:
+    def decode(cls, source: Path, max_size: int, team: Role) -> Self:
         """Decodes the data found at the given path into a python object.
 
         Args:
             source: Path to data that can be used to construct an instance of this class. May either point to a folder
                 or a single file. The expected type of path should be consistent with the result of :meth:`.encode`.
-            size: The size of the fight for which this data is being decoded.
+            max_size: The size of the fight for which this data is being decoded.
             team: Role of the team that output the data.
 
         Raises:
@@ -100,14 +118,13 @@ class Encodable(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def encode(self, target: Path, size: int, team: Role) -> None:
+    def encode(self, target: Path, team: Role) -> None:
         """Encodes the object onto the file system so that it can be passed to a program.
 
         Args:
             target: Path to the location where the program expects the encoded data. :meth:`.encode` may either create
                 a single file at the target location, or an entire folder. If creating a single file, it may append a
                 file type ending to the path. It should not affect any other files or directories.
-            size: The size of the data to be encoded.
             team: Role of the team that receives the data.
 
         Raises:
@@ -133,8 +150,10 @@ class EncodableModel(BaseModel, Encodable, ABC):
     """Problem data that can easily be encoded into and decoded from json files."""
 
     @classmethod
-    def decode(cls, source: Path, size: int, team: Role) -> Self:
+    def decode(cls, source: Path, max_size: int, team: Role) -> Self:
         """Uses pydantic to create a python object from a `.json` file."""
+        if not source.with_suffix(".json").is_file():
+            raise EncodingError("The json file does not exist.")
         try:
             return cls.parse_file(source.with_suffix(".json"))
         except PydanticValidationError as e:
@@ -142,7 +161,7 @@ class EncodableModel(BaseModel, Encodable, ABC):
         except Exception as e:
             raise EncodingError("Unknown error while decoding the data.", detail=str(e))
 
-    def encode(self, target: Path, size: int, team: Role) -> None:
+    def encode(self, target: Path, team: Role) -> None:
         """Uses pydantic to create a json representation of the object at the targeted file."""
         try:
             with open(target.with_suffix(".json"), "w") as f:
@@ -186,7 +205,7 @@ def flat_intersperse(iterable: Iterable[Iterable[T]], element: T) -> Iterable[T]
 class AlgobattleBaseException(Exception):
     """Base exception class for errors used by the algobattle package."""
 
-    def __init__(self, message: str, *, detail: str | None = None) -> None:
+    def __init__(self, message: LiteralString, *, detail: str | None = None) -> None:
         """Base exception class for errors used by the algobattle package.
 
         Args:
@@ -213,7 +232,7 @@ class BuildError(AlgobattleBaseException):
 class ExecutionError(AlgobattleBaseException):
     """Indicates that the program could not be executed successfully."""
 
-    def __init__(self, message: str, *, detail: str | None = None, runtime: float) -> None:
+    def __init__(self, message: LiteralString, *, detail: str | None = None, runtime: float) -> None:
         """Indicates that the program could not be executed successfully.
 
         Args:
@@ -234,7 +253,7 @@ class DockerError(AlgobattleBaseException):
 
 
 class ExceptionInfo(BaseModel):
-    """An exception that can be encoded into a json file."""
+    """Details about an exception that was raised."""
 
     type: str
     message: str

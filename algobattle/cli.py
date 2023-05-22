@@ -18,7 +18,7 @@ from anyio.abc import TaskGroup
 
 from algobattle.battle import Battle, Fight
 from algobattle.docker_util import GeneratorResult, ProgramRunInfo, SolverResult
-from algobattle.match import MatchConfig, Match, Ui
+from algobattle.match import BaseConfig, Match, Ui
 from algobattle.problem import Problem
 from algobattle.team import Matchup, TeamInfo
 from algobattle.util import Role, TimerInfo, check_path, flat_intersperse
@@ -30,21 +30,22 @@ class CliOptions:
 
     problem: type[Problem]
     silent: bool = False
-    result_output: Path | None = None
+    result: Path | None = None
 
 
-def parse_cli_args(args: list[str]) -> tuple[CliOptions, MatchConfig]:
+def parse_cli_args(args: list[str]) -> tuple[CliOptions, BaseConfig]:
     """Parse a given CLI arg list into config objects."""
     parser = ArgumentParser()
     parser.add_argument("problem", help="Either the name of an installed problem, or a path to a problem file.")
     parser.add_argument(
         "--config",
+        "-c",
         type=partial(check_path, type="file"),
         help="Path to a config file, defaults to '{problem} / config.toml'.",
     )
-    parser.add_argument("-s", "--silent", action="store_true", help="Disable the cli Ui.")
+    parser.add_argument("--silent", "-s", action="store_true", help="Disable the cli Ui.")
     parser.add_argument(
-        "--result_output", type=check_path, help="If set, the match result object will be saved to the specified file."
+        "--result", "-r", type=check_path, help="If set, the match result object will be saved to the specified file."
     )
 
     parsed = parser.parse_args(args)
@@ -64,32 +65,26 @@ def parse_cli_args(args: list[str]) -> tuple[CliOptions, MatchConfig]:
     exec_config = CliOptions(
         problem=problem,
         silent=parsed.silent,
-        result_output=parsed.result_output,
+        result=parsed.result,
     )
     cfg_path: Path = parsed.config or base_path / "config.toml"
 
     if cfg_path.is_file():
         try:
-            config = MatchConfig.from_file(cfg_path)
+            config = BaseConfig.from_file(cfg_path)
         except Exception as e:
             raise ValueError(f"Invalid config file, terminating execution.\n{e}")
     else:
-        config = MatchConfig()
+        config = BaseConfig()
 
     if not config.teams:
-        config.teams.append(
-            TeamInfo(
-                name="team_0",
-                generator=base_path / "generator",
-                solver=base_path / "solver",
-            )
-        )
+        config.teams["team_0"] = TeamInfo(generator=base_path / "generator", solver=base_path / "solver")
 
     return exec_config, config
 
 
 async def _run_with_ui(
-    match_config: MatchConfig,
+    match_config: BaseConfig,
     problem: type[Problem],
 ) -> Match:
     async with CliUi() as ui:
@@ -107,15 +102,15 @@ def main():
             result = run(_run_with_ui, config, exec_config.problem)
         print("\n".join(CliUi.display_match(result)))
 
-        if config.points > 0:
-            points = result.calculate_points(config.points)
+        if config.match.points > 0:
+            points = result.calculate_points(config.match.points)
             for team, pts in points.items():
                 print(f"Team {team} gained {pts:.1f} points.")
 
-        if exec_config.result_output is not None:
+        if exec_config.result is not None:
             t = datetime.now()
             filename = f"{t.year:04d}-{t.month:02d}-{t.day:02d}_{t.hour:02d}-{t.minute:02d}-{t.second:02d}.json"
-            with open(exec_config.result_output / filename, "w+") as f:
+            with open(exec_config.result / filename, "w+") as f:
                 f.write(result.json())
 
     except KeyboardInterrupt:
@@ -148,7 +143,7 @@ class _BuildInfo:
 
 @dataclass
 class _FightUiData:
-    size: int
+    max_size: int
     generator: TimerInfo | float | ProgramRunInfo | None = None
     solver: TimerInfo | float | ProgramRunInfo | None = None
 
@@ -207,9 +202,9 @@ class CliUi(Ui):
         """Passes new custom battle data to the Ui."""
         self.battle_data[matchup] = data
 
-    def start_fight(self, matchup: Matchup, size: int) -> None:
+    def start_fight(self, matchup: Matchup, max_size: int) -> None:
         """Informs the Ui of a newly started fight."""
-        self.fight_data[matchup] = _FightUiData(size, None, None)
+        self.fight_data[matchup] = _FightUiData(max_size, None, None)
 
     def update_curr_fight(
         self,
@@ -218,10 +213,10 @@ class CliUi(Ui):
         data: TimerInfo | float | ProgramRunInfo | None = None,
     ) -> None:
         """Passes new info about the current fight to the Ui."""
-        if role == "generator" or role is None:
+        if role == Role.generator or role is None:
             assert not isinstance(data, SolverResult)
             self.fight_data[matchup].generator = data
-        if role == "solver" or role is None:
+        if role == Role.solver or role is None:
             assert not isinstance(data, GeneratorResult)
             self.fight_data[matchup].solver = data
 
@@ -242,7 +237,7 @@ class CliUi(Ui):
             out.append(status)
         elif isinstance(status, _BuildInfo):
             runtime = (datetime.now() - status.start).total_seconds()
-            status_str = f"Building {status.role} of team {status.team}: {runtime:3.1f}s"
+            status_str = f"Building {status.role.name} of team {status.team}: {runtime:3.1f}s"
             if status.timeout is not None:
                 status_str += f" / {status.timeout:3.1f}s"
             out.append(status_str)
@@ -288,7 +283,7 @@ class CliUi(Ui):
     @staticmethod
     def display_program(role: Role, data: TimerInfo | float | ProgramRunInfo | None) -> str:
         """Formats program runtime data."""
-        role_str = role.capitalize() + ": "
+        role_str = role.name.capitalize() + ": "
         out = f"{role_str: <11}"
         if data is None:
             return out
@@ -319,24 +314,21 @@ class CliUi(Ui):
         """Formats the current fight of a battle into a compact overview."""
         fight = self.fight_data[matchup]
         return [
-            f"Current fight at size {fight.size}:",
-            self.display_program("generator", fight.generator),
-            self.display_program("solver", fight.solver),
+            f"Current fight at size {fight.max_size}:",
+            self.display_program(Role.generator, fight.generator),
+            self.display_program(Role.solver, fight.solver),
         ]
 
     @staticmethod
-    def display_fight(fight: Fight, index: int) -> list[str]:
+    def display_fight(fight: Fight, index: int) -> str:
         """Formats a completed fight into a compact overview."""
-        out = [f"Fight {index} at size {fight.size}:"]
         if fight.generator.error is not None:
-            out.append("Generator failed!")
-            return out
-        assert fight.solver is not None
-        if fight.solver.error is not None:
-            out.append("Solver failed!")
-            return out
-        out.append(f"Score: {fight.score}")
-        return out
+            exec_info = ", generator failed!"
+        elif fight.solver is not None and fight.solver.error is not None:
+            exec_info = ", solver failed!"
+        else:
+            exec_info = ""
+        return f"Fight {index} at size {fight.max_size}: {fight.score}{exec_info}"
 
     def display_battle(self, matchup: Matchup) -> list[str]:
         """Formats the battle data into a string that can be printed to the terminal."""
@@ -353,13 +345,12 @@ class CliUi(Ui):
             sections.append(self.display_current_fight(matchup))
 
         if fights:
-            fight_history: list[list[str]] = []
+            fight_history: list[str] = []
             for i, fight in enumerate(fights, max(len(battle.fight_results) - 2, 1)):
                 fight_history.append(self.display_fight(fight, i))
-            fight_history = fight_history[::-1]
             fight_display = [
-                "Most recent fights:",
-            ] + list(flat_intersperse(fight_history, ""))
+                "Most recent fight results:",
+            ] + fight_history[::-1]
             sections.append(fight_display)
 
         combined_sections = list(flat_intersperse(sections, ""))

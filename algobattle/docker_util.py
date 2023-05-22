@@ -13,7 +13,7 @@ from docker.models.images import Image as DockerImage
 from docker.models.containers import Container as DockerContainer
 from docker.types import Mount, LogConfig, Ulimit
 from requests import Timeout, ConnectionError
-from pydantic import Field
+from pydantic import Field, validator
 from anyio.to_thread import run_sync
 from urllib3.exceptions import ReadTimeoutError
 
@@ -38,6 +38,11 @@ from algobattle.problem import Problem
 _client_var: DockerClient | None = None
 
 
+def parse_zero_to_none(cls, value):
+    """Used as a validator to parse 0 values into Python None objects."""
+    return None if value == 0 else value
+
+
 class RunParameters(BaseModel):
     """The parameters determining how a program is run."""
 
@@ -45,8 +50,169 @@ class RunParameters(BaseModel):
     space: int | None = None
     cpus: int = 1
 
+    _parse_zero = validator("timeout", "space", allow_reuse=True)(parse_zero_to_none)
 
-class DockerConfig(BaseModel):
+
+class AdvancedRunArgs(BaseModel):
+    """Advanced docker run options.
+
+    Contains all options exposed on the python docker run api, except `device_requests`
+    and those set by :meth:`Image.run` itself.
+    """
+
+    class _BlockIOWeight(TypedDict):
+        Path: str
+        Weight: int
+
+    class _DeviceRate(TypedDict):
+        Path: str
+        Rate: int
+
+    class _HealthCheck(TypedDict):
+        test: list[str] | str
+        interval: int
+        timeout: int
+        retries: int
+        start_period: int
+
+    class _LogConfigArgs(TypedDict):
+        type: str
+        conifg: dict[Any, Any]
+
+    class _UlimitArgs(TypedDict):
+        name: str
+        soft: int
+        hard: int
+
+    network_mode: str = "none"
+    command: str | list[str] | None = None
+    auto_remove: bool | None = None
+    blkio_weight_device: list[_BlockIOWeight] | None = None
+    blkio_weight: int | None = Field(default=None, ge=10, le=1000)
+    cap_add: list[str] | None = None
+    cap_drop: list[str] | None = None
+    cgroup_parent: str | None = None
+    cgroupns: str | None = None
+    cpu_count: int | None = None
+    cpu_percent: int | None = None
+    cpu_period: int | None = None
+    cpu_quota: int | None = None
+    cpu_rt_period: int | None = None
+    cpu_rt_runtime: int | None = None
+    cpu_shares: int | None = None
+    cpuset_mems: str | None = None
+    device_cgroup_rules: list[str] | None = None
+    device_read_bps: list[_DeviceRate] | None = None
+    device_read_iops: list[_DeviceRate] | None = None
+    device_write_bps: list[_DeviceRate] | None = None
+    device_write_iops: list[_DeviceRate] | None = None
+    devices: list[str] | None = None
+    dns: list[str] | None = None
+    dns_opt: list[str] | None = None
+    dns_search: list[str] | None = None
+    domainname: str | list[str] | None = None
+    entrypoint: str | list[str] | None = None
+    environment: dict[str, str] | list[str] | None = None
+    extra_hosts: dict[str, str] | None = None
+    group_add: list[str] | None = None
+    healthcheck: _HealthCheck | None = None
+    hostname: str | None = None
+    init: bool | None = None
+    init_path: str | None = None
+    ipc_mode: str | None = None
+    isolation: str | None = None
+    kernel_memory: int | str | None = None
+    labels: dict[str, str] | list[str] | None = None
+    links: dict[str, str] | None = None
+    log_config: _LogConfigArgs | None = None
+    lxc_conf: dict[Any, Any] | None = None
+    mac_address: str | None = None
+    mem_limit: int | str | None = None
+    mem_reservation: int | str | None = None
+    mem_swappiness: int | None = None
+    memswap_limit: str | int | None = None
+    network: str | None = None
+    network_disabled: bool | None = None
+    oom_kill_disable: bool | None = None
+    oom_score_adj: int | None = None
+    pid_mode: str | None = None
+    pids_limit: int | None = None
+    platform: str | None = None
+    ports: dict[Any, Any] | None = None
+    privileged: bool | None = None
+    publish_all_ports: bool | None = None
+    read_only: bool | None = None
+    restart_policy: dict[Any, Any] | None = None
+    runtime: str | None = None
+    security_opt: list[str] | None = None
+    shm_size: str | int | None = None
+    stdin_open: bool | None = None
+    stdout: bool | None = None
+    stderr: bool | None = None
+    stop_signal: str | None = None
+    storage_opt: dict[Any, Any] | None = None
+    stream: bool | None = None
+    sysctls: dict[Any, Any] | None = None
+    tmpfs: dict[Any, Any] | None = None
+    tty: bool | None = None
+    ulimits: list[_UlimitArgs] | None = None
+    use_config_proxy: bool | None = None
+    user: str | int | None = None
+    userns_mode: str | None = None
+    uts_mode: str | None = None
+    version: str | None = None
+    volume_driver: str | None = None
+    volumes: dict[Any, Any] | list[Any] | None = None
+    volumes_from: list[Any] | None = None
+    working_dir: str | None = None
+
+    def to_docker_args(self) -> dict[str, Any]:
+        """Transforms the object into :meth:`client.containers.run` kwargs."""
+        kwargs = self.dict(exclude_none=True)
+        if "log_config" in kwargs:
+            kwargs["log_config"] = LogConfig(**kwargs["log_config"])
+        if "ulimits" in kwargs:
+            kwargs["ulimits"] = Ulimit(**kwargs["ulimits"])
+        return kwargs
+
+
+class AdvancedBuildArgs(BaseModel):
+    """Advanced docker build options.
+
+    Contains all options exposed on the python docker build api, except those set by :meth:`Image.build` itself.
+    """
+
+    class _ContainerLimits(TypedDict):
+        memory: int
+        memswap: int
+        cpushares: int
+        cpusetcpus: str
+
+    quiet: bool = True
+    nocache: bool | None = None
+    rm: bool = True
+    encoding: str | None = None
+    pull: bool | None = True
+    forcerm: bool = True
+    buildargs: dict[Any, Any] | None = None
+    container_limits: _ContainerLimits | None = None
+    shmsize: int | None = None
+    labels: dict[Any, Any] | None = None
+    cache_from: list[Any] | None = None
+    target: str | None = None
+    network_mode: str = "host"
+    squash: bool | None = None
+    extra_hosts: dict[Any, Any] | None = None
+    platform: str | None = None
+    isolation: str | None = None
+    use_config_proxy: bool | None = None
+
+    def to_docker_args(self) -> dict[str, Any]:
+        """Transforms the object into :meth:`client.images.build` kwargs."""
+        return self.dict(exclude_none=True)
+
+
+class ProgramConfig(BaseModel):
     """Config options relevant to the way programs are run and built."""
 
     build_timeout: float | None = None
@@ -55,8 +221,14 @@ class DockerConfig(BaseModel):
     image_size: int | None = None
     generator: RunParameters = RunParameters()
     solver: RunParameters = RunParameters()
-    advanced_run_params: "AdvancedRunArgs | None" = None
-    advanced_build_params: "AdvancedBuildArgs | None" = None
+    advanced_build_params: AdvancedBuildArgs = AdvancedBuildArgs()
+    advanced_run_params: AdvancedRunArgs = AdvancedRunArgs()
+
+    _parse_zero = validator("build_timeout", "image_size", allow_reuse=True)(parse_zero_to_none)
+
+    @validator("set_cpus")
+    def _parse_empty_str(cls, value):
+        return None if value == "" else value
 
 
 def client() -> DockerClient:
@@ -72,16 +244,14 @@ def client() -> DockerClient:
     return _client_var
 
 
-def set_docker_config(config: DockerConfig) -> None:
+def set_docker_config(config: ProgramConfig) -> None:
     """Sets up the static docker config attributes.
 
     Various classes in the docker_util module need statically set config options, e.g. advanced build/run arguments or
     the strict_timeout option. This function propagates initializes all of these correctly.
     """
-    if config.advanced_run_params is not None:
-        Image.run_kwargs = config.advanced_run_params.to_docker_args()
-    if config.advanced_build_params is not None:
-        Image.build_kwargs = config.advanced_build_params.to_docker_args()
+    Image.build_kwargs = config.advanced_build_params.to_docker_args()
+    Image.run_kwargs = config.advanced_run_params.to_docker_args()
     Program.docker_config = config
     Image.docker_config = config
 
@@ -109,7 +279,7 @@ class Image:
     id: str
     path: Path
 
-    docker_config: ClassVar[DockerConfig] = DockerConfig()
+    docker_config: ClassVar[ProgramConfig] = ProgramConfig()
 
     run_kwargs: ClassVar[dict[str, Any]] = {
         "network_mode": "none",
@@ -371,7 +541,7 @@ class Program(ABC):
     """The problem this program creates instances and/or solutions for."""
 
     role: ClassVar[Role]
-    docker_config: ClassVar[DockerConfig] = DockerConfig()
+    docker_config: ClassVar[ProgramConfig] = ProgramConfig()
 
     @classmethod
     async def build(
@@ -396,7 +566,7 @@ class Program(ABC):
         """
         if isinstance(image, Path):
             if team_name is not None:
-                name = f"algobattle_{team_name}_{cls.role}"
+                name = f"algobattle_{team_name}_{cls.role.name}"
             else:
                 name = None
             image = await Image.build(
@@ -408,18 +578,18 @@ class Program(ABC):
         return cls(image, config, problem_class)
 
     @abstractmethod
-    def _encode_input(self, input: Path, output: Path, size: int, instance: Problem | None) -> None:
+    def _encode_input(self, input: Path, output: Path, max_size: int, instance: Problem | None) -> None:
         """Sets up the i/o folders as required for the specific type of program."""
         raise NotImplementedError
 
     @abstractmethod
-    def _parse_output(self, output: Path, size: int, instance: Problem | None) -> _GenResData | Problem.Solution:
+    def _parse_output(self, output: Path, max_size: int, instance: Problem | None) -> _GenResData | Problem.Solution:
         """Parses the data in the output folder into problem instances/solutions."""
         raise NotImplementedError
 
     async def _run(
         self,
-        size: int,
+        max_size: int,
         input_instance: Problem | None = None,
         *,
         timeout: float | None = ...,
@@ -438,17 +608,17 @@ class Program(ABC):
         if cpus is Ellipsis:
             cpus = self.config.cpus
         run_params = RunParameters(timeout=timeout, space=space, cpus=cpus)
-        result_class = GeneratorResult if self.role == "generator" else SolverResult
+        result_class = GeneratorResult if self.role == Role.generator else SolverResult
 
         with TempDir() as input, TempDir() as output:
             try:
-                self._encode_input(input, output, size, input_instance)
+                self._encode_input(input, output, max_size, input_instance)
             except AlgobattleBaseException as e:
                 return result_class(ProgramRunInfo(params=run_params, runtime=0, error=ExceptionInfo.from_exception(e)))
             with open(input / "info.json", "w+") as f:
                 json.dump(
                     {
-                        "size": size,
+                        "max_size": max_size,
                         "timeout": timeout,
                         "space": space,
                         "cpus": cpus,
@@ -457,7 +627,7 @@ class Program(ABC):
                 )
             if battle_input is not None:
                 try:
-                    battle_input.encode(input / "battle_data", size, self.role)
+                    battle_input.encode(input / "battle_data", self.role)
                 except Exception as e:
                     return result_class(
                         ProgramRunInfo(
@@ -496,7 +666,7 @@ class Program(ABC):
                 )
 
             try:
-                output_data = self._parse_output(output, size, input_instance)
+                output_data = self._parse_output(output, max_size, input_instance)
             except AlgobattleBaseException as e:
                 return result_class(
                     ProgramRunInfo(
@@ -507,7 +677,7 @@ class Program(ABC):
                 )
 
             if battle_output:
-                decoded_battle_output = battle_output.decode(output / "battle_data", size, self.role)
+                decoded_battle_output = battle_output.decode(output / "battle_data", max_size, self.role)
             else:
                 decoded_battle_output = None
 
@@ -545,23 +715,25 @@ class Program(ABC):
 class Generator(Program):
     """A higher level interface for a team's generator."""
 
-    role: ClassVar[Role] = "generator"
+    role: ClassVar[Role] = Role.generator
 
-    def _encode_input(self, input: Path, output: Path, size: int, instance: Problem | None) -> None:
+    def _encode_input(self, input: Path, output: Path, max_size: int, instance: Problem | None) -> None:
         assert instance is None
-        with open(input / "size.txt", "w+") as f:
-            f.write(str(size))
+        with open(input / "max_size.txt", "w+") as f:
+            f.write(str(max_size))
 
-    def _parse_output(self, output: Path, size: int, instance: Problem | None) -> _GenResData:
+    def _parse_output(self, output: Path, max_size: int, instance: Problem | None) -> _GenResData:
         assert instance is None
         try:
-            problem = self.problem_class.decode(output / "instance", size, self.role)
+            problem = self.problem_class.decode(output / "instance", max_size, self.role)
         except EncodingError:
             raise
         except Exception as e:
             raise EncodingError("Error thrown while decoding the problem instance.", detail=str(e)) from e
+        if problem.size > max_size:
+            raise EncodingError("Instance is too large.", detail=f"Generated: {problem.size}, maximum: {max_size}")
         try:
-            problem.validate_instance(size)
+            problem.validate_instance()
         except ValidationError:
             raise
         except Exception as e:
@@ -569,13 +741,13 @@ class Generator(Program):
 
         if problem.with_solution:
             try:
-                solution = problem.Solution.decode(output / "solution", size, self.role)
+                solution = problem.Solution.decode(output / "solution", max_size, self.role)
             except EncodingError:
                 raise
             except Exception as e:
                 raise EncodingError("Error thrown while decoding the solution.", detail=str(e)) from e
             try:
-                solution.validate_solution(problem, size)
+                solution.validate_solution(problem)
             except ValidationError:
                 raise
             except Exception as e:
@@ -586,7 +758,7 @@ class Generator(Program):
 
     async def run(
         self,
-        size: int,
+        max_size: int,
         *,
         timeout: float | None = ...,
         space: int | None = ...,
@@ -599,7 +771,7 @@ class Generator(Program):
         """Executes the generator and parses its output into a problem instance.
 
         Args:
-            size: Size of the instance that the generator will be asked to generate.
+            max_size: Maximum size of the instance that the generator is allowed to generate.
             timeout: Timeout in seconds.
             space: Memory limit in MB.
             cpus: Number of physical cpus the generator can use.
@@ -615,7 +787,7 @@ class Generator(Program):
         return cast(
             GeneratorResult,
             await self._run(
-                size=size,
+                max_size=max_size,
                 input_instance=None,
                 timeout=timeout,
                 space=space,
@@ -631,22 +803,22 @@ class Generator(Program):
 class Solver(Program):
     """A higher level interface for a team's solver."""
 
-    role: ClassVar[Role] = "solver"
+    role: ClassVar[Role] = Role.solver
 
-    def _encode_input(self, input: Path, output: Path, size: int, instance: Problem | None) -> None:
+    def _encode_input(self, input: Path, output: Path, max_size: int, instance: Problem | None) -> None:
         assert instance is not None
-        instance.encode(input / "instance", size, self.role)
+        instance.encode(input / "instance", self.role)
 
-    def _parse_output(self, output: Path, size: int, instance: Problem | None) -> Problem.Solution:
+    def _parse_output(self, output: Path, max_size: int, instance: Problem | None) -> Problem.Solution:
         assert instance is not None
         try:
-            solution = self.problem_class.Solution.decode(output / "solution", size, self.role)
+            solution = self.problem_class.Solution.decode(output / "solution", max_size, self.role)
         except EncodingError:
             raise
         except Exception as e:
             raise EncodingError("Error thrown while decoding the solution.", detail=str(e)) from e
         try:
-            solution.validate_solution(instance, size)
+            solution.validate_solution(instance)
         except ValidationError:
             raise
         except Exception as e:
@@ -656,7 +828,7 @@ class Solver(Program):
     async def run(
         self,
         instance: Problem,
-        size: int,
+        max_size: int,
         *,
         timeout: float | None = ...,
         space: int | None = ...,
@@ -669,7 +841,7 @@ class Solver(Program):
         """Executes the solver on the given problem instance and parses its output into a problem solution.
 
         Args:
-            size: Size of the instance that the solver will be asked to generate.
+            max_size: Maximum size of the instance that the generator is allowed to generate.
             timeout: Timeout in seconds.
             space: Memory limit in MB.
             cpus: Number of physical cpus the solver can use.
@@ -685,7 +857,7 @@ class Solver(Program):
         return cast(
             SolverResult,
             await self._run(
-                size=size,
+                max_size=max_size,
                 input_instance=instance,
                 timeout=timeout,
                 space=space,
@@ -696,165 +868,3 @@ class Solver(Program):
                 ui=ui,
             ),
         )
-
-
-class AdvancedRunArgs(BaseModel):
-    """Advanced docker run options.
-
-    Contains all options exposed on the python docker run api, except `device_requests`
-    and those set by :meth:`Image.run` itself.
-    """
-
-    class _BlockIOWeight(TypedDict):
-        Path: str
-        Weight: int
-
-    class _DeviceRate(TypedDict):
-        Path: str
-        Rate: int
-
-    class _HealthCheck(TypedDict):
-        test: list[str] | str
-        interval: int
-        timeout: int
-        retries: int
-        start_period: int
-
-    class _LogConfigArgs(TypedDict):
-        type: str
-        conifg: dict[Any, Any]
-
-    class _UlimitArgs(TypedDict):
-        name: str
-        soft: int
-        hard: int
-
-    network_mode: str = "none"
-    command: str | list[str] | None = None
-    auto_remove: bool | None = None
-    blkio_weight_device: list[_BlockIOWeight] | None = None
-    blkio_weight: int | None = Field(default=None, ge=10, le=1000)
-    cap_add: list[str] | None = None
-    cap_drop: list[str] | None = None
-    cgroup_parent: str | None = None
-    cgroupns: str | None = None
-    cpu_count: int | None = None
-    cpu_percent: int | None = None
-    cpu_period: int | None = None
-    cpu_quota: int | None = None
-    cpu_rt_period: int | None = None
-    cpu_rt_runtime: int | None = None
-    cpu_shares: int | None = None
-    cpuset_mems: str | None = None
-    device_cgroup_rules: list[str] | None = None
-    device_read_bps: list[_DeviceRate] | None = None
-    device_read_iops: list[_DeviceRate] | None = None
-    device_write_bps: list[_DeviceRate] | None = None
-    device_write_iops: list[_DeviceRate] | None = None
-    devices: list[str] | None = None
-    dns: list[str] | None = None
-    dns_opt: list[str] | None = None
-    dns_search: list[str] | None = None
-    domainname: str | list[str] | None = None
-    entrypoint: str | list[str] | None = None
-    environment: dict[str, str] | list[str] | None = None
-    extra_hosts: dict[str, str] | None = None
-    group_add: list[str] | None = None
-    healthcheck: _HealthCheck | None = None
-    hostname: str | None = None
-    init: bool | None = None
-    init_path: str | None = None
-    ipc_mode: str | None = None
-    isolation: str | None = None
-    kernel_memory: int | str | None = None
-    labels: dict[str, str] | list[str] | None = None
-    links: dict[str, str] | None = None
-    log_config: _LogConfigArgs | None = None
-    lxc_conf: dict[Any, Any] | None = None
-    mac_address: str | None = None
-    mem_limit: int | str | None = None
-    mem_reservation: int | str | None = None
-    mem_swappiness: int | None = None
-    memswap_limit: str | int | None = None
-    network: str | None = None
-    network_disabled: bool | None = None
-    oom_kill_disable: bool | None = None
-    oom_score_adj: int | None = None
-    pid_mode: str | None = None
-    pids_limit: int | None = None
-    platform: str | None = None
-    ports: dict[Any, Any] | None = None
-    privileged: bool | None = None
-    publish_all_ports: bool | None = None
-    read_only: bool | None = None
-    restart_policy: dict[Any, Any] | None = None
-    runtime: str | None = None
-    security_opt: list[str] | None = None
-    shm_size: str | int | None = None
-    stdin_open: bool | None = None
-    stdout: bool | None = None
-    stderr: bool | None = None
-    stop_signal: str | None = None
-    storage_opt: dict[Any, Any] | None = None
-    stream: bool | None = None
-    sysctls: dict[Any, Any] | None = None
-    tmpfs: dict[Any, Any] | None = None
-    tty: bool | None = None
-    ulimits: list[_UlimitArgs] | None = None
-    use_config_proxy: bool | None = None
-    user: str | int | None = None
-    userns_mode: str | None = None
-    uts_mode: str | None = None
-    version: str | None = None
-    volume_driver: str | None = None
-    volumes: dict[Any, Any] | list[Any] | None = None
-    volumes_from: list[Any] | None = None
-    working_dir: str | None = None
-
-    def to_docker_args(self) -> dict[str, Any]:
-        """Transforms the object into :meth:`client.containers.run` kwargs."""
-        kwargs = self.dict(exclude_none=True)
-        if "log_config" in kwargs:
-            kwargs["log_config"] = LogConfig(**kwargs["log_config"])
-        if "ulimits" in kwargs:
-            kwargs["ulimits"] = Ulimit(**kwargs["ulimits"])
-        return kwargs
-
-
-class AdvancedBuildArgs(BaseModel):
-    """Advanced docker build options.
-
-    Contains all options exposed on the python docker build api, except those set by :meth:`Image.build` itself.
-    """
-
-    class _ContainerLimits(TypedDict):
-        memory: int
-        memswap: int
-        cpushares: int
-        cpusetcpus: str
-
-    quiet: bool = True
-    nocache: bool | None = None
-    rm: bool = True
-    encoding: str | None = None
-    pull: bool | None = True
-    forcerm: bool = True
-    buildargs: dict[Any, Any] | None = None
-    container_limits: _ContainerLimits | None = None
-    shmsize: int | None = None
-    labels: dict[Any, Any] | None = None
-    cache_from: list[Any] | None = None
-    target: str | None = None
-    network_mode: str = "host"
-    squash: bool | None = None
-    extra_hosts: dict[Any, Any] | None = None
-    platform: str | None = None
-    isolation: str | None = None
-    use_config_proxy: bool | None = None
-
-    def to_docker_args(self) -> dict[str, Any]:
-        """Transforms the object into :meth:`client.images.build` kwargs."""
-        return self.dict(exclude_none=True)
-
-
-DockerConfig.update_forward_refs()
