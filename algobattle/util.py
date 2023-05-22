@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from traceback import format_exception
-from typing import Any, Iterable, Literal, TypeVar, Self
+from typing import Any, Iterable, Literal, LiteralString, TypeVar, Self
 
 from pydantic import BaseConfig, BaseModel as PydandticBaseModel, Extra, ValidationError as PydanticValidationError
 
@@ -187,7 +187,7 @@ def flat_intersperse(iterable: Iterable[Iterable[T]], element: T) -> Iterable[T]
 class AlgobattleBaseException(Exception):
     """Base exception class for errors used by the algobattle package."""
 
-    def __init__(self, message: str, *, detail: str | None = None) -> None:
+    def __init__(self, message: LiteralString, *, detail: str | None = None) -> None:
         """Base exception class for errors used by the algobattle package.
 
         Args:
@@ -214,7 +214,7 @@ class BuildError(AlgobattleBaseException):
 class ExecutionError(AlgobattleBaseException):
     """Indicates that the program could not be executed successfully."""
 
-    def __init__(self, message: str, *, detail: str | None = None, runtime: float) -> None:
+    def __init__(self, message: LiteralString, *, detail: str | None = None, runtime: float) -> None:
         """Indicates that the program could not be executed successfully.
 
         Args:
