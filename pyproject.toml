@@ -1,6 +1,11 @@
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
 [project]
 name = "algobattle"
-version = "4.0.0"
+version = "4.0.0-rc1"
+description = "The Algobattle lab course package."
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}

@@ -3,3 +3,5 @@ algobattle.egg-info/*
 .vscode/*
 .pdm-python
 pdm.lock
+build
+dist
