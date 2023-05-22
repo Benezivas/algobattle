@@ -10,7 +10,7 @@ from typing import Any, ClassVar, Literal, Protocol, Self, Generic, TypeAlias, T
 from pydantic import Field
 from pydantic.generics import GenericModel
 
-from algobattle.util import Encodable, EncodableModel, ValidationError
+from algobattle.util import u64, Encodable, EncodableModel, ValidationError
 
 
 _Problem: TypeAlias = Any
@@ -244,8 +244,8 @@ class DirectedGraph(ProblemModel):
 
     export: ClassVar[bool] = False
 
-    num_vertices: int = Field(ge=0, le=2**63 - 1)
-    edges: list[tuple[int, int]] = Field(ge=0, le=2**63 - 1, unique_items=True)
+    num_vertices: u64
+    edges: list[tuple[u64, u64]] = Field(unique_items=True)
 
     @property
     def size(self) -> int:
