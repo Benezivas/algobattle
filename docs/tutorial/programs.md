@@ -172,7 +172,7 @@ To test this setup we first build the image with Docker
 <div class="termy">
 
 ```console
-$ docker build ./generator/ -t test_image
+docker build ./generator/ -t test_image
 ```
 
 </div>
@@ -187,7 +187,7 @@ To then create and run a container from it, we run
 <div class="termy">
 
 ```console
-$ docker run -it -rm test_image
+docker run -it -rm test_image
 ```
 
 </div>
@@ -434,7 +434,7 @@ find them automatically, all we need to do is point it to the folder containing 
 <div class="termy">
 
 ```console
-$ algobattle algobattle-problems/pairsum
+algobattle algobattle-problems/pairsum
 ```
 
 </div>

@@ -24,7 +24,7 @@ achieved by it only containing a single one, but more complex use cases are poss
 <div class="termy">
 
 ```console
-$ algobattle .\algobattle_problems\pairsum
+algobattle .\algobattle_problems\pairsum
 ```
 
 </div>
@@ -35,7 +35,7 @@ $ algobattle .\algobattle_problems\pairsum
 <div class="termy">
 
 ```console
-$ algobattle Pairsum
+algobattle Pairsum
 ```
 
 </div>
@@ -160,7 +160,7 @@ saved when running the match
 <div class="termy">
 
 ```console
-$ algobattle .\algobattle_problems\pairsum --result_output=.\algobattle_logs
+algobattle .\algobattle_problems\pairsum --result_output=.\algobattle_logs
 ```
 
 </div>

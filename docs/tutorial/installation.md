@@ -37,13 +37,13 @@ Once you've installed either one you can just create a new environment and have 
 
 /// tab | conda
 ```console
-$ conda create -n algobattle python=3.11
+conda create -n algobattle python=3.11
 ```
 ///
 
 /// tab | pyenv
 ```console
-$ pyenv virtualenv 3.11 algobattle
+pyenv virtualenv 3.11 algobattle
 ```
 ///
 
@@ -51,13 +51,13 @@ Just remember to always activate the environment before trying to install or run
 
 /// tab | conda
 ```console
-$ conda  activate algobattle
+conda  activate algobattle
 ```
 ///
 
 /// tab | pyenv
 ```console
-$ pyenv activate algobattle
+pyenv activate algobattle
 ```
 ///
 
