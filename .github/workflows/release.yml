@@ -2,8 +2,6 @@ name: Release
 
 on:
   push:
-    branches:
-      - update_ci
     tags:
       - v*.*.*
 
@@ -11,6 +9,7 @@ jobs:
   pypi-publish:
     name: Upload release to PyPI
     runs-on: ubuntu-latest
+    environment: release
     permissions:
       # IMPORTANT: this permission is mandatory for trusted publishing
       id-token: write
@@ -23,8 +22,11 @@ jobs:
   release:
     name: Create Github release
     runs-on: ubuntu-latest
+    environment: release
     steps:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Release
         uses: softprops/action-gh-release@v1
+        with:
+          generate_release_notes: true
