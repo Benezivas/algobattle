@@ -213,10 +213,10 @@ class CliUi(Ui):
         data: TimerInfo | float | ProgramRunInfo | None = None,
     ) -> None:
         """Passes new info about the current fight to the Ui."""
-        if role == "generator" or role is None:
+        if role == Role.generator or role is None:
             assert not isinstance(data, SolverResult)
             self.fight_data[matchup].generator = data
-        if role == "solver" or role is None:
+        if role == Role.solver or role is None:
             assert not isinstance(data, GeneratorResult)
             self.fight_data[matchup].solver = data
 
@@ -237,7 +237,7 @@ class CliUi(Ui):
             out.append(status)
         elif isinstance(status, _BuildInfo):
             runtime = (datetime.now() - status.start).total_seconds()
-            status_str = f"Building {status.role} of team {status.team}: {runtime:3.1f}s"
+            status_str = f"Building {status.role.name} of team {status.team}: {runtime:3.1f}s"
             if status.timeout is not None:
                 status_str += f" / {status.timeout:3.1f}s"
             out.append(status_str)
@@ -283,7 +283,7 @@ class CliUi(Ui):
     @staticmethod
     def display_program(role: Role, data: TimerInfo | float | ProgramRunInfo | None) -> str:
         """Formats program runtime data."""
-        role_str = role.capitalize() + ": "
+        role_str = role.name.capitalize() + ": "
         out = f"{role_str: <11}"
         if data is None:
             return out
@@ -315,8 +315,8 @@ class CliUi(Ui):
         fight = self.fight_data[matchup]
         return [
             f"Current fight at size {fight.max_size}:",
-            self.display_program("generator", fight.generator),
-            self.display_program("solver", fight.solver),
+            self.display_program(Role.generator, fight.generator),
+            self.display_program(Role.solver, fight.solver),
         ]
 
     @staticmethod

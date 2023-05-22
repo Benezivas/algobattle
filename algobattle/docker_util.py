@@ -566,7 +566,7 @@ class Program(ABC):
         """
         if isinstance(image, Path):
             if team_name is not None:
-                name = f"algobattle_{team_name}_{cls.role}"
+                name = f"algobattle_{team_name}_{cls.role.name}"
             else:
                 name = None
             image = await Image.build(
@@ -608,7 +608,7 @@ class Program(ABC):
         if cpus is Ellipsis:
             cpus = self.config.cpus
         run_params = RunParameters(timeout=timeout, space=space, cpus=cpus)
-        result_class = GeneratorResult if self.role == "generator" else SolverResult
+        result_class = GeneratorResult if self.role == Role.generator else SolverResult
 
         with TempDir() as input, TempDir() as output:
             try:
@@ -715,7 +715,7 @@ class Program(ABC):
 class Generator(Program):
     """A higher level interface for a team's generator."""
 
-    role: ClassVar[Role] = "generator"
+    role: ClassVar[Role] = Role.generator
 
     def _encode_input(self, input: Path, output: Path, max_size: int, instance: Problem | None) -> None:
         assert instance is None
@@ -803,7 +803,7 @@ class Generator(Program):
 class Solver(Program):
     """A higher level interface for a team's solver."""
 
-    role: ClassVar[Role] = "solver"
+    role: ClassVar[Role] = Role.solver
 
     def _encode_input(self, input: Path, output: Path, max_size: int, instance: Problem | None) -> None:
         assert instance is not None
