@@ -82,11 +82,8 @@ get, we recommend Docker desktop as it provides a nicer user experience.
 
 ### Installing Algobattle
 
-Now we're finally ready to install Algobattle itself. Head over to
-[our GitHub repository](https://github.com/Benezivas/algobattle) and download the code. Then you can use pip to install
-it.
+Installing Algobattle itself is the easiest part of everything since we can use the package manager we set up earlier.
 
 ```console
-$ pip install .
+pip install algobattle-base --pre
 ```
-
