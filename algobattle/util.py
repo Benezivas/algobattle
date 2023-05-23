@@ -89,7 +89,7 @@ def check_path(path: str, *, type: Literal["file", "dir", "exists"] = "exists") 
 
 
 class TempDir(TemporaryDirectory[Any]):
-    """A :class:`TemporaryDirecroty`, but it's context manager returns a :class:`Path` object instead of a bare string."""
+    """A `TemporaryDirecroty`, but it's context manager returns a :class:`Path` object instead of a bare string."""
 
     def __enter__(self):
         return Path(super().__enter__())

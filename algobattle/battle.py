@@ -265,8 +265,8 @@ class Battle(BaseModel):
         """Executes one battle.
 
         Args:
-            fight: The :class:`FightHandler` used to run each fight of this battle. It already contains information about
-                the participating teams, default config settings, etc. Each fight can be executed using the
+            fight: The :class:`FightHandler` used to run each fight of this battle. It already contains information
+                about the participating teams, default config settings, etc. Each fight can be executed using the
                 :meth:`FightHandler.run` method.
             config: An instance of this battle type's :class:`BattleConfig` class, parsed from the corresponding section
                 of the config file.

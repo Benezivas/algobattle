@@ -5,6 +5,7 @@ statistics = True
 max_line_length = 120
 per_file_ignores =
     tests/*: D102, D104, D107
+    docs/*: D100, E261
 docstring_convention = google
 ignore = D105, D401, E302, W503
 exclude =

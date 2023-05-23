@@ -4,7 +4,7 @@ from random import randrange, sample
 with open("input/size.txt") as file:  # (1)!
     size = int(file.read())
 
-numbers = [randrange(2**63 - 1) for _ in range(size - 4)] # (2)!
+numbers = [randrange(2**63 - 1) for _ in range(size - 4)]  # (2)!
 
 a, b = randrange(2**63 - 1), randrange(2**63 - 1)  # (4)!
 c = randrange(min(a + b, 2**63 - 1))
