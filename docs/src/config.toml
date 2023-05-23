@@ -1,33 +1,33 @@
+[teams]
+
+[match]
 battle_type = "Iterated"
 points = 100
 parallel_battles = 1
-mode = "tournament"
-teams = []
+mode = "testing"
 
-[docker]
-build_timeout = 300
+[program]
+build_timeout = 0
 strict_timeouts = false
 image_size = 0
 set_cpus = ""
-advanced_build_params = {}
-advanced_run_params = {}
 
-[docker.generator]
+[program.generator]
 timeout = 30
 space = 0
 cpus = 1
 
-[docker.solver]
+[program.solver]
 timeout = 30
 space = 0
 cpus = 1
 
 [battle.Iterated]
 rounds = 5
-iteration_cap = 50_000
+maximum_size = 50_000
 exponent = 2
-approximation_ratio = 1
+minimum_score = 1
 
 [battle.Averaged]
 instance_size = 10
-iterations = 10
+num_fights = 10

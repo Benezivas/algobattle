@@ -44,16 +44,30 @@ Toml syntax can be a bit confusing if you're unfamiliar with it, a full explanat
 
 An example config file filled with default values looks like this:
 
+/// example
 ```toml
 {!> config.toml !}
 ```
-
-///note
-The commented out fields are advanced config options that default to `None`. Since toml does not have a None type, you
-need to leave out the keys entirely or provide your own values.
 ///
 
-The top level keys are:
+### Teams
+
+The `teams` table contains keys that are the team's name. Values are tables containing paths to the generators and
+solvers.
+
+/// example
+```toml
+[teams.cats]
+generator = "cats/generator"
+solver = "cats/solver"
+
+[teams.dogs]
+generator = "dogs/generator"
+solver = "dogs/solver"
+```
+///
+
+### Match
 
 `battle_type`
 
@@ -77,12 +91,6 @@ The top level keys are:
 :   Either `"tournament"` or `"testing"`. When set to tournament the docker containers are not given tags and are
     cleaned up after the match to prevent potential exploits. Using the testing mode often is nicer since it lets Docker
     use the build cache and thus massively speeds up development.
-
-`teams`
-
-:   A list of dictionaries each containing a string `name`, and `generator` and `solver` paths. If you want to run
-    a battle between multiple teams, or have placed the programs at different locations you can use this to specify
-    where every team's programs are found.
 
 ### Program
 
@@ -145,7 +153,7 @@ full behavior is documented [here](battle_types.md)
 :   Number of rounds that will be run and averaged. A _round_ is one sequence of fights until a size has been found
     where the solver succeeds at all smaller sizes and fails at all bigger ones.
 
-`iteration_cap`
+`maximum_size`
 
 :   Maximum size that will be iterated to.
 
@@ -154,7 +162,7 @@ full behavior is documented [here](battle_types.md)
 :   An integer that determines how quickly the size increases. For example, an exponent of 2 results in a size sequence
     of 1, 2, 6, 15, 31, etc. while an exponent of 3 leads to 1, 2, 9, 36, 100, 255, etc.
 
-`approximation_ratio`
+`minimum_score`
 
 :   A float between 0 and 1 (inclusive) that is the minimum score a solver needs to achieve to "successfully" solve
     an instance.
@@ -165,6 +173,6 @@ full behavior is documented [here](battle_types.md)
 
 :   The instance size every match will be fought at.
 
-`iterations`
+`num_fights`
 
 :   The number of fights that will be fought in each match.
