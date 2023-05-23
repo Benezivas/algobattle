@@ -19,11 +19,6 @@ Generator: 0.9s / 30.0s ✓
 Solver:    0.5s / 30.0s …
 
 Most recent fights:
-Fight 5 at size 12:
-Score: 1.0
-
-Fight 4 at size 11:
-Score: 1.0
-
-Fight 3 at size 10:
-Score: 1.0
+Fight 5 at size 12: 1.0
+Fight 4 at size 11: 1.0
+Fight 3 at size 10: 1.0
