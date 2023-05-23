@@ -1,6 +1,11 @@
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
 [project]
-name = "algobattle"
-version = "4.0.0"
+name = "algobattle-base"
+version = "4.0.0-rc1"
+description = "The Algobattle lab course package."
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
@@ -15,13 +20,12 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "docker",
-    "prettytable",
-    "pydantic < 2",
-    "anyio",
-
+    "docker>=6.1.2",
+    "prettytable>=3.7.0",
+    "pydantic~=1.10",
+    "anyio>=3.6.2",
     # on windows, we need to manually install curses bindings
-    "windows-curses; os_name == 'nt'",
+    "windows-curses>=2.3.1; os_name == 'nt'",
 ]
 [project.optional-dependencies]
 dev = [
