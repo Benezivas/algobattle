@@ -21,13 +21,13 @@ Running `algobattle --help` will bring up a short description of each of these i
 
 :   Setting this will hide the match output in the terminal.
 
-`--result_output`
+`--result` / `-r`
 
 :   This accepts a path to some directory. If it is set the match will be saved as a json file in that directory. It
     includes a lot of useful info that is not displayed to the terminal during execution such as error messages from
     programs that failed.
 
-`--config`
+`--config` / `-c`
 
 :   This accepts a path to a config toml file. What exactly it can contain is explained in the next section.
 
