@@ -12,7 +12,7 @@ class TestProblem(ProblemModel):
     with_solution: ClassVar[bool] = False
 
     class Solution(SolutionModel):
-        """Solution class for :cls:`Tests`."""
+        """Solution class for :class:`Tests`."""
 
         semantics: bool
         quality: bool

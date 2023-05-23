@@ -1,0 +1,33 @@
+[teams]
+
+[match]
+battle_type = "Iterated"
+points = 100
+parallel_battles = 1
+mode = "testing"
+
+[program]
+build_timeout = 0
+strict_timeouts = false
+image_size = 0
+set_cpus = ""
+
+[program.generator]
+timeout = 30
+space = 0
+cpus = 1
+
+[program.solver]
+timeout = 30
+space = 0
+cpus = 1
+
+[battle.Iterated]
+rounds = 5
+maximum_size = 50_000
+exponent = 2
+minimum_score = 1
+
+[battle.Averaged]
+instance_size = 10
+num_fights = 10
