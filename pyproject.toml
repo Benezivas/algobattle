@@ -23,6 +23,17 @@ dependencies = [
     # on windows, we need to manually install curses bindings
     "windows-curses; os_name == 'nt'",
 ]
+[project.optional-dependencies]
+dev = [
+    "black",
+    "flake8",
+    "flake8-docstrings",
+    "mkdocs",
+    "mkdocs-material",
+    "pymdown-extensions",
+    "mkdocstrings[python]",
+    "mdx_include",
+]
 
 [project.scripts]
 algobattle = "algobattle.cli:main"

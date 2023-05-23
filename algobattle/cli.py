@@ -60,7 +60,7 @@ def parse_cli_args(args: list[str]) -> tuple[CliOptions, BaseConfig]:
                 f"Passed argument '{parsed.problem}' is neither the name of an installed problem nor a path to one."
             )
         problem = Problem.import_from_path(problem_path)
-        base_path = problem_path
+        base_path = problem_path if problem_path.is_dir() else problem_path.parent
 
     exec_config = CliOptions(
         problem=problem,
@@ -150,7 +150,7 @@ class _FightUiData:
 
 @dataclass
 class CliUi(Ui):
-    """A :cls:`Ui` displaying the data to the cli.
+    """A :class:`Ui` displaying the data to the cli.
 
     Uses curses to continually draw a basic text based ui to the terminal.
     """

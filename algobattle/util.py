@@ -1,6 +1,6 @@
 """Module containung various utility definitions.
 
-In particular, the base classes :cls:`BaseModel`, :cls:`Encodable`, :cls:`EncodableModel`, and exception classes.
+In particular, the base classes :class:`BaseModel`, :class:`Encodable`, :class:`EncodableModel`, and exception classes.
 """
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -62,7 +62,7 @@ def inherit_docs(obj: T) -> T:
 
 
 def check_path(path: str, *, type: Literal["file", "dir", "exists"] = "exists") -> Path:
-    """Parses a string into a :cls:`Path` and checks that it is valid.
+    """Parses a string into a :class:`Path` and checks that it is valid.
 
     Args:
         path: The string to be parsed.
@@ -89,7 +89,7 @@ def check_path(path: str, *, type: Literal["file", "dir", "exists"] = "exists") 
 
 
 class TempDir(TemporaryDirectory[Any]):
-    """A :cls:`TemporaryDirecroty`, but it's context manager returns a :cls:`Path` object instead of a bare string."""
+    """A `TemporaryDirecroty`, but it's context manager returns a :class:`Path` object instead of a bare string."""
 
     def __enter__(self):
         return Path(super().__enter__())

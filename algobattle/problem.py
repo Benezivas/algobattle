@@ -14,20 +14,20 @@ from algobattle.util import u64, Encodable, EncodableModel, ValidationError
 
 
 _Problem: TypeAlias = Any
-"""Type alias used to generate correct typings when subclassing :cls:`Problem` and :cls:`Problem.Solution`.
+"""Type alias used to generate correct typings when subclassing :class:`Problem` and :class:`Problem.Solution`.
 
 Each problem's and solution's methods are guaranteed to be passed a instance of the correct problem/solution objects.
 But due to limitations in the python type system we are currently not able to express this properly.
-When creating your own problem it is recommended to not use this alias and instead use the :cls:`Problem` and
-:cls:`Solution` you are creating directly.
+When creating your own problem it is recommended to not use this alias and instead use the :class:`Problem` and
+:class:`Solution` you are creating directly.
 """
 _Solution: TypeAlias = Any
-"""Type alias used to generate correct typings when subclassing :cls:`Problem` and :cls:`Problem.Solution`.
+"""Type alias used to generate correct typings when subclassing :class:`Problem` and :class:`Problem.Solution`.
 
 Each problem's and solution's methods are guaranteed to be passed a instance of the correct problem/solution objects.
 But due to limitations in the python type system we are currently not able to express this properly.
-When creating your own problem it is recommended to not use this alias and instead use the :cls:`Problem` and
-:cls:`Solution` you are creating directly.
+When creating your own problem it is recommended to not use this alias and instead use the :class:`Problem` and
+:class:`Solution` you are creating directly.
 """
 
 
@@ -127,7 +127,7 @@ class Problem(Encodable, ABC):
         """Try to import a Problem class object from a given path.
 
         The specified file will be imported using the standard python loaders. If the created module contains exactly
-        one class inheriting from :cls:`Problem` with the `export` flag set, it will be imported. Otherwise, if one of
+        one class inheriting from :class:`Problem` with the `export` flag set, it will be imported. Otherwise, if one of
         the classes is named `Problem` it will be imported. If neither procedure finds a unique problem class the method
         fails.
 
@@ -178,7 +178,7 @@ class Problem(Encodable, ABC):
     def all(cls) -> dict[str, type[Self]]:
         """Returns a dictionary mapping the names of all installed problems to their python classes.
 
-        It includes all subclasses of :cls:`Problem` that have been initialized so far, including ones exposed to the
+        It includes all subclasses of :class:`Problem` that have been initialized so far, including ones exposed to the
         algobattle module via the `algobattle.problem` entrypoint hook.
 
         Raises:
