@@ -1,9 +1,8 @@
 # Tutorial
 
 The Algobattle tutorial goes over everything needed to understand how the package works and the most common ways to
-use it. It's primarily aimed at students participating in a course and course instructor that want to learn how to work
-with the package. If you are an instructor that is trying to get an overview over all features Algobattle offers, the
-[Instructor Overview](../advanced/instructor.md) is better suited for you.
+use it. It's aimed at students participating in a course and course instructor that want to learn how to work with the
+package.
 
 The tutorial pages build on each other and are best read in sequence. It assumes almost no prerequisite knowledge of
 specific topics, but an understanding of basic theoretical computer science ideas like algorithmic problems and of

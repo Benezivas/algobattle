@@ -104,8 +104,6 @@ nav:
     - tutorial/programs.md
     - tutorial/battle_types.md
     - tutorial/config.md
-  - Advanced Guides:
-    - advanced/index.md
   - API Reference:
     - api/index.md
     - api/battle.md

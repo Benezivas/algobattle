@@ -13,16 +13,9 @@ The teams then battle against each other, generating instances for other teams, 
 generated for them. Each team then is evaluated on its performance and is awarded points.
 
 
-## How to use it
+## Usage
 
 The best place to start learning more about Algobattle is by reading through [the tutorial](tutorial/index.md).
-
-Once you're done with that you'll be ready for the more advanced user guides:  
-
-* If you are a student in a course, you can find the information most relevant to you in our
-[student guide](student/index.md).
-
-* If you are an instructor looking to run a course, the [instructor guide](instructor/index.md) is best suited for you.
 
 
 ## Requirements
