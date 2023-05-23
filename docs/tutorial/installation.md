@@ -85,5 +85,5 @@ get, we recommend Docker desktop as it provides a nicer user experience.
 Installing Algobattle itself is the easiest part of everything since we can use the package manager we set up earlier.
 
 ```console
-pip install algobattle-base --pre
+pip install algobattle-base
 ```
