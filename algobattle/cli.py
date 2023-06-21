@@ -275,7 +275,7 @@ class CliUi(Ui):
                 if result.run_exception is None:
                     res = result.format_score(result.score())
                 else:
-                    res = f"Error: {result.run_exception}"
+                    res = "Error!"
                 table.add_row([generating, solving, res])
 
         return str(table).split("\n")
