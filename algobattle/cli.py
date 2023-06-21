@@ -231,7 +231,7 @@ class CliUi(Ui):
         """Disaplys the current status of the match to the cli."""
         terminal_height, _ = self.stdscr.getmaxyx()
         out: list[str] = []
-        out.append(f"Algobattle version {pkg_version(__package__)}")
+        out.append(f"Algobattle version {pkg_version('algobattle_base')}")
         status = self.build_status
         if isinstance(status, str):
             out.append(status)
