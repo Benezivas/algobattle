@@ -1,6 +1,9 @@
 """Module providing an interface to interact with the teams' programs."""
 from abc import ABC, abstractmethod
+from os import environ
 from pathlib import Path
+from shutil import rmtree
+from tempfile import TemporaryDirectory
 from timeit import default_timer
 from typing import Any, ClassVar, Iterator, Protocol, Self, TypedDict, cast
 from uuid import uuid4
@@ -28,7 +31,6 @@ from algobattle.util import (
     ExecutionTimeout,
     ValidationError,
     Role,
-    TempDir,
     inherit_docs,
     BaseModel,
 )
@@ -268,6 +270,105 @@ class ProgramUiProxy(Protocol):
         """Signals that the program execution has been finished."""
 
 
+class ProgramIO:
+    """
+    Manages the directories used to pass IO to programs.
+
+    Normally we can just create temporary directories using the python stdlib, but when running inside a container we
+    need to use shared volumes since the host Docker daemon can't create mounts between two sibling containers.
+    """
+
+    @property
+    def input(self) -> Path:
+        """Path to the input directory."""
+        raise NotImplementedError
+
+    @property
+    def output(self) -> Path:
+        """Path to the output directoy."""
+        raise NotImplementedError
+
+    @property
+    def mounts(self) -> list[Mount]:
+        """Creates a list of Mount objects corresponding to these IO directories that can be passed to the docker api."""
+        raise NotImplementedError
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, exc, val, tb):
+        return
+
+
+class TmpFileIO(ProgramIO):
+    """Uses mounted temporary files."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._input = TemporaryDirectory()
+        self._output = TemporaryDirectory()
+
+    @property
+    def input(self) -> Path:
+        return Path(self._input.name)
+
+    @property
+    def output(self) -> Path:
+        return Path(self._output.name)
+
+    @property
+    def mounts(self) -> list[Mount]:
+        return [
+            Mount(target="/input", source=self._input.name, type="bind", read_only=True),
+            Mount(target="/output", source=self._output.name, type="bind"),
+        ]
+
+    def __exit__(self, exc, val, tb):
+        self._input.__exit__(exc, val, tb)
+        self._output.__exit__(exc, val, tb)
+        return super().__exit__(exc, val, tb)
+
+
+class VolumeIO(ProgramIO):
+    """Uses shared volumes."""
+
+    @property
+    def input(self) -> Path:
+        return Path("/algobattle/input")
+
+    @property
+    def output(self) -> Path:
+        return Path("/algobattle/output")
+
+    @property
+    def mounts(self) -> list[Mount]:
+        return [
+            Mount(target="/input", source="algobattle_input", type="volume"),
+            Mount(target="/output", source="algobattle_output", type="volume"),
+        ]
+
+    def clean_volume(self, path: Path) -> None:
+        rmtree(path, ignore_errors=True)
+        # removing the mounted directory itself will always fail, but we might also ignore errors when removing
+        # something inside it. To make sure we never call a container with leftover data from a previous run we
+        # have to raise an exception if there is something we can't remove.
+        if any(path.iterdir()):
+            raise RuntimeError("Could not remove everything in {path}.")
+
+    def __enter__(self) -> Self:
+        self.clean_volume(self.input)
+        self.clean_volume(self.output)
+        return super().__enter__()
+
+    def __exit__(self, exc, value, tb) -> None:
+        self.clean_volume(self.input)
+        self.clean_volume(self.output)
+        return super().__exit__(exc, value, tb)
+
+
+IOFolders: type[ProgramIO] = VolumeIO if environ.get("ALGOBATTLE_IO_VOLUMES", False) else TmpFileIO
+
+
 @dataclass
 class Image:
     """Class defining a docker image.
@@ -375,8 +476,7 @@ class Image:
 
     async def run(
         self,
-        input_dir: Path | None = None,
-        output_dir: Path | None = None,
+        io: ProgramIO | None = None,
         *,
         timeout: float | None = None,
         memory: int | None = None,
@@ -387,8 +487,7 @@ class Image:
         """Runs a docker image.
 
         Args:
-            input_dir: Path to a directory containing input data for the container.
-            output_dir: Path to a directory where the container will place output data.
+            io: ProgramIO object tracking an input directory with data for the container and one for its output data.
             timeout: Timeout in seconds.
             memory: Memory limit in MB.
             cpus: Number of physical cpus the container can use.
@@ -410,12 +509,6 @@ class Image:
             memory = memory * 1_000_000
         cpus = cpus * 1_000_000_000
 
-        mounts = []
-        if input_dir is not None:
-            mounts.append(Mount(target="/input", source=str(input_dir), type="bind", read_only=True))
-        if output_dir is not None:
-            mounts.append(Mount(target="/output", source=str(output_dir), type="bind"))
-
         container: DockerContainer | None = None
         elapsed_time = 0
         try:
@@ -427,7 +520,7 @@ class Image:
                     mem_limit=memory,
                     nano_cpus=cpus,
                     detach=True,
-                    mounts=mounts,
+                    mounts=io.mounts if io else None,
                     cpuset_cpus=set_cpus,
                     **self.run_kwargs,
                 ),
@@ -578,7 +671,7 @@ class Program(ABC):
         return cls(image, config, problem_class)
 
     @abstractmethod
-    def _encode_input(self, input: Path, output: Path, max_size: int, instance: Problem | None) -> None:
+    def _encode_input(self, input: Path, max_size: int, instance: Problem | None) -> None:
         """Sets up the i/o folders as required for the specific type of program."""
         raise NotImplementedError
 
@@ -610,12 +703,12 @@ class Program(ABC):
         run_params = RunParameters(timeout=timeout, space=space, cpus=cpus)
         result_class = GeneratorResult if self.role == Role.generator else SolverResult
 
-        with TempDir() as input, TempDir() as output:
+        with IOFolders() as io:
             try:
-                self._encode_input(input, output, max_size, input_instance)
+                self._encode_input(io.input, max_size, input_instance)
             except AlgobattleBaseException as e:
                 return result_class(ProgramRunInfo(params=run_params, runtime=0, error=ExceptionInfo.from_exception(e)))
-            with open(input / "info.json", "w+") as f:
+            with open(io.input / "info.json", "w+") as f:
                 json.dump(
                     {
                         "max_size": max_size,
@@ -627,7 +720,7 @@ class Program(ABC):
                 )
             if battle_input is not None:
                 try:
-                    battle_input.encode(input / "battle_data", self.role)
+                    battle_input.encode(io.input / "battle_data", self.role)
                 except Exception as e:
                     return result_class(
                         ProgramRunInfo(
@@ -638,9 +731,7 @@ class Program(ABC):
                     )
 
             try:
-                runtime = await self.image.run(
-                    input, output, timeout=timeout, memory=space, cpus=cpus, ui=ui, set_cpus=set_cpus
-                )
+                runtime = await self.image.run(io, timeout=timeout, memory=space, cpus=cpus, ui=ui, set_cpus=set_cpus)
             except ExecutionTimeout as e:
                 if self.docker_config.strict_timeouts:
                     return result_class(
@@ -666,7 +757,7 @@ class Program(ABC):
                 )
 
             try:
-                output_data = self._parse_output(output, max_size, input_instance)
+                output_data = self._parse_output(io.output, max_size, input_instance)
             except AlgobattleBaseException as e:
                 return result_class(
                     ProgramRunInfo(
@@ -677,7 +768,7 @@ class Program(ABC):
                 )
 
             if battle_output:
-                decoded_battle_output = battle_output.decode(output / "battle_data", max_size, self.role)
+                decoded_battle_output = battle_output.decode(io.output / "battle_data", max_size, self.role)
             else:
                 decoded_battle_output = None
 
@@ -717,7 +808,7 @@ class Generator(Program):
 
     role: ClassVar[Role] = Role.generator
 
-    def _encode_input(self, input: Path, output: Path, max_size: int, instance: Problem | None) -> None:
+    def _encode_input(self, input: Path, max_size: int, instance: Problem | None) -> None:
         assert instance is None
         with open(input / "max_size.txt", "w+") as f:
             f.write(str(max_size))
@@ -805,7 +896,7 @@ class Solver(Program):
 
     role: ClassVar[Role] = Role.solver
 
-    def _encode_input(self, input: Path, output: Path, max_size: int, instance: Problem | None) -> None:
+    def _encode_input(self, input: Path, max_size: int, instance: Problem | None) -> None:
         assert instance is not None
         instance.encode(input / "instance", self.role)
 
