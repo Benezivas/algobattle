@@ -271,8 +271,7 @@ class ProgramUiProxy(Protocol):
 
 
 class ProgramIO:
-    """
-    Manages the directories used to pass IO to programs.
+    """Manages the directories used to pass IO to programs.
 
     Normally we can just create temporary directories using the python stdlib, but when running inside a container we
     need to use shared volumes since the host Docker daemon can't create mounts between two sibling containers.
@@ -290,7 +289,7 @@ class ProgramIO:
 
     @property
     def mounts(self) -> list[Mount]:
-        """Creates a list of Mount objects corresponding to these IO directories that can be passed to the docker api."""
+        """A list of Mounts corresponding to these IO directories that can be passed to the docker api."""
         raise NotImplementedError
 
     def __enter__(self) -> Self:
@@ -301,23 +300,27 @@ class ProgramIO:
 
 
 class TmpFileIO(ProgramIO):
-    """Uses mounted temporary files."""
+    """Uses mounted temporary directories."""
 
     def __init__(self) -> None:
+        """Creates the needed temporary directories."""
         super().__init__()
         self._input = TemporaryDirectory()
         self._output = TemporaryDirectory()
 
     @property
     def input(self) -> Path:
+        """Path to the input directory."""
         return Path(self._input.name)
 
     @property
     def output(self) -> Path:
+        """Path to the output directoy."""
         return Path(self._output.name)
 
     @property
     def mounts(self) -> list[Mount]:
+        """A list of Mounts corresponding to these IO directories that can be passed to the docker api."""
         return [
             Mount(target="/input", source=self._input.name, type="bind", read_only=True),
             Mount(target="/output", source=self._output.name, type="bind"),
@@ -334,20 +337,24 @@ class VolumeIO(ProgramIO):
 
     @property
     def input(self) -> Path:
+        """Path to the input directory."""
         return Path("/algobattle/input")
 
     @property
     def output(self) -> Path:
+        """Path to the output directoy."""
         return Path("/algobattle/output")
 
     @property
     def mounts(self) -> list[Mount]:
+        """A list of Mounts corresponding to these IO directories that can be passed to the docker api."""
         return [
             Mount(target="/input", source="algobattle_input", type="volume"),
             Mount(target="/output", source="algobattle_output", type="volume"),
         ]
 
     def clean_volume(self, path: Path) -> None:
+        """Empties a volume so that it can be used for a new program invocation."""
         rmtree(path, ignore_errors=True)
         # removing the mounted directory itself will always fail, but we might also ignore errors when removing
         # something inside it. To make sure we never call a container with leftover data from a previous run we
