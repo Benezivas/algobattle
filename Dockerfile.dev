@@ -1,0 +1,8 @@
+FROM python:3.11
+
+ENV ALGOBATTLE_IO_VOLUMES=true
+WORKDIR /workspaces/algobattle
+COPY . .
+RUN pip install -e . --config-settings editable_mode=compat
+WORKDIR /
+RUN rm -rf /workspaces
