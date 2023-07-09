@@ -8,11 +8,10 @@
 	},
     "mounts": [
         "source=${localWorkspaceFolder}/../algobattle-problems/algobattle_problems,target=/algobattle/problems,type=bind",
-        "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind",
         "source=algobattle_input,target=/algobattle/input",
         "source=algobattle_output,target=/algobattle/output"
     ],
     "features": {
-    //    "ghcr.io/devcontainers/features/docker-outside-of-docker": {}
+        "ghcr.io/devcontainers/features/docker-outside-of-docker": {}
     }
 }
