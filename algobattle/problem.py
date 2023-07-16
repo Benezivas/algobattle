@@ -1,11 +1,13 @@
 """Module defining the Problem and Solution base classes and related objects."""
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, KW_ONLY
+from functools import wraps
 from importlib.metadata import entry_points
 import importlib.util
 import sys
 from pathlib import Path
-from typing import Any, ClassVar, Literal, Protocol, Self, Generic, TypeVar, runtime_checkable
+from typing import Any, Callable, ClassVar, ParamSpec, Protocol, Self, Generic, TypeVar
+from math import inf, isnan
 
 from pydantic import BaseModel, Field
 from pydantic.generics import GenericModel
@@ -35,19 +37,7 @@ class Instance(Encodable, ABC):
 
 
 InstanceT = TypeVar("InstanceT", bound=Instance, contravariant=True)
-
-
-@runtime_checkable
-class Scored(Protocol, Generic[InstanceT]):
-    """A solution with an associated score."""
-
-    direction: ClassVar[Literal["minimize", "maximize"]]
-    """The direction that better scores are found at."""
-
-    @abstractmethod
-    def score(self, instance: InstanceT) -> float:
-        """Calculate the score of this solution for the given problem instance."""
-        raise NotImplementedError
+P = ParamSpec("P")
 
 
 class Solution(Encodable, Generic[InstanceT], ABC):
@@ -66,6 +56,38 @@ class Solution(Encodable, Generic[InstanceT], ABC):
             ValidationError: if the created instance is invalid.
         """
         return
+
+
+class Scored(Solution[InstanceT]):
+    """A solution with an associated score."""
+
+    @abstractmethod
+    def score(self, instance: InstanceT) -> float:
+        """Calculate the score of this solution for the given problem instance.
+        
+        Args:
+            instance: The instance this solution solves
+        Returns:
+            The calculates score of this solution. Must be a nonnegative number. Bigger scores are considered better,
+            if your score rates better scores lower you can use the @minimize decorator.
+        """
+        raise NotImplementedError
+
+
+def minimize(function: Callable[P, float]) -> Callable[P, float]:
+    """Wraps a score function such that smaller scores are considered better."""
+    @wraps(function)
+    def inner(*args: P.args, **kwargs: P.kwargs) -> float:
+        try:
+            return 1 / function(*args, **kwargs)
+        except ZeroDivisionError:
+            return inf
+    return inner
+
+
+def maximize(function: Callable[P, float]) -> Callable[P, float]:
+    """No-op decorator to indicate that bigger scores are considered better."""
+    return function
 
 
 SolutionT = TypeVar("SolutionT", bound=Solution[Any])
@@ -110,16 +132,16 @@ def default_score(instance: Instance, solver_solution: SolutionT, generator_solu
     if isinstance(generator_solution, Scored):
         assert isinstance(solver_solution, Scored)
         gen_score = generator_solution.score(instance)
-        if gen_score == 0:
-            return 1
+        if gen_score < 0 or isnan(gen_score):
+            raise RuntimeError("Score function didn't return a nonnegative value.")
         sol_score = solver_solution.score(instance)
-        if sol_score == 0:
-            return 0
+        if sol_score < 0 or isnan(sol_score):
+            raise RuntimeError("Score function didn't return a nonnegative value.")
 
-        if generator_solution.direction == "minimize":
-            return gen_score / sol_score
-        else:
-            return sol_score / gen_score
+        try:
+            return max(0, min(1, sol_score / gen_score))
+        except ZeroDivisionError:
+            return float(sol_score < 0)
     else:
         return 1
 
