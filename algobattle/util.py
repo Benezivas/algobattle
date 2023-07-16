@@ -6,18 +6,19 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
+import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from traceback import format_exception
 from typing import Annotated, Any, Iterable, Literal, LiteralString, TypeVar, Self
 
 from pydantic import (
-    BaseConfig,
+    ConfigDict,
     BaseModel as PydandticBaseModel,
     Extra,
     ValidationError as PydanticValidationError,
-    conint,
 )
+from annotated_types import Interval
 
 
 class Role(Enum):
@@ -40,16 +41,12 @@ def str_with_traceback(exception: Exception) -> str:
 class BaseModel(PydandticBaseModel):
     """Base class for all pydantic models."""
 
-    class Config(BaseConfig):
-        """Base config for all pydandic configs."""
-
-        extra = Extra.forbid
-        underscore_attrs_are_private = False
+    model_config = ConfigDict(extra=Extra.forbid)
 
 
-u64 = Annotated[conint(ge=0, le=2**64 - 1), ...]
+u64 = Annotated[int, Interval(ge=0, lt=2 ** 63)]
 """Helper type to easily define model fields that fit into a 64 bit unsigned int."""
-i64 = Annotated[conint(ge=-(2**63), le=2**63 - 1), ...]
+i64 = Annotated[int, Interval(ge=-(2**63), lt=2**63)]
 """Helper type to easily define model fields that fit into a 64 bit signed int."""
 
 
@@ -155,7 +152,8 @@ class EncodableModel(BaseModel, Encodable, ABC):
         if not source.with_suffix(".json").is_file():
             raise EncodingError("The json file does not exist.")
         try:
-            return cls.parse_file(source.with_suffix(".json"))
+            with open(source.with_suffix(".json"), "r") as f:
+                return cls.model_validate_json(f.read())
         except PydanticValidationError as e:
             raise EncodingError("Json data does not fit the schema.", detail=str(e))
         except Exception as e:
@@ -165,24 +163,15 @@ class EncodableModel(BaseModel, Encodable, ABC):
         """Uses pydantic to create a json representation of the object at the targeted file."""
         try:
             with open(target.with_suffix(".json"), "w") as f:
-                f.write(self.json(exclude=self._excludes(team)))
+                f.write(self.model_dump_json())
         except Exception as e:
             raise EncodingError("Unkown error while encoding the data.", detail=str(e))
 
     @classmethod
     def io_schema(cls) -> str:
         """Uses pydantic to generate a json schema for this class."""
-        return cls.schema_json(indent=4)
+        return json.dumps(cls.model_json_schema(), indent=4)
 
-    def _excludes(self, team: Role) -> dict[str | int, Any]:
-        excludes = {}
-        for name, field in self.__fields__.items():
-            hidden = field.field_info.extra.get("hidden", False)
-            if (isinstance(hidden, str) and hidden == team) or (isinstance(hidden, bool) and hidden):
-                excludes[name] = True
-            elif isinstance(getattr(self, name, None), EncodableModel):
-                excludes[name] = getattr(self, name)._excludes(team)
-        return excludes
 
 
 @dataclass

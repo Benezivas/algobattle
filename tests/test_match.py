@@ -50,7 +50,7 @@ class Matchtests(TestCase):
         cls.matchup1 = Matchup(cls.team1, cls.team0)
         cls.team_dict = {
             "active_teams": [cls.team0.name, cls.team1.name],
-            "excluded_teams": [],
+            "excluded_teams": {},
         }
         cls.teams = TeamHandler([cls.team0, cls.team1])
 

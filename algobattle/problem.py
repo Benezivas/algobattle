@@ -9,8 +9,7 @@ from pathlib import Path
 from typing import Any, Callable, ClassVar, ParamSpec, Protocol, Self, Generic, TypeVar
 from math import inf, isnan
 
-from pydantic import BaseModel, Field
-from pydantic.generics import GenericModel
+from pydantic import BaseModel, field_validator
 
 from algobattle.util import Role, u64, Encodable, EncodableModel, ValidationError
 
@@ -240,10 +239,6 @@ class Problem(Generic[InstanceT, SolutionT]):
                         f"'{path}' contains {len(problems)} different problems: {', '.join(p.name for p in problems)}."
                     )
 
-            if issubclass(problem.instance_cls, BaseModel):
-                problem.instance_cls.update_forward_refs()
-            if issubclass(problem.solution_cls, BaseModel):
-                problem.solution_cls.update_forward_refs()
             return problem
 
         finally:
@@ -274,7 +269,7 @@ class InstanceModel(EncodableModel, Instance, ABC):
     """An instance that can easily be parsed to/from a json file."""
 
 
-class SolutionModel(Solution[InstanceT], EncodableModel, GenericModel, ABC):
+class SolutionModel(Solution[InstanceT], EncodableModel, BaseModel, ABC):
     """A solution that can easily be parsed to/from a json file."""
 
 
@@ -282,7 +277,14 @@ class DirectedGraph(InstanceModel):
     """Base instance class for problems on directed graphs."""
 
     num_vertices: u64
-    edges: list[tuple[u64, u64]] = Field(unique_items=True)
+    edges: list[tuple[u64, u64]]
+
+    @field_validator("edges", mode="after")
+    @classmethod
+    def unique_edges(cls, value: list[tuple[u64, u64]]) -> list[tuple[u64, u64]]:
+        if len(set(value)) != len(value):
+            raise ValueError("Edge list contains duplicate entries.")
+        return value
 
     @property
     def size(self) -> int:
@@ -319,7 +321,7 @@ class UndirectedGraph(DirectedGraph):
 Weight = TypeVar("Weight")
 
 
-class EdgeWeights(DirectedGraph, GenericModel, Generic[Weight]):
+class EdgeWeights(DirectedGraph, BaseModel, Generic[Weight]):
     """Mixin for graphs with weighted edges."""
 
     edge_weights: list[Weight]
@@ -331,7 +333,7 @@ class EdgeWeights(DirectedGraph, GenericModel, Generic[Weight]):
             raise ValidationError("Number of edge weights doesn't match the number of edges.")
 
 
-class VertexWeights(DirectedGraph, GenericModel, Generic[Weight]):
+class VertexWeights(DirectedGraph, BaseModel, Generic[Weight]):
     """Mixin for graphs with weighted vertices."""
 
     vertex_weights: list[Weight]

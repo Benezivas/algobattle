@@ -5,9 +5,9 @@ from datetime import datetime
 from itertools import combinations
 from pathlib import Path
 import tomllib
-from typing import Any, Mapping, Self, cast, overload
+from typing import Annotated, Any, Mapping, Self, cast, overload
 
-from pydantic import validator, Field
+from pydantic import field_validator, Field
 from anyio import create_task_group, CapacityLimiter
 from anyio.to_thread import current_default_thread_limiter
 
@@ -34,7 +34,8 @@ class MatchConfig(BaseModel):
     parallel_battles: int = 1
     mode: MatchMode = "testing"
 
-    @validator("battle_type", pre=True)
+    @field_validator("battle_type", mode="before")
+    @classmethod
     def validate_battle_type(cls, value):
         """Validates that the given battle type is a correct name of a battle class."""
         if value in Battle.all():
@@ -51,7 +52,8 @@ class BaseConfig(BaseModel):
     program: ProgramConfig = ProgramConfig()
     battle: dict[str, Battle.BattleConfig] = {n: b.BattleConfig() for n, b in Battle.all().items()}
 
-    @validator("battle", pre=True)
+    @field_validator("battle", mode="before")
+    @classmethod
     def val_battle_configs(cls, vals):
         """Parses the dict of battle configs into their corresponding config objects."""
         battle_types = Battle.all()
@@ -60,10 +62,11 @@ class BaseConfig(BaseModel):
         out = {}
         for name, battle_cls in battle_types.items():
             data = vals.get(name, {})
-            out[name] = battle_cls.BattleConfig.parse_obj(data)
+            out[name] = battle_cls.BattleConfig.model_validate(data)
         return out
 
-    @validator("program")
+    @field_validator("program", mode="after")
+    @classmethod
     def val_set_cpus(cls, v: ProgramConfig, values) -> ProgramConfig:
         """Validates that each battle that is being executed is assigned some cpu cores."""
         if isinstance(v.set_cpus, list) and values["match"]["parallel_battles"] > len(v.set_cpus):
@@ -81,7 +84,7 @@ class BaseConfig(BaseModel):
                 config_dict = tomllib.load(f)
             except tomllib.TOMLDecodeError as e:
                 raise ValueError(f"The config file at {file} is not a properly formatted TOML file!\n{e}")
-        return cls.parse_obj(config_dict)
+        return cls.model_validate(config_dict)
 
 
 class Match(BaseModel):
@@ -89,7 +92,7 @@ class Match(BaseModel):
 
     active_teams: list[str]
     excluded_teams: dict[str, ExceptionInfo]
-    results: defaultdict[str, dict[str, Battle]] = Field(default_factory=lambda: defaultdict(dict), init=False)
+    results: defaultdict[str, Annotated[dict[str, Battle], Field(default_factory=dict)]] = Field(default_factory=lambda: defaultdict(dict))
 
     async def _run_battle(
         self,

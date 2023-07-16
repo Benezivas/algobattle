@@ -115,7 +115,7 @@ def main():
             t = datetime.now()
             filename = f"{t.year:04d}-{t.month:02d}-{t.day:02d}_{t.hour:02d}-{t.minute:02d}-{t.second:02d}.json"
             with open(exec_config.result / filename, "w+") as f:
-                f.write(result.json())
+                f.write(result.model_dump_json())
 
     except KeyboardInterrupt:
         raise SystemExit("Received keyboard interrupt, terminating execution.")

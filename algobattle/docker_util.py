@@ -2,7 +2,8 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
 from timeit import default_timer
-from typing import Any, ClassVar, Generic, Iterator, Protocol, Self, TypedDict, cast
+from typing import Any, ClassVar, Generic, Iterator, Protocol, Self, cast
+from typing_extensions import TypedDict
 from uuid import uuid4
 import json
 from dataclasses import dataclass
@@ -13,7 +14,7 @@ from docker.models.images import Image as DockerImage
 from docker.models.containers import Container as DockerContainer
 from docker.types import Mount, LogConfig, Ulimit
 from requests import Timeout, ConnectionError
-from pydantic import Field, validator
+from pydantic import field_validator, Field, validator
 from anyio.to_thread import run_sync
 from urllib3.exceptions import ReadTimeoutError
 
@@ -226,7 +227,8 @@ class ProgramConfig(BaseModel):
 
     _parse_zero = validator("build_timeout", "image_size", allow_reuse=True)(parse_zero_to_none)
 
-    @validator("set_cpus")
+    @field_validator("set_cpus")
+    @classmethod
     def _parse_empty_str(cls, value):
         return None if value == "" else value
 
