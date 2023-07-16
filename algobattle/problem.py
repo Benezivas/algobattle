@@ -1,75 +1,20 @@
 """Module defining the Problem and Solution base classes and related objects."""
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, KW_ONLY
 from importlib.metadata import entry_points
 import importlib.util
-from inspect import isclass
 import sys
 from pathlib import Path
-from typing import Any, ClassVar, Literal, Protocol, Self, Generic, TypeAlias, TypeVar, runtime_checkable
+from typing import Any, ClassVar, Literal, Protocol, Self, Generic, TypeVar, runtime_checkable
 
-from pydantic import Field
+from pydantic import BaseModel, Field
 from pydantic.generics import GenericModel
 
 from algobattle.util import u64, Encodable, EncodableModel, ValidationError
 
 
-_Problem: TypeAlias = Any
-"""Type alias used to generate correct typings when subclassing :class:`Problem` and :class:`Problem.Solution`.
-
-Each problem's and solution's methods are guaranteed to be passed a instance of the correct problem/solution objects.
-But due to limitations in the python type system we are currently not able to express this properly.
-When creating your own problem it is recommended to not use this alias and instead use the :class:`Problem` and
-:class:`Solution` you are creating directly.
-"""
-_Solution: TypeAlias = Any
-"""Type alias used to generate correct typings when subclassing :class:`Problem` and :class:`Problem.Solution`.
-
-Each problem's and solution's methods are guaranteed to be passed a instance of the correct problem/solution objects.
-But due to limitations in the python type system we are currently not able to express this properly.
-When creating your own problem it is recommended to not use this alias and instead use the :class:`Problem` and
-:class:`Solution` you are creating directly.
-"""
-
-
-@runtime_checkable
-class Scored(Protocol):
-    """A solution with an associated score."""
-
-    direction: ClassVar[Literal["minimize", "maximize"]]
-    """The direction that better scores are found at."""
-
-    @abstractmethod
-    def score(self, instance: _Problem) -> float:
-        """Calculate the score of this solution for the given problem instance."""
-        raise NotImplementedError
-
-
-class Problem(Encodable, ABC):
-    """Problem base class."""
-
-    name: ClassVar[str]
-    """The name of the problem."""
-
-    min_size: ClassVar[int] = 0
-    """Minimum size of valid instances of this problem."""
-
-    with_solution: ClassVar[bool] = True
-    """Whether an instance of this problem also comes with a solution."""
-
-    export: ClassVar[bool] = False
-    """Wether the class should be exported.
-
-    Helps with uniquely specifying a class to be executed in a problem file. For more details view the documentation.
-    """
-
-    _installed: ClassVar[dict[str, type["Problem"]]] = {}
-
-    def __init_subclass__(cls, export: bool = True) -> None:
-        if "export" not in cls.__dict__:
-            cls.export = export
-        if cls.export and cls.name not in Problem._installed:
-            Problem._installed[cls.name] = cls
-        return super().__init_subclass__()
+class Instance(Encodable, ABC):
+    """Instance base class."""
 
     @property
     @abstractmethod
@@ -88,13 +33,56 @@ class Problem(Encodable, ABC):
         """
         return
 
-    def score(self, solver_solution: _Solution, generator_solution: _Solution | None) -> float:
-        """Calculates how well a solution solves this problem instance.
 
-        If the solution is :cls:`Scored` the score is the ratio of the generator's solution score to the solver's
-        solution score. Otherwise, it simply defaults to 1 since the solver generated a valid solution.
+InstanceT = TypeVar("InstanceT", bound=Instance, contravariant=True)
+
+
+@runtime_checkable
+class Scored(Protocol, Generic[InstanceT]):
+    """A solution with an associated score."""
+
+    direction: ClassVar[Literal["minimize", "maximize"]]
+    """The direction that better scores are found at."""
+
+    @abstractmethod
+    def score(self, instance: InstanceT) -> float:
+        """Calculate the score of this solution for the given problem instance."""
+        raise NotImplementedError
+
+
+class Solution(Encodable, Generic[InstanceT], ABC):
+    """A proposed solution for an instance of this problem."""
+
+    def validate_solution(self, instance: InstanceT) -> None:
+        """Confirms that the parsed solution is valid.
+
+        Should be idempotent, but may also perform additional postprocessing such as bringing the solution
+        into a normal form.
 
         Args:
+            instance: The problem instance this solution is purported to solve.
+
+        Raises:
+            ValidationError: if the created instance is invalid.
+        """
+        return
+
+
+SolutionT = TypeVar("SolutionT", bound=Solution[Any])
+
+
+_I = TypeVar("_I", bound=Instance, contravariant=True)
+_S = TypeVar("_S", bound=Solution[Instance], contravariant=True)
+
+
+class ScoreFunction(Protocol, Generic[_I, _S]):
+    """Type of `score` function passed to Problem."""
+
+    def __call__(self, instance: _I, solver_solution: _S, generator_solution: _S | None) -> Any:
+        """Calculates how well a solution solves this problem instance.
+
+        Args:
+            instance: The generated instance.
             solver_solution: The solution created by the solver.
             generator_solution: The solution output by the generator, if any.
 
@@ -102,40 +90,104 @@ class Problem(Encodable, ABC):
             The calculated score, a number in [0, 1] with a value of 0 indicating that the solver failed completely and
             1 that it solved the instance perfectly.
         """
-        if isinstance(generator_solution, self.Solution) and isinstance(generator_solution, Scored):
-            assert isinstance(solver_solution, Scored)
-            gen_score = generator_solution.score(self)
-            if gen_score == 0:
-                return 1
-            sol_score = solver_solution.score(self)
-            if sol_score == 0:
-                return 0
 
-            if generator_solution.direction == "minimize":
-                return gen_score / sol_score
-            else:
-                return sol_score / gen_score
-        else:
+
+def default_score(instance: Instance, solver_solution: SolutionT, generator_solution: SolutionT | None) -> float:
+    """Calculates how well a solution solves this problem instance.
+
+    If the solution is `Scored` the score is the ratio of the generator's solution score to the solver's
+    solution score. Otherwise, it simply defaults to 1 since the solver generated a valid solution.
+
+    Args:
+        instance: The generated instance.
+        solver_solution: The solution created by the solver.
+        generator_solution: The solution output by the generator, if any.
+
+    Returns:
+        The calculated score, a number in [0, 1] with a value of 0 indicating that the solver failed completely and
+        1 that it solved the instance perfectly.
+    """
+    if isinstance(generator_solution, Scored):
+        assert isinstance(solver_solution, Scored)
+        gen_score = generator_solution.score(instance)
+        if gen_score == 0:
             return 1
+        sol_score = solver_solution.score(instance)
+        if sol_score == 0:
+            return 0
 
-    @staticmethod
-    def _is_importable(val: Any):
-        return isclass(val) and issubclass(val, Problem) and val.export
+        if generator_solution.direction == "minimize":
+            return gen_score / sol_score
+        else:
+            return sol_score / gen_score
+    else:
+        return 1
+
+
+@dataclass
+class Problem(Generic[InstanceT, SolutionT]):
+    """The definition of a problem."""
+
+    name: str
+    """The name of the problem."""
+
+    _: KW_ONLY
+
+    instance_cls: type[InstanceT]
+    """Class defining what instances of this problem look like."""
+
+    solution_cls: type[SolutionT]
+    """Class definitng what solutions of this problem look like."""
+
+    min_size: int = 0
+    """Minimum size of valid instances of this problem."""
+
+    with_solution: bool = True
+    """Whether the generator should also create a solution."""
+
+    export: bool = True
+    """Wether the class should be exported.
+
+    If a battle is run by specifying a module, exactly one Problem in it must have `export=True`. It will then be used
+    to run the battle.
+    """
+
+    score: ScoreFunction[InstanceT, SolutionT] = default_score
+    """Function used to score how well a solution solves a problem instance.
+
+    The default scoring function uses the `Scored` protocol to compare the solver's solution to the generator's. If the
+    used solution class does not support this, it  will always return 1 and thus score all valid solutions equally.
+
+    The signature of the `score` function is as follows:
+
+    Args:
+        instance: The generated instance.
+        solver_solution: The solution created by the solver.
+        generator_solution: The solution output by the generator, if any.
+
+    Returns:
+        The calculated score, a number in [0, 1] with a value of 0 indicating that the solver failed completely and
+        1 that it solved the instance perfectly.
+    """
+
+    _installed: ClassVar[dict[str, Self]] = {}
+
+    def __post_init__(self) -> None:
+        if self.export and self.name not in Problem._installed:
+            Problem._installed[self.name] = self
 
     @classmethod
-    def import_from_path(cls, path: Path) -> type[Self]:
-        """Try to import a Problem class object from a given path.
+    def import_from_path(cls, path: Path) -> Self:
+        """Try to import a Problem from a given path.
 
         The specified file will be imported using the standard python loaders. If the created module contains exactly
-        one class inheriting from :class:`Problem` with the `export` flag set, it will be imported. Otherwise, if one of
-        the classes is named `Problem` it will be imported. If neither procedure finds a unique problem class the method
-        fails.
+        one Problem with the `export` flag set, it will be imported.
 
         Args:
-            path: A path to a python file or a folder containing a `__init__.py` or `problem.py` file.
+            path: A path to a module, or a folder containing an `__init__.py` or `problem.py` file.
 
         Raises:
-            ValueError: If the path doesn't point to a valid file or the file cannot be imported properly.
+            ValueError: If the path doesn't point to a module or the file cannot be imported properly.
         """
         if path.is_file():
             pass
@@ -155,94 +207,57 @@ class Problem(Encodable, ABC):
             raise ValueError from e
 
         try:
-            problem_classes = [val for val in vars(problem_module).values() if cls._is_importable(val)]
-            if len(problem_classes) == 0:
-                raise ValueError(f"'{path}' contains no Problem classes.")
-            elif len(problem_classes) == 1:
-                problem_cls = problem_classes[0]
-            elif hasattr(problem_classes, "Problem") and issubclass(getattr(problem_classes, "Problem"), Problem):
-                problem_cls: type[Self] = problem_module.Problem
-            else:
-                raise ValueError(f"'{path}' contains {len(problem_classes)} different problem classes!")
+            problems = [obj for obj in vars(problem_module).values() if isinstance(obj, cls) and obj.export]
+            match len(problems):
+                case 0:
+                    raise ValueError(f"'{path}' contains no Problems.")
+                case 1:
+                    problem = problems[0]
+                case _:
+                    raise ValueError(
+                        f"'{path}' contains {len(problems)} different problems: {', '.join(p.name for p in problems)}."
+                    )
 
-            if issubclass(problem_cls, EncodableModel):
-                problem_cls.update_forward_refs(Solution=problem_cls.Solution)
-            if issubclass(problem_cls.Solution, EncodableModel):
-                problem_cls.Solution.update_forward_refs()
-            return problem_cls
+            if issubclass(problem.instance_cls, BaseModel):
+                problem.instance_cls.update_forward_refs()
+            if issubclass(problem.solution_cls, BaseModel):
+                problem.solution_cls.update_forward_refs()
+            return problem
 
         finally:
             sys.modules.pop("_problem")
 
     @classmethod
-    def all(cls) -> dict[str, type[Self]]:
-        """Returns a dictionary mapping the names of all installed problems to their python classes.
+    def all(cls) -> dict[str, Self]:
+        """Returns a dictionary mapping the names of all installed problems to their python objects.
 
-        It includes all subclasses of :class:`Problem` that have been initialized so far, including ones exposed to the
-        algobattle module via the `algobattle.problem` entrypoint hook.
+        It includes all Problem objects that have been created so far and ones exposed to the algobattle module via the
+        `algobattle.problem` entrypoint hook.
 
         Raises:
-            RuntimeError: If an entrypoint is not a problem class.
+            RuntimeError: If an entrypoint is not a Problem.
         """
         for entrypoint in entry_points(group="algobattle.problem"):
             if entrypoint.name not in Problem._installed:
                 problem = entrypoint.load()
-                if not issubclass(problem, cls):
+                if not isinstance(problem, cls):
                     raise RuntimeError(
-                        f"The entrypoint '{entrypoint.name}' doesn't point to a problem class but rather: {problem}."
+                        f"The entrypoint '{entrypoint.name}' doesn't point to a problem but rather: {problem}."
                     )
                 cls._installed[entrypoint.name] = problem
         return cls._installed
 
-    class Solution(Encodable, ABC):
-        """A proposed solution for an instance of this problem."""
 
-        def validate_solution(self, instance: _Problem) -> None:
-            """Confirms that the parsed solution is valid.
-
-            Should be idempotent, but may also perform additional postprocessing such as bringing the solution
-            into a normal form.
-
-            Args:
-                instance: The problem instance this solution is purported to solve.
-
-            Raises:
-                ValidationError: if the created instance is invalid.
-            """
-            return
+class InstanceModel(EncodableModel, Instance, ABC):
+    """An instance that can easily be parsed to/from a json file."""
 
 
-class ProblemModel(EncodableModel, Problem, ABC):
-    """A Problem that can easily be parsed to/from a json file."""
-
-    export: ClassVar[bool] = False
-
-    class Config(EncodableModel.Config):
-        """Pydantic config object to hide these fields in the json if someone redeclared them incorrectly."""
-
-        fields: dict[str, Any] = {
-            "filename": {"exclude": True},
-            "name": {"exclude": True},
-            "min_size": {"exclude": True},
-            "has_solution": {"exclude": True},
-            "Solution": {"exclude": True},
-            "export": {"exclude": True},
-        }
-
-
-class SolutionModel(EncodableModel, Problem.Solution, ABC):
+class SolutionModel(Solution[InstanceT], EncodableModel, GenericModel, ABC):
     """A solution that can easily be parsed to/from a json file."""
 
-    class Config(EncodableModel.Config):
-        """Pydantic config object to hide these fields in the json if someone redeclared them incorrectly."""
 
-        fields: dict[str, Any] = {"filename": {"exclude": True}}
-
-
-class DirectedGraph(ProblemModel):
-    """Base class for problems on directed graphs."""
-
-    export: ClassVar[bool] = False
+class DirectedGraph(InstanceModel):
+    """Base instance class for problems on directed graphs."""
 
     num_vertices: u64
     edges: list[tuple[u64, u64]] = Field(unique_items=True)
@@ -259,9 +274,7 @@ class DirectedGraph(ProblemModel):
 
 
 class UndirectedGraph(DirectedGraph):
-    """Base class for problems on undirected graphs."""
-
-    export: ClassVar[bool] = False
+    """Base instance class for problems on undirected graphs."""
 
     def validate_instance(self):
         """Validates that the graph is well formed and contains no self loops.
@@ -287,8 +300,6 @@ Weight = TypeVar("Weight")
 class EdgeWeights(DirectedGraph, GenericModel, Generic[Weight]):
     """Mixin for graphs with weighted edges."""
 
-    export: ClassVar[bool] = False
-
     edge_weights: list[Weight]
 
     def validate_instance(self):
@@ -300,8 +311,6 @@ class EdgeWeights(DirectedGraph, GenericModel, Generic[Weight]):
 
 class VertexWeights(DirectedGraph, GenericModel, Generic[Weight]):
     """Mixin for graphs with weighted vertices."""
-
-    export: ClassVar[bool] = False
 
     vertex_weights: list[Weight]
 

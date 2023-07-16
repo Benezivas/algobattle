@@ -1,25 +1,11 @@
 """Problem class built for tests."""
-from typing import ClassVar
 
-from algobattle.problem import ProblemModel, SolutionModel
+from algobattle.problem import Problem, InstanceModel, SolutionModel
 from algobattle.util import ValidationError
 
 
-class TestProblem(ProblemModel):
+class TestInstance(InstanceModel):
     """Artificial problem used for tests."""
-
-    name: ClassVar[str] = "Tests"
-    with_solution: ClassVar[bool] = False
-
-    class Solution(SolutionModel):
-        """Solution class for :class:`Tests`."""
-
-        semantics: bool
-        quality: bool
-
-        def validate_solution(self, instance: "TestProblem"):
-            if not self.semantics:
-                raise ValidationError("")
 
     semantics: bool
 
@@ -31,5 +17,27 @@ class TestProblem(ProblemModel):
         if not self.semantics:
             raise ValidationError("")
 
-    def score(self, solver_solution: Solution, generator_solution: Solution | None) -> float:
-        return solver_solution.quality
+
+class TestSolution(SolutionModel[TestInstance]):
+    """Solution class for :class:`Tests`."""
+
+    semantics: bool
+    quality: bool
+
+    def validate_solution(self, instance: TestInstance) -> None:
+        if not self.semantics:
+            raise ValidationError("")
+
+
+def score(instance: TestInstance, solver_solution: TestSolution, generator_solution: TestSolution | None) -> float:
+    """Test score function."""
+    return solver_solution.quality
+
+
+TestProblem = Problem(
+    "Tests",
+    instance_cls=TestInstance,
+    solution_cls=TestSolution,
+    with_solution=False,
+    score=score,
+)

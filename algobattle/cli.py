@@ -9,7 +9,7 @@ from functools import partial
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, ParamSpec, Self, TypeVar
+from typing import Any, Callable, ParamSpec, Self, TypeVar
 from importlib.metadata import version as pkg_version
 
 from prettytable import DOUBLE_BORDER, PrettyTable
@@ -24,11 +24,15 @@ from algobattle.team import Matchup, TeamInfo
 from algobattle.util import Role, TimerInfo, check_path, flat_intersperse
 
 
+AnyProblem = Problem[Any, Any]
+AnyMatchup = Matchup[Any, Any]
+
+
 @dataclass
 class CliOptions:
     """Options used by the cli."""
 
-    problem: type[Problem]
+    problem: AnyProblem
     silent: bool = False
     result: Path | None = None
 
@@ -85,7 +89,7 @@ def parse_cli_args(args: list[str]) -> tuple[CliOptions, BaseConfig]:
 
 async def _run_with_ui(
     match_config: BaseConfig,
-    problem: type[Problem],
+    problem: AnyProblem,
 ) -> Match:
     async with CliUi() as ui:
         return await Match.run(match_config, problem, ui)
@@ -155,8 +159,8 @@ class CliUi(Ui):
     Uses curses to continually draw a basic text based ui to the terminal.
     """
 
-    battle_data: dict[Matchup, Battle.UiData] = field(default_factory=dict, init=False)
-    fight_data: dict[Matchup, _FightUiData] = field(default_factory=dict, init=False)
+    battle_data: dict[AnyMatchup, Battle.UiData] = field(default_factory=dict, init=False)
+    fight_data: dict[AnyMatchup, _FightUiData] = field(default_factory=dict, init=False)
     task_group: TaskGroup | None = field(default=None, init=False)
     build_status: _BuildInfo | str | None = field(default=None, init=False)
 
@@ -192,23 +196,23 @@ class CliUi(Ui):
         self.build_status = None
 
     @check_for_terminal
-    def battle_completed(self, matchup: Matchup) -> None:
+    def battle_completed(self, matchup: AnyMatchup) -> None:
         """Notifies the Ui that a specific battle has been completed."""
         self.battle_data.pop(matchup, None)
         self.fight_data.pop(matchup, None)
         super().battle_completed(matchup)
 
-    def update_battle_data(self, matchup: Matchup, data: Battle.UiData) -> None:
+    def update_battle_data(self, matchup: AnyMatchup, data: Battle.UiData) -> None:
         """Passes new custom battle data to the Ui."""
         self.battle_data[matchup] = data
 
-    def start_fight(self, matchup: Matchup, max_size: int) -> None:
+    def start_fight(self, matchup: AnyMatchup, max_size: int) -> None:
         """Informs the Ui of a newly started fight."""
         self.fight_data[matchup] = _FightUiData(max_size, None, None)
 
     def update_curr_fight(
         self,
-        matchup: Matchup,
+        matchup: AnyMatchup,
         role: Role | None = None,
         data: TimerInfo | float | ProgramRunInfo | None = None,
     ) -> None:
@@ -310,7 +314,7 @@ class CliUi(Ui):
         out += f" {state_glyph}"
         return out
 
-    def display_current_fight(self, matchup: Matchup) -> list[str]:
+    def display_current_fight(self, matchup: AnyMatchup) -> list[str]:
         """Formats the current fight of a battle into a compact overview."""
         fight = self.fight_data[matchup]
         return [
@@ -330,7 +334,7 @@ class CliUi(Ui):
             exec_info = ""
         return f"Fight {index} at size {fight.max_size}: {fight.score}{exec_info}"
 
-    def display_battle(self, matchup: Matchup) -> list[str]:
+    def display_battle(self, matchup: AnyMatchup) -> list[str]:
         """Formats the battle data into a string that can be printed to the terminal."""
         if self.match is None:
             return []

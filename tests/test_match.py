@@ -1,5 +1,6 @@
 """Tests for the Match class."""
 # pyright: reportMissingSuperCall=false
+from typing import Any
 from unittest import IsolatedAsyncioTestCase, TestCase, main
 from pathlib import Path
 
@@ -11,7 +12,7 @@ from algobattle.docker_util import ProgramConfig, ProgramRunInfo, RunParameters
 from .testsproblem.problem import TestProblem
 
 
-class TestTeam(Team):
+class TestTeam(Team[Any, Any]):
     """Team that doesn't rely on actual docker images."""
 
     def __init__(self, team_name: str) -> None:
