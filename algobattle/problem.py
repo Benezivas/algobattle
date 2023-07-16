@@ -12,7 +12,7 @@ from math import inf, isnan
 from pydantic import BaseModel, Field
 from pydantic.generics import GenericModel
 
-from algobattle.util import u64, Encodable, EncodableModel, ValidationError
+from algobattle.util import Role, u64, Encodable, EncodableModel, ValidationError
 
 
 class Instance(Encodable, ABC):
@@ -43,7 +43,7 @@ P = ParamSpec("P")
 class Solution(Encodable, Generic[InstanceT], ABC):
     """A proposed solution for an instance of this problem."""
 
-    def validate_solution(self, instance: InstanceT) -> None:
+    def validate_solution(self, instance: InstanceT, role: Role) -> None:
         """Confirms that the parsed solution is valid.
 
         Should be idempotent, but may also perform additional postprocessing such as bringing the solution
@@ -64,7 +64,7 @@ class Scored(Solution[InstanceT]):
     @abstractmethod
     def score(self, instance: InstanceT) -> float:
         """Calculate the score of this solution for the given problem instance.
-        
+
         Args:
             instance: The instance this solution solves
         Returns:
@@ -76,12 +76,14 @@ class Scored(Solution[InstanceT]):
 
 def minimize(function: Callable[P, float]) -> Callable[P, float]:
     """Wraps a score function such that smaller scores are considered better."""
+
     @wraps(function)
     def inner(*args: P.args, **kwargs: P.kwargs) -> float:
         try:
             return 1 / function(*args, **kwargs)
         except ZeroDivisionError:
             return inf
+
     return inner
 
 

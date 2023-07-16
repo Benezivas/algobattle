@@ -1,7 +1,7 @@
 """Problem class built for tests."""
 
 from algobattle.problem import Problem, InstanceModel, SolutionModel
-from algobattle.util import ValidationError
+from algobattle.util import Role, ValidationError
 
 
 class TestInstance(InstanceModel):
@@ -24,7 +24,7 @@ class TestSolution(SolutionModel[TestInstance]):
     semantics: bool
     quality: bool
 
-    def validate_solution(self, instance: TestInstance) -> None:
+    def validate_solution(self, instance: TestInstance, role: Role) -> None:
         if not self.semantics:
             raise ValidationError("")
 

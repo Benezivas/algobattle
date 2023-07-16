@@ -751,7 +751,7 @@ class Generator(Program[InstanceT, SolutionT]):
             except Exception as e:
                 raise EncodingError("Error thrown while decoding the solution.", detail=str(e)) from e
             try:
-                solution.validate_solution(instance)
+                solution.validate_solution(instance, Role.generator)
             except ValidationError:
                 raise
             except Exception as e:
@@ -816,13 +816,13 @@ class Solver(Program[InstanceT, SolutionT]):
     def _parse_output(self, output: Path, max_size: int, instance: InstanceT | None) -> SolutionT:
         assert instance is not None
         try:
-            solution = self.problem_class.Solution.decode(output / "solution", max_size, self.role)  # type: ignore
+            solution = self.problem.solution_cls.decode(output / "solution", max_size, self.role)
         except EncodingError:
             raise
         except Exception as e:
             raise EncodingError("Error thrown while decoding the solution.", detail=str(e)) from e
         try:
-            solution.validate_solution(instance)
+            solution.validate_solution(instance, Role.solver)
         except ValidationError:
             raise
         except Exception as e:
