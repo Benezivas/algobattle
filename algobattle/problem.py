@@ -1,6 +1,6 @@
 """Module defining the Problem and Solution base classes and related objects."""
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, KW_ONLY
+from dataclasses import dataclass
 from functools import wraps
 from importlib.metadata import entry_points
 import importlib.util
@@ -148,14 +148,12 @@ def default_score(instance: Instance, solver_solution: SolutionT, generator_solu
         return 1
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Problem(Generic[InstanceT, SolutionT]):
     """The definition of a problem."""
 
     name: str
     """The name of the problem."""
-
-    _: KW_ONLY
 
     instance_cls: type[InstanceT]
     """Class defining what instances of this problem look like."""

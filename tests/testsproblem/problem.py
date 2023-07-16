@@ -35,7 +35,7 @@ def score(instance: TestInstance, solver_solution: TestSolution, generator_solut
 
 
 TestProblem = Problem(
-    "Tests",
+    name="Tests",
     instance_cls=TestInstance,
     solution_cls=TestSolution,
     with_solution=False,
