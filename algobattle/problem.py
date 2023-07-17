@@ -11,7 +11,8 @@ from math import inf, isnan
 
 from pydantic import BaseModel, field_validator
 
-from algobattle.util import Role, u64, Encodable, EncodableModel, ValidationError
+from algobattle.util import Role, Encodable, EncodableModel, ValidationError
+from algobattle.types import u64
 
 
 class Instance(Encodable, ABC):

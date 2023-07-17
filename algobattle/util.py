@@ -44,12 +44,6 @@ class BaseModel(PydandticBaseModel):
     model_config = ConfigDict(extra=Extra.forbid)
 
 
-u64 = Annotated[int, Interval(ge=0, lt=2 ** 63)]
-"""Helper type to easily define model fields that fit into a 64 bit unsigned int."""
-i64 = Annotated[int, Interval(ge=-(2**63), lt=2**63)]
-"""Helper type to easily define model fields that fit into a 64 bit signed int."""
-
-
 def inherit_docs(obj: T) -> T:
     """Decorator to mark a method as inheriting its docstring.
 
