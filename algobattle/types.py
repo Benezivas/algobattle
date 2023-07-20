@@ -1,6 +1,9 @@
 """Utility types used to easily define Problems."""
-from typing import Annotated
+from typing import Annotated, Generic, TypeVar
 from annotated_types import Interval
+from pydantic import BaseModel, ValidationError, field_validator
+
+from algobattle.problem import InstanceModel
 
 __all__ = (
     "u64",
@@ -9,6 +12,10 @@ __all__ = (
     "i32",
     "u16",
     "i16",
+    "DirectedGraph",
+    "UndirectedGraph",
+    "EdgeWeights",
+    "VertexWeights",
 )
 
 
@@ -29,3 +36,75 @@ u16 = Annotated[int, Interval(ge=0, lt=2 ** 16)]
 
 i16 = Annotated[int, Interval(ge=-(2**15), lt=2 ** 15)]
 """16 bit signed int."""
+
+
+class DirectedGraph(InstanceModel):
+    """Base instance class for problems on directed graphs."""
+
+    num_vertices: u64
+    edges: list[tuple[u64, u64]]
+
+    @field_validator("edges", mode="after")
+    @classmethod
+    def unique_edges(cls, value: list[tuple[u64, u64]]) -> list[tuple[u64, u64]]:
+        if len(set(value)) != len(value):
+            raise ValueError("Edge list contains duplicate entries.")
+        return value
+
+    @property
+    def size(self) -> int:
+        """A graph's size is the number of vertices in it."""
+        return self.num_vertices
+
+    def validate_instance(self):
+        """Validates that the graph contains at most `size` many vertices and all edges are well defined."""
+        if any(u >= self.num_vertices for edge in self.edges for u in edge):
+            raise ValidationError("Graph contains edges whose endpoints aren't valid vertices")
+
+
+class UndirectedGraph(DirectedGraph):
+    """Base instance class for problems on undirected graphs."""
+
+    def validate_instance(self):
+        """Validates that the graph is well formed and contains no self loops.
+
+        Also brings it into a normal form where every edge {u, v} occurs exactly once in the list.
+        I.e. `[(0, 1), (1, 0), (1, 2)]` is accepted as valid and normalised to `[(0, 1), (1, 2)]`.
+        """
+        super().validate_instance()
+        if any(u == v for u, v in self.edges):
+            raise ValidationError("Undirected graph contains self loops.")
+
+        # we remove the redundant edge definitions to create an easy to use normal form
+        normalized_edges: set[tuple[int, int]] = set()
+        for u, v in self.edges:
+            if (v, u) not in normalized_edges:
+                normalized_edges.add((u, v))
+        self.edges = list(normalized_edges)
+
+
+Weight = TypeVar("Weight")
+
+
+class EdgeWeights(DirectedGraph, BaseModel, Generic[Weight]):
+    """Mixin for graphs with weighted edges."""
+
+    edge_weights: list[Weight]
+
+    def validate_instance(self):
+        """Validates that each edge has an associated weight."""
+        super().validate_instance()
+        if len(self.edge_weights) != len(self.edges):
+            raise ValidationError("Number of edge weights doesn't match the number of edges.")
+
+
+class VertexWeights(DirectedGraph, BaseModel, Generic[Weight]):
+    """Mixin for graphs with weighted vertices."""
+
+    vertex_weights: list[Weight]
+
+    def validate_instance(self):
+        """Validates that each vertex has an associated weight."""
+        super().validate_instance()
+        if len(self.vertex_weights) != self.num_vertices:
+            raise ValidationError("Number of vertex weights doesn't match the number of vertices.")
