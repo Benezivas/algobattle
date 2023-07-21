@@ -1,9 +1,10 @@
 """Utility types used to easily define Problems."""
-from typing import Annotated, Generic, TypeVar
-from annotated_types import Interval
-from pydantic import BaseModel, ValidationError, field_validator
+from typing import Annotated, Sized, TypeVar, Generic
+from annotated_types import Ge, Interval
 
-from algobattle.problem import InstanceModel
+from pydantic import AfterValidator, ValidationInfo, ValidationError, field_validator
+from algobattle.problem import ValidateWith, InstanceModel
+from algobattle.util import BaseModel
 
 __all__ = (
     "u64",
@@ -12,6 +13,8 @@ __all__ = (
     "i32",
     "u16",
     "i16",
+    "SizeIndex",
+    "SizeLen",
     "DirectedGraph",
     "UndirectedGraph",
     "EdgeWeights",
@@ -33,6 +36,41 @@ i32 = Annotated[int, Interval(ge=-(2**31), lt=2**31)]
 
 u16 = Annotated[int, Interval(ge=0, lt=2 ** 16)]
 """16 bit unsigned int."""
+
+i16 = Annotated[int, Interval(ge=-(2**15), lt=2 ** 15)]
+"""16 bit signed int."""
+
+
+def get_instance(info: ValidationInfo) -> InstanceModel | None:
+    if info.context is None:
+        return None
+    return info.context.get("instance", None)
+
+
+def size_index_val(v: int, info: ValidationInfo) -> int:
+    instance = get_instance(info)
+    if instance is None:
+        return v
+    if v >= instance.size:
+        raise ValueError("SizeIndex is not a valid index into a collection of length `instance.size`")
+    return v
+
+SizeIndex = Annotated[int, Ge(0), AfterValidator(size_index_val), ValidateWith.Instance]
+
+
+S = TypeVar("S", bound=Sized)
+
+def size_len_val(v: S, info: ValidationInfo) -> S:
+    """Validates that the collection has length `instance.size`."""
+    instance = get_instance(info)
+    if instance is None:
+        return v
+    if len(v) != instance.size:
+        raise ValueError("Value does not have length `instance.size`")
+    return v
+
+SizeLen = Annotated[S, AfterValidator(size_len_val), ValidateWith.Instance]
+
 
 i16 = Annotated[int, Interval(ge=-(2**15), lt=2 ** 15)]
 """16 bit signed int."""

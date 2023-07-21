@@ -1,12 +1,13 @@
 """Module defining the Problem and Solution base classes and related objects."""
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from enum import Enum
 from functools import wraps
 from importlib.metadata import entry_points
 import importlib.util
 import sys
 from pathlib import Path
-from typing import Any, Callable, ClassVar, ParamSpec, Protocol, Self, Generic, TypeVar
+from typing import Any, Callable, ClassVar, ParamSpec, Protocol, Self, Generic, TypeVar, get_args
 from math import inf, isnan
 
 from algobattle.util import Role, Encodable, EncodableModel
@@ -263,9 +264,44 @@ class Problem(Generic[InstanceT, SolutionT]):
         return cls._installed
 
 
+class ValidateWith(Enum):
+    """Marker class to make an instance or solution be validated again with itself in the context.
+    
+    Needs to be included via a typing.Annotation if you want to define custom types that access instance/solution
+    attributes that are usable within those models.
+    """
+    Instance = "instance"
+    Solution = "solution"
+
+
+    def annotates(self, annotation: Any) -> bool:
+        """Checks if a type needs to be parsed again with the instance/solution context."""
+        if annotation == self:
+            return True
+        return any(self.annotates(e) for e in get_args(annotation))
+
+
 class InstanceModel(EncodableModel, Instance, ABC):
     """An instance that can easily be parsed to/from a json file."""
+
+    def validate_instance(self) -> None:
+        """Validate the instance again, this time also passing itself in the context.
+        
+        Very inefficient implementation to make SizeIndex and similar types work.
+        """
+        super().validate_instance()
+        if any(ValidateWith.Instance.annotates(info.annotation) for info in self.model_fields.values()):
+            self.model_validate(self, context={"instance": self})
 
 
 class SolutionModel(Solution[InstanceT], EncodableModel, ABC):
     """A solution that can easily be parsed to/from a json file."""
+
+    def validate_solution(self, instance: InstanceT, role: Role) -> None:
+        """Validate the solution again, this time also passing itself and the instance in the context.
+        
+        Very inefficient implementation to make SizeIndex and similar types work.
+        """
+        super().validate_solution(instance, role)
+        if any(ValidateWith.Instance.annotates(info.annotation) for info in self.model_fields.values()):
+            self.model_validate(self, context={"instance": instance, "solution": self, "role": role})

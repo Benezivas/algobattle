@@ -10,7 +10,8 @@ import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from traceback import format_exception
-from typing import Annotated, Any, Iterable, Literal, LiteralString, TypeVar, Self
+from typing import Any, Iterable, Literal, LiteralString, Mapping, TypeVar, Self
+from typing_extensions import TypedDict
 
 from pydantic import (
     ConfigDict,
@@ -18,7 +19,6 @@ from pydantic import (
     Extra,
     ValidationError as PydanticValidationError,
 )
-from annotated_types import Interval
 
 
 class Role(Enum):
@@ -38,10 +38,17 @@ def str_with_traceback(exception: Exception) -> str:
     return "\n".join(format_exception(exception))
 
 
+class AlgobattleContext(TypedDict, total=False):
+    """Context passed to validation methods used to parse Program output."""
+
+    role: Role
+    max_size: int
+
+
 class BaseModel(PydandticBaseModel):
     """Base class for all pydantic models."""
 
-    model_config = ConfigDict(extra=Extra.forbid)
+    model_config = ConfigDict(extra=Extra.forbid, from_attributes=True)
 
 
 def inherit_docs(obj: T) -> T:
@@ -147,7 +154,7 @@ class EncodableModel(BaseModel, Encodable, ABC):
             raise EncodingError("The json file does not exist.")
         try:
             with open(source.with_suffix(".json"), "r") as f:
-                return cls.model_validate_json(f.read())
+                return cls.model_validate_json(f.read(), context={"role": team, "max_size": max_size})
         except PydanticValidationError as e:
             raise EncodingError("Json data does not fit the schema.", detail=str(e))
         except Exception as e:
