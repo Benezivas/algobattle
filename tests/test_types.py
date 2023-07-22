@@ -5,8 +5,21 @@ from unittest import TestCase, main
 from pydantic import ValidationError
 
 from algobattle.problem import InstanceModel
-from algobattle.util import SelfReference
-from algobattle.types import Ge, SizeIndex
+from algobattle.util import InstanceReference, SelfReference
+from algobattle.types import Ge, Interval, SizeIndex
+
+
+class ModelCreationTests(TestCase):
+    """Test that the model creation process runs smoothly."""
+
+    def test_basic(self):
+        basic_instance()
+
+    def test_size(self):
+        size_instance()
+
+    def test_interval(self):
+        interval_instance()
 
 
 def basic_instance() -> type[InstanceModel]:
@@ -21,30 +34,6 @@ def basic_instance() -> type[InstanceModel]:
             return 0
 
     return TestModel
-
-
-def size_instance() -> type[InstanceModel]:
-    """Create a basic solution class."""
-
-    class SizeModel(InstanceModel):
-        items: list[int]
-        index: SizeIndex
-
-        @property
-        def size(self) -> int:
-            return len(self.items)
-
-    return SizeModel
-
-
-class ModelCreationTests(TestCase):
-    """Test that the model creation process runs smoothly."""
-
-    def test_basic(self):
-        basic_instance()
-
-    def test_size(self):
-        size_instance()
 
 
 class BasicTests(TestCase):
@@ -75,6 +64,20 @@ class BasicTests(TestCase):
             self.TestModel.model_validate(self.wrong_ref_instance_dict, context={"self": instance})
 
 
+def size_instance() -> type[InstanceModel]:
+    """Create a basic solution class."""
+
+    class SizeModel(InstanceModel):
+        items: list[int]
+        index: SizeIndex
+
+        @property
+        def size(self) -> int:
+            return len(self.items)
+
+    return SizeModel
+
+
 class SizeTests(TestCase):
     """Tests for the SizeIndex type."""
 
@@ -97,6 +100,45 @@ class SizeTests(TestCase):
         instance = self.TestModel.model_validate(model_dict)
         with self.assertRaises(ValidationError):
             self.TestModel.model_validate(model_dict, context={"instance": instance})
+
+
+def interval_instance() -> type[InstanceModel]:
+    """Create a basic solution class with an Interval constraint."""
+
+    class IntervalModel(InstanceModel):
+        lower_bound: int
+        i: Annotated[int, Interval(ge=InstanceReference("lower_bound"), lt=10)]
+
+        @property
+        def size(self) -> int:
+            return self.i
+
+    return IntervalModel
+
+
+class IntervalTests(TestCase):
+    """Tests for the Interval grouped metada."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.TestModel = interval_instance()
+
+    def test_accept(self):
+        """Accept correct instance."""
+        self.TestModel.model_validate({"lower_bound": 0, "i": 5})
+
+    def test_reject_lower(self):
+        """Reject instance incorrect because of lower bound."""
+        model_dict = {"lower_bound": 0, "i": -1}
+        instance = self.TestModel.model_validate(model_dict)
+        with self.assertRaises(ValidationError):
+            self.TestModel.model_validate(model_dict, context={"instance": instance})
+
+    def test_reject_upper(self):
+        """Reject instance incorrect because of upper bound."""
+        model_dict = {"lower_bound": 0, "i": 10}
+        with self.assertRaises(ValidationError):
+            self.TestModel.model_validate(model_dict)
 
 
 if __name__ == "__main__":

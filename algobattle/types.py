@@ -1,12 +1,15 @@
 """Utility types used to easily define Problems."""
-from typing import Annotated, Any, Callable, Sized, TypeVar, Generic, overload
+from dataclasses import dataclass
+from typing import Annotated, Any, Callable, Iterator, Sized, TypeVar, Generic, overload
 import operator
 from annotated_types import (
-    Interval,
+    BaseMetadata,
     Ge as AnnotatedGe,
+    GroupedMetadata,
     Gt as AnnotatedGt,
     Le as AnnotatedLe,
     Lt as AnnotatedLt,
+    Interval as AnnotatedInterval,
     SupportsGe,
     SupportsGt,
     SupportsLe,
@@ -37,22 +40,22 @@ __all__ = (
 )
 
 
-u64 = Annotated[int, Interval(ge=0, lt=2**64)]
+u64 = Annotated[int, AnnotatedInterval(ge=0, lt=2**64)]
 """64 bit unsigned int."""
 
-i64 = Annotated[int, Interval(ge=-(2**63), lt=2**63)]
+i64 = Annotated[int, AnnotatedInterval(ge=-(2**63), lt=2**63)]
 """64 bit signed int."""
 
-u32 = Annotated[int, Interval(ge=0, lt=2**32)]
+u32 = Annotated[int, AnnotatedInterval(ge=0, lt=2**32)]
 """32 bit unsigned int."""
 
-i32 = Annotated[int, Interval(ge=-(2**31), lt=2**31)]
+i32 = Annotated[int, AnnotatedInterval(ge=-(2**31), lt=2**31)]
 """32 bit signed int."""
 
-u16 = Annotated[int, Interval(ge=0, lt=2**16)]
+u16 = Annotated[int, AnnotatedInterval(ge=0, lt=2**16)]
 """16 bit unsigned int."""
 
-i16 = Annotated[int, Interval(ge=-(2**15), lt=2**15)]
+i16 = Annotated[int, AnnotatedInterval(ge=-(2**15), lt=2**15)]
 """16 bit signed int."""
 
 
@@ -176,6 +179,31 @@ def Le(le: SupportsLe | AttributeReference) -> AnnotatedLe | AfterValidator:
         return AnnotatedLe(le)
 
 
+@dataclass(frozen=True, kw_only=True, slots=True)
+class Interval(GroupedMetadata):
+    """Interval can express inclusive or exclusive bounds with a single object.
+
+    It accepts keyword arguments ``gt``, ``ge``, ``lt``, and/or ``le``, which
+    are interpreted the same way as the single-bound constraints.
+    """
+
+    gt: SupportsGt | AttributeReference | None = None
+    ge: SupportsGe | AttributeReference | None = None
+    lt: SupportsLt | AttributeReference | None = None
+    le: SupportsLe | AttributeReference | None = None
+
+    def __iter__(self) -> Iterator[BaseMetadata | AfterValidator]:  # type: ignore
+        """Unpack an Interval into zero or more single-bounds."""
+        if self.gt is not None:
+            yield Gt(self.gt)
+        if self.ge is not None:
+            yield Ge(self.ge)
+        if self.lt is not None:
+            yield Lt(self.lt)
+        if self.le is not None:
+            yield Le(self.le)
+
+
 SizeIndex = Annotated[u64, AnnotatedGe(0), Lt(InstanceReference("size"))]
 
 
@@ -199,10 +227,6 @@ def size_len_val(v: S, info: ValidationInfo) -> S:
 
 
 SizeLen = Annotated[S, AfterValidator(size_len_val), ValidateWith.Instance]
-
-
-i16 = Annotated[int, Interval(ge=-(2**15), lt=2**15)]
-"""16 bit signed int."""
 
 
 class DirectedGraph(InstanceModel):
