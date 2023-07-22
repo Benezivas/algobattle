@@ -5,7 +5,7 @@ from unittest import TestCase, main
 from pydantic import ValidationError
 
 from algobattle.problem import InstanceModel
-from algobattle.util import InstanceReference, SelfReference
+from algobattle.util import AttributeReference
 from algobattle.types import Ge, Interval, SizeIndex
 
 
@@ -27,7 +27,7 @@ def basic_instance() -> type[InstanceModel]:
 
     class TestModel(InstanceModel):
         ge_const: Annotated[int, Ge(0)]
-        ge_ref: Annotated[int, Ge(SelfReference("ge_const"))]
+        ge_ref: Annotated[int, Ge(AttributeReference("self", "ge_const"))]
 
         @property
         def size(self) -> int:
@@ -107,7 +107,7 @@ def interval_instance() -> type[InstanceModel]:
 
     class IntervalModel(InstanceModel):
         lower_bound: int
-        i: Annotated[int, Interval(ge=InstanceReference("lower_bound"), lt=10)]
+        i: Annotated[int, Interval(ge=AttributeReference("self", "lower_bound"), lt=10)]
 
         @property
         def size(self) -> int:

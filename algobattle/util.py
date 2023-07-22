@@ -6,21 +6,24 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from inspect import isclass
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from traceback import format_exception
-from typing import Any, ClassVar, Iterable, Literal, LiteralString, TypeVar, Self, get_args
+from typing import Any, Callable, Iterable, Literal, LiteralString, TypeVar, Self, cast, get_args
 from typing_extensions import TypedDict
 
 from pydantic import (
     ConfigDict,
     BaseModel as PydandticBaseModel,
     Extra,
+    GetCoreSchemaHandler,
     ValidationError as PydanticValidationError,
     ValidationInfo,
 )
+from pydantic._internal._decorators import inspect_validator
+from pydantic_core import CoreSchema
+from pydantic_core.core_schema import general_after_validator_function
 
 
 class Role(Enum):
@@ -51,74 +54,6 @@ class BaseModel(PydandticBaseModel):
     """Base class for all pydantic models."""
 
     model_config = ConfigDict(extra=Extra.forbid, from_attributes=True)
-
-
-@dataclass(frozen=True, slots=True)
-class AttributeReference:
-    """Base class so we can search for model attribute references."""
-
-    attribute: str
-
-    _key: ClassVar[str]
-
-    def get_value(self, info: ValidationInfo) -> Any | None:
-        """Returns the referenced value from the correct object in the info context.
-
-        If the correct object is not in the context or doesn't have the referenced attribute it returns None.
-        """
-        if info.context is None or self._key not in info.context:
-            return None
-        model = info.context[self._key]
-        if hasattr(model, self.attribute):
-            return getattr(model, self.attribute)
-        else:
-            return None
-
-    @classmethod
-    def in_annotation(cls, annotation: object) -> bool:
-        """Checks if a type appears in an annotation metadata."""
-        if isclass(annotation) and issubclass(annotation, cls):
-            return True
-        return any(cls.in_annotation(e) for e in get_args(annotation))
-
-    @staticmethod
-    def validate_with_self(model: BaseModel, model_type: Literal["instance", "solution"]) -> bool:
-        """Checks if a model needs to be parsed with itself in the context."""
-        metadata_cls = InstanceReference if model_type == "instance" else SolutionReference
-        return any(metadata_cls.in_annotation(info.annotation) for info in model.model_fields.values())
-
-
-class InstanceReference(AttributeReference):
-    """A reference to an attribute of an instance."""
-
-    __slots__ = ()
-
-    _key = "instance"
-
-    def __str__(self) -> str:
-        return f"instance.{self.attribute}"
-
-
-class SolutionReference(AttributeReference):
-    """A reference to an attribute of a solution."""
-
-    __slots__ = ()
-
-    _key = "solution"
-
-    def __str__(self) -> str:
-        return f"solution.{self.attribute}"
-
-
-class SelfReference(InstanceReference, SolutionReference):
-    """A reference to an attribute of the object currently being validated."""
-
-    __slots__ = ()
-
-    _key = "self"
-
-    def __str__(self) -> str:
-        return f"self.{self.attribute}"
 
 
 def inherit_docs(obj: T) -> T:
@@ -242,6 +177,96 @@ class EncodableModel(BaseModel, Encodable, ABC):
     def io_schema(cls) -> str:
         """Uses pydantic to generate a json schema for this class."""
         return json.dumps(cls.model_json_schema(), indent=4)
+
+
+class InstanceSolutionModel(EncodableModel, ABC):
+    """Base Model class for instances or solution classes."""
+
+    @classmethod
+    def _annotation_needs_self(cls, annotation: object, model_type: Literal["instance", "solution"]) -> bool:
+        if isinstance(annotation, AttributeReferenceValidator):
+            return annotation.needs_self(model_type)
+        return any(cls._annotation_needs_self(e, model_type) for e in get_args(annotation))
+
+    @classmethod
+    def _validate_with_self(cls, model_type: Literal["instance", "solution"]) -> bool:
+        return any(cls._annotation_needs_self(info.annotation, model_type) for info in cls.model_fields.values())
+
+
+@dataclass(frozen=True, slots=True)
+class AttributeReference:
+    """Creates a reference to the attribute of a model to be used in validaton schemas."""
+
+    model: Literal["instance", "solution", "self"]
+    attribute: str
+
+    def get_value(self, info: ValidationInfo) -> Any | None:
+        """Returns the referenced value from the correct object in the info context.
+
+        If the correct object is not in the context or doesn't have the referenced attribute it returns None.
+        """
+        if info.context is None or self.model not in info.context:
+            return None
+        model = info.context[self.model]
+        if hasattr(model, self.attribute):
+            return getattr(model, self.attribute)
+        else:
+            return None
+
+    def __str__(self) -> str:
+        return f"{self.model}.{self.attribute}"
+
+    def needs_self(self, model_type: Literal["instance", "solution"]) -> bool:
+        """Checks if an attribute reference needs a reference to the current model in order to be resolved."""
+        if self.model == "self":
+            return True
+        else:
+            return self.model == model_type
+
+
+NoInfoAttrValidatorFunction = Callable[[Any, Any], Any]
+GeneralAttrValidatorFunction = Callable[[Any, Any, ValidationInfo], Any]
+
+
+@dataclass(frozen=True, slots=True)
+class AttributeReferenceValidator:
+    """An AfterValidator that can resolve a reference to a model attribute and pass it to the validator function.
+
+    Using this with a reference to an attribute in the model it is defined may significantly impact performance.
+    """
+
+    attribute: AttributeReference
+    func: NoInfoAttrValidatorFunction | GeneralAttrValidatorFunction
+
+    def __get_pydantic_core_schema__(self, source_type: Any, handler: GetCoreSchemaHandler) -> CoreSchema:
+        schema = handler(source_type)
+        info_arg = inspect_validator(self.func, "after")
+        if info_arg:
+            func = cast(GeneralAttrValidatorFunction, self.func)
+
+            def wrapper(value: Any, info: ValidationInfo) -> Any:
+                attribute_val = self.attribute.get_value(info)
+                if attribute_val is None:
+                    return value
+                return func(value, attribute_val, info)
+
+        else:
+            func = cast(NoInfoAttrValidatorFunction, self.func)
+
+            def wrapper(value: Any, info: ValidationInfo) -> Any:
+                attribute_val = self.attribute.get_value(info)
+                if attribute_val is None:
+                    return value
+                return func(value, attribute_val)
+
+        return general_after_validator_function(wrapper, schema=schema)
+
+    def needs_self(self, model_type: Literal["instance", "solution"]) -> bool:
+        """Checks if the validator needs a reference to the current model in order to work fully."""
+        if self.attribute.model == "self":
+            return True
+        else:
+            return self.attribute.model == model_type
 
 
 @dataclass
