@@ -15,7 +15,7 @@ from annotated_types import (
 )
 
 from pydantic import AfterValidator, ValidationInfo, ValidationError, field_validator
-from algobattle.problem import ValidateWith, InstanceModel
+from algobattle.problem import InstanceModel
 from algobattle.util import BaseModel, AttributeReference, AttributeReferenceValidator
 
 __all__ = (
@@ -318,17 +318,14 @@ def get_instance(info: ValidationInfo) -> InstanceModel | None:
 S = TypeVar("S", bound=Sized)
 
 
-def size_len_val(v: S, info: ValidationInfo) -> S:
+def size_len_val(v: S, size: int) -> S:
     """Validates that the collection has length `instance.size`."""
-    instance = get_instance(info)
-    if instance is None:
-        return v
-    if len(v) != instance.size:
+    if len(v) != size:
         raise ValueError("Value does not have length `instance.size`")
     return v
 
 
-SizeLen = Annotated[S, AfterValidator(size_len_val), ValidateWith.Instance]
+SizeLen = Annotated[S, AttributeReferenceValidator(AttributeReference("instance", "size"), size_len_val)]
 
 
 class DirectedGraph(InstanceModel):
@@ -371,30 +368,23 @@ class UndirectedGraph(DirectedGraph):
         self.edges = list(normalized_edges)
 
 
-def edge_index_val(v: int, info: ValidationInfo) -> int:
-    instance = get_instance(info)
-    if instance is None:
-        return v
-    assert isinstance(instance, DirectedGraph)
-    if v >= len(instance.edges):
+def edge_index_val(v: int, edges: list[tuple[u64, u64]]) -> int:
+    if v >= len(edges):
         raise ValueError("Value is not a valid index into `instance.`")
     return v
 
 
-EdgeIndex = Annotated[u64, AfterValidator(edge_index_val), ValidateWith.Instance]
+EdgeIndex = Annotated[u64, AttributeReferenceValidator(AttributeReference("instance", "edges"), edge_index_val)]
 
 
-def edge_len_val(v: S, info: ValidationInfo) -> S:
-    """Validates that the collection has length `instance.size`."""
-    instance = get_instance(info)
-    if not isinstance(instance, DirectedGraph):
-        return v
-    if len(v) != len(instance.edges):
+def edge_len_val(v: S, edges: list[tuple[u64, u64]]) -> S:
+    """Validates that the collection has the same length as `instance.edges`."""
+    if len(v) != len(edges):
         raise ValueError("Value does not have the same length `instance.edges`")
     return v
 
 
-SizeLen = Annotated[S, AfterValidator(size_len_val), ValidateWith.Instance]
+SizeLen = Annotated[S, AttributeReferenceValidator(AttributeReference("instance", "edges"), edge_len_val)]
 
 
 Weight = TypeVar("Weight")
