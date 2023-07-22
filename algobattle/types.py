@@ -83,6 +83,15 @@ def Gt(gt: AttributeReference) -> AfterValidator:
 
 
 def Gt(gt: SupportsGt | AttributeReference) -> AnnotatedGt | AfterValidator:
+    """Implies that the value must be greater than the argument.
+
+    Passing an `AttributeReferece` means that the value must be greater than the value on the referenced property of
+    the instance or solution. E.g. `Gt(InstanceReference("size"))` in a solution model implies that the value must be
+    greater than the size of the instance it solves.
+
+    It can be used with any type that supports the ``>`` operator,
+    including numbers, dates and times, strings, sets, and so on.
+    """
     if isinstance(gt, AttributeReference):
         return attribute_cmp_validator(gt, operator.gt, "greater than")
     else:
@@ -100,6 +109,15 @@ def Ge(ge: AttributeReference) -> AfterValidator:
 
 
 def Ge(ge: SupportsGe | AttributeReference) -> AnnotatedGe | AfterValidator:
+    """Implies that the value must be greater than or equal to the argument.
+
+    Passing an `AttributeReferece` means that the value must be greater than or equal to the value on the referenced
+    property of the instance or solution. E.g. `Ge(InstanceReference("size"))` in a solution model implies that the
+    value must be greater than or equal to the size of the instance it solves.
+
+    It can be used with any type that supports the ``>=`` operator,
+    including numbers, dates and times, strings, sets, and so on.
+    """
     if isinstance(ge, AttributeReference):
         return attribute_cmp_validator(ge, operator.ge, "greater than or equal to")
     else:
@@ -117,6 +135,15 @@ def Lt(lt: AttributeReference) -> AfterValidator:
 
 
 def Lt(lt: SupportsLt | AttributeReference) -> AnnotatedLt | AfterValidator:
+    """Implies that the value must be less than the argument.
+
+    Passing an `AttributeReferece` means that the value must be less than the value on the referenced property of
+    the instance or solution. E.g. `Lt(InstanceReference("size"))` in a solution model implies that the value must be
+    less than the size of the instance it solves.
+
+    It can be used with any type that supports the ``<`` operator,
+    including numbers, dates and times, strings, sets, and so on.
+    """
     if isinstance(lt, AttributeReference):
         return attribute_cmp_validator(lt, operator.lt, "less than")
     else:
@@ -134,6 +161,15 @@ def Le(le: AttributeReference) -> AfterValidator:
 
 
 def Le(le: SupportsLe | AttributeReference) -> AnnotatedLe | AfterValidator:
+    """Implies that the value must be less than or equal to the argument.
+
+    Passing an `AttributeReferece` means that the value must be less than or equal to the value on the referenced
+    property of the instance or solution. E.g. `Le(InstanceReference("size"))` in a solution model implies that the
+    value must be less than or equal to the size of the instance it solves.
+
+    It can be used with any type that supports the ``<=`` operator,
+    including numbers, dates and times, strings, sets, and so on.
+    """
     if isinstance(le, AttributeReference):
         return attribute_cmp_validator(le, operator.le, "less than or equal to")
     else:
@@ -177,7 +213,7 @@ class DirectedGraph(InstanceModel):
 
     @field_validator("edges", mode="after")
     @classmethod
-    def unique_edges(cls, value: list[tuple[u64, u64]]) -> list[tuple[u64, u64]]:
+    def _unique_edges(cls, value: list[tuple[u64, u64]]) -> list[tuple[u64, u64]]:
         if len(set(value)) != len(value):
             raise ValueError("Edge list contains duplicate entries.")
         return value

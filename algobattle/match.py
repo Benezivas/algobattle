@@ -92,7 +92,9 @@ class Match(BaseModel):
 
     active_teams: list[str]
     excluded_teams: dict[str, ExceptionInfo]
-    results: defaultdict[str, Annotated[dict[str, Battle], Field(default_factory=dict)]] = Field(default_factory=lambda: defaultdict(dict))
+    results: defaultdict[str, Annotated[dict[str, Battle], Field(default_factory=dict)]] = Field(
+        default_factory=lambda: defaultdict(dict)
+    )
 
     async def _run_battle(
         self,

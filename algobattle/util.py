@@ -62,6 +62,10 @@ class AttributeReference:
     _key: ClassVar[str]
 
     def get_value(self, info: ValidationInfo) -> Any | None:
+        """Returns the referenced value from the correct object in the info context.
+
+        If the correct object is not in the context or doesn't have the referenced attribute it returns None.
+        """
         if info.context is None or self._key not in info.context:
             return None
         model = info.context[self._key]
@@ -85,6 +89,8 @@ class AttributeReference:
 
 
 class InstanceReference(AttributeReference):
+    """A reference to an attribute of an instance."""
+
     __slots__ = ()
 
     _key = "instance"
@@ -94,6 +100,8 @@ class InstanceReference(AttributeReference):
 
 
 class SolutionReference(AttributeReference):
+    """A reference to an attribute of a solution."""
+
     __slots__ = ()
 
     _key = "solution"
@@ -103,6 +111,8 @@ class SolutionReference(AttributeReference):
 
 
 class SelfReference(InstanceReference, SolutionReference):
+    """A reference to an attribute of the object currently being validated."""
+
     __slots__ = ()
 
     _key = "self"
