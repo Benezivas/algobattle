@@ -14,7 +14,7 @@ from annotated_types import (
     SupportsMod,
 )
 
-from pydantic import AfterValidator, ValidationInfo, ValidationError, field_validator
+from pydantic import ValidationInfo, ValidationError, field_validator
 from algobattle.problem import InstanceModel
 from algobattle.util import BaseModel, AttributeReference, AttributeReferenceValidator
 
@@ -68,7 +68,7 @@ def attribute_cmp_validator(
             raise ValueError(f"Value is not {phrase} {attribute}")
         return value
 
-    return AttributeReferenceValidator(attribute, validator)
+    return AttributeReferenceValidator(validator, attribute)
 
 
 @overload
@@ -210,7 +210,7 @@ def attribute_multiple_of_validator(attribute: AttributeReference) -> AttributeR
             raise ValueError(f"Value is not a multiple of {attribute}")
         return value
 
-    return AttributeReferenceValidator(attribute, validator)
+    return AttributeReferenceValidator(validator, attribute)
 
 
 @overload
@@ -255,7 +255,7 @@ def MinLen(min_length: Annotated[int, Ge(0)] | AttributeReference) -> at.MinLen 
                 raise ValueError(f"Value does not have a minimum length of {min_length}")
             return value
 
-        return AttributeReferenceValidator(min_length, validator)
+        return AttributeReferenceValidator(validator, min_length)
     else:
         return MinLen(min_length)
 
@@ -283,7 +283,7 @@ def MaxLen(max_length: Annotated[int, Ge(0)] | AttributeReference) -> at.MaxLen 
                 raise ValueError(f"Value does not have a maximum length of {max_length}")
             return value
 
-        return AttributeReferenceValidator(max_length, validator)
+        return AttributeReferenceValidator(validator, max_length)
     else:
         return MaxLen(max_length)
 
@@ -325,7 +325,7 @@ def size_len_val(v: S, size: int) -> S:
     return v
 
 
-SizeLen = Annotated[S, AttributeReferenceValidator(AttributeReference("instance", "size"), size_len_val)]
+SizeLen = Annotated[S, AttributeReferenceValidator(size_len_val, model="instance", attribute="size")]
 
 
 class DirectedGraph(InstanceModel):
@@ -374,7 +374,7 @@ def edge_index_val(v: int, edges: list[tuple[u64, u64]]) -> int:
     return v
 
 
-EdgeIndex = Annotated[u64, AttributeReferenceValidator(AttributeReference("instance", "edges"), edge_index_val)]
+EdgeIndex = Annotated[u64, AttributeReferenceValidator(edge_index_val, model="instance", attribute="edges")]
 
 
 def edge_len_val(v: S, edges: list[tuple[u64, u64]]) -> S:
@@ -384,7 +384,7 @@ def edge_len_val(v: S, edges: list[tuple[u64, u64]]) -> S:
     return v
 
 
-SizeLen = Annotated[S, AttributeReferenceValidator(AttributeReference("instance", "edges"), edge_len_val)]
+SizeLen = Annotated[S, AttributeReferenceValidator(edge_len_val, model="instance", attribute="edges")]
 
 
 Weight = TypeVar("Weight")

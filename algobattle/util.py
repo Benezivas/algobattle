@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from traceback import format_exception
-from typing import Any, Callable, Iterable, Literal, LiteralString, TypeVar, Self, cast, get_args
+from typing import Any, Callable, Iterable, Literal, LiteralString, TypeVar, Self, cast, get_args, overload
 from typing_extensions import TypedDict
 
 from pydantic import (
@@ -193,11 +193,14 @@ class InstanceSolutionModel(EncodableModel, ABC):
         return any(cls._annotation_needs_self(info.annotation, model_type) for info in cls.model_fields.values())
 
 
+ModelReference = Literal["instance", "solution", "self"]
+
+
 @dataclass(frozen=True, slots=True)
 class AttributeReference:
     """Creates a reference to the attribute of a model to be used in validaton schemas."""
 
-    model: Literal["instance", "solution", "self"]
+    model: ModelReference
     attribute: str
 
     def get_value(self, info: ValidationInfo) -> Any | None:
@@ -226,17 +229,43 @@ class AttributeReference:
 
 NoInfoAttrValidatorFunction = Callable[[Any, Any], Any]
 GeneralAttrValidatorFunction = Callable[[Any, Any, ValidationInfo], Any]
+AttrValidatorFunction = NoInfoAttrValidatorFunction | GeneralAttrValidatorFunction
 
 
-@dataclass(frozen=True, slots=True)
 class AttributeReferenceValidator:
     """An AfterValidator that can resolve a reference to a model attribute and pass it to the validator function.
 
     Using this with a reference to an attribute in the model it is defined may significantly impact performance.
     """
 
-    attribute: AttributeReference
-    func: NoInfoAttrValidatorFunction | GeneralAttrValidatorFunction
+    __slots__ = ("func", "attribute")
+
+    @overload
+    @inherit_docs
+    def __init__(self, func: AttrValidatorFunction, ref: AttributeReference) -> None:
+        ...
+
+    @overload
+    @inherit_docs
+    def __init__(self, func: AttrValidatorFunction, *, model: ModelReference, attribute: str) -> None:
+        ...
+
+    def __init__(
+        self,
+        func: AttrValidatorFunction,
+        ref: AttributeReference | None = None,
+        *,
+        model: ModelReference | None = None,
+        attribute: str | None = None,
+    ) -> None:
+        """Creates an AttributeReferenceValidator."""
+        super().__init__()
+        self.func = func
+        if ref is not None:
+            self.attribute = ref
+        else:
+            assert model is not None and attribute is not None
+            self.attribute = AttributeReference(model, attribute)
 
     def __get_pydantic_core_schema__(self, source_type: Any, handler: GetCoreSchemaHandler) -> CoreSchema:
         schema = handler(source_type)
