@@ -2,18 +2,16 @@
 from dataclasses import dataclass
 from typing import Annotated, Any, Callable, Iterator, Sized, TypeVar, Generic, overload
 import operator
+import annotated_types as at
 from annotated_types import (
     BaseMetadata,
-    Ge as AnnotatedGe,
     GroupedMetadata,
-    Gt as AnnotatedGt,
-    Le as AnnotatedLe,
-    Lt as AnnotatedLt,
-    Interval as AnnotatedInterval,
+    SupportsDiv,
     SupportsGe,
     SupportsGt,
     SupportsLe,
     SupportsLt,
+    SupportsMod,
 )
 
 from pydantic import AfterValidator, ValidationInfo, ValidationError, field_validator
@@ -40,22 +38,22 @@ __all__ = (
 )
 
 
-u64 = Annotated[int, AnnotatedInterval(ge=0, lt=2**64)]
+u64 = Annotated[int, at.Interval(ge=0, lt=2**64)]
 """64 bit unsigned int."""
 
-i64 = Annotated[int, AnnotatedInterval(ge=-(2**63), lt=2**63)]
+i64 = Annotated[int, at.Interval(ge=-(2**63), lt=2**63)]
 """64 bit signed int."""
 
-u32 = Annotated[int, AnnotatedInterval(ge=0, lt=2**32)]
+u32 = Annotated[int, at.Interval(ge=0, lt=2**32)]
 """32 bit unsigned int."""
 
-i32 = Annotated[int, AnnotatedInterval(ge=-(2**31), lt=2**31)]
+i32 = Annotated[int, at.Interval(ge=-(2**31), lt=2**31)]
 """32 bit signed int."""
 
-u16 = Annotated[int, AnnotatedInterval(ge=0, lt=2**16)]
+u16 = Annotated[int, at.Interval(ge=0, lt=2**16)]
 """16 bit unsigned int."""
 
-i16 = Annotated[int, AnnotatedInterval(ge=-(2**15), lt=2**15)]
+i16 = Annotated[int, at.Interval(ge=-(2**15), lt=2**15)]
 """16 bit signed int."""
 
 
@@ -76,7 +74,7 @@ def attribute_cmp_validator(attribute: AttributeReference, operator_func: CmpOpT
 
 
 @overload
-def Gt(gt: SupportsGt) -> AnnotatedGt:
+def Gt(gt: SupportsGt) -> at.Gt:
     ...
 
 
@@ -85,7 +83,7 @@ def Gt(gt: AttributeReference) -> AfterValidator:
     ...
 
 
-def Gt(gt: SupportsGt | AttributeReference) -> AnnotatedGt | AfterValidator:
+def Gt(gt: SupportsGt | AttributeReference) -> at.Gt | AfterValidator:
     """Implies that the value must be greater than the argument.
 
     Passing an `AttributeReferece` means that the value must be greater than the value on the referenced property of
@@ -98,11 +96,11 @@ def Gt(gt: SupportsGt | AttributeReference) -> AnnotatedGt | AfterValidator:
     if isinstance(gt, AttributeReference):
         return attribute_cmp_validator(gt, operator.gt, "greater than")
     else:
-        return AnnotatedGt(gt)
+        return at.Gt(gt)
 
 
 @overload
-def Ge(ge: SupportsGe) -> AnnotatedGe:
+def Ge(ge: SupportsGe) -> at.Ge:
     ...
 
 
@@ -111,7 +109,7 @@ def Ge(ge: AttributeReference) -> AfterValidator:
     ...
 
 
-def Ge(ge: SupportsGe | AttributeReference) -> AnnotatedGe | AfterValidator:
+def Ge(ge: SupportsGe | AttributeReference) -> at.Ge | AfterValidator:
     """Implies that the value must be greater than or equal to the argument.
 
     Passing an `AttributeReferece` means that the value must be greater than or equal to the value on the referenced
@@ -124,11 +122,11 @@ def Ge(ge: SupportsGe | AttributeReference) -> AnnotatedGe | AfterValidator:
     if isinstance(ge, AttributeReference):
         return attribute_cmp_validator(ge, operator.ge, "greater than or equal to")
     else:
-        return AnnotatedGe(ge)
+        return at.Ge(ge)
 
 
 @overload
-def Lt(lt: SupportsLt) -> AnnotatedLt:
+def Lt(lt: SupportsLt) -> at.Lt:
     ...
 
 
@@ -137,7 +135,7 @@ def Lt(lt: AttributeReference) -> AfterValidator:
     ...
 
 
-def Lt(lt: SupportsLt | AttributeReference) -> AnnotatedLt | AfterValidator:
+def Lt(lt: SupportsLt | AttributeReference) -> at.Lt | AfterValidator:
     """Implies that the value must be less than the argument.
 
     Passing an `AttributeReferece` means that the value must be less than the value on the referenced property of
@@ -150,11 +148,11 @@ def Lt(lt: SupportsLt | AttributeReference) -> AnnotatedLt | AfterValidator:
     if isinstance(lt, AttributeReference):
         return attribute_cmp_validator(lt, operator.lt, "less than")
     else:
-        return AnnotatedLt(lt)
+        return at.Lt(lt)
 
 
 @overload
-def Le(le: SupportsLe) -> AnnotatedLe:
+def Le(le: SupportsLe) -> at.Le:
     ...
 
 
@@ -163,7 +161,7 @@ def Le(le: AttributeReference) -> AfterValidator:
     ...
 
 
-def Le(le: SupportsLe | AttributeReference) -> AnnotatedLe | AfterValidator:
+def Le(le: SupportsLe | AttributeReference) -> at.Le | AfterValidator:
     """Implies that the value must be less than or equal to the argument.
 
     Passing an `AttributeReferece` means that the value must be less than or equal to the value on the referenced
@@ -176,7 +174,7 @@ def Le(le: SupportsLe | AttributeReference) -> AnnotatedLe | AfterValidator:
     if isinstance(le, AttributeReference):
         return attribute_cmp_validator(le, operator.le, "less than or equal to")
     else:
-        return AnnotatedLe(le)
+        return at.Le(le)
 
 
 @dataclass(frozen=True, kw_only=True, slots=True)
@@ -204,7 +202,111 @@ class Interval(GroupedMetadata):
             yield Le(self.le)
 
 
-SizeIndex = Annotated[u64, AnnotatedGe(0), Lt(InstanceReference("size"))]
+def attribute_multiple_of_validator(attribute: AttributeReference) -> AfterValidator:
+    def validator(value: Any, info: ValidationInfo) -> Any:
+        attribute_val = attribute.get_value(info)
+        if attribute_val is None:
+            return value
+
+        if not (value % attribute_val == 0):
+            raise ValueError(f"Value is not a multiple of {attribute}")
+        return value
+
+    return AfterValidator(validator)
+
+
+@overload
+def MultipleOf(multiple_of: SupportsDiv | SupportsMod) -> at.MultipleOf:
+    ...
+
+
+@overload
+def MultipleOf(multiple_of: AttributeReference) -> AfterValidator:
+    ...
+
+
+def MultipleOf(multiple_of: SupportsDiv | SupportsMod | AttributeReference) -> at.MultipleOf | AfterValidator:
+    if isinstance(multiple_of, AttributeReference):
+        return attribute_multiple_of_validator(multiple_of)
+    else:
+        return at.MultipleOf(multiple_of)
+
+
+@overload
+def MinLen(min_length: Annotated[int, Ge(0)]) -> at.MinLen:
+    ...
+
+
+@overload
+def MinLen(min_length: AttributeReference) -> AfterValidator:
+    ...
+
+
+def MinLen(min_length: Annotated[int, Ge(0)] | AttributeReference) -> at.MinLen | AfterValidator:
+    """Implies minimum inclusive length, i.e. `len(value) >= min_length`."""
+    if isinstance(min_length, AttributeReference):
+
+        def validator(value: Any, info: ValidationInfo) -> Any:
+            attribute_val = min_length.get_value(info)
+            if attribute_val is None:
+                return value
+
+            if not (len(value) >= attribute_val):
+                raise ValueError(f"Value does not have a minimum length of {min_length}")
+            return value
+
+        return AfterValidator(validator)
+    else:
+        return MinLen(min_length)
+
+
+@overload
+def MaxLen(max_length: Annotated[int, Ge(0)]) -> at.MaxLen:
+    ...
+
+
+@overload
+def MaxLen(max_length: AttributeReference) -> AfterValidator:
+    ...
+
+
+def MaxLen(max_length: Annotated[int, Ge(0)] | AttributeReference) -> at.MaxLen | AfterValidator:
+    """Implies maximum inclusive length, i.e. `len(value) <= max_length`."""
+    if isinstance(max_length, AttributeReference):
+
+        def validator(value: Any, info: ValidationInfo) -> Any:
+            attribute_val = max_length.get_value(info)
+            if attribute_val is None:
+                return value
+
+            if not (len(value) <= attribute_val):
+                raise ValueError(f"Value does not have a maximum length of {max_length}")
+            return value
+
+        return AfterValidator(validator)
+    else:
+        return MaxLen(max_length)
+
+
+@dataclass(frozen=True, slots=True)
+class Len(GroupedMetadata):
+    """Implies `min_length <= len(value) <= max_length`.
+
+    Upper bound may be omitted or ``None`` to indicate no upper length bound.
+    """
+
+    min_length: Annotated[int, Ge(0)] = 0
+    max_length: Annotated[int, Ge(0)] | None = None
+
+    def __iter__(self) -> Iterator[BaseMetadata | AfterValidator]:  # type: ignore
+        """Unpack a Len into one or more single-bounds."""
+        if self.min_length > 0:
+            yield MinLen(self.min_length)
+        if self.max_length is not None:
+            yield MaxLen(self.max_length)
+
+
+SizeIndex = Annotated[u64, at.Ge(0), Lt(InstanceReference("size"))]
 
 
 def get_instance(info: ValidationInfo) -> InstanceModel | None:
