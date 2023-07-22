@@ -266,13 +266,13 @@ class Problem(Generic[InstanceT, SolutionT]):
 
 class ValidateWith(Enum):
     """Marker class to make an instance or solution be validated again with itself in the context.
-    
+
     Needs to be included via a typing.Annotation if you want to define custom types that access instance/solution
     attributes that are usable within those models.
     """
+
     Instance = "instance"
     Solution = "solution"
-
 
     def annotates(self, annotation: Any) -> bool:
         """Checks if a type needs to be parsed again with the instance/solution context."""
@@ -286,7 +286,7 @@ class InstanceModel(EncodableModel, Instance, ABC):
 
     def validate_instance(self) -> None:
         """Validate the instance again, this time also passing itself in the context.
-        
+
         Very inefficient implementation to make SizeIndex and similar types work.
         """
         super().validate_instance()
@@ -299,7 +299,7 @@ class SolutionModel(Solution[InstanceT], EncodableModel, ABC):
 
     def validate_solution(self, instance: InstanceT, role: Role) -> None:
         """Validate the solution again, this time also passing itself and the instance in the context.
-        
+
         Very inefficient implementation to make SizeIndex and similar types work.
         """
         super().validate_solution(instance, role)

@@ -1,10 +1,21 @@
 """Utility types used to easily define Problems."""
-from typing import Annotated, Sized, TypeVar, Generic
-from annotated_types import Ge, Interval
+from typing import Annotated, Any, Callable, Sized, TypeVar, Generic, overload
+import operator
+from annotated_types import (
+    Interval,
+    Ge as AnnotatedGe,
+    Gt as AnnotatedGt,
+    Le as AnnotatedLe,
+    Lt as AnnotatedLt,
+    SupportsGe,
+    SupportsGt,
+    SupportsLe,
+    SupportsLt,
+)
 
 from pydantic import AfterValidator, ValidationInfo, ValidationError, field_validator
 from algobattle.problem import ValidateWith, InstanceModel
-from algobattle.util import BaseModel
+from algobattle.util import BaseModel, AttributeReference, InstanceReference
 
 __all__ = (
     "u64",
@@ -13,6 +24,10 @@ __all__ = (
     "i32",
     "u16",
     "i16",
+    "Gt",
+    "Ge",
+    "Lt",
+    "Le",
     "SizeIndex",
     "SizeLen",
     "DirectedGraph",
@@ -22,23 +37,110 @@ __all__ = (
 )
 
 
-u64 = Annotated[int, Interval(ge=0, lt=2 ** 64)]
+u64 = Annotated[int, Interval(ge=0, lt=2**64)]
 """64 bit unsigned int."""
 
 i64 = Annotated[int, Interval(ge=-(2**63), lt=2**63)]
 """64 bit signed int."""
 
-u32 = Annotated[int, Interval(ge=0, lt=2 ** 32)]
+u32 = Annotated[int, Interval(ge=0, lt=2**32)]
 """32 bit unsigned int."""
 
 i32 = Annotated[int, Interval(ge=-(2**31), lt=2**31)]
 """32 bit signed int."""
 
-u16 = Annotated[int, Interval(ge=0, lt=2 ** 16)]
+u16 = Annotated[int, Interval(ge=0, lt=2**16)]
 """16 bit unsigned int."""
 
-i16 = Annotated[int, Interval(ge=-(2**15), lt=2 ** 15)]
+i16 = Annotated[int, Interval(ge=-(2**15), lt=2**15)]
 """16 bit signed int."""
+
+
+CmpOpType = Callable[[Any, Any], bool]
+
+
+def attribute_cmp_validator(attribute: AttributeReference, operator_func: CmpOpType, phrase: str) -> AfterValidator:
+    def validator(value: Any, info: ValidationInfo) -> Any:
+        attribute_val = attribute.get_value(info)
+        if attribute_val is None:
+            return value
+
+        if not operator_func(value, attribute_val):
+            raise ValueError(f"Value is not {phrase} {attribute}")
+        return value
+
+    return AfterValidator(validator)
+
+
+@overload
+def Gt(gt: SupportsGt) -> AnnotatedGt:
+    ...
+
+
+@overload
+def Gt(gt: AttributeReference) -> AfterValidator:
+    ...
+
+
+def Gt(gt: SupportsGt | AttributeReference) -> AnnotatedGt | AfterValidator:
+    if isinstance(gt, AttributeReference):
+        return attribute_cmp_validator(gt, operator.gt, "greater than")
+    else:
+        return AnnotatedGt(gt)
+
+
+@overload
+def Ge(ge: SupportsGe) -> AnnotatedGe:
+    ...
+
+
+@overload
+def Ge(ge: AttributeReference) -> AfterValidator:
+    ...
+
+
+def Ge(ge: SupportsGe | AttributeReference) -> AnnotatedGe | AfterValidator:
+    if isinstance(ge, AttributeReference):
+        return attribute_cmp_validator(ge, operator.ge, "greater than or equal to")
+    else:
+        return AnnotatedGe(ge)
+
+
+@overload
+def Lt(lt: SupportsLt) -> AnnotatedLt:
+    ...
+
+
+@overload
+def Lt(lt: AttributeReference) -> AfterValidator:
+    ...
+
+
+def Lt(lt: SupportsLt | AttributeReference) -> AnnotatedLt | AfterValidator:
+    if isinstance(lt, AttributeReference):
+        return attribute_cmp_validator(lt, operator.lt, "less than")
+    else:
+        return AnnotatedLt(lt)
+
+
+@overload
+def Le(le: SupportsLe) -> AnnotatedLe:
+    ...
+
+
+@overload
+def Le(le: AttributeReference) -> AfterValidator:
+    ...
+
+
+def Le(le: SupportsLe | AttributeReference) -> AnnotatedLe | AfterValidator:
+    if isinstance(le, AttributeReference):
+        return attribute_cmp_validator(le, operator.le, "less than or equal to")
+    else:
+        return AnnotatedLe(le)
+
+
+SizeIndex = Annotated[u64, AnnotatedGe(0), Lt(InstanceReference("size"))]
 
 
 def get_instance(info: ValidationInfo) -> InstanceModel | None:
@@ -47,18 +149,8 @@ def get_instance(info: ValidationInfo) -> InstanceModel | None:
     return info.context.get("instance", None)
 
 
-def size_index_val(v: int, info: ValidationInfo) -> int:
-    instance = get_instance(info)
-    if instance is None:
-        return v
-    if v >= instance.size:
-        raise ValueError("SizeIndex is not a valid index into a collection of length `instance.size`")
-    return v
-
-SizeIndex = Annotated[int, Ge(0), AfterValidator(size_index_val), ValidateWith.Instance]
-
-
 S = TypeVar("S", bound=Sized)
+
 
 def size_len_val(v: S, info: ValidationInfo) -> S:
     """Validates that the collection has length `instance.size`."""
@@ -69,10 +161,11 @@ def size_len_val(v: S, info: ValidationInfo) -> S:
         raise ValueError("Value does not have length `instance.size`")
     return v
 
+
 SizeLen = Annotated[S, AfterValidator(size_len_val), ValidateWith.Instance]
 
 
-i16 = Annotated[int, Interval(ge=-(2**15), lt=2 ** 15)]
+i16 = Annotated[int, Interval(ge=-(2**15), lt=2**15)]
 """16 bit signed int."""
 
 
@@ -80,7 +173,7 @@ class DirectedGraph(InstanceModel):
     """Base instance class for problems on directed graphs."""
 
     num_vertices: u64
-    edges: list[tuple[u64, u64]]
+    edges: list[tuple[SizeIndex, SizeIndex]]
 
     @field_validator("edges", mode="after")
     @classmethod
@@ -93,11 +186,6 @@ class DirectedGraph(InstanceModel):
     def size(self) -> int:
         """A graph's size is the number of vertices in it."""
         return self.num_vertices
-
-    def validate_instance(self):
-        """Validates that the graph contains at most `size` many vertices and all edges are well defined."""
-        if any(u >= self.num_vertices for edge in self.edges for u in edge):
-            raise ValidationError("Graph contains edges whose endpoints aren't valid vertices")
 
 
 class UndirectedGraph(DirectedGraph):
@@ -119,6 +207,32 @@ class UndirectedGraph(DirectedGraph):
             if (v, u) not in normalized_edges:
                 normalized_edges.add((u, v))
         self.edges = list(normalized_edges)
+
+
+def edge_index_val(v: int, info: ValidationInfo) -> int:
+    instance = get_instance(info)
+    if instance is None:
+        return v
+    assert isinstance(instance, DirectedGraph)
+    if v >= len(instance.edges):
+        raise ValueError("Value is not a valid index into `instance.`")
+    return v
+
+
+EdgeIndex = Annotated[u64, AfterValidator(edge_index_val), ValidateWith.Instance]
+
+
+def edge_len_val(v: S, info: ValidationInfo) -> S:
+    """Validates that the collection has length `instance.size`."""
+    instance = get_instance(info)
+    if not isinstance(instance, DirectedGraph):
+        return v
+    if len(v) != len(instance.edges):
+        raise ValueError("Value does not have the same length `instance.edges`")
+    return v
+
+
+SizeLen = Annotated[S, AfterValidator(size_len_val), ValidateWith.Instance]
 
 
 Weight = TypeVar("Weight")

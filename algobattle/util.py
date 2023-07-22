@@ -6,11 +6,12 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
+from inspect import isclass
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from traceback import format_exception
-from typing import Any, Iterable, Literal, LiteralString, Mapping, TypeVar, Self
+from typing import Any, ClassVar, Iterable, Literal, LiteralString, TypeVar, Self, get_args
 from typing_extensions import TypedDict
 
 from pydantic import (
@@ -18,6 +19,7 @@ from pydantic import (
     BaseModel as PydandticBaseModel,
     Extra,
     ValidationError as PydanticValidationError,
+    ValidationInfo,
 )
 
 
@@ -49,6 +51,64 @@ class BaseModel(PydandticBaseModel):
     """Base class for all pydantic models."""
 
     model_config = ConfigDict(extra=Extra.forbid, from_attributes=True)
+
+
+@dataclass(frozen=True, slots=True)
+class AttributeReference:
+    """Base class so we can search for model attribute references."""
+
+    attribute: str
+
+    _key: ClassVar[str]
+
+    def get_value(self, info: ValidationInfo) -> Any | None:
+        if info.context is None or self._key not in info.context:
+            return None
+        model = info.context[self._key]
+        if hasattr(model, self.attribute):
+            return getattr(model, self.attribute)
+        else:
+            return None
+
+    @classmethod
+    def in_annotation(cls, annotation: object) -> bool:
+        """Checks if a type appears in an annotation metadata."""
+        if isclass(annotation) and issubclass(annotation, cls):
+            return True
+        return any(cls.in_annotation(e) for e in get_args(annotation))
+
+    @staticmethod
+    def validate_with_self(model: BaseModel, model_type: Literal["instance", "solution"]) -> bool:
+        """Checks if a model needs to be parsed with itself in the context."""
+        metadata_cls = InstanceReference if model_type == "instance" else SolutionReference
+        return any(metadata_cls.in_annotation(info.annotation) for info in model.model_fields.values())
+
+
+class InstanceReference(AttributeReference):
+    __slots__ = ()
+
+    _key = "instance"
+
+    def __str__(self) -> str:
+        return f"instance.{self.attribute}"
+
+
+class SolutionReference(AttributeReference):
+    __slots__ = ()
+
+    _key = "solution"
+
+    def __str__(self) -> str:
+        return f"solution.{self.attribute}"
+
+
+class SelfReference(InstanceReference, SolutionReference):
+    __slots__ = ()
+
+    _key = "self"
+
+    def __str__(self) -> str:
+        return f"self.{self.attribute}"
 
 
 def inherit_docs(obj: T) -> T:
@@ -172,7 +232,6 @@ class EncodableModel(BaseModel, Encodable, ABC):
     def io_schema(cls) -> str:
         """Uses pydantic to generate a json schema for this class."""
         return json.dumps(cls.model_json_schema(), indent=4)
-
 
 
 @dataclass
