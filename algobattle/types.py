@@ -33,15 +33,21 @@ __all__ = (
     "Ge",
     "Lt",
     "Le",
+    "Interval",
+    "MultipleOf",
+    "MinLen",
+    "MaxLen",
+    "Len",
+    "UniqueItems",
     "SizeIndex",
     "SizeLen",
-    "UniqueItems",
     "DirectedGraph",
     "UndirectedGraph",
     "EdgeIndex",
     "EdgeLen",
     "EdgeWeights",
     "VertexWeights",
+    "AlgobattleContext",
 )
 
 
@@ -291,6 +297,7 @@ class Len(GroupedMetadata):
 
 
 SizeIndex = Annotated[u64, at.Ge(0), Lt(InstanceRef.size)]
+"""Specifies that the field is a valid index into a instance.size length sequence, i.e. 0 <= i < instance.size."""
 
 
 S = TypeVar("S", bound=Sized)
@@ -304,6 +311,7 @@ def size_len_val(v: S, size: int) -> S:
 
 
 SizeLen = Annotated[S, AttributeReferenceValidator(size_len_val, InstanceRef.size)]
+"""Specifies that the legth of the field is the same as instance.size."""
 
 
 C = TypeVar("C", bound=Collection[Hashable])
@@ -330,6 +338,7 @@ class UniqueItemsValidator:
 
 
 UniqueItems = Annotated[C, UniqueItemsValidator()]
+"""Specifies that the collection should contain no duplicates."""
 
 
 class DirectedGraph(InstanceModel):
@@ -369,6 +378,7 @@ def edge_index_val(v: int, edges: list[tuple[u64, u64]]) -> int:
 
 
 EdgeIndex = Annotated[u64, AttributeReferenceValidator(edge_index_val, InstanceRef.edges)]
+"""Specifies that the field should be a valid index into instance.edges."""
 
 
 def edge_len_val(v: S, edges: list[tuple[u64, u64]]) -> S:
@@ -379,6 +389,7 @@ def edge_len_val(v: S, edges: list[tuple[u64, u64]]) -> S:
 
 
 EdgeLen = Annotated[S, AttributeReferenceValidator(edge_len_val, InstanceRef.edges)]
+"""Specifies that the field should have the same length as instance.edges."""
 
 
 Weight = TypeVar("Weight")
