@@ -53,6 +53,7 @@ class Solution(Encodable, Generic[InstanceT], ABC):
 
         Args:
             instance: The problem instance this solution is purported to solve.
+            role: The role of the team that generated this solution.
 
         Raises:
             ValidationError: if the created instance is invalid.

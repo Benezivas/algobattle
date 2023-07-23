@@ -11,7 +11,6 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from traceback import format_exception
 from typing import Any, Iterable, Literal, LiteralString, TypeVar, Self
-from typing_extensions import TypedDict
 
 from pydantic import (
     ConfigDict,
@@ -36,13 +35,6 @@ T = TypeVar("T")
 def str_with_traceback(exception: Exception) -> str:
     """Returns the full exception info with a stacktrace."""
     return "\n".join(format_exception(exception))
-
-
-class AlgobattleContext(TypedDict, total=False):
-    """Context passed to validation methods used to parse Program output."""
-
-    role: Role
-    max_size: int
 
 
 class BaseModel(PydandticBaseModel):
@@ -93,19 +85,28 @@ class TempDir(TemporaryDirectory[Any]):
         return Path(super().__enter__())
 
 
+@dataclass
+class Context:
+    """Context passed to parsing/validation methods handing Program i/o."""
+
+    role: Role
+    """Role of the team that created/will receive this data."""
+    max_size: int
+    """Maximum size of the current fight this data is for."""
+
+
 class Encodable(ABC):
     """Represents data that docker containers can interact with."""
 
     @classmethod
     @abstractmethod
-    def decode(cls, source: Path, max_size: int, team: Role) -> Self:
+    def decode(cls, source: Path, context: Context) -> Self:
         """Decodes the data found at the given path into a python object.
 
         Args:
             source: Path to data that can be used to construct an instance of this class. May either point to a folder
                 or a single file. The expected type of path should be consistent with the result of :meth:`.encode`.
-            max_size: The size of the fight for which this data is being decoded.
-            team: Role of the team that output the data.
+            context: dictionary containing additional context information about the current i/o step.
 
         Raises:
             EncodingError: If the data cannot be decoded into an instance.
@@ -116,14 +117,14 @@ class Encodable(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def encode(self, target: Path, team: Role) -> None:
+    def encode(self, target: Path, context: Context) -> None:
         """Encodes the object onto the file system so that it can be passed to a program.
 
         Args:
             target: Path to the location where the program expects the encoded data. :meth:`.encode` may either create
                 a single file at the target location, or an entire folder. If creating a single file, it may append a
                 file type ending to the path. It should not affect any other files or directories.
-            team: Role of the team that receives the data.
+            context: dictionary containing additional context information about the current i/o step.
 
         Raises:
             EncodingError: If the data cannot be properly encoded.
@@ -148,19 +149,19 @@ class EncodableModel(BaseModel, Encodable, ABC):
     """Problem data that can easily be encoded into and decoded from json files."""
 
     @classmethod
-    def decode(cls, source: Path, max_size: int, team: Role) -> Self:
+    def decode(cls, source: Path, context: Context) -> Self:
         """Uses pydantic to create a python object from a `.json` file."""
         if not source.with_suffix(".json").is_file():
             raise EncodingError("The json file does not exist.")
         try:
             with open(source.with_suffix(".json"), "r") as f:
-                return cls.model_validate_json(f.read(), context={"role": team, "max_size": max_size})
+                return cls.model_validate_json(f.read(), context=context.__dict__)
         except PydanticValidationError as e:
             raise EncodingError("Json data does not fit the schema.", detail=str(e))
         except Exception as e:
             raise EncodingError("Unknown error while decoding the data.", detail=str(e))
 
-    def encode(self, target: Path, team: Role) -> None:
+    def encode(self, target: Path, context: Context) -> None:
         """Uses pydantic to create a json representation of the object at the targeted file."""
         try:
             with open(target.with_suffix(".json"), "w") as f:

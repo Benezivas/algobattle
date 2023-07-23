@@ -1,6 +1,6 @@
 """Utility types used to easily define Problems."""
 from dataclasses import dataclass
-from typing import Annotated, Any, Collection, Hashable, Iterator, Sized, TypeVar, Generic, overload
+from typing import Annotated, Any, Collection, Hashable, Iterator, Sized, TypeVar, Generic, TypedDict, overload
 import annotated_types as at
 from annotated_types import (
     BaseMetadata,
@@ -19,8 +19,8 @@ import pydantic._internal._validators as validators
 from pydantic_core import CoreSchema, PydanticKnownError
 from pydantic_core.core_schema import no_info_after_validator_function
 
-from algobattle.problem import InstanceModel, AttributeReference, AttributeReferenceValidator, InstanceRef
-from algobattle.util import BaseModel, ValidationError
+from algobattle.problem import InstanceModel, AttributeReference, AttributeReferenceValidator, InstanceRef, SolutionModel
+from algobattle.util import BaseModel, Role, ValidationError
 
 __all__ = (
     "u64",
@@ -43,6 +43,21 @@ __all__ = (
     "EdgeWeights",
     "VertexWeights",
 )
+
+
+class AlgobattleContext(TypedDict, total=False):
+    """Reference class containing the attributes that can be present in the context dict."""
+
+    role: Role
+    """Role of the team that created/will receive this data."""
+    max_size: int
+    """Maximum size of the current fight this data is for."""
+    self: InstanceModel | SolutionModel[InstanceModel]
+    """Object currently being validated, if it is the second round of validation."""
+    instance: InstanceModel
+    """Instance object the solution that is being validated is for."""
+    solution: SolutionModel[InstanceModel]
+    """Solution object that is currently being validated."""
 
 
 u64 = Annotated[int, at.Interval(ge=0, lt=2**64)]

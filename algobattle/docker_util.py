@@ -21,6 +21,7 @@ from urllib3.exceptions import ReadTimeoutError
 from algobattle.util import (
     AlgobattleBaseException,
     BuildError,
+    Context,
     DockerError,
     Encodable,
     EncodingError,
@@ -532,6 +533,13 @@ class _GenResData(Generic[InstanceT, SolutionT]):
 
 
 @dataclass
+class SolutionContext(Context, Generic[InstanceT]):
+    """Context that also includes the Instance that the solution is for."""
+
+    instance: InstanceT
+
+
+@dataclass
 class Program(ABC, Generic[InstanceT, SolutionT]):
     """A higher level interface for a team's programs."""
 
@@ -631,7 +639,7 @@ class Program(ABC, Generic[InstanceT, SolutionT]):
                 )
             if battle_input is not None:
                 try:
-                    battle_input.encode(input / "battle_data", self.role)
+                    battle_input.encode(input / "battle_data", Context(self.role, max_size))
                 except Exception as e:
                     return result_class(
                         ProgramRunInfo(
@@ -681,7 +689,7 @@ class Program(ABC, Generic[InstanceT, SolutionT]):
                 )
 
             if battle_output:
-                decoded_battle_output = battle_output.decode(output / "battle_data", max_size, self.role)
+                decoded_battle_output = battle_output.decode(output / "battle_data", Context(self.role, max_size))
             else:
                 decoded_battle_output = None
 
@@ -731,7 +739,7 @@ class Generator(Program[InstanceT, SolutionT]):
     ) -> _GenResData[InstanceT, SolutionT]:
         assert instance is None
         try:
-            instance = self.problem.instance_cls.decode(output / "instance", max_size, self.role)
+            instance = self.problem.instance_cls.decode(output / "instance", Context(self.role, max_size))
         except EncodingError:
             raise
         except Exception as e:
@@ -747,7 +755,7 @@ class Generator(Program[InstanceT, SolutionT]):
 
         if self.problem.with_solution:
             try:
-                solution = self.problem.solution_cls.decode(output / "solution", max_size, self.role)
+                solution = self.problem.solution_cls.decode(output / "solution", Context(self.role, max_size))
             except EncodingError:
                 raise
             except Exception as e:
@@ -813,12 +821,14 @@ class Solver(Program[InstanceT, SolutionT]):
 
     def _encode_input(self, input: Path, output: Path, max_size: int, instance: InstanceT | None) -> None:
         assert instance is not None
-        instance.encode(input / "instance", self.role)
+        instance.encode(input / "instance", SolutionContext(self.role, max_size, instance))
 
     def _parse_output(self, output: Path, max_size: int, instance: InstanceT | None) -> SolutionT:
         assert instance is not None
         try:
-            solution = self.problem.solution_cls.decode(output / "solution", max_size, self.role)
+            solution = self.problem.solution_cls.decode(
+                output / "solution", SolutionContext(self.role, max_size, instance)
+            )
         except EncodingError:
             raise
         except Exception as e:
