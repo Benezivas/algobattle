@@ -295,12 +295,12 @@ class Len(GroupedMetadata):
     Upper bound may be omitted or ``None`` to indicate no upper length bound.
     """
 
-    min_length: Annotated[int, Ge(0)] = 0
-    max_length: Annotated[int, Ge(0)] | None = None
+    min_length: Annotated[int, Ge(0)] | AttributeReference = 0
+    max_length: Annotated[int, Ge(0)] | AttributeReference | None = None
 
     def __iter__(self) -> Iterator[BaseMetadata | AttributeReferenceValidator]:  # type: ignore
         """Unpack a Len into one or more single-bounds."""
-        if self.min_length > 0:
+        if self.min_length != 0:
             yield MinLen(self.min_length)
         if self.max_length is not None:
             yield MaxLen(self.max_length)
