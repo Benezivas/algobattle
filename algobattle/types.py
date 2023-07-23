@@ -33,6 +33,8 @@ __all__ = (
     "SizeLen",
     "DirectedGraph",
     "UndirectedGraph",
+    "EdgeIndex",
+    "EdgeLen",
     "EdgeWeights",
     "VertexWeights",
 )
@@ -309,12 +311,6 @@ class Len(GroupedMetadata):
 SizeIndex = Annotated[u64, at.Ge(0), Lt(AttributeReference("instance", "size"))]
 
 
-def get_instance(info: ValidationInfo) -> InstanceModel | None:
-    if info.context is None:
-        return None
-    return info.context.get("instance", None)
-
-
 S = TypeVar("S", bound=Sized)
 
 
@@ -384,7 +380,7 @@ def edge_len_val(v: S, edges: list[tuple[u64, u64]]) -> S:
     return v
 
 
-SizeLen = Annotated[S, AttributeReferenceValidator(edge_len_val, model="instance", attribute="edges")]
+EdgeLen = Annotated[S, AttributeReferenceValidator(edge_len_val, model="instance", attribute="edges")]
 
 
 Weight = TypeVar("Weight")
