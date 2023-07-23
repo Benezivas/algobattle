@@ -6,7 +6,7 @@ from pydantic import ValidationError
 
 from algobattle.problem import InstanceModel
 from algobattle.util import AttributeReference
-from algobattle.types import Ge, Interval, SizeIndex
+from algobattle.types import Ge, Interval, SizeIndex, UniqueItems
 
 
 class ModelCreationTests(TestCase):
@@ -20,6 +20,9 @@ class ModelCreationTests(TestCase):
 
     def test_interval(self):
         interval_instance()
+
+    def test_uniqe(self):
+        unique_items_instance()
 
 
 def basic_instance() -> type[InstanceModel]:
@@ -139,6 +142,38 @@ class IntervalTests(TestCase):
         model_dict = {"lower_bound": 0, "i": 10}
         with self.assertRaises(ValidationError):
             self.TestModel.model_validate(model_dict)
+
+
+def unique_items_instance() -> type[InstanceModel]:
+    """Create a basic instance class with a unique items constraint."""
+
+    class UniqueModel(InstanceModel):
+        array: UniqueItems[list[int]]
+
+        @property
+        def size(self) -> int:
+            return len(self.array)
+
+    return UniqueModel
+
+
+class UniqueItemsTest(TestCase):
+    """Tests for the unique items decorator."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.TestModel = unique_items_instance()
+
+    def test_success(self):
+        self.TestModel.model_validate({"array": [1, 2, 3]})
+
+    def test_rejected(self):
+        with self.assertRaises(ValidationError):
+            self.TestModel.model_validate({"array": [1, 2, 2]})
+
+    def test_schema(self):
+        schema = self.TestModel.model_json_schema()
+        self.assertIn("uniqueItems", schema["properties"]["array"])
 
 
 if __name__ == "__main__":

@@ -13,9 +13,11 @@ from annotated_types import (
     SupportsMod,
 )
 
-from pydantic import AfterValidator
+from pydantic import GetCoreSchemaHandler, GetJsonSchemaHandler
+from pydantic.json_schema import JsonSchemaValue
 import pydantic._internal._validators as validators
-from pydantic_core import PydanticKnownError
+from pydantic_core import CoreSchema, PydanticKnownError
+from pydantic_core.core_schema import no_info_after_validator_function
 
 from algobattle.problem import InstanceModel
 from algobattle.util import BaseModel, AttributeReference, AttributeReferenceValidator, ValidationError
@@ -33,6 +35,7 @@ __all__ = (
     "Le",
     "SizeIndex",
     "SizeLen",
+    "UniqueItems",
     "DirectedGraph",
     "UndirectedGraph",
     "EdgeIndex",
@@ -291,14 +294,27 @@ SizeLen = Annotated[S, AttributeReferenceValidator(size_len_val, model="instance
 C = TypeVar("C", bound=Collection[Hashable])
 
 
-def unique_items_val(iterable: C) -> C:
+@dataclass
+class UniqueItemsValidator:
     """Validates that the iterable contains unique items."""
-    if len(iterable) != len(set(iterable)):
-        raise ValueError("Value contains duplicate elements")
-    return iterable
+
+    @staticmethod
+    def _func(collection: C) -> C:
+        if len(collection) != len(set(collection)):
+            raise ValueError("Value contains duplicate elements")
+        return collection
+
+    def __get_pydantic_core_schema__(self, source_type: Any, handler: GetCoreSchemaHandler) -> CoreSchema:
+        return no_info_after_validator_function(self._func, handler(source_type))
+
+    @classmethod
+    def __get_pydantic_json_schema__(cls, core_schema: CoreSchema, handler: GetJsonSchemaHandler) -> JsonSchemaValue:
+        schema = handler(core_schema)
+        schema["uniqueItems"] = True
+        return schema
 
 
-UniqueItems = Annotated[C, AfterValidator(unique_items_val)]
+UniqueItems = Annotated[C, UniqueItemsValidator()]
 
 
 class DirectedGraph(InstanceModel):
