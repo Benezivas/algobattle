@@ -1,7 +1,6 @@
 """Utility types used to easily define Problems."""
 from dataclasses import dataclass
-from typing import Annotated, Any, Callable, Iterator, Sized, TypeVar, Generic, overload
-import operator
+from typing import Annotated, Any, Iterator, Sized, TypeVar, Generic, overload
 import annotated_types as at
 from annotated_types import (
     BaseMetadata,
@@ -14,7 +13,9 @@ from annotated_types import (
     SupportsMod,
 )
 
-from pydantic import ValidationInfo, ValidationError, field_validator
+from pydantic import ValidationError, field_validator
+import pydantic._internal._validators as validators
+from pydantic_core import PydanticKnownError
 from algobattle.problem import InstanceModel
 from algobattle.util import BaseModel, AttributeReference, AttributeReferenceValidator
 
@@ -59,20 +60,6 @@ i16 = Annotated[int, at.Interval(ge=-(2**15), lt=2**15)]
 """16 bit signed int."""
 
 
-CmpOpType = Callable[[Any, Any], bool]
-
-
-def attribute_cmp_validator(
-    attribute: AttributeReference, operator_func: CmpOpType, phrase: str
-) -> AttributeReferenceValidator:
-    def validator(value: Any, attribute: Any) -> Any:
-        if not operator_func(value, attribute):
-            raise ValueError(f"Value is not {phrase} {attribute}")
-        return value
-
-    return AttributeReferenceValidator(validator, attribute)
-
-
 @overload
 def Gt(gt: SupportsGt) -> at.Gt:
     ...
@@ -94,7 +81,7 @@ def Gt(gt: SupportsGt | AttributeReference) -> at.Gt | AttributeReferenceValidat
     including numbers, dates and times, strings, sets, and so on.
     """
     if isinstance(gt, AttributeReference):
-        return attribute_cmp_validator(gt, operator.gt, "greater than")
+        return AttributeReferenceValidator(validators.greater_than_validator, gt)
     else:
         return at.Gt(gt)
 
@@ -120,7 +107,7 @@ def Ge(ge: SupportsGe | AttributeReference) -> at.Ge | AttributeReferenceValidat
     including numbers, dates and times, strings, sets, and so on.
     """
     if isinstance(ge, AttributeReference):
-        return attribute_cmp_validator(ge, operator.ge, "greater than or equal to")
+        return AttributeReferenceValidator(validators.greater_than_or_equal_validator, ge)
     else:
         return at.Ge(ge)
 
@@ -146,7 +133,7 @@ def Lt(lt: SupportsLt | AttributeReference) -> at.Lt | AttributeReferenceValidat
     including numbers, dates and times, strings, sets, and so on.
     """
     if isinstance(lt, AttributeReference):
-        return attribute_cmp_validator(lt, operator.lt, "less than")
+        return AttributeReferenceValidator(validators.less_than_validator, lt)
     else:
         return at.Lt(lt)
 
@@ -172,7 +159,7 @@ def Le(le: SupportsLe | AttributeReference) -> at.Le | AttributeReferenceValidat
     including numbers, dates and times, strings, sets, and so on.
     """
     if isinstance(le, AttributeReference):
-        return attribute_cmp_validator(le, operator.le, "less than or equal to")
+        return AttributeReferenceValidator(validators.less_than_or_equal_validator, le)
     else:
         return at.Le(le)
 
@@ -202,19 +189,6 @@ class Interval(GroupedMetadata):
             yield Le(self.le)
 
 
-def attribute_multiple_of_validator(attribute: AttributeReference) -> AttributeReferenceValidator:
-    def validator(value: Any, info: ValidationInfo) -> Any:
-        attribute_val = attribute.get_value(info)
-        if attribute_val is None:
-            return value
-
-        if not (value % attribute_val == 0):
-            raise ValueError(f"Value is not a multiple of {attribute}")
-        return value
-
-    return AttributeReferenceValidator(validator, attribute)
-
-
 @overload
 def MultipleOf(multiple_of: SupportsDiv | SupportsMod) -> at.MultipleOf:
     ...
@@ -229,7 +203,7 @@ def MultipleOf(
     multiple_of: SupportsDiv | SupportsMod | AttributeReference,
 ) -> at.MultipleOf | AttributeReferenceValidator:
     if isinstance(multiple_of, AttributeReference):
-        return attribute_multiple_of_validator(multiple_of)
+        return AttributeReferenceValidator(validators.multiple_of_validator, multiple_of)
     else:
         return at.MultipleOf(multiple_of)
 
@@ -247,17 +221,7 @@ def MinLen(min_length: AttributeReference) -> AttributeReferenceValidator:
 def MinLen(min_length: Annotated[int, Ge(0)] | AttributeReference) -> at.MinLen | AttributeReferenceValidator:
     """Implies minimum inclusive length, i.e. `len(value) >= min_length`."""
     if isinstance(min_length, AttributeReference):
-
-        def validator(value: Any, info: ValidationInfo) -> Any:
-            attribute_val = min_length.get_value(info)
-            if attribute_val is None:
-                return value
-
-            if not (len(value) >= attribute_val):
-                raise ValueError(f"Value does not have a minimum length of {min_length}")
-            return value
-
-        return AttributeReferenceValidator(validator, min_length)
+        return AttributeReferenceValidator(validators.min_length_validator, min_length)
     else:
         return MinLen(min_length)
 
@@ -275,17 +239,16 @@ def MaxLen(max_length: AttributeReference) -> AttributeReferenceValidator:
 def MaxLen(max_length: Annotated[int, Ge(0)] | AttributeReference) -> at.MaxLen | AttributeReferenceValidator:
     """Implies maximum inclusive length, i.e. `len(value) <= max_length`."""
     if isinstance(max_length, AttributeReference):
+        # pydantic impl is currently bugged
+        def max_length_validator(x: Any, max_length: Any) -> Any:
+            if not (len(x) <= max_length):
+                raise PydanticKnownError(
+                    "too_long",
+                    {"field_type": "Value", "max_length": max_length, "actual_length": len(x)},
+                )
+            return x
 
-        def validator(value: Any, info: ValidationInfo) -> Any:
-            attribute_val = max_length.get_value(info)
-            if attribute_val is None:
-                return value
-
-            if not (len(value) <= attribute_val):
-                raise ValueError(f"Value does not have a maximum length of {max_length}")
-            return value
-
-        return AttributeReferenceValidator(validator, max_length)
+        return AttributeReferenceValidator(max_length_validator, max_length)
     else:
         return MaxLen(max_length)
 
