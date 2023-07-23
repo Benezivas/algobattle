@@ -19,7 +19,13 @@ import pydantic._internal._validators as validators
 from pydantic_core import CoreSchema, PydanticKnownError
 from pydantic_core.core_schema import no_info_after_validator_function
 
-from algobattle.problem import InstanceModel, AttributeReference, AttributeReferenceValidator, InstanceRef, SolutionModel
+from algobattle.problem import (
+    InstanceModel,
+    AttributeReference,
+    AttributeReferenceValidator,
+    InstanceRef,
+    SolutionModel,
+)
 from algobattle.util import BaseModel, Role, ValidationError
 
 __all__ = (
@@ -64,6 +70,9 @@ class AlgobattleContext(TypedDict, total=False):
     """Instance object the solution that is being validated is for."""
     solution: SolutionModel[InstanceModel]
     """Solution object that is currently being validated."""
+
+
+# * General helper types
 
 
 u64 = Annotated[int, at.Interval(ge=0, lt=2**64)]
@@ -227,6 +236,7 @@ def MultipleOf(multiple_of: AttributeReference) -> AttributeReferenceValidator:
 def MultipleOf(
     multiple_of: SupportsDiv | SupportsMod | AttributeReference,
 ) -> at.MultipleOf | AttributeReferenceValidator:
+    """Specifies `value % multiple_of == 0`."""
     if isinstance(multiple_of, AttributeReference):
         return AttributeReferenceValidator(validators.multiple_of_validator, multiple_of)
     else:
@@ -296,24 +306,6 @@ class Len(GroupedMetadata):
             yield MaxLen(self.max_length)
 
 
-SizeIndex = Annotated[u64, at.Ge(0), Lt(InstanceRef.size)]
-"""Specifies that the field is a valid index into a instance.size length sequence, i.e. 0 <= i < instance.size."""
-
-
-S = TypeVar("S", bound=Sized)
-
-
-def size_len_val(v: S, size: int) -> S:
-    """Validates that the collection has length `instance.size`."""
-    if len(v) != size:
-        raise ValueError("Value does not have length `instance.size`")
-    return v
-
-
-SizeLen = Annotated[S, AttributeReferenceValidator(size_len_val, InstanceRef.size)]
-"""Specifies that the legth of the field is the same as instance.size."""
-
-
 C = TypeVar("C", bound=Collection[Hashable])
 
 
@@ -339,6 +331,65 @@ class UniqueItemsValidator:
 
 UniqueItems = Annotated[C, UniqueItemsValidator()]
 """Specifies that the collection should contain no duplicates."""
+
+
+def In(attribute: AttributeReference) -> AttributeReferenceValidator:
+    """Specifies that the value should be `in` some collection."""
+
+    def validator(val: Any, attr: Any) -> Any:
+        if not (val in attr):
+            raise ValueError(f"Value is not contained in collection {attribute}.")
+        return val
+
+    return AttributeReferenceValidator(validator, attribute)
+
+
+class IndexInto:
+    """Specifies that the value is a valid index into the Sequence.
+
+    May be used an annotation to another type like this: `index: Annotated[i16, IndexInto(SelfRef.list)]`,
+    or as a bare type annotation `index: IndexInto[SelfRef.list]`.
+    """
+
+    def __new__(cls, attribute: AttributeReference) -> AttributeReferenceValidator:
+        def validator(val: Any, attr: Any) -> Any:
+            validators.greater_than_or_equal_validator(val, 0)
+            validators.less_than_validator(val, len(attr))
+            return val
+
+        return AttributeReferenceValidator(validator, attribute)
+
+    @classmethod
+    def __class_getitem__(cls, __key: AttributeReference) -> type[int]:
+        def validator(val: Any, attr: Any) -> Any:
+            validators.less_than_validator(val, len(attr))
+            return val
+
+        return Annotated[int, at.Ge(0), AttributeReferenceValidator(validator, __key)]
+
+
+# * Algobattle specific types
+
+
+SizeIndex = Annotated[u64, at.Ge(0), Lt(InstanceRef.size)]
+"""Specifies that the field is a valid index into a instance.size length sequence, i.e. 0 <= i < instance.size."""
+
+
+S = TypeVar("S", bound=Sized)
+
+
+def size_len_val(v: S, size: int) -> S:
+    """Validates that the collection has length `instance.size`."""
+    if len(v) != size:
+        raise ValueError("Value does not have length `instance.size`")
+    return v
+
+
+SizeLen = Annotated[S, AttributeReferenceValidator(size_len_val, InstanceRef.size)]
+"""Specifies that the legth of the field is the same as instance.size."""
+
+
+# * Graph classes
 
 
 class DirectedGraph(InstanceModel):
@@ -377,7 +428,7 @@ def edge_index_val(v: int, edges: list[tuple[u64, u64]]) -> int:
     return v
 
 
-EdgeIndex = Annotated[u64, AttributeReferenceValidator(edge_index_val, InstanceRef.edges)]
+EdgeIndex = IndexInto[DirectedGraph.edges]
 """Specifies that the field should be a valid index into instance.edges."""
 
 
