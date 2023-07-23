@@ -1,6 +1,6 @@
 """Utility types used to easily define Problems."""
 from dataclasses import dataclass
-from typing import Annotated, Any, Iterator, Sized, TypeVar, Generic, overload
+from typing import Annotated, Any, Collection, Hashable, Iterator, Sized, TypeVar, Generic, overload
 import annotated_types as at
 from annotated_types import (
     BaseMetadata,
@@ -13,11 +13,12 @@ from annotated_types import (
     SupportsMod,
 )
 
-from pydantic import ValidationError, field_validator
+from pydantic import AfterValidator
 import pydantic._internal._validators as validators
 from pydantic_core import PydanticKnownError
+
 from algobattle.problem import InstanceModel
-from algobattle.util import BaseModel, AttributeReference, AttributeReferenceValidator
+from algobattle.util import BaseModel, AttributeReference, AttributeReferenceValidator, ValidationError
 
 __all__ = (
     "u64",
@@ -287,18 +288,24 @@ def size_len_val(v: S, size: int) -> S:
 SizeLen = Annotated[S, AttributeReferenceValidator(size_len_val, model="instance", attribute="size")]
 
 
+C = TypeVar("C", bound=Collection[Hashable])
+
+
+def unique_items_val(iterable: C) -> C:
+    """Validates that the iterable contains unique items."""
+    if len(iterable) != len(set(iterable)):
+        raise ValueError("Value contains duplicate elements")
+    return iterable
+
+
+UniqueItems = Annotated[C, AfterValidator(unique_items_val)]
+
+
 class DirectedGraph(InstanceModel):
     """Base instance class for problems on directed graphs."""
 
     num_vertices: u64
-    edges: list[tuple[SizeIndex, SizeIndex]]
-
-    @field_validator("edges", mode="after")
-    @classmethod
-    def _unique_edges(cls, value: list[tuple[u64, u64]]) -> list[tuple[u64, u64]]:
-        if len(set(value)) != len(value):
-            raise ValueError("Edge list contains duplicate entries.")
-        return value
+    edges: UniqueItems[list[tuple[SizeIndex, SizeIndex]]]
 
     @property
     def size(self) -> int:
@@ -319,12 +326,9 @@ class UndirectedGraph(DirectedGraph):
         if any(u == v for u, v in self.edges):
             raise ValidationError("Undirected graph contains self loops.")
 
-        # we remove the redundant edge definitions to create an easy to use normal form
-        normalized_edges: set[tuple[int, int]] = set()
-        for u, v in self.edges:
-            if (v, u) not in normalized_edges:
-                normalized_edges.add((u, v))
-        self.edges = list(normalized_edges)
+        edge_set = set(self.edges)
+        if any(edge[::-1] in edge_set for edge in self.edges):
+            raise ValidationError("Undirected graph contains back and forth edges between two vertices.")
 
 
 def edge_index_val(v: int, edges: list[tuple[u64, u64]]) -> int:
@@ -352,22 +356,10 @@ Weight = TypeVar("Weight")
 class EdgeWeights(DirectedGraph, BaseModel, Generic[Weight]):
     """Mixin for graphs with weighted edges."""
 
-    edge_weights: list[Weight]
-
-    def validate_instance(self):
-        """Validates that each edge has an associated weight."""
-        super().validate_instance()
-        if len(self.edge_weights) != len(self.edges):
-            raise ValidationError("Number of edge weights doesn't match the number of edges.")
+    edge_weights: EdgeLen[list[Weight]]
 
 
 class VertexWeights(DirectedGraph, BaseModel, Generic[Weight]):
     """Mixin for graphs with weighted vertices."""
 
-    vertex_weights: list[Weight]
-
-    def validate_instance(self):
-        """Validates that each vertex has an associated weight."""
-        super().validate_instance()
-        if len(self.vertex_weights) != self.num_vertices:
-            raise ValidationError("Number of vertex weights doesn't match the number of vertices.")
+    vertex_weights: SizeLen[list[Weight]]
