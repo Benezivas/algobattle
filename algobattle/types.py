@@ -19,8 +19,8 @@ import pydantic._internal._validators as validators
 from pydantic_core import CoreSchema, PydanticKnownError
 from pydantic_core.core_schema import no_info_after_validator_function
 
-from algobattle.problem import InstanceModel
-from algobattle.util import BaseModel, AttributeReference, AttributeReferenceValidator, ValidationError, SelfRef, InstanceRef
+from algobattle.problem import InstanceModel, AttributeReference, AttributeReferenceValidator, InstanceRef
+from algobattle.util import BaseModel, ValidationError
 
 __all__ = (
     "u64",

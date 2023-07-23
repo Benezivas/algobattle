@@ -4,8 +4,7 @@ from unittest import TestCase, main
 
 from pydantic import ValidationError
 
-from algobattle.problem import InstanceModel
-from algobattle.util import AttributeReference
+from algobattle.problem import InstanceModel, AttributeReference
 from algobattle.types import Ge, Interval, SizeIndex, UniqueItems
 
 
