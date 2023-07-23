@@ -20,7 +20,7 @@ from pydantic_core import CoreSchema, PydanticKnownError
 from pydantic_core.core_schema import no_info_after_validator_function
 
 from algobattle.problem import InstanceModel
-from algobattle.util import BaseModel, AttributeReference, AttributeReferenceValidator, ValidationError
+from algobattle.util import BaseModel, AttributeReference, AttributeReferenceValidator, ValidationError, SelfRef, InstanceRef
 
 __all__ = (
     "u64",
@@ -275,7 +275,7 @@ class Len(GroupedMetadata):
             yield MaxLen(self.max_length)
 
 
-SizeIndex = Annotated[u64, at.Ge(0), Lt(AttributeReference("instance", "size"))]
+SizeIndex = Annotated[u64, at.Ge(0), Lt(InstanceRef.size)]
 
 
 S = TypeVar("S", bound=Sized)
@@ -288,7 +288,7 @@ def size_len_val(v: S, size: int) -> S:
     return v
 
 
-SizeLen = Annotated[S, AttributeReferenceValidator(size_len_val, model="instance", attribute="size")]
+SizeLen = Annotated[S, AttributeReferenceValidator(size_len_val, InstanceRef.size)]
 
 
 C = TypeVar("C", bound=Collection[Hashable])
@@ -353,7 +353,7 @@ def edge_index_val(v: int, edges: list[tuple[u64, u64]]) -> int:
     return v
 
 
-EdgeIndex = Annotated[u64, AttributeReferenceValidator(edge_index_val, model="instance", attribute="edges")]
+EdgeIndex = Annotated[u64, AttributeReferenceValidator(edge_index_val, InstanceRef.edges)]
 
 
 def edge_len_val(v: S, edges: list[tuple[u64, u64]]) -> S:
@@ -363,7 +363,7 @@ def edge_len_val(v: S, edges: list[tuple[u64, u64]]) -> S:
     return v
 
 
-EdgeLen = Annotated[S, AttributeReferenceValidator(edge_len_val, model="instance", attribute="edges")]
+EdgeLen = Annotated[S, AttributeReferenceValidator(edge_len_val, InstanceRef.edges)]
 
 
 Weight = TypeVar("Weight")

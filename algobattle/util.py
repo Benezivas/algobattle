@@ -232,40 +232,15 @@ GeneralAttrValidatorFunction = Callable[[Any, Any, ValidationInfo], Any]
 AttrValidatorFunction = NoInfoAttrValidatorFunction | GeneralAttrValidatorFunction
 
 
+@dataclass(frozen=True, slots=True)
 class AttributeReferenceValidator:
     """An AfterValidator that can resolve a reference to a model attribute and pass it to the validator function.
 
     Using this with a reference to an attribute in the model it is defined may significantly impact performance.
     """
 
-    __slots__ = ("func", "attribute")
-
-    @overload
-    @inherit_docs
-    def __init__(self, func: AttrValidatorFunction, ref: AttributeReference) -> None:
-        ...
-
-    @overload
-    @inherit_docs
-    def __init__(self, func: AttrValidatorFunction, *, model: ModelReference, attribute: str) -> None:
-        ...
-
-    def __init__(
-        self,
-        func: AttrValidatorFunction,
-        ref: AttributeReference | None = None,
-        *,
-        model: ModelReference | None = None,
-        attribute: str | None = None,
-    ) -> None:
-        """Creates an AttributeReferenceValidator."""
-        super().__init__()
-        self.func = func
-        if ref is not None:
-            self.attribute = ref
-        else:
-            assert model is not None and attribute is not None
-            self.attribute = AttributeReference(model, attribute)
+    func: AttrValidatorFunction
+    attribute: AttributeReference
 
     def __get_pydantic_core_schema__(self, source_type: Any, handler: GetCoreSchemaHandler) -> CoreSchema:
         schema = handler(source_type)
@@ -296,6 +271,25 @@ class AttributeReferenceValidator:
             return True
         else:
             return self.attribute.model == model_type
+
+
+@dataclass
+class AttributeReferenceMaker:
+    """Helper class to easily create attribute references."""
+
+    _attr_ref_maker_model: ModelReference
+
+    def __getattribute__(self, __name: str) -> Any:
+        return AttributeReference(self._attr_ref_maker_model, __name)
+
+
+SelfRef = AttributeReferenceMaker("self")
+
+
+InstanceRef = AttributeReferenceMaker("instance")
+
+
+SolutionRef = AttributeReferenceMaker("solution")
 
 
 @dataclass

@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Callable, ClassVar, ParamSpec, Protocol, Self, Generic, TypeVar
 from math import inf, isnan
 
-from algobattle.util import Role, Encodable, InstanceSolutionModel
+from algobattle.util import AttributeReference, Role, Encodable, InstanceSolutionModel
 
 
 class Instance(Encodable, ABC):
@@ -266,6 +266,12 @@ class Problem(Generic[InstanceT, SolutionT]):
 class InstanceModel(InstanceSolutionModel, Instance, ABC):
     """An instance that can easily be parsed to/from a json file."""
 
+    @classmethod
+    def __pydantic_init_subclass__(cls, **kwargs: Any) -> None:
+        super().__pydantic_init_subclass__(**kwargs)
+        for name in cls.model_fields:
+            setattr(cls, name, AttributeReference("instance", name))
+
     def validate_instance(self) -> None:
         """Validate the instance again, this time also passing itself in the context.
 
@@ -279,6 +285,12 @@ class InstanceModel(InstanceSolutionModel, Instance, ABC):
 class SolutionModel(Solution[InstanceT], InstanceSolutionModel, ABC):
     """A solution that can easily be parsed to/from a json file."""
 
+    @classmethod
+    def __pydantic_init_subclass__(cls, **kwargs: Any) -> None:
+        super().__pydantic_init_subclass__(**kwargs)
+        for name in cls.model_fields:
+            setattr(cls, name, AttributeReference("solution", name))
+
     def validate_solution(self, instance: InstanceT, role: Role) -> None:
         """Validate the solution again, this time also passing itself and the instance in the context.
 
@@ -286,4 +298,4 @@ class SolutionModel(Solution[InstanceT], InstanceSolutionModel, ABC):
         """
         super().validate_solution(instance, role)
         if self._validate_with_self("solution"):
-            self.model_validate(self, context={"instance": instance, "solution": self, "solution": self, "role": role})
+            self.model_validate(self, context={"instance": instance, "solution": self, "self": self, "role": role})
