@@ -55,15 +55,10 @@ class BasicTests(TestCase):
         with self.assertRaises(ValidationError, msg="Constant comparison not rejected"):
             self.TestModel.model_validate({"ge_const": -1, "ge_ref": 0})
 
-    def test_wrong_ref_no_context(self):
-        """Accept a wrong instance if there is no context passed."""
-        self.TestModel.model_validate(self.wrong_ref_instance_dict)
-
     def test_wrong_ref_context(self):
-        """Reject a wrong instance if the context has been set."""
-        instance = self.TestModel.model_validate(self.wrong_ref_instance_dict)
-        with self.assertRaises(ValidationError, msg="Attr ref comparison not rejectect"):
-            self.TestModel.model_validate(self.wrong_ref_instance_dict, context={"self": instance})
+        """Reject a wrong instance."""
+        with self.assertRaises(ValidationError):
+            self.TestModel.model_validate(self.wrong_ref_instance_dict)
 
 
 def size_instance() -> type[InstanceModel]:
@@ -98,10 +93,8 @@ class SizeTests(TestCase):
 
     def test_index_large(self):
         """Reject too large indices."""
-        model_dict = {"items": [1, 2], "index": 2}
-        instance = self.TestModel.model_validate(model_dict)
         with self.assertRaises(ValidationError):
-            self.TestModel.model_validate(model_dict, context={"instance": instance})
+            self.TestModel.model_validate({"items": [1, 2], "index": 2})
 
 
 def interval_instance() -> type[InstanceModel]:
@@ -132,7 +125,7 @@ class IntervalTests(TestCase):
     def test_reject_lower(self):
         """Reject instance incorrect because of lower bound."""
         with self.assertRaises(ValidationError):
-            self.TestModel.create_and_validate({"lower_bound": 0, "i": -1})
+            self.TestModel.model_validate({"lower_bound": 0, "i": -1})
 
     def test_reject_upper(self):
         """Reject instance incorrect because of upper bound."""

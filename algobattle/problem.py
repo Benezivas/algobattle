@@ -384,6 +384,24 @@ class Problem(ProblemBase[InstanceT, SolutionT]):
 class InstanceSolutionModel(EncodableModel, ABC):
     """Base Model class for instances or solution classes."""
 
+    _algobattle_model_type: ClassVar[Literal["instance", "solution"]]
+
+    @inherit_docs
+    @classmethod
+    def model_validate(
+        cls,
+        obj: Any,
+        *,
+        strict: bool | None = None,
+        from_attributes: bool | None = None,
+        context: dict[str, Any] | None = None,
+    ) -> Self:
+        model = super().model_validate(obj, strict=strict, from_attributes=from_attributes, context=context)
+        if cls._validate_with_self(cls._algobattle_model_type):
+            context = (context or {}) | {"self": model, cls._algobattle_model_type: model}
+            model = super().model_validate(obj, context=context)
+        return model
+
     @classmethod
     def _annotation_needs_self(cls, annotation: object, model_type: Literal["instance", "solution"]) -> bool:
         if isinstance(annotation, AttributeReferenceValidator):
@@ -517,51 +535,10 @@ SolutionRef = AttributeReferenceMaker("solution")
 class InstanceModel(Instance, InstanceSolutionModel, ABC):
     """An instance that can easily be parsed to/from a json file."""
 
-    @classmethod
-    def create_and_validate(
-        cls,
-        data: dict[str, Any],
-        *,
-        role: Role = Role.generator,
-    ) -> Self:
-        """Helper method to easily create a fully validated instance."""
-        res = cls.model_validate(data, context={"role": role})
-        res.validate_instance()
-        return res
-
-    def validate_instance(self) -> None:
-        """Validate the instance again, this time also passing itself in the context.
-
-        Very inefficient implementation to make SizeIndex and similar types work.
-        """
-        super().validate_instance()
-        if self._validate_with_self("instance"):
-            self.model_validate(self.__dict__, context={"instance": self, "self": self, "role": Role.generator})
+    _algobattle_model_type: ClassVar[Literal["instance"]] = "instance"
 
 
 class SolutionModel(Solution[InstanceT], InstanceSolutionModel, ABC):
     """A solution that can easily be parsed to/from a json file."""
 
-    @classmethod
-    def create_and_validate(
-        cls,
-        data: dict[str, Any],
-        *,
-        instance: InstanceT,
-        role: Role = Role.generator,
-    ) -> Self:
-        """Helper method to easily create a fully validated solution."""
-        res = cls.model_validate(data, context={"role": role, "instance": instance})
-        res.validate_solution(instance, role)
-        return res
-
-    def validate_solution(self, instance: InstanceT, role: Role) -> None:
-        """Validate the solution again, this time also passing itself and the instance in the context.
-
-        Very inefficient implementation to make SizeIndex and similar types work.
-        """
-        super().validate_solution(instance, role)
-        if self._validate_with_self("solution"):
-            self.model_validate(
-                self.__dict__, context={"instance": instance, "solution": self, "self": self, "role": role}
-            )
+    _algobattle_model_type: ClassVar[Literal["solution"]] = "solution"
