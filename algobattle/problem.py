@@ -343,7 +343,7 @@ class Problem(ProblemBase[InstanceT, SolutionT]):
         min_size: int = 0,
         with_solution: Literal[True] = True,
         export: bool = True,
-        score: ScoreFunctionWithSol[InstanceT, SolutionT] = default_score,
+        score_function: ScoreFunctionWithSol[InstanceT, SolutionT] = default_score,
     ) -> None:
         ...
 
@@ -358,7 +358,7 @@ class Problem(ProblemBase[InstanceT, SolutionT]):
         min_size: int = 0,
         with_solution: Literal[False],
         export: bool = True,
-        score: ScoreFunctionNoSol[InstanceT, SolutionT] = default_score,
+        score_function: ScoreFunctionNoSol[InstanceT, SolutionT] = default_score,
     ) -> None:
         ...
 

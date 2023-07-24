@@ -39,5 +39,5 @@ TestProblem = Problem(
     instance_cls=TestInstance,
     solution_cls=TestSolution,
     with_solution=False,
-    score=score,
+    score_function=score,
 )
