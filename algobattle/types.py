@@ -1,6 +1,6 @@
 """Utility types used to easily define Problems."""
 from dataclasses import dataclass
-from typing import Annotated, Any, Collection, Hashable, Iterator, Sized, TypeVar, Generic, TypedDict, overload
+from typing import Annotated, Any, Collection, Iterator, Sized, TypeVar, Generic, TypedDict, overload
 import annotated_types as at
 from annotated_types import (
     BaseMetadata,
@@ -306,31 +306,25 @@ class Len(GroupedMetadata):
             yield MaxLen(self.max_length)
 
 
-C = TypeVar("C", bound=Collection[Hashable])
+class UniqueItems:
+    """Specifies that the collection should contain no duplicates.
 
-
-@dataclass
-class UniqueItemsValidator:
-    """Validates that the iterable contains unique items."""
+    Can only annotate Collection types.
+    """
 
     @staticmethod
-    def _func(collection: C) -> C:
-        if len(collection) != len(set(collection)):
-            raise ValueError("Value contains duplicate elements")
-        return collection
-
-    def __get_pydantic_core_schema__(self, source_type: Any, handler: GetCoreSchemaHandler) -> CoreSchema:
-        return no_info_after_validator_function(self._func, handler(source_type))
+    def __get_pydantic_core_schema__(source_type: Any, handler: GetCoreSchemaHandler) -> CoreSchema:
+        def _func(collection: Collection[Any]) -> Collection[Any]:
+            if len(collection) != len(set(collection)):
+                raise ValueError("Value contains duplicate elements")
+            return collection
+        return no_info_after_validator_function(_func, handler(source_type))
 
     @classmethod
     def __get_pydantic_json_schema__(cls, core_schema: CoreSchema, handler: GetJsonSchemaHandler) -> JsonSchemaValue:
         schema = handler(core_schema)
         schema["uniqueItems"] = True
         return schema
-
-
-UniqueItems = Annotated[C, UniqueItemsValidator()]
-"""Specifies that the collection should contain no duplicates."""
 
 
 def In(attribute: AttributeReference) -> AttributeReferenceValidator:
@@ -342,6 +336,10 @@ def In(attribute: AttributeReference) -> AttributeReferenceValidator:
         return val
 
     return AttributeReferenceValidator(validator, attribute)
+
+
+KeyOf = In
+"""Specifies that the value should be the key of the referenced dict."""
 
 
 class IndexInto:
@@ -375,18 +373,24 @@ SizeIndex = Annotated[u64, at.Ge(0), Lt(InstanceRef.size)]
 """Specifies that the field is a valid index into a instance.size length sequence, i.e. 0 <= i < instance.size."""
 
 
-S = TypeVar("S", bound=Sized)
+class SizeLen:
+    """Specifies that the collection has length `instance.size`.
 
+    Can only annotate Sized types.
+    """
 
-def size_len_val(v: S, size: int) -> S:
-    """Validates that the collection has length `instance.size`."""
-    if len(v) != size:
-        raise ValueError("Value does not have length `instance.size`")
-    return v
+    @staticmethod
+    def _func(v: Any, size: int) -> Any:
+        """Validates that the collection has length `instance.size`."""
+        if len(v) != size:
+            raise ValueError("Value does not have length `instance.size`")
+        return v
 
+    _validator = AttributeReferenceValidator(_func, InstanceRef.size)
 
-SizeLen = Annotated[S, AttributeReferenceValidator(size_len_val, InstanceRef.size)]
-"""Specifies that the legth of the field is the same as instance.size."""
+    @classmethod
+    def __get_pydantic_core_schema__(cls, source_type: Any, handler: GetCoreSchemaHandler) -> CoreSchema:
+        return cls._validator.__get_pydantic_core_schema__(source_type, handler)
 
 
 # * Graph classes
@@ -396,7 +400,7 @@ class DirectedGraph(InstanceModel):
     """Base instance class for problems on directed graphs."""
 
     num_vertices: u64
-    edges: UniqueItems[list[tuple[SizeIndex, SizeIndex]]]
+    edges: Annotated[list[tuple[SizeIndex, SizeIndex]], UniqueItems]
 
     @property
     def size(self) -> int:
@@ -430,15 +434,24 @@ Edge = IndexInto[InstanceRef.edges]
 """Type for edges, encoded as indices into `instance.edges`."""
 
 
-def edge_len_val(v: S, edges: list[tuple[u64, u64]]) -> S:
-    """Validates that the collection has the same length as `instance.edges`."""
-    if len(v) != len(edges):
-        raise ValueError("Value does not have the same length `instance.edges`")
-    return v
+class EdgeLen:
+    """Specifies that the collection has the same length as `instance.edges`.
 
+    Can only annotate Sized types.
+    """
 
-EdgeLen = Annotated[S, AttributeReferenceValidator(edge_len_val, InstanceRef.edges)]
-"""Specifies that the field should have the same length as instance.edges."""
+    @staticmethod
+    def _func(v: Any, edges: list[tuple[int, int]]) -> Any:
+        """Validates that the collection has length `instance.size`."""
+        if len(v) != len(edges):
+            raise ValueError("Value does not have length `instance.size`")
+        return v
+
+    _validator = AttributeReferenceValidator(_func, InstanceRef.size)
+
+    @classmethod
+    def __get_pydantic_core_schema__(cls, source_type: Any, handler: GetCoreSchemaHandler) -> CoreSchema:
+        return cls._validator.__get_pydantic_core_schema__(source_type, handler)
 
 
 Weight = TypeVar("Weight")
@@ -447,10 +460,10 @@ Weight = TypeVar("Weight")
 class EdgeWeights(DirectedGraph, BaseModel, Generic[Weight]):
     """Mixin for graphs with weighted edges."""
 
-    edge_weights: EdgeLen[list[Weight]]
+    edge_weights: Annotated[list[Weight], EdgeLen]
 
 
 class VertexWeights(DirectedGraph, BaseModel, Generic[Weight]):
     """Mixin for graphs with weighted vertices."""
 
-    vertex_weights: SizeLen[list[Weight]]
+    vertex_weights: Annotated[list[Weight], SizeLen]

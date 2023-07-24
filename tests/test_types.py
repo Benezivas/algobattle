@@ -4,7 +4,7 @@ from unittest import TestCase, main
 
 from pydantic import ValidationError
 
-from algobattle.problem import InstanceModel, AttributeReference
+from algobattle.problem import InstanceModel, AttributeReference, SelfRef
 from algobattle.types import Ge, Interval, SizeIndex, UniqueItems
 
 
@@ -109,7 +109,7 @@ def interval_instance() -> type[InstanceModel]:
 
     class IntervalModel(InstanceModel):
         lower_bound: int
-        i: Annotated[int, Interval(ge=AttributeReference("self", "lower_bound"), lt=10)]
+        i: Annotated[int, Interval(ge=SelfRef.lower_bound, lt=10)]
 
         @property
         def size(self) -> int:
@@ -131,10 +131,8 @@ class IntervalTests(TestCase):
 
     def test_reject_lower(self):
         """Reject instance incorrect because of lower bound."""
-        model_dict = {"lower_bound": 0, "i": -1}
-        instance = self.TestModel.model_validate(model_dict)
         with self.assertRaises(ValidationError):
-            self.TestModel.model_validate(model_dict, context={"instance": instance})
+            self.TestModel.create_and_validate({"lower_bound": 0, "i": -1})
 
     def test_reject_upper(self):
         """Reject instance incorrect because of upper bound."""
@@ -147,7 +145,7 @@ def unique_items_instance() -> type[InstanceModel]:
     """Create a basic instance class with a unique items constraint."""
 
     class UniqueModel(InstanceModel):
-        array: UniqueItems[list[int]]
+        array: Annotated[list[int], UniqueItems]
 
         @property
         def size(self) -> int:
