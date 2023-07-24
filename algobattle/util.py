@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
+from inspect import Parameter, Signature
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -264,3 +265,13 @@ class ExceptionInfo(BaseModel):
                 message=str(error),
                 detail=str_with_traceback(error),
             )
+
+
+def count_positional_params(sig: Signature) -> int:
+    """Counts the number of positional parameters in a signature."""
+    return sum(1 for param in sig.parameters.values() if can_be_positional(param))
+
+
+def can_be_positional(param: Parameter) -> bool:
+    """Checks whether a parameter is positional."""
+    return param.kind in (Parameter.POSITIONAL_ONLY, Parameter.POSITIONAL_OR_KEYWORD)

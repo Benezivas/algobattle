@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from functools import wraps
 from importlib.metadata import entry_points
 import importlib.util
+from inspect import signature
 import sys
 from pathlib import Path
 from typing import Any, Callable, ClassVar, Literal, ParamSpec, Protocol, Self, Generic, TypeVar, cast, get_args
@@ -12,9 +13,8 @@ from math import inf, isnan
 from pydantic import GetCoreSchemaHandler, ValidationInfo
 from pydantic_core import CoreSchema
 from pydantic_core.core_schema import general_after_validator_function
-from pydantic._internal._decorators import inspect_validator
 
-from algobattle.util import Role, Encodable, EncodableModel
+from algobattle.util import Role, Encodable, EncodableModel, count_positional_params
 
 
 class Instance(Encodable, ABC):
@@ -322,6 +322,17 @@ GeneralAttrValidatorFunction = Callable[[Any, Any, ValidationInfo], Any]
 AttrValidatorFunction = NoInfoAttrValidatorFunction | GeneralAttrValidatorFunction
 
 
+def is_info_validator(validator: AttrValidatorFunction) -> bool:
+    """Helper method to discriminate the union."""
+    match count_positional_params(signature(validator)):
+        case 2:
+            return False
+        case 3:
+            return True
+        case _:
+            raise TypeError
+
+
 @dataclass(frozen=True, slots=True)
 class AttributeReferenceValidator:
     """An AfterValidator that can resolve a reference to a model attribute and pass it to the validator function.
@@ -334,7 +345,7 @@ class AttributeReferenceValidator:
 
     def __get_pydantic_core_schema__(self, source_type: Any, handler: GetCoreSchemaHandler) -> CoreSchema:
         schema = handler(source_type)
-        info_arg = inspect_validator(self.func, "after")
+        info_arg = is_info_validator(self.func)
         if info_arg:
             func = cast(GeneralAttrValidatorFunction, self.func)
 
@@ -391,7 +402,7 @@ class InstanceModel(InstanceSolutionModel, Instance, ABC):
         data: dict[str, Any],
         *,
         role: Role = Role.generator,
-        ) -> Self:
+    ) -> Self:
         """Helper method to easily create a fully validated instance."""
         res = cls.model_validate(data, context={"role": role})
         res.validate_instance()
@@ -417,7 +428,7 @@ class SolutionModel(Solution[InstanceT], InstanceSolutionModel, ABC):
         *,
         instance: InstanceT,
         role: Role = Role.generator,
-        ) -> Self:
+    ) -> Self:
         """Helper method to easily create a fully validated solution."""
         res = cls.model_validate(data, context={"role": role, "instance": instance})
         res.validate_solution(instance, role)
