@@ -258,7 +258,7 @@ def MinLen(min_length: Annotated[int, Ge(0)] | AttributeReference) -> at.MinLen 
     if isinstance(min_length, AttributeReference):
         return AttributeReferenceValidator(validators.min_length_validator, min_length)
     else:
-        return MinLen(min_length)
+        return at.MinLen(min_length)
 
 
 @overload
@@ -285,7 +285,7 @@ def MaxLen(max_length: Annotated[int, Ge(0)] | AttributeReference) -> at.MaxLen 
 
         return AttributeReferenceValidator(max_length_validator, max_length)
     else:
-        return MaxLen(max_length)
+        return at.MaxLen(max_length)
 
 
 @dataclass(frozen=True, slots=True)
