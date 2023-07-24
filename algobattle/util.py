@@ -52,7 +52,7 @@ def inherit_docs(obj: T) -> T:
     return obj
 
 
-ModelType = Literal["instance", "solution"]
+ModelType = Literal["instance", "solution", "other"]
 ModelReference = ModelType | Literal["self"]
 
 
@@ -61,7 +61,7 @@ class BaseModel(PydandticBaseModel):
 
     model_config = ConfigDict(extra=Extra.forbid, from_attributes=True)
 
-    _algobattle_model_type: ClassVar[ModelType]
+    _algobattle_model_type: ClassVar[ModelType] = "other"
 
     @inherit_docs
     @classmethod
@@ -80,7 +80,7 @@ class BaseModel(PydandticBaseModel):
         return model
 
     @classmethod
-    def _annotation_needs_self(cls, annotation: object, model_type: Literal["instance", "solution"]) -> bool:
+    def _annotation_needs_self(cls, annotation: object, model_type: ModelType) -> bool:
         if isinstance(annotation, AttributeReferenceValidator):
             return annotation.needs_self(model_type)
         if isinstance(annotation, GroupedMetadata):
@@ -88,7 +88,7 @@ class BaseModel(PydandticBaseModel):
         return any(cls._annotation_needs_self(e, model_type) for e in get_args(annotation))
 
     @classmethod
-    def _validate_with_self(cls, model_type: Literal["instance", "solution"]) -> bool:
+    def _validate_with_self(cls, model_type: ModelType) -> bool:
         # info.annotation contains the type and any nested metadata, info.metadata the top level metadata
         # we can use _annotation_needs_self for all of them, so we iterate over all fields and see if any of them
         # either have an annotation or metadata we need to parse with a self reference
@@ -179,7 +179,7 @@ class AttributeReferenceValidator:
 
         return general_after_validator_function(wrapper, schema=schema)
 
-    def needs_self(self, model_type: Literal["instance", "solution"]) -> bool:
+    def needs_self(self, model_type: ModelType) -> bool:
         """Checks if the validator needs a reference to the current model in order to work fully."""
         if self.attribute.model == "self":
             return True
