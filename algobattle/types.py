@@ -49,7 +49,7 @@ __all__ = (
     "SizeLen",
     "DirectedGraph",
     "UndirectedGraph",
-    "EdgeIndex",
+    "Edge",
     "EdgeLen",
     "EdgeWeights",
     "VertexWeights",
@@ -422,14 +422,12 @@ class UndirectedGraph(DirectedGraph):
             raise ValidationError("Undirected graph contains back and forth edges between two vertices.")
 
 
-def edge_index_val(v: int, edges: list[tuple[u64, u64]]) -> int:
-    if v >= len(edges):
-        raise ValueError("Value is not a valid index into `instance.`")
-    return v
+Vertex = SizeIndex
+"""Type for vertices, encoded as numbers `0 <= v < instance.num_vertices`."""
 
 
-EdgeIndex = IndexInto[DirectedGraph.edges]
-"""Specifies that the field should be a valid index into instance.edges."""
+Edge = IndexInto[DirectedGraph.edges]
+"""Type for edges, encoded as indices into `instance.edges`."""
 
 
 def edge_len_val(v: S, edges: list[tuple[u64, u64]]) -> S:
