@@ -1,5 +1,9 @@
 # Lehrkonzept Praktikum "Algorithmic Battle"
-## Über dieses Dokument
+
+## Grundlegendes
+
+### Über dieses Dokument
+
 Dieses Dokument beschreibt ein in der universitären Lehre praktisch
 erarbeitetes Lehrkonzept. Dieses hat das Ziel, Lehrende dabei zu
 unterstützen, das `algobattle`-tool, sowie dazugehörige Software für
@@ -7,7 +11,9 @@ die eigene Lehre einzusetzen. Der Fokus liegt hierbei auf dem
 Lehraspekt. Für eine Erklärung der technischen Vorraussetzungen sowie
 Bedienungdetails, konsultieren Sie bitte die [technische
 Dokumentation](https://algobattle.org/docs).
-## Für wen ist diese Software?
+
+### Für wen ist diese Software?
+
 Das `algobattle`-Tool wurde seit 2019 an der RWTH Aachen University
 entwickelt und für den Einsatz im Rahmen eines Softwarepraktikums für
 Studierende des Bachelor Informatik entworfen. Während die [Sammlung der von uns bereitgestellten Aufgaben](https://github.com/Benezivas/algobattle-problems)
@@ -20,7 +26,9 @@ Arbeit erleichtern möchten, ein kompetitive Lernerfahrung aufzubauen.
 Die extrem modulare Natur des Projekts erlaubt es, über ein Semester
 entweder viele verschiedene Themen abzudecken, oder sich mit
 ausgewählten Themen intensiv zu befassen.
-## Muss ich Lizenzen bei der Verwendung beachten?
+
+### Muss ich Lizenzen bei der Verwendung beachten?
+
 Alle Software sowie dazugehörige Dokumente sind unter einer freien
 MIT-Lizenz veröffentlicht, sofern nicht explizit anders angegeben. Sie
 müssen daher kein Einverständnis einholen, um die Software und
@@ -28,7 +36,9 @@ dazughörige Dokumente und Veröffentlichungen zu verwenden,
 modifizieren, weiterzuentwickeln, oder in einem kommerziellen Rahmen
 (z.B. in privaten Lehrstätten) zu verwenden. Wir fänden es jedoch
 nett, wenn Sie dabei auf uns als Quelle verweisen würden.
-## Für welche Teilnehmerzahl ist das Praktikum geeignet?
+
+### Für welche Teilnehmerzahl ist das Praktikum geeignet?
+
 Wir empfehlen, die Studierenden in mehrere Einzelgruppen einzuteilen,
 unserer Erfahrung nach ist eine Gruppengröße von sechs Personen am
 besten geeignet. Von diesen kann es dann prinzipiell beliebig viele
@@ -38,8 +48,9 @@ Praktikumsbetrieb für 18 Studierende gut neben den sonstigen
 beruflichen Tätigkeiten managen. Der effektive Zeitaufwand betrug dann
 nicht mehr als zwei Wochentage.
 
-# Aufbau
-## Grundidee
+## Aufbau
+
+### Grundidee
 Das Algorithmic Battle hat in seiner ursprünglichen Gestaltung als
 Ziel, Studierenden eine praktische Auseinandersetzung mit sonst
 theoretischem Vorlesungsstoff zu bieten. Im Informatikstudium ist die
@@ -57,7 +68,9 @@ Dies liegt darin begründet, dass ein Problem als Sammlung von allen
 möglichen Instanzen zwar schwer beherrschbar ist, mitunter aber viele
 Teilmengen dieser Instanzen trotzdem sehr schnell korrekt lösbar sind,
 wie es bei praktischen Instanzen oft der Fall zu sein scheint.
-## Lernziele
+
+### Lernziele
+
 Der Fokus des Praktikums liegt daher darin, Studierende beide
 Perspektiven des Lösungsprozesses einnehmen zu lassen. Sie sollen im
 Kern zwei Fragen beantworten:
@@ -115,7 +128,9 @@ dokumentierende Person ist also insbesondere nicht in der Pflicht,
 anderen Gruppenmitgliedern hinterher zu rennen: Wer nichts meldet, der
 steht am Ende nicht in der Dokumentation und hat damit als Erstannahme
 auch nichts getan.
-## Beispiel für den Aufbau eines Semesters
+
+### Beispiel für den Aufbau eines Semesters
+
 Wir beschreiben im Folgenden den Aufbau eines typischen
 Universitätssemesters an der RWTH Aachen University. Dieser Aufbau ist
 selbstverständlich nicht bindend und stellt ein Format dar, welches
@@ -185,13 +200,16 @@ nach grob nach folgendem Schema:
 Nach der fünften Aufgabe endet das Praktikum bei uns mit der
 Vorlesungszeit. Anschließend folgt die Bewertung und Notengebung.
 
-# Bewertung der Studierenden
+## Bewertung der Studierenden
+
 Falls man die Teilnehmer des Praktikums am Ende benoten möchte, geben
 wir hiermit noch ein paar Anregungen, worauf man diese Bewertung
 basieren könnte. Wir prüfen die folgenden Punkte meist schon einmal in
 der Mitte des Semesters, um Einzelpersonen, welche in unseren Augen
 abgehängt wurden, wieder auf die Spur zu helfen.
-## Qualität der Software
+
+### Qualität der Software
+
 Hiermit lässt sich am besten ein Voreindruck für die Notengebung
 in einer Gruppe von Studis erstellen. Die zentrale Frage hier lautet:
 Wie viel Aufwand ist in die Erarbeitung der Software über das Semester
@@ -199,7 +217,9 @@ hinweg geflossen? Eine Gruppe, die zwar viele Battles verliert, dabei
 aber viele verschiedene Ansätze recherchiert und ausprobiert hat,
 ist unserer Meinung nach nicht schlecht zu bewerten, nur weil die
 Ergebnisse in den Battles nicht sehr gut sind.
-## Dokumentation
+
+### Dokumentation
+
 Hier ist die für die Dokumentation zuständige Person natürlich davon
 abhängig, was und in welcher Qualität die anderen Gruppenmitglieder
 ihr über die eigene Arbeit berichtet haben. Daher kann man hierüber
@@ -207,17 +227,22 @@ sehen, welche Gruppenmitglieder in welchen Wochen Arbeit geleistet
 haben. Wir werten Personen ab, welche über das ganze Semester hinweg
 nur eine Art von Arbeit geleistet haben, z.B. nur implementiert oder
 nur recherchiert haben.
-## Vorträge
+
+### Vorträge
+
 Falls eine Person merkbar unvorbereitet ist, führt dies zur Abwertung.
 Hier lässt sich auch recht gut feststellen, ob die Vortragenden
 wissen, was in der Gruppenarbeit getan wurde.
-## Implementationsarbeit
+
+### Implementationsarbeit
+
 Da dies ein Softwareprojektpraktikum ist, lassen wir niemanden
 bestehen, der nicht an Implementierungsarbeit beteiligt war, sei es
 durch Pair Programming oder eigenständige Implementationen. Dies lässt
 sich am einfachsten über die Commit History der Gruppe feststellen.
 
-# Weitere Anwendungsmöglichkeiten der Software
+## Weitere Anwendungsmöglichkeiten der Software
+
 Wir möchten an dieser Stelle betonen, dass wir das `algobattle`-Tool
 bewusst sehr modular geschrieben haben, was die Art von Aufgaben und
 die eigentliche Durchführung von Battles betrifft. Während wir als
@@ -225,7 +250,9 @@ Autoren einen sehr theoriegeprägten Hintergrund haben und uns daher
 hauptsächlich für Probleme interessieren, welche der Theorie
 nahestehen, spricht nichts dagegen, andere Typen von Aufgaben und
 Battles durchzuführen.
-## Andere Arten von Battles
+
+### Andere Arten von Battles
+
 Wir sind in der bisherigen Beschreibung davon ausgegangen,
 dass ein Battle immer so durchgeführt wird, dass sich `generator` und
 `solver` zu immer größeren Instanzgrößen duellieren. Die
@@ -240,7 +267,9 @@ erfolgt dann über die durchschnittliche Lösungsqualität eines Solvers.
 
 Prinzipiell lassen sich alle Arten von Abstraktionen von einzelnen
 Fights zwischen `generator` und `solver` implementieren.
-## Andere Arten von Aufgaben
+
+### Andere Arten von Aufgaben
+
 In den meisten unserer
 [Beispielaufgaben](https://github.com/Benezivas/algobattle-problems)
 sind Input und Output von `generator` und `solver` einfache
@@ -249,8 +278,10 @@ beliebige Dateien- und Ordnerstrukturen zulässt, spricht nichts
 dagegen, etwa Multimediainhalt wie Musik oder Bilder als Ein- und
 Ausgaben der `generator` und `solver` zu spezifizieren.
 
-# Sonstiges
-## Bug Bounties
+## Sonstiges
+
+### Bug Bounties
+
 Wir ermutigen unsere Studierenden, sowohl unser
 `algobattle`-Framework, als auch die von uns geschriebenen Aufgaben
 möglichst kaputt zu machen. Konkret interessieren wir uns für
@@ -269,7 +300,9 @@ Der große Vorteil dieses Verfahrens ist es, dass wir die natürliche
 Neugier, Systeme zu erkunden gesteuert belohnen können und wir weitere
 Testcases für unseren eigenen Code erhalten. Gleichzeitig können wir
 die Bemühungen der Studierenden belohnen.
-## Bekannte Fallstricke
+
+### Bekannte Fallstricke
+
 Unserer Erfahrung nach stellen Studierende irgendwann fest, dass
 MIP-Solver existieren. Diese sind für viele Aufgabenstellungen Gift,
 da sich diese schnell einschleifen und als Allzweckwaffe genutzt
@@ -278,7 +311,9 @@ gestalten, dass das wiederholte verwenden der gleichen Software
 unattraktiv wird. Im Falle von MIP-Solvern hilft es bereits, den
 verfügbaren Arbeitsspeicher einzuschränken, da diese meist sehr
 speicherintensiv arbeiten.
-## Weitere Ressourcen
+
+### Weitere Ressourcen
+
 [algobattle auf Github](https://github.com/Benezivas/algobattle)  
 [algobattle-problems auf Github](https://github.com/Benezivas/algobattle-problems)  
 [algobattle-web auf Github](https://github.com/Benezivas/algobattle-web)  
