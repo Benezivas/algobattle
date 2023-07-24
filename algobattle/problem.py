@@ -5,6 +5,7 @@ from functools import wraps
 from importlib.metadata import entry_points
 import importlib.util
 from inspect import signature
+from itertools import chain
 import sys
 from pathlib import Path
 from typing import (
@@ -22,6 +23,7 @@ from typing import (
     get_args,
 )
 from math import inf, isnan
+from annotated_types import GroupedMetadata
 
 from pydantic import GetCoreSchemaHandler, ValidationInfo
 from pydantic_core import CoreSchema
@@ -386,11 +388,20 @@ class InstanceSolutionModel(EncodableModel, ABC):
     def _annotation_needs_self(cls, annotation: object, model_type: Literal["instance", "solution"]) -> bool:
         if isinstance(annotation, AttributeReferenceValidator):
             return annotation.needs_self(model_type)
+        if isinstance(annotation, GroupedMetadata):
+            return any(cls._annotation_needs_self(e, model_type) for e in annotation)
         return any(cls._annotation_needs_self(e, model_type) for e in get_args(annotation))
 
     @classmethod
     def _validate_with_self(cls, model_type: Literal["instance", "solution"]) -> bool:
-        return any(cls._annotation_needs_self(info.annotation, model_type) for info in cls.model_fields.values())
+        # info.annotation contains the type and any nested metadata, info.metadata the top level metadata
+        # we can use _annotation_needs_self for all of them, so we iterate over all fields and see if any of them
+        # either have an annotation or metadata we need to parse with a self reference
+        for info in cls.model_fields.values():
+            values = chain((info.annotation,), info.metadata)
+            if any(cls._annotation_needs_self(value, model_type) for value in values):
+                return True
+        return False
 
 
 ModelReference = Literal["instance", "solution", "self"]
@@ -525,7 +536,7 @@ class InstanceModel(Instance, InstanceSolutionModel, ABC):
         """
         super().validate_instance()
         if self._validate_with_self("instance"):
-            self.model_validate(self, context={"instance": self, "self": self, "role": Role.generator})
+            self.model_validate(self.__dict__, context={"instance": self, "self": self, "role": Role.generator})
 
 
 class SolutionModel(Solution[InstanceT], InstanceSolutionModel, ABC):
@@ -551,4 +562,4 @@ class SolutionModel(Solution[InstanceT], InstanceSolutionModel, ABC):
         """
         super().validate_solution(instance, role)
         if self._validate_with_self("solution"):
-            self.model_validate(self, context={"instance": instance, "solution": self, "self": self, "role": role})
+            self.model_validate(self.__dict__, context={"instance": instance, "solution": self, "self": self, "role": role})
