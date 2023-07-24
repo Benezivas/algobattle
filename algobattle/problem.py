@@ -7,14 +7,27 @@ import importlib.util
 from inspect import signature
 import sys
 from pathlib import Path
-from typing import Any, Callable, ClassVar, Literal, ParamSpec, Protocol, Self, Generic, TypeVar, cast, get_args
+from typing import (
+    Any,
+    Callable,
+    ClassVar,
+    Literal,
+    ParamSpec,
+    Protocol,
+    Self,
+    Generic,
+    TypeVar,
+    overload,
+    cast,
+    get_args,
+)
 from math import inf, isnan
 
 from pydantic import GetCoreSchemaHandler, ValidationInfo
 from pydantic_core import CoreSchema
 from pydantic_core.core_schema import general_after_validator_function
 
-from algobattle.util import Role, Encodable, EncodableModel, count_positional_params
+from algobattle.util import Role, Encodable, EncodableModel, count_positional_params, inherit_docs
 
 
 class Instance(Encodable, ABC):
@@ -60,21 +73,19 @@ class Solution(Encodable, Generic[InstanceT], ABC):
         """
         return
 
-
-class Scored(Solution[InstanceT]):
-    """A solution with an associated score."""
-
-    @abstractmethod
-    def score(self, instance: InstanceT) -> float:
+    def score(self, instance: InstanceT, role: Role) -> float:
         """Calculate the score of this solution for the given problem instance.
+
+        The default implementation always returns 1, indicating that all solutions of this problem are equally good.
 
         Args:
             instance: The instance this solution solves
+            role: The role of the team that generated this solution
         Returns:
             The calculates score of this solution. Must be a nonnegative number. Bigger scores are considered better,
             if your score rates better scores lower you can use the @minimize decorator.
         """
-        raise NotImplementedError
+        return 1
 
 
 def minimize(function: Callable[P, float]) -> Callable[P, float]:
@@ -102,44 +113,82 @@ _I = TypeVar("_I", bound=Instance, contravariant=True)
 _S = TypeVar("_S", bound=Solution[Instance], contravariant=True)
 
 
-class ScoreFunction(Protocol, Generic[_I, _S]):
-    """Type of `score` function passed to Problem."""
+class ScoreFunctionWithSol(Protocol, Generic[_I, _S]):
+    """Type of `score` function passed to Problem if `with_solution` is set."""
 
-    def __call__(self, instance: _I, solver_solution: _S, generator_solution: _S | None) -> Any:
+    def __call__(self, instance: _I, *, generator_solution: _S, solver_solution: _S) -> float:
         """Calculates how well a solution solves this problem instance.
 
         Args:
             instance: The generated instance.
+            generator_solution: The solution output by the generator.
             solver_solution: The solution created by the solver.
-            generator_solution: The solution output by the generator, if any.
 
         Returns:
             The calculated score, a number in [0, 1] with a value of 0 indicating that the solver failed completely and
             1 that it solved the instance perfectly.
         """
+        ...
 
 
-def default_score(instance: Instance, solver_solution: SolutionT, generator_solution: SolutionT | None) -> float:
+class ScoreFunctionNoSol(Protocol, Generic[_I, _S]):
+    """Type of `score` function passed to Problem if `with_solution` is not set."""
+
+    def __call__(self, instance: _I, *, solution: _S) -> float:
+        """Calculates how well a solution solves this problem instance.
+
+        Args:
+            instance: The generated instance.
+            solution: The solution output by the generator.
+
+        Returns:
+            The calculated score, a number in [0, 1] with a value of 0 indicating that the solver failed completely and
+            1 that it solved the instance perfectly.
+        """
+        ...
+
+
+ScoreFunction = ScoreFunctionWithSol[InstanceT, SolutionT] | ScoreFunctionNoSol[InstanceT, SolutionT]
+
+
+@overload
+def default_score(instance: Instance, *, solution: Solution[Instance]) -> float:
+    ...
+
+
+@overload
+def default_score(instance: Instance, *, generator_solution: SolutionT, solver_solution: SolutionT) -> float:
+    ...
+
+
+def default_score(
+    instance: Instance,
+    solution: SolutionT | None = None,
+    generator_solution: SolutionT | None = None,
+    solver_solution: SolutionT | None = None,
+) -> float:
     """Calculates how well a solution solves this problem instance.
 
-    If the solution is `Scored` the score is the ratio of the generator's solution score to the solver's
-    solution score. Otherwise, it simply defaults to 1 since the solver generated a valid solution.
+    If the problem is `with_solution` it calculates the ratio between the solver's and generator's solutions.
+    Otherwise it just returns the solution's score clamped to [0, 1].
 
     Args:
         instance: The generated instance.
+        solution: The solution if the problem is with_solution=False.
         solver_solution: The solution created by the solver.
-        generator_solution: The solution output by the generator, if any.
+        generator_solution: The solution output by the generator.
 
     Returns:
         The calculated score, a number in [0, 1] with a value of 0 indicating that the solver failed completely and
         1 that it solved the instance perfectly.
     """
-    if isinstance(generator_solution, Scored):
-        assert isinstance(solver_solution, Scored)
-        gen_score = generator_solution.score(instance)
+    if solution is None:
+        assert generator_solution is not None
+        assert solver_solution is not None
+        gen_score = generator_solution.score(instance, Role.generator)
         if gen_score < 0 or isnan(gen_score):
             raise RuntimeError("Score function didn't return a nonnegative value.")
-        sol_score = solver_solution.score(instance)
+        sol_score = solver_solution.score(instance, Role.solver)
         if sol_score < 0 or isnan(sol_score):
             raise RuntimeError("Score function didn't return a nonnegative value.")
 
@@ -148,11 +197,11 @@ def default_score(instance: Instance, solver_solution: SolutionT, generator_solu
         except ZeroDivisionError:
             return float(sol_score < 0)
     else:
-        return 1
+        return max(0, min(1, solution.score(instance, Role.solver)))
 
 
 @dataclass(kw_only=True)
-class Problem(Generic[InstanceT, SolutionT]):
+class ProblemBase(Generic[InstanceT, SolutionT]):
     """The definition of a problem."""
 
     name: str
@@ -177,29 +226,51 @@ class Problem(Generic[InstanceT, SolutionT]):
     to run the battle.
     """
 
-    score: ScoreFunction[InstanceT, SolutionT] = default_score
+    score_function: ScoreFunction[InstanceT, SolutionT] = default_score
     """Function used to score how well a solution solves a problem instance.
 
     The default scoring function uses the `Scored` protocol to compare the solver's solution to the generator's. If the
     used solution class does not support this, it  will always return 1 and thus score all valid solutions equally.
 
-    The signature of the `score` function is as follows:
-
-    Args:
-        instance: The generated instance.
-        solver_solution: The solution created by the solver.
-        generator_solution: The solution output by the generator, if any.
-
-    Returns:
-        The calculated score, a number in [0, 1] with a value of 0 indicating that the solver failed completely and
-        1 that it solved the instance perfectly.
+    The score function always takes the instance as the first argument. If `with_solution` is set it then gets the
+    generated solutions at `generator_solution` and `solver_solution`. If it is not set it receives the solver's
+    solution at `solution`. It should return the calculated score, a number in [0, 1] with a value of 0 indicating that
+    the solver failed completely and 1 that it solved the instance perfectly.
     """
 
     _installed: ClassVar[dict[str, Self]] = {}
 
     def __post_init__(self) -> None:
-        if self.export and self.name not in Problem._installed:
-            Problem._installed[self.name] = self
+        if self.export and self.name not in ProblemBase._installed:
+            ProblemBase._installed[self.name] = self
+
+    @overload
+    def score(self, instance: InstanceT, *, solution: SolutionT) -> float:
+        ...
+
+    @overload
+    def score(self, instance: InstanceT, *, generator_solution: SolutionT, solver_solution: SolutionT) -> float:
+        ...
+
+    def score(
+        self,
+        instance: InstanceT,
+        *,
+        solution: SolutionT | None = None,
+        generator_solution: SolutionT | None = None,
+        solver_solution: SolutionT | None = None,
+    ) -> float:
+        """Helper function to call self.score_function with easier to use overloads."""
+        if self.with_solution:
+            if solution is not None or generator_solution is None or solver_solution is None:
+                raise TypeError
+            assert isinstance(self.score_function, ScoreFunctionWithSol)
+            return self.score_function(instance, generator_solution=generator_solution, solver_solution=solver_solution)
+        else:
+            if solution is None or generator_solution is not None or solver_solution is not None:
+                raise TypeError
+            assert isinstance(self.score_function, ScoreFunctionNoSol)
+            return self.score_function(instance, solution=solution)
 
     @classmethod
     def import_from_path(cls, path: Path) -> Self:
@@ -259,7 +330,7 @@ class Problem(Generic[InstanceT, SolutionT]):
             RuntimeError: If an entrypoint is not a Problem.
         """
         for entrypoint in entry_points(group="algobattle.problem"):
-            if entrypoint.name not in Problem._installed:
+            if entrypoint.name not in cls._installed:
                 problem = entrypoint.load()
                 if not isinstance(problem, cls):
                     raise RuntimeError(
@@ -267,6 +338,45 @@ class Problem(Generic[InstanceT, SolutionT]):
                     )
                 cls._installed[entrypoint.name] = problem
         return cls._installed
+
+
+# Helper class to provide overloads for the __init__ so that score function type and with_solution match up
+class Problem(ProblemBase[InstanceT, SolutionT]):
+    """The definition of a problem."""
+
+    @inherit_docs
+    @overload
+    def __init__(
+        self,
+        *,
+        name: str,
+        instance_cls: type[InstanceT],
+        solution_cls: type[SolutionT],
+        min_size: int = 0,
+        with_solution: Literal[True] = True,
+        export: bool = True,
+        score: ScoreFunctionWithSol[InstanceT, SolutionT] = default_score,
+    ) -> None:
+        ...
+
+    @inherit_docs
+    @overload
+    def __init__(
+        self,
+        *,
+        name: str,
+        instance_cls: type[InstanceT],
+        solution_cls: type[SolutionT],
+        min_size: int = 0,
+        with_solution: Literal[False],
+        export: bool = True,
+        score: ScoreFunctionNoSol[InstanceT, SolutionT] = default_score,
+    ) -> None:
+        ...
+
+    @inherit_docs
+    def __init__(self, *args, **kwargs) -> None:
+        return super().__init__(*args, **kwargs)
 
 
 class InstanceSolutionModel(EncodableModel, ABC):
@@ -393,7 +503,7 @@ InstanceRef = AttributeReferenceMaker("instance")
 SolutionRef = AttributeReferenceMaker("solution")
 
 
-class InstanceModel(InstanceSolutionModel, Instance, ABC):
+class InstanceModel(Instance, InstanceSolutionModel, ABC):
     """An instance that can easily be parsed to/from a json file."""
 
     @classmethod

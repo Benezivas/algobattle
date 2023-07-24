@@ -171,9 +171,13 @@ class FightHandler(Generic[InstanceT, SolutionT]):
         if sol_result.solution is None:
             return self._saved(Fight(score=0, max_size=max_size, generator=gen_result.info, solver=sol_result.info))
 
-        score = self._problem.score(
-            instance=gen_result.instance, solver_solution=sol_result.solution, generator_solution=gen_result.solution
-        )
+        if self._problem.with_solution:
+            assert gen_result.solution is not None
+            score = self._problem.score(
+                gen_result.instance, solver_solution=sol_result.solution, generator_solution=gen_result.solution
+            )
+        else:
+            score = self._problem.score(gen_result.instance, solution=sol_result.solution)
         score = max(0, min(1, float(score)))
         return self._saved(Fight(score=score, max_size=max_size, generator=gen_result.info, solver=sol_result.info))
 
