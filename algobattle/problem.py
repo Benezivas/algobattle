@@ -57,13 +57,14 @@ class Solution(Encodable, Generic[InstanceT], ABC):
         """
         return
 
-    def score(self, instance: InstanceT) -> float:
+    def score(self, instance: InstanceT, role: Role) -> float:
         """Calculate the score of this solution for the given problem instance.
 
         The default implementation always returns 1, indicating that all solutions of this problem are equally good.
 
         Args:
             instance: The instance this solution solves
+            role: The role of the team that generated this solution
         Returns:
             The calculates score of this solution. Must be a nonnegative number. Bigger scores are considered better,
             if your score rates better scores lower you can use the @minimize decorator.
@@ -152,8 +153,8 @@ def default_score(
 ) -> float:
     """Calculates how well a solution solves this problem instance.
 
-    If the solution is `Scored` the score is the ratio of the generator's solution score to the solver's
-    solution score. Otherwise, it simply defaults to 1 since the solver generated a valid solution.
+    If the problem is `with_solution` it calculates the ratio between the solver's and generator's solutions.
+    Otherwise it just returns the solution's score clamped to [0, 1].
 
     Args:
         instance: The generated instance.
@@ -168,10 +169,10 @@ def default_score(
     if solution is None:
         assert generator_solution is not None
         assert solver_solution is not None
-        gen_score = generator_solution.score(instance)
+        gen_score = generator_solution.score(instance, Role.generator)
         if gen_score < 0 or isnan(gen_score):
             raise RuntimeError("Score function didn't return a nonnegative value.")
-        sol_score = solver_solution.score(instance)
+        sol_score = solver_solution.score(instance, Role.solver)
         if sol_score < 0 or isnan(sol_score):
             raise RuntimeError("Score function didn't return a nonnegative value.")
 
@@ -180,7 +181,7 @@ def default_score(
         except ZeroDivisionError:
             return float(sol_score < 0)
     else:
-        return solution.score(instance)
+        return max(0, min(1, solution.score(instance, Role.solver)))
 
 
 @dataclass(kw_only=True)
