@@ -385,6 +385,18 @@ SolutionRef = AttributeReferenceMaker("solution")
 class InstanceModel(InstanceSolutionModel, Instance, ABC):
     """An instance that can easily be parsed to/from a json file."""
 
+    @classmethod
+    def create_and_validate(
+        cls,
+        data: dict[str, Any],
+        *,
+        role: Role = Role.generator,
+        ) -> Self:
+        """Helper method to easily create a fully validated instance."""
+        res = cls.model_validate(data, context={"role": role})
+        res.validate_instance()
+        return res
+
     def validate_instance(self) -> None:
         """Validate the instance again, this time also passing itself in the context.
 
@@ -397,6 +409,19 @@ class InstanceModel(InstanceSolutionModel, Instance, ABC):
 
 class SolutionModel(Solution[InstanceT], InstanceSolutionModel, ABC):
     """A solution that can easily be parsed to/from a json file."""
+
+    @classmethod
+    def create_and_validate(
+        cls,
+        data: dict[str, Any],
+        *,
+        instance: InstanceT,
+        role: Role = Role.generator,
+        ) -> Self:
+        """Helper method to easily create a fully validated solution."""
+        res = cls.model_validate(data, context={"role": role, "instance": instance})
+        res.validate_solution(instance, role)
+        return res
 
     def validate_solution(self, instance: InstanceT, role: Role) -> None:
         """Validate the solution again, this time also passing itself and the instance in the context.
