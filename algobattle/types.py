@@ -426,7 +426,7 @@ Vertex = SizeIndex
 """Type for vertices, encoded as numbers `0 <= v < instance.num_vertices`."""
 
 
-Edge = IndexInto[DirectedGraph.edges]
+Edge = IndexInto[InstanceRef.edges]
 """Type for edges, encoded as indices into `instance.edges`."""
 
 
