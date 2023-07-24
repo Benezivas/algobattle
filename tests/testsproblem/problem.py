@@ -29,9 +29,9 @@ class TestSolution(SolutionModel[TestInstance]):
             raise ValidationError("")
 
 
-def score(instance: TestInstance, solver_solution: TestSolution, generator_solution: TestSolution | None) -> float:
+def score(instance: TestInstance, solution: TestSolution) -> float:
     """Test score function."""
-    return solver_solution.quality
+    return solution.quality
 
 
 TestProblem = Problem(
