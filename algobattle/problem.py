@@ -210,7 +210,7 @@ class ProblemBase(Generic[InstanceT, SolutionT]):
     to run the battle.
     """
 
-    score: ScoreFunction[InstanceT, SolutionT] = default_score
+    score_function: ScoreFunction[InstanceT, SolutionT] = default_score
     """Function used to score how well a solution solves a problem instance.
 
     The default scoring function uses the `Scored` protocol to compare the solver's solution to the generator's. If the
@@ -227,6 +227,34 @@ class ProblemBase(Generic[InstanceT, SolutionT]):
     def __post_init__(self) -> None:
         if self.export and self.name not in ProblemBase._installed:
             ProblemBase._installed[self.name] = self
+
+    @overload
+    def score(self, instance: InstanceT, *, solution: SolutionT) -> float:
+        ...
+
+    @overload
+    def score(self, instance: InstanceT, *, generator_solution: SolutionT, solver_solution: SolutionT) -> float:
+        ...
+
+    def score(
+        self,
+        instance: InstanceT,
+        *,
+        solution: SolutionT | None = None,
+        generator_solution: SolutionT | None = None,
+        solver_solution: SolutionT | None = None,
+    ) -> float:
+        """Helper function to call self.score_function with easier to use overloads."""
+        if self.with_solution:
+            if solution is not None or generator_solution is None or solver_solution is None:
+                raise TypeError
+            assert isinstance(self.score_function, ScoreFunctionWithSol)
+            return self.score_function(instance, generator_solution=generator_solution, solver_solution=solver_solution)
+        else:
+            if solution is None or generator_solution is not None or solver_solution is not None:
+                raise TypeError
+            assert isinstance(self.score_function, ScoreFunctionNoSol)
+            return self.score_function(instance, solution=solution)
 
     @classmethod
     def import_from_path(cls, path: Path) -> Self:
