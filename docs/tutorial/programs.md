@@ -223,7 +223,7 @@ image build will be ignored by the match.
 Both types of programs will find a file `info.json` in the input directory. It contains some basic info about how the
 program is run and the resources it has available. In particular, its keys are:
 
-`size`
+`max_size`
 
 :   The instance size of this fight. If the program is a generator, its output must be
     smaller than it and if it is a solver the input instance is guaranteed to be smaller than it.
@@ -245,7 +245,7 @@ program is run and the resources it has available. In particular, its keys are:
 /// example | Example (with more human-readable formatting)
 ```json title="input/info.json"
 {
-    "size": 17,
+    "max_size": 17,
     "timeout": 20,
     "space": none,
     "cpus": 2
@@ -274,11 +274,11 @@ container will most likely contain a file called `instance.json`, but it might a
 
 #### Generators
 
-Generators will also find a file called `size.txt` in their input directory. This simply contains the maximum allowed
-size of the instance they are tasked with generating.
+Generators will also find a file called `max_size.txt` in their input directory. This simply contains the maximum
+allowed size of the instance they are tasked with generating.
 
 /// example
-```text title="input/size.txt"
+```text title="input/max_size.txt"
 17
 ```
 ///
