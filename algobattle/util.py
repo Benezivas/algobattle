@@ -6,19 +6,25 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from inspect import Parameter, Signature
+from inspect import Parameter, Signature, signature
+from itertools import chain
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from traceback import format_exception
-from typing import Any, Iterable, Literal, LiteralString, TypeVar, Self
+from typing import Any, Callable, ClassVar, Iterable, Literal, LiteralString, TypeVar, Self, cast, get_args
+from annotated_types import GroupedMetadata
 
 from pydantic import (
     ConfigDict,
     BaseModel as PydandticBaseModel,
     Extra,
+    GetCoreSchemaHandler,
     ValidationError as PydanticValidationError,
+    ValidationInfo,
 )
+from pydantic_core import CoreSchema
+from pydantic_core.core_schema import general_after_validator_function
 
 
 class Role(Enum):
@@ -38,18 +44,166 @@ def str_with_traceback(exception: Exception) -> str:
     return "\n".join(format_exception(exception))
 
 
-class BaseModel(PydandticBaseModel):
-    """Base class for all pydantic models."""
-
-    model_config = ConfigDict(extra=Extra.forbid, from_attributes=True)
-
-
 def inherit_docs(obj: T) -> T:
     """Decorator to mark a method as inheriting its docstring.
 
     Python 3.5+ already does this, but pydocstyle needs a static hint.
     """
     return obj
+
+
+ModelType = Literal["instance", "solution"]
+ModelReference = ModelType | Literal["self"]
+
+
+class BaseModel(PydandticBaseModel):
+    """Base class for all pydantic models."""
+
+    model_config = ConfigDict(extra=Extra.forbid, from_attributes=True)
+
+    _algobattle_model_type: ClassVar[ModelType]
+
+    @inherit_docs
+    @classmethod
+    def model_validate(
+        cls,
+        obj: Any,
+        *,
+        strict: bool | None = None,
+        from_attributes: bool | None = None,
+        context: dict[str, Any] | None = None,
+    ) -> Self:
+        model = super().model_validate(obj, strict=strict, from_attributes=from_attributes, context=context)
+        if cls._validate_with_self(cls._algobattle_model_type):
+            context = (context or {}) | {"self": model, cls._algobattle_model_type: model}
+            model = super().model_validate(obj, context=context)
+        return model
+
+    @classmethod
+    def _annotation_needs_self(cls, annotation: object, model_type: Literal["instance", "solution"]) -> bool:
+        if isinstance(annotation, AttributeReferenceValidator):
+            return annotation.needs_self(model_type)
+        if isinstance(annotation, GroupedMetadata):
+            return any(cls._annotation_needs_self(e, model_type) for e in annotation)
+        return any(cls._annotation_needs_self(e, model_type) for e in get_args(annotation))
+
+    @classmethod
+    def _validate_with_self(cls, model_type: Literal["instance", "solution"]) -> bool:
+        # info.annotation contains the type and any nested metadata, info.metadata the top level metadata
+        # we can use _annotation_needs_self for all of them, so we iterate over all fields and see if any of them
+        # either have an annotation or metadata we need to parse with a self reference
+        for info in cls.model_fields.values():
+            values = chain((info.annotation,), info.metadata)
+            if any(cls._annotation_needs_self(value, model_type) for value in values):
+                return True
+        return False
+
+
+@dataclass(frozen=True, slots=True)
+class AttributeReference:
+    """Creates a reference to the attribute of a model to be used in validaton schemas."""
+
+    model: ModelReference
+    attribute: str
+
+    def get_value(self, info: ValidationInfo) -> Any | None:
+        """Returns the referenced value from the correct object in the info context.
+
+        If the correct object is not in the context or doesn't have the referenced attribute it returns None.
+        """
+        if info.context is None or self.model not in info.context:
+            return None
+        model = info.context[self.model]
+        if hasattr(model, self.attribute):
+            return getattr(model, self.attribute)
+        else:
+            return None
+
+    def __str__(self) -> str:
+        return f"{self.model}.{self.attribute}"
+
+    def needs_self(self, model_type: Literal["instance", "solution"]) -> bool:
+        """Checks if an attribute reference needs a reference to the current model in order to be resolved."""
+        if self.model == "self":
+            return True
+        else:
+            return self.model == model_type
+
+
+NoInfoAttrValidatorFunction = Callable[[Any, Any], Any]
+GeneralAttrValidatorFunction = Callable[[Any, Any, ValidationInfo], Any]
+AttrValidatorFunction = NoInfoAttrValidatorFunction | GeneralAttrValidatorFunction
+
+
+def is_info_validator(validator: AttrValidatorFunction) -> bool:
+    """Helper method to discriminate the union."""
+    match count_positional_params(signature(validator)):
+        case 2:
+            return False
+        case 3:
+            return True
+        case _:
+            raise TypeError
+
+
+@dataclass(frozen=True, slots=True)
+class AttributeReferenceValidator:
+    """An AfterValidator that can resolve a reference to a model attribute and pass it to the validator function.
+
+    Using this with a reference to an attribute in the model it is defined may significantly impact performance.
+    """
+
+    func: AttrValidatorFunction
+    attribute: AttributeReference
+
+    def __get_pydantic_core_schema__(self, source_type: Any, handler: GetCoreSchemaHandler) -> CoreSchema:
+        schema = handler(source_type)
+        info_arg = is_info_validator(self.func)
+        if info_arg:
+            func = cast(GeneralAttrValidatorFunction, self.func)
+
+            def wrapper(value: Any, info: ValidationInfo) -> Any:
+                attribute_val = self.attribute.get_value(info)
+                if attribute_val is None:
+                    return value
+                return func(value, attribute_val, info)
+
+        else:
+            func = cast(NoInfoAttrValidatorFunction, self.func)
+
+            def wrapper(value: Any, info: ValidationInfo) -> Any:
+                attribute_val = self.attribute.get_value(info)
+                if attribute_val is None:
+                    return value
+                return func(value, attribute_val)
+
+        return general_after_validator_function(wrapper, schema=schema)
+
+    def needs_self(self, model_type: Literal["instance", "solution"]) -> bool:
+        """Checks if the validator needs a reference to the current model in order to work fully."""
+        if self.attribute.model == "self":
+            return True
+        else:
+            return self.attribute.model == model_type
+
+
+@dataclass
+class AttributeReferenceMaker:
+    """Helper class to easily create attribute references."""
+
+    _attr_ref_maker_model: ModelReference
+
+    def __getattr__(self, __name: str) -> AttributeReference:
+        return AttributeReference(self._attr_ref_maker_model, __name)
+
+
+SelfRef = AttributeReferenceMaker("self")
+
+
+InstanceRef = AttributeReferenceMaker("instance")
+
+
+SolutionRef = AttributeReferenceMaker("solution")
 
 
 def check_path(path: str, *, type: Literal["file", "dir", "exists"] = "exists") -> Path:

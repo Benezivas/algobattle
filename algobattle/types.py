@@ -21,12 +21,16 @@ from pydantic_core.core_schema import no_info_after_validator_function
 
 from algobattle.problem import (
     InstanceModel,
+    SolutionModel,
+)
+from algobattle.util import (
+    BaseModel,
+    Role,
     AttributeReference,
     AttributeReferenceValidator,
     InstanceRef,
-    SolutionModel,
+    ValidationError,
 )
-from algobattle.util import BaseModel, Role, ValidationError
 
 __all__ = (
     "u64",
