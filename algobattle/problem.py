@@ -7,6 +7,7 @@ import importlib.util
 import sys
 from pathlib import Path
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     ClassVar,
@@ -257,12 +258,14 @@ class ProblemBase(Generic[InstanceT, SolutionT]):
         if self.with_solution:
             if solution is not None or generator_solution is None or solver_solution is None:
                 raise TypeError
-            assert isinstance(self.score_function, ScoreFunctionWithSol)
+            if TYPE_CHECKING:
+                assert isinstance(self.score_function, ScoreFunctionWithSol)
             return self.score_function(instance, generator_solution=generator_solution, solver_solution=solver_solution)
         else:
             if solution is None or generator_solution is not None or solver_solution is not None:
                 raise TypeError
-            assert isinstance(self.score_function, ScoreFunctionNoSol)
+            if TYPE_CHECKING:
+                assert isinstance(self.score_function, ScoreFunctionNoSol)
             return self.score_function(instance, solution=solution)
 
     @classmethod
