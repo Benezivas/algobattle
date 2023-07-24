@@ -1,6 +1,6 @@
 """Utility types used to easily define Problems."""
 from dataclasses import dataclass
-from typing import Annotated, Any, Collection, Iterator, Sized, TypeVar, Generic, TypedDict, overload
+from typing import Annotated, Any, Collection, Iterator, TypeVar, Generic, TypedDict, overload
 import annotated_types as at
 from annotated_types import (
     BaseMetadata,
@@ -318,6 +318,7 @@ class UniqueItems:
             if len(collection) != len(set(collection)):
                 raise ValueError("Value contains duplicate elements")
             return collection
+
         return no_info_after_validator_function(_func, handler(source_type))
 
     @classmethod

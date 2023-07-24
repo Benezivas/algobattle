@@ -562,4 +562,6 @@ class SolutionModel(Solution[InstanceT], InstanceSolutionModel, ABC):
         """
         super().validate_solution(instance, role)
         if self._validate_with_self("solution"):
-            self.model_validate(self.__dict__, context={"instance": instance, "solution": self, "self": self, "role": role})
+            self.model_validate(
+                self.__dict__, context={"instance": instance, "solution": self, "self": self, "role": role}
+            )
