@@ -369,7 +369,7 @@ class AttributeReferenceMaker:
 
     _attr_ref_maker_model: ModelReference
 
-    def __getattr__(self, __name: str) -> Any:
+    def __getattr__(self, __name: str) -> AttributeReference:
         return AttributeReference(self._attr_ref_maker_model, __name)
 
 
