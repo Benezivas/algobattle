@@ -57,13 +57,10 @@ class Solution(Encodable, Generic[InstanceT], ABC):
         """
         return
 
-
-class Scored(Solution[InstanceT]):
-    """A solution with an associated score."""
-
-    @abstractmethod
     def score(self, instance: InstanceT) -> float:
         """Calculate the score of this solution for the given problem instance.
+
+        The default implementation always returns 1, indicating that all solutions of this problem are equally good.
 
         Args:
             instance: The instance this solution solves
@@ -71,7 +68,7 @@ class Scored(Solution[InstanceT]):
             The calculates score of this solution. Must be a nonnegative number. Bigger scores are considered better,
             if your score rates better scores lower you can use the @minimize decorator.
         """
-        raise NotImplementedError
+        return 1
 
 
 def minimize(function: Callable[P, float]) -> Callable[P, float]:
@@ -168,8 +165,9 @@ def default_score(
         The calculated score, a number in [0, 1] with a value of 0 indicating that the solver failed completely and
         1 that it solved the instance perfectly.
     """
-    if isinstance(generator_solution, Scored):
-        assert isinstance(solver_solution, Scored)
+    if solution is None:
+        assert generator_solution is not None
+        assert solver_solution is not None
         gen_score = generator_solution.score(instance)
         if gen_score < 0 or isnan(gen_score):
             raise RuntimeError("Score function didn't return a nonnegative value.")
@@ -182,7 +180,7 @@ def default_score(
         except ZeroDivisionError:
             return float(sol_score < 0)
     else:
-        return 1
+        return solution.score(instance)
 
 
 @dataclass(kw_only=True)
