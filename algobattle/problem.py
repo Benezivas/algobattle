@@ -301,8 +301,9 @@ class ProblemBase(Generic[InstanceT, SolutionT]):
 
 
 # Helper class to provide overloads for the __init__ so that score function type and with_solution match up
-@inherit_docs
 class Problem(ProblemBase[InstanceT, SolutionT]):
+    """The definition of a problem."""
+
     @inherit_docs
     @overload
     def __init__(
@@ -312,7 +313,7 @@ class Problem(ProblemBase[InstanceT, SolutionT]):
         instance_cls: type[InstanceT],
         solution_cls: type[SolutionT],
         min_size: int = 0,
-        with_solution: Literal[True],
+        with_solution: Literal[True] = True,
         export: bool = True,
         score: ScoreFunctionWithSol[InstanceT, SolutionT] = default_score,
     ) -> None:
