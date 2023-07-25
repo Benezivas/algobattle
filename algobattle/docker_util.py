@@ -839,7 +839,7 @@ class Generator(Program):
 
         if problem.with_solution:
             try:
-                solution = problem.Solution.decode(output / "solution", max_size, self.role)
+                solution = problem.Solution.decode(output / "solution", max_size, self.role)  # type: ignore
             except EncodingError:
                 raise
             except Exception as e:
@@ -910,7 +910,7 @@ class Solver(Program):
     def _parse_output(self, output: Path, max_size: int, instance: Problem | None) -> Problem.Solution:
         assert instance is not None
         try:
-            solution = self.problem_class.Solution.decode(output / "solution", max_size, self.role)
+            solution = self.problem_class.Solution.decode(output / "solution", max_size, self.role)  # type: ignore
         except EncodingError:
             raise
         except Exception as e:
