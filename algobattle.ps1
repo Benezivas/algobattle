@@ -44,11 +44,18 @@ if ($teams) {
     $mounts += "--mount type=bind,source=" + (Resolve-Path $teams) + ",target=/algobattle/teams "
 }
 
-Invoke-Expression ("docker run -it --rm " +
-    "--mount type=volume,source=algobattle_input,target=/algobattle/input " +
-    "--mount type=volume,source=algobattle_output,target=/algobattle/output " +
-    "--mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock " +
-    $mounts +
-    "algobattle " +
-    $docker_args 
-)
+$tempFolderPath = Join-Path $Env:Temp $(New-Guid)
+New-Item -Type Directory -Path $tempFolderPath | Out-Null
+
+try {
+    Invoke-Expression ("docker run -it --rm " +
+        "--mount type=bind,source=" + $tempFolderPath + ",target=/algobattle/io " +
+        "--env ALGOBATTLE_IO_DIR=" + $tempFolderPath + " " +
+        "--mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock " +
+        $mounts +
+        "algobattle " +
+        $docker_args 
+    )
+} finally {
+    Remove-Item -LiteralPath $tempFolderPath -Force -Recurse
+}

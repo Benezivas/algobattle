@@ -2,7 +2,6 @@
 from abc import ABC, abstractmethod
 from os import environ
 from pathlib import Path
-from shutil import rmtree
 from tempfile import TemporaryDirectory
 from timeit import default_timer
 from typing import Any, ClassVar, Iterator, Protocol, Self, TypedDict, cast
@@ -274,39 +273,17 @@ class ProgramIO:
     """Manages the directories used to pass IO to programs.
 
     Normally we can just create temporary directories using the python stdlib, but when running inside a container we
-    need to use shared volumes since the host Docker daemon can't create mounts between two sibling containers.
+    need to use a directory thats bound to one on the host machine.
     """
 
-    @property
-    def input(self) -> Path:
-        """Path to the input directory."""
-        raise NotImplementedError
-
-    @property
-    def output(self) -> Path:
-        """Path to the output directoy."""
-        raise NotImplementedError
-
-    @property
-    def mounts(self) -> list[Mount]:
-        """A list of Mounts corresponding to these IO directories that can be passed to the docker api."""
-        raise NotImplementedError
-
-    def __enter__(self) -> Self:
-        return self
-
-    def __exit__(self, exc, val, tb):
-        return
-
-
-class TmpFileIO(ProgramIO):
-    """Uses mounted temporary directories."""
+    host_dir: ClassVar[Path | None] = Path(environ["ALGOBATTLE_IO_DIR"]) if "ALGOBATTLE_IO_DIR" in environ else None
+    parent_dir: ClassVar[Path | None] = Path("/algobattle/io") if "ALGOBATTLE_IO_DIR" in environ else None
 
     def __init__(self) -> None:
         """Creates the needed temporary directories."""
         super().__init__()
-        self._input = TemporaryDirectory()
-        self._output = TemporaryDirectory()
+        self._input = TemporaryDirectory(dir=self.parent_dir)
+        self._output = TemporaryDirectory(dir=self.parent_dir)
 
     @property
     def input(self) -> Path:
@@ -321,59 +298,23 @@ class TmpFileIO(ProgramIO):
     @property
     def mounts(self) -> list[Mount]:
         """A list of Mounts corresponding to these IO directories that can be passed to the docker api."""
+        if self.host_dir:
+            host_input = self.host_dir / self.input.name
+            host_output = self.host_dir / self.output.name
+        else:
+            host_input = self.input
+            host_output = self.output
         return [
-            Mount(target="/input", source=self._input.name, type="bind", read_only=True),
-            Mount(target="/output", source=self._output.name, type="bind"),
+            Mount(target="/input", source=str(host_input), type="bind", read_only=True),
+            Mount(target="/output", source=str(host_output), type="bind"),
         ]
-
-    def __exit__(self, exc, val, tb):
-        self._input.__exit__(exc, val, tb)
-        self._output.__exit__(exc, val, tb)
-        return super().__exit__(exc, val, tb)
-
-
-class VolumeIO(ProgramIO):
-    """Uses shared volumes."""
-
-    @property
-    def input(self) -> Path:
-        """Path to the input directory."""
-        return Path("/algobattle/input")
-
-    @property
-    def output(self) -> Path:
-        """Path to the output directoy."""
-        return Path("/algobattle/output")
-
-    @property
-    def mounts(self) -> list[Mount]:
-        """A list of Mounts corresponding to these IO directories that can be passed to the docker api."""
-        return [
-            Mount(target="/input", source="algobattle_input", type="volume"),
-            Mount(target="/output", source="algobattle_output", type="volume"),
-        ]
-
-    def clean_volume(self, path: Path) -> None:
-        """Empties a volume so that it can be used for a new program invocation."""
-        rmtree(path, ignore_errors=True)
-        # removing the mounted directory itself will always fail, but we might also ignore errors when removing
-        # something inside it. To make sure we never call a container with leftover data from a previous run we
-        # have to raise an exception if there is something we can't remove.
-        if any(path.iterdir()):
-            raise RuntimeError("Could not remove everything in {path}.")
 
     def __enter__(self) -> Self:
-        self.clean_volume(self.input)
-        self.clean_volume(self.output)
-        return super().__enter__()
+        return self
 
-    def __exit__(self, exc, value, tb) -> None:
-        self.clean_volume(self.input)
-        self.clean_volume(self.output)
-        return super().__exit__(exc, value, tb)
-
-
-IOFolders: type[ProgramIO] = VolumeIO if environ.get("ALGOBATTLE_IO_VOLUMES", False) else TmpFileIO
+    def __exit__(self, exc: Any, val: Any, tb: Any):
+        self._input.__exit__(exc, val, tb)
+        self._output.__exit__(exc, val, tb)
 
 
 @dataclass
@@ -710,7 +651,7 @@ class Program(ABC):
         run_params = RunParameters(timeout=timeout, space=space, cpus=cpus)
         result_class = GeneratorResult if self.role == Role.generator else SolverResult
 
-        with IOFolders() as io:
+        with ProgramIO() as io:
             try:
                 self._encode_input(io.input, max_size, input_instance)
             except AlgobattleBaseException as e:
