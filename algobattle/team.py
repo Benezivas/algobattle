@@ -3,12 +3,12 @@ from abc import abstractmethod
 from dataclasses import dataclass, field
 from itertools import combinations
 from pathlib import Path
-from typing import Iterator, Protocol, Self, TypeAlias
+from typing import Generic, Iterator, Protocol, Self, TypeAlias
 
 from pydantic import BaseModel
 
 from algobattle.docker_util import ProgramConfig, Generator, Solver
-from algobattle.problem import Problem
+from algobattle.problem import InstanceT, Problem, SolutionT
 from algobattle.util import ExceptionInfo, MatchMode, Role
 
 
@@ -34,8 +34,13 @@ class TeamInfo(BaseModel):
     solver: Path
 
     async def build(
-        self, name: str, problem: type[Problem], config: ProgramConfig, name_programs: bool, ui: BuildUiProxy
-    ) -> "Team":
+        self,
+        name: str,
+        problem: Problem[InstanceT, SolutionT],
+        config: ProgramConfig,
+        name_programs: bool,
+        ui: BuildUiProxy,
+    ) -> "Team[InstanceT, SolutionT]":
         """Builds the specified docker files into images and return the corresponding team.
 
         Args:
@@ -71,12 +76,12 @@ TeamInfos: TypeAlias = dict[str, TeamInfo]
 
 
 @dataclass
-class Team:
+class Team(Generic[InstanceT, SolutionT]):
     """Team class responsible for holding basic information of a specific team."""
 
     name: str
-    generator: Generator
-    solver: Solver
+    generator: Generator[InstanceT, SolutionT]
+    solver: Solver[InstanceT, SolutionT]
 
     def __post_init__(self) -> None:
         """Creates a team object.
@@ -116,13 +121,13 @@ class Team:
 
 
 @dataclass(frozen=True)
-class Matchup:
+class Matchup(Generic[InstanceT, SolutionT]):
     """Represents an individual matchup of teams."""
 
-    generator: Team
-    solver: Team
+    generator: Team[InstanceT, SolutionT]
+    solver: Team[InstanceT, SolutionT]
 
-    def __iter__(self) -> Iterator[Team]:
+    def __iter__(self) -> Iterator[Team[InstanceT, SolutionT]]:
         yield self.generator
         yield self.solver
 
@@ -131,16 +136,21 @@ class Matchup:
 
 
 @dataclass
-class TeamHandler:
+class TeamHandler(Generic[InstanceT, SolutionT]):
     """Handles building teams and cleaning them up."""
 
-    active: list[Team] = field(default_factory=list)
+    active: list[Team[InstanceT, SolutionT]] = field(default_factory=list)
     excluded: dict[str, ExceptionInfo] = field(default_factory=dict)
     cleanup: bool = True
 
     @classmethod
     async def build(
-        cls, infos: TeamInfos, problem: type[Problem], mode: MatchMode, config: ProgramConfig, ui: BuildUiProxy
+        cls,
+        infos: TeamInfos,
+        problem: Problem[InstanceT, SolutionT],
+        mode: MatchMode,
+        config: ProgramConfig,
+        ui: BuildUiProxy,
     ) -> Self:
         """Builds the programs of every team.
 
@@ -174,7 +184,7 @@ class TeamHandler:
                 team.cleanup()
 
     @property
-    def grouped_matchups(self) -> list[tuple[Matchup, Matchup]]:
+    def grouped_matchups(self) -> list[tuple[Matchup[InstanceT, SolutionT], Matchup[InstanceT, SolutionT]]]:
         """All matchups, grouped by the involved teams.
 
         Each tuple's first matchup has the first team in the group generating, the second has it solving.
@@ -182,7 +192,7 @@ class TeamHandler:
         return [(Matchup(*g), Matchup(*g[::-1])) for g in combinations(self.active, 2)]
 
     @property
-    def matchups(self) -> list[Matchup]:
+    def matchups(self) -> list[Matchup[InstanceT, SolutionT]]:
         """All matchups that will be fought."""
         if len(self.active) == 1:
             return [Matchup(self.active[0], self.active[0])]

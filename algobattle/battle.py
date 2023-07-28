@@ -9,6 +9,7 @@ from abc import abstractmethod
 from typing import (
     Any,
     ClassVar,
+    Generic,
     Protocol,
     TypeAlias,
     TypeVar,
@@ -22,6 +23,7 @@ from algobattle.docker_util import (
     ProgramUiProxy,
     Solver,
 )
+from algobattle.problem import InstanceT, Problem, SolutionT
 from algobattle.util import Encodable, Role, inherit_docs, BaseModel
 
 
@@ -75,11 +77,12 @@ class FightUiProxy(Protocol):
 
 
 @dataclass
-class FightHandler:
+class FightHandler(Generic[InstanceT, SolutionT]):
     """Helper class to run fights of a given battle."""
 
-    _generator: Generator
-    _solver: Solver
+    _problem: Problem[InstanceT, SolutionT]
+    _generator: Generator[InstanceT, SolutionT]
+    _solver: Solver[InstanceT, SolutionT]
     _battle: "Battle"
     _ui: FightUiProxy
     _set_cpus: str | None = None
@@ -131,7 +134,7 @@ class FightHandler:
         Returns:
             The resulting info about the executed fight.
         """
-        min_size = self._generator.problem_class.min_size
+        min_size = self._problem.min_size
         if max_size < min_size:
             raise ValueError(
                 f"Cannot run battle at size {max_size} since it is smaller than the smallest "
@@ -168,7 +171,13 @@ class FightHandler:
         if sol_result.solution is None:
             return self._saved(Fight(score=0, max_size=max_size, generator=gen_result.info, solver=sol_result.info))
 
-        score = gen_result.instance.score(solver_solution=sol_result.solution, generator_solution=gen_result.solution)
+        if self._problem.with_solution:
+            assert gen_result.solution is not None
+            score = self._problem.score(
+                gen_result.instance, solver_solution=sol_result.solution, generator_solution=gen_result.solution
+            )
+        else:
+            score = self._problem.score(gen_result.instance, solution=sol_result.solution)
         score = max(0, min(1, float(score)))
         return self._saved(Fight(score=score, max_size=max_size, generator=gen_result.info, solver=sol_result.info))
 
@@ -261,7 +270,9 @@ class Battle(BaseModel):
         return cls.__name__
 
     @abstractmethod
-    async def run_battle(self, fight: FightHandler, config: _BattleConfig, min_size: int, ui: BattleUiProxy) -> None:
+    async def run_battle(
+        self, fight: FightHandler[InstanceT, SolutionT], config: _BattleConfig, min_size: int, ui: BattleUiProxy
+    ) -> None:
         """Executes one battle.
 
         Args:
@@ -297,7 +308,9 @@ class Iterated(Battle):
         reached: list[int]
         cap: int
 
-    async def run_battle(self, fight: FightHandler, config: BattleConfig, min_size: int, ui: BattleUiProxy) -> None:
+    async def run_battle(
+        self, fight: FightHandler[InstanceT, SolutionT], config: BattleConfig, min_size: int, ui: BattleUiProxy
+    ) -> None:
         """Execute an iterated battle.
 
         Incrementally tries to search for the highest n for which the solver is still able to solve instances.
@@ -369,7 +382,9 @@ class Averaged(Battle):
     class UiData(Battle.UiData):
         round: int
 
-    async def run_battle(self, fight: FightHandler, config: BattleConfig, min_size: int, ui: BattleUiProxy) -> None:
+    async def run_battle(
+        self, fight: FightHandler[InstanceT, SolutionT], config: BattleConfig, min_size: int, ui: BattleUiProxy
+    ) -> None:
         """Execute an averaged battle.
 
         This simple battle type just executes `iterations` many fights after each other at size `instance_size`.

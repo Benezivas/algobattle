@@ -13,7 +13,7 @@ from algobattle.docker_util import (
     Solver,
 )
 from . import testsproblem
-from .testsproblem.problem import TestProblem as TestProblem
+from .testsproblem.problem import TestProblem, TestInstance, TestSolution
 
 
 class ImageTests(IsolatedAsyncioTestCase):
@@ -75,7 +75,7 @@ class ProgramTests(IsolatedAsyncioTestCase):
         cls.problem_path = Path(testsproblem.__file__).parent
         cls.params = RunParameters()
         cls.params_short = RunParameters(timeout=2)
-        cls.instance = TestProblem(semantics=True)
+        cls.instance = TestInstance(semantics=True)
 
     async def test_gen_lax_timeout(self):
         """The generator times out but still outputs a valid instance."""
@@ -117,7 +117,7 @@ class ProgramTests(IsolatedAsyncioTestCase):
         """The generator returns the fixed instance."""
         with await Generator.build(self.problem_path / "generator", TestProblem, self.params) as gen:
             res = await gen.run(5)
-            correct = TestProblem(semantics=True)
+            correct = TestInstance(semantics=True)
             self.assertEqual(res.instance, correct)
 
     async def test_sol_strict_timeout(self):
@@ -160,7 +160,7 @@ class ProgramTests(IsolatedAsyncioTestCase):
         """The solver outputs a solution with a low quality."""
         with await Solver.build(self.problem_path / "solver", TestProblem, self.params) as sol:
             res = await sol.run(self.instance, 5)
-            correct = TestProblem.Solution(semantics=True, quality=True)
+            correct = TestSolution(semantics=True, quality=True)
             self.assertEqual(res.solution, correct)
 
 

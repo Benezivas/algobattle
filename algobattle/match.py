@@ -5,7 +5,7 @@ from datetime import datetime
 from itertools import combinations
 from pathlib import Path
 import tomllib
-from typing import Mapping, Self, cast, overload
+from typing import Any, Mapping, Self, cast, overload
 
 from pydantic import validator, Field
 from anyio import create_task_group, CapacityLimiter
@@ -14,8 +14,11 @@ from anyio.to_thread import current_default_thread_limiter
 from algobattle.battle import Battle, FightHandler, FightUiProxy, BattleUiProxy
 from algobattle.docker_util import ProgramConfig, ProgramRunInfo, ProgramUiProxy, set_docker_config
 from algobattle.team import Matchup, Team, TeamHandler, TeamInfos
-from algobattle.problem import Problem
+from algobattle.problem import InstanceT, Problem, SolutionT
 from algobattle.util import ExceptionInfo, MatchMode, Role, TimerInfo, inherit_docs, BaseModel, str_with_traceback
+
+
+AnyMatchup = Matchup[Any, Any]
 
 
 class MatchConfig(BaseModel):
@@ -91,9 +94,9 @@ class Match(BaseModel):
     async def _run_battle(
         self,
         battle: Battle,
-        matchup: Matchup,
+        matchup: Matchup[InstanceT, SolutionT],
         config: Battle.BattleConfig,
-        problem: type[Problem],
+        problem: Problem[InstanceT, SolutionT],
         cpus: list[str | None],
         ui: "Ui",
         limiter: CapacityLimiter,
@@ -103,7 +106,7 @@ class Match(BaseModel):
             ui.start_battle(matchup)
             battle_ui = ui.BattleObserver(ui, matchup)
             handler = FightHandler(
-                matchup.generator.generator, matchup.solver.solver, battle, battle_ui.fight_ui, set_cpus
+                problem, matchup.generator.generator, matchup.solver.solver, battle, battle_ui.fight_ui, set_cpus
             )
             try:
                 await battle.run_battle(
@@ -121,7 +124,7 @@ class Match(BaseModel):
     async def run(
         cls,
         config: BaseConfig,
-        problem: type[Problem],
+        problem: Problem[InstanceT, SolutionT],
         ui: "Ui | None" = None,
     ) -> Self:
         """Runs a match with the given config settings and problem type.
@@ -163,15 +166,19 @@ class Match(BaseModel):
                 return result
 
     @overload
-    def battle(self, matchup: Matchup) -> Battle | None:
+    def battle(self, matchup: Matchup[InstanceT, SolutionT]) -> Battle | None:
         ...
 
     @overload
-    def battle(self, *, generating: Team, solving: Team) -> Battle | None:
+    def battle(self, *, generating: Team[InstanceT, SolutionT], solving: Team[InstanceT, SolutionT]) -> Battle | None:
         ...
 
     def battle(
-        self, matchup: Matchup | None = None, *, generating: Team | None = None, solving: Team | None = None
+        self,
+        matchup: Matchup[InstanceT, SolutionT] | None = None,
+        *,
+        generating: Team[InstanceT, SolutionT] | None = None,
+        solving: Team[InstanceT, SolutionT] | None = None,
     ) -> Battle | None:
         """Helper method to look up the battle between a specific matchup.
 
@@ -188,20 +195,22 @@ class Match(BaseModel):
             return None
 
     @overload
-    def insert_battle(self, battle: Battle, matchup: Matchup) -> None:
+    def insert_battle(self, battle: Battle, matchup: Matchup[InstanceT, SolutionT]) -> None:
         ...
 
     @overload
-    def insert_battle(self, battle: Battle, *, generating: Team, solving: Team) -> None:
+    def insert_battle(
+        self, battle: Battle, *, generating: Team[InstanceT, SolutionT], solving: Team[InstanceT, SolutionT]
+    ) -> None:
         ...
 
     def insert_battle(
         self,
         battle: Battle,
-        matchup: Matchup | None = None,
+        matchup: Matchup[InstanceT, SolutionT] | None = None,
         *,
-        generating: Team | None = None,
-        solving: Team | None = None,
+        generating: Team[InstanceT, SolutionT] | None = None,
+        solving: Team[InstanceT, SolutionT] | None = None,
     ) -> None:
         """Helper method to insert a new battle for a specific matchup."""
         if matchup is not None:
@@ -265,7 +274,7 @@ class Ui:
     """
 
     match: Match | None = field(default=None, init=False)
-    active_battles: list[Matchup] = field(default_factory=list, init=False)
+    active_battles: list[AnyMatchup] = field(default_factory=list, init=False)
 
     def start_build(self, team: str, role: Role, timeout: float | None) -> None:
         """Informs the ui that a new program is being built."""
@@ -275,29 +284,29 @@ class Ui:
         """Informs the ui that the current build has been finished."""
         return
 
-    def start_battle(self, matchup: Matchup) -> None:
+    def start_battle(self, matchup: Matchup[InstanceT, SolutionT]) -> None:
         """Notifies the Ui that a battle has been started."""
         self.active_battles.append(matchup)
 
-    def battle_completed(self, matchup: Matchup) -> None:
+    def battle_completed(self, matchup: Matchup[InstanceT, SolutionT]) -> None:
         """Notifies the Ui that a specific battle has been completed."""
         self.active_battles.remove(matchup)
 
-    def update_fights(self, matchup: Matchup) -> None:
+    def update_fights(self, matchup: Matchup[InstanceT, SolutionT]) -> None:
         """Notifies the Ui to update the display of fight results for a specific battle."""
         return
 
-    def update_battle_data(self, matchup: Matchup, data: Battle.UiData) -> None:
+    def update_battle_data(self, matchup: Matchup[InstanceT, SolutionT], data: Battle.UiData) -> None:
         """Passes new custom battle data to the Ui."""
         return
 
-    def start_fight(self, matchup: Matchup, max_size: int) -> None:
+    def start_fight(self, matchup: Matchup[InstanceT, SolutionT], max_size: int) -> None:
         """Informs the Ui of a newly started fight."""
         return
 
     def update_curr_fight(
         self,
-        matchup: Matchup,
+        matchup: AnyMatchup,
         role: Role | None = None,
         data: TimerInfo | float | ProgramRunInfo | None = None,
     ) -> None:
@@ -309,7 +318,7 @@ class Ui:
         """Tracks updates for a specific battle."""
 
         ui: "Ui"
-        matchup: Matchup
+        matchup: AnyMatchup
         fight_ui: "Ui.FightObserver" = field(init=False)
 
         def __post_init__(self) -> None:
