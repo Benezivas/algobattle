@@ -10,7 +10,6 @@ from inspect import Parameter, Signature, signature
 from itertools import chain
 import json
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from traceback import format_exception
 from typing import Any, Callable, ClassVar, Iterable, Literal, LiteralString, TypeVar, Self, cast, get_args
 from annotated_types import GroupedMetadata
@@ -231,13 +230,6 @@ def check_path(path: str, *, type: Literal["file", "dir", "exists"] = "exists") 
         return _path
     else:
         raise ValueError
-
-
-class TempDir(TemporaryDirectory[Any]):
-    """A `TemporaryDirecroty`, but it's context manager returns a :class:`Path` object instead of a bare string."""
-
-    def __enter__(self):
-        return Path(super().__enter__())
 
 
 @dataclass
