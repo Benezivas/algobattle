@@ -52,6 +52,11 @@ P = ParamSpec("P")
 class Solution(Encodable, Generic[InstanceT], ABC):
     """A proposed solution for an instance of this problem."""
 
+    @classmethod
+    @abstractmethod
+    def decode(cls, source: Path, max_size: int, role: Role, instance: InstanceT | None = None) -> Self:
+        raise NotImplementedError
+
     def validate_solution(self, instance: InstanceT, role: Role) -> None:
         """Confirms that the parsed solution is valid.
 
@@ -385,3 +390,11 @@ class SolutionModel(Solution[InstanceT], EncodableModel, ABC):
     """A solution that can easily be parsed to/from a json file."""
 
     _algobattle_model_type: ClassVar[Literal["solution"]] = "solution"
+
+    @classmethod
+    def decode(cls, source: Path, max_size: int, role: Role, instance: InstanceT | None = None) -> Self:
+        """Uses pydantic to create a python object from a `.json` file."""
+        context = {"max_size": max_size, "role": role}
+        if instance is not None:
+            context["instance"] = instance
+        return cls._decode(source, **context)
