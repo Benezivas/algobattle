@@ -672,7 +672,7 @@ class Program(ABC, Generic[InstanceT, SolutionT]):
                 )
             if battle_input is not None:
                 try:
-                    battle_input.encode(io.input / "battle_data", max_size, self.role)
+                    battle_input.encode(io.input / "battle_data", self.role)
                 except Exception as e:
                     return result_class(
                         ProgramRunInfo(
@@ -852,7 +852,7 @@ class Solver(Program[InstanceT, SolutionT]):
 
     def _encode_input(self, input: Path, max_size: int, instance: InstanceT | None) -> None:
         assert instance is not None
-        instance.encode(input / "instance", max_size, self.role)
+        instance.encode(input / "instance", self.role)
 
     def _parse_output(self, output: Path, max_size: int, instance: InstanceT | None) -> SolutionT:
         assert instance is not None
