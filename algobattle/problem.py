@@ -52,6 +52,7 @@ P = ParamSpec("P")
 class Solution(Encodable, Generic[InstanceT], ABC):
     """A proposed solution for an instance of this problem."""
 
+    @inherit_docs
     @classmethod
     @abstractmethod
     def decode(cls, source: Path, max_size: int, role: Role, instance: InstanceT | None = None) -> Self:
