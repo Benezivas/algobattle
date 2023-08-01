@@ -22,7 +22,7 @@ classifiers = [
 dependencies = [
     "docker>=6.1.2",
     "prettytable>=3.7.0",
-    "pydantic~=1.10",
+    "pydantic>=2.0.3",
     "anyio>=3.6.2",
     # on windows, we need to manually install curses bindings
     "windows-curses>=2.3.1; os_name == 'nt'",

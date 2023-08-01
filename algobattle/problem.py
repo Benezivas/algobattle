@@ -21,10 +21,7 @@ from typing import (
 )
 from math import inf, isnan
 
-from pydantic import BaseModel, Field
-from pydantic.generics import GenericModel
-
-from algobattle.util import Role, inherit_docs, u64, Encodable, EncodableModel, ValidationError
+from algobattle.util import EncodableModel, Role, Encodable, inherit_docs
 
 
 class Instance(Encodable, ABC):
@@ -55,6 +52,12 @@ P = ParamSpec("P")
 class Solution(Encodable, Generic[InstanceT], ABC):
     """A proposed solution for an instance of this problem."""
 
+    @inherit_docs
+    @classmethod
+    @abstractmethod
+    def decode(cls, source: Path, max_size: int, role: Role, instance: InstanceT | None = None) -> Self:
+        raise NotImplementedError
+
     def validate_solution(self, instance: InstanceT, role: Role) -> None:
         """Confirms that the parsed solution is valid.
 
@@ -63,6 +66,7 @@ class Solution(Encodable, Generic[InstanceT], ABC):
 
         Args:
             instance: The problem instance this solution is purported to solve.
+            role: The role of the team that generated this solution.
 
         Raises:
             ValidationError: if the created instance is invalid.
@@ -312,10 +316,6 @@ class ProblemBase(Generic[InstanceT, SolutionT]):
                         f"'{path}' contains {len(problems)} different problems: {', '.join(p.name for p in problems)}."
                     )
 
-            if issubclass(problem.instance_cls, BaseModel):
-                problem.instance_cls.update_forward_refs()
-            if issubclass(problem.solution_cls, BaseModel):
-                problem.solution_cls.update_forward_refs()
             return problem
 
         finally:
@@ -381,74 +381,21 @@ class Problem(ProblemBase[InstanceT, SolutionT]):
         return super().__init__(*args, **kwargs)
 
 
-class InstanceModel(EncodableModel, Instance, ABC):
+class InstanceModel(Instance, EncodableModel, ABC):
     """An instance that can easily be parsed to/from a json file."""
 
+    _algobattle_model_type: ClassVar[Literal["instance"]] = "instance"
 
-class SolutionModel(Solution[InstanceT], EncodableModel, GenericModel, ABC):
+
+class SolutionModel(Solution[InstanceT], EncodableModel, ABC):
     """A solution that can easily be parsed to/from a json file."""
 
+    _algobattle_model_type: ClassVar[Literal["solution"]] = "solution"
 
-class DirectedGraph(InstanceModel):
-    """Base instance class for problems on directed graphs."""
-
-    num_vertices: u64
-    edges: list[tuple[u64, u64]] = Field(unique_items=True)
-
-    @property
-    def size(self) -> int:
-        """A graph's size is the number of vertices in it."""
-        return self.num_vertices
-
-    def validate_instance(self):
-        """Validates that the graph contains at most `size` many vertices and all edges are well defined."""
-        if any(u >= self.num_vertices for edge in self.edges for u in edge):
-            raise ValidationError("Graph contains edges whose endpoints aren't valid vertices")
-
-
-class UndirectedGraph(DirectedGraph):
-    """Base instance class for problems on undirected graphs."""
-
-    def validate_instance(self):
-        """Validates that the graph is well formed and contains no self loops.
-
-        Also brings it into a normal form where every edge {u, v} occurs exactly once in the list.
-        I.e. `[(0, 1), (1, 0), (1, 2)]` is accepted as valid and normalised to `[(0, 1), (1, 2)]`.
-        """
-        super().validate_instance()
-        if any(u == v for u, v in self.edges):
-            raise ValidationError("Undirected graph contains self loops.")
-
-        # we remove the redundant edge definitions to create an easy to use normal form
-        normalized_edges: set[tuple[int, int]] = set()
-        for u, v in self.edges:
-            if (v, u) not in normalized_edges:
-                normalized_edges.add((u, v))
-        self.edges = list(normalized_edges)
-
-
-Weight = TypeVar("Weight")
-
-
-class EdgeWeights(DirectedGraph, GenericModel, Generic[Weight]):
-    """Mixin for graphs with weighted edges."""
-
-    edge_weights: list[Weight]
-
-    def validate_instance(self):
-        """Validates that each edge has an associated weight."""
-        super().validate_instance()
-        if len(self.edge_weights) != len(self.edges):
-            raise ValidationError("Number of edge weights doesn't match the number of edges.")
-
-
-class VertexWeights(DirectedGraph, GenericModel, Generic[Weight]):
-    """Mixin for graphs with weighted vertices."""
-
-    vertex_weights: list[Weight]
-
-    def validate_instance(self):
-        """Validates that each vertex has an associated weight."""
-        super().validate_instance()
-        if len(self.vertex_weights) != self.num_vertices:
-            raise ValidationError("Number of vertex weights doesn't match the number of vertices.")
+    @classmethod
+    def decode(cls, source: Path, max_size: int, role: Role, instance: InstanceT | None = None) -> Self:
+        """Uses pydantic to create a python object from a `.json` file."""
+        context = {"max_size": max_size, "role": role}
+        if instance is not None:
+            context["instance"] = instance
+        return cls._decode(source, **context)
