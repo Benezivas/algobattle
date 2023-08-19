@@ -11,6 +11,6 @@ to provide your own problems.
 
 ::: algobattle.problem.Solution
 
-::: algobattle.problem.ProblemModel
+::: algobattle.problem.InstanceModel
 
 ::: algobattle.problem.SolutionModel
