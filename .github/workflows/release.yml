@@ -39,7 +39,7 @@ jobs:
       - name: Build docs
         run: mkdocs build -d ./site
       - name: zip docs
-        run: zip -r docs.zip ./site
+        run: zip -r docs.zip ./site/*
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
