@@ -110,7 +110,7 @@ lediglich folgende Einschränkungen, die wir forcieren:
 
 - Nur Software verwenden, deren Lizenz es erlaubt.
 - Kein Ausspähen oder Absprechen zwischen den Teams.
-- Keine Exploits unserer Software ausnutzen (siehe auch `Bug Bounties`).
+- Keine Exploits unserer Software ausnutzen (siehe auch [Bug Bounties](#bug-bounties)).
 
 Den Code für beides ließen wir die Studierenden in einem für uns
 Betreuer einsehbaren Versionsverwaltungssystem (in unserem Fall
@@ -194,12 +194,12 @@ Gruppengrößen.
 Bezüglich des Lernziels der einzelnen Aufgaben arbeiten wir momentan
 nach grob nach folgendem Schema:
 
-- 0: `pairsum` zum Aufwärmen.
-- 1: Klassisches NP-vollständiges Problem um Recherche attraktiv zu machen.
-- 2: Problem in P für starke Optimierungen von Datenstrukturen und Algorithmen.
-- 3: Approximationsproblem mit Approximationsrate, die nicht polynomiell erreichbar ist (z.B. 1.5 an Vertex Cover).
-- 4: Nicht-klassisches NP-vollständiges Problem, um MIP-Solver attraktiv zu machen.
-- 5: Wildcard, z.B. Problem mit stark beschränktem Speicher, Problem in FPT, ...
+0. `pairsum` zum Aufwärmen.
+1. Klassisches NP-vollständiges Problem um Recherche attraktiv zu machen.
+2. Problem in P für starke Optimierungen von Datenstrukturen und Algorithmen.
+3. Approximationsproblem mit Approximationsrate, die nicht polynomiell erreichbar ist (z.B. 1.5 an Vertex Cover).
+4. Nicht-klassisches NP-vollständiges Problem, um MIP-Solver attraktiv zu machen.
+5. Wildcard, z.B. Problem mit stark beschränktem Speicher, Problem in FPT, ...
 
 Nach der sechsten Aufgabe endet das Praktikum bei uns mit der
 Vorlesungszeit. Anschließend folgt die Bewertung und Notengebung.
