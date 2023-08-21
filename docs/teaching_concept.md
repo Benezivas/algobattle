@@ -101,7 +101,7 @@ möglichst lange lösen zu können.
 Besonders attraktiv für den Lernprozess ist hierbei, dass wir
 keinerlei Einschränkungen vorgeben, welche externe Software die
 Studierenden für das Erreichen dieser Ziele verwenden (solange es
-keine lizenzrechtlichen Probleme o.Ä. gibt.) Da alle Software in
+keine lizenzrechtlichen Probleme o.Ä. gibt). Da alle Software in
 Dockercontainern läuft und man sich auch im echten Leben nicht
 künstlich geißelt, sind die Studierenden angehalten, möglichst breit
 zu recherchieren, um Publikationen, Beschreibungen von Algorithmen oder
@@ -184,7 +184,7 @@ auszumerzen. Danach sind alle Battles bepunktet, bis zum nächsten
 Abschlusstreffen.
 
 In einem typischen Semester ist somit Zeit für 6-7 Aufgaben nach
-diesem Format (die `pairsum`-Aufgabe bereits eingerechnet.) Wir
+diesem Format (die `pairsum`-Aufgabe bereits eingerechnet). Wir
 empfehlen sehr, bei 6 Aufgaben zu bleiben und die freiwerdenen Wochen
 als Puffer für andere Aufgaben zu verwenden. Einerseits reduziert sich
 so der Arbeitsdruck für die Studierenden etwas, andererseits deckt
@@ -288,7 +288,7 @@ Ausgaben der `generator` und `solver` zu spezifizieren.
 
 Wir ermutigen unsere Studierenden, sowohl unser
 `algobattle`-Framework als auch die von uns geschriebenen Aufgaben
-möglichst kaputt zu machen. Konkret interessieren wir uns für
+möglichst kaputtzumachen. Konkret interessieren wir uns für
 Eingaben, mit denen Studierende in der Lage sind, unseren Code zu crashen,
 die `solver` bzw. `generator` der anderen Teams zu crashen oder
 auszunutzen, bis hin zu Möglichkeiten, über das Ausführen der Battles
