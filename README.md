@@ -14,35 +14,38 @@ increasing size that the other group has to solve within a time limit.
 Points are distributed relative to the biggest instance size for which a group
 was still able to solve an instance.
 
-# Installation
-This project is being developed and tested on both Windows and Linux, MacOS support
-is being worked on but still is tentative.
+# Installation and Usage
+This project is developed and tested on all major operating systems.
+We require `docker` and `python3` in version at least `3.11`.
 
-`python3` in version at least `3.10` and `docker` are required.
+Please consult the official [documentation](www.algobattle.org/docs/)
+for detailed instructions on installation and usage.
 
-We recommend installing the package as a user using `pip`
-```
-pip install . --user
-```
+# Related projects
+This repository only includes the core framework for executing an `Algorithmic
+Battle`. For a selection of concrete problems that you can use to play around
+with the framework, have a look at the
+[algobattle-problems](https://github.com/Benezivas/algobattle-problems)
+repository. These are problems that have been posed to students in some form
+over the years.
 
-Adjust the parameters set in the `algobattle/config.ini` file to set
-which hardware resources you want to assign. You can pass alternative
-configuration files to the script using the `--config_file` option.
+While the framework provides all essential tools to host a tournament, e.g. in
+the form of a lab course yourself, you may be interested in the
+[algobattle-web](https://github.com/Benezivas/algobattle-problems) project.  The
+`algobattle-web` project implements a webframework with which you are able to
+comfortably manage your students teams and their code, your problem files and
+their documentation as well as schedule matches to be fought between registered
+student teams, using the `algobattle` API.
 
+# Contributing
+Feel free to open issues and pull requests if you feel the design of the code
+could be improved. We have developed this project on the basis of practical
+experience inside our lab courses, thus some design elements may be unintuitive
+to you. We welcome any input on how to make this project accessible to as many
+people as possible.
 
-# Usage
-This repository does not include any practical problems. For a selection of problems
-that have been posed to students in practice, have a look at the
-[algobattle-problems](https://github.com/Benezivas/algobattle-problems) repository.
-
-To start a basic run on a problem, using the `solver` and `generator` that
-are part of the problem directory, use
-```
-algobattle path/to/concrecte/problem/folder
-```
-
-The `algobattle` script offers several options, e.g. to give custom paths for
-solvers and generators. Run `algobattle --help` for all options.
-
-
-Check the [wiki](https://github.com/Benezivas/algobattle/wiki) for further documentation.
+# Funding
+The development of version `4.0.0` was funded by
+[`Stiftung Innovation in der Hochschullehre`](https://stiftung-hochschullehre.de/en/) (Project 
+`FRFMM-106/2022 Algobattle`) and by the [Department of Computer Science of
+RWTH Aachen University](https://www.informatik.rwth-aachen.de/go/id/mxz/?lidx=1).
