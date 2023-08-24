@@ -9,7 +9,6 @@ from abc import abstractmethod
 from typing import (
     Any,
     ClassVar,
-    Generic,
     Protocol,
     TypeAlias,
     TypeVar,
@@ -23,7 +22,7 @@ from algobattle.docker_util import (
     ProgramUiProxy,
     Solver,
 )
-from algobattle.problem import InstanceT, Problem, SolutionT
+from algobattle.problem import AnyProblem
 from algobattle.util import Encodable, Role, inherit_docs, BaseModel
 
 
@@ -77,12 +76,12 @@ class FightUiProxy(Protocol):
 
 
 @dataclass
-class FightHandler(Generic[InstanceT, SolutionT]):
+class FightHandler:
     """Helper class to run fights of a given battle."""
 
-    _problem: Problem[InstanceT, SolutionT]
-    _generator: Generator[InstanceT, SolutionT]
-    _solver: Solver[InstanceT, SolutionT]
+    _problem: AnyProblem
+    _generator: Generator
+    _solver: Solver
     _battle: "Battle"
     _ui: FightUiProxy
     _set_cpus: str | None = None
@@ -270,9 +269,7 @@ class Battle(BaseModel):
         return cls.__name__
 
     @abstractmethod
-    async def run_battle(
-        self, fight: FightHandler[InstanceT, SolutionT], config: _BattleConfig, min_size: int, ui: BattleUiProxy
-    ) -> None:
+    async def run_battle(self, fight: FightHandler, config: _BattleConfig, min_size: int, ui: BattleUiProxy) -> None:
         """Executes one battle.
 
         Args:
@@ -308,9 +305,7 @@ class Iterated(Battle):
         reached: list[int]
         cap: int
 
-    async def run_battle(
-        self, fight: FightHandler[InstanceT, SolutionT], config: BattleConfig, min_size: int, ui: BattleUiProxy
-    ) -> None:
+    async def run_battle(self, fight: FightHandler, config: BattleConfig, min_size: int, ui: BattleUiProxy) -> None:
         """Execute an iterated battle.
 
         Incrementally tries to search for the highest n for which the solver is still able to solve instances.
@@ -382,9 +377,7 @@ class Averaged(Battle):
     class UiData(Battle.UiData):
         round: int
 
-    async def run_battle(
-        self, fight: FightHandler[InstanceT, SolutionT], config: BattleConfig, min_size: int, ui: BattleUiProxy
-    ) -> None:
+    async def run_battle(self, fight: FightHandler, config: BattleConfig, min_size: int, ui: BattleUiProxy) -> None:
         """Execute an averaged battle.
 
         This simple battle type just executes `iterations` many fights after each other at size `instance_size`.

@@ -12,7 +12,7 @@ from algobattle.docker_util import ProgramConfig, ProgramRunInfo, RunParameters
 from .testsproblem.problem import TestProblem
 
 
-class TestTeam(Team[Any, Any]):
+class TestTeam(Team):
     """Team that doesn't rely on actual docker images."""
 
     def __init__(self, team_name: str) -> None:
@@ -48,7 +48,7 @@ class Matchtests(TestCase):
         cls.team1 = TestTeam("1")
         cls.matchup0 = Matchup(cls.team0, cls.team1)
         cls.matchup1 = Matchup(cls.team1, cls.team0)
-        cls.team_dict = {
+        cls.team_dict: dict[str, Any] = {
             "active_teams": [cls.team0.name, cls.team1.name],
             "excluded_teams": {},
         }

@@ -4,7 +4,8 @@ from os import environ
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from timeit import default_timer
-from typing import Any, ClassVar, Generic, Iterator, Protocol, Self, cast
+from types import TracebackType
+from typing import Annotated, Any, ClassVar, Iterator, Protocol, Self, cast
 from typing_extensions import TypedDict
 from uuid import uuid4
 import json
@@ -16,7 +17,7 @@ from docker.models.images import Image as DockerImage
 from docker.models.containers import Container as DockerContainer
 from docker.types import Mount, LogConfig, Ulimit
 from requests import Timeout, ConnectionError
-from pydantic import field_validator, Field, validator
+from pydantic import AfterValidator, Field
 from anyio.to_thread import run_sync
 from urllib3.exceptions import ReadTimeoutError
 
@@ -34,25 +35,31 @@ from algobattle.util import (
     inherit_docs,
     BaseModel,
 )
-from algobattle.problem import InstanceT, Problem, SolutionT
+from algobattle.problem import AnyProblem, Instance, Solution
+
+
+AnySolution = Solution[Instance]
 
 
 _client_var: DockerClient | None = None
 
 
-def parse_zero_to_none(cls, value):
-    """Used as a validator to parse 0 values into Python None objects."""
-    return None if value == 0 else value
+def parse_none(value: Any) -> Any | None:
+    """Used as a validator to parse false-y values into Python None objects."""
+    return None if not value else value
+
+
+NoneFloat = Annotated[float | None, AfterValidator(parse_none)]
+NoneInt = Annotated[int | None, AfterValidator(parse_none)]
+NoneStr = Annotated[str | None, AfterValidator(parse_none)]
 
 
 class RunParameters(BaseModel):
     """The parameters determining how a program is run."""
 
-    timeout: float | None = 30
-    space: int | None = None
+    timeout: NoneFloat = 30
+    space: NoneInt = None
     cpus: int = 1
-
-    _parse_zero = validator("timeout", "space", allow_reuse=True)(parse_zero_to_none)
 
 
 class AdvancedRunArgs(BaseModel):
@@ -170,7 +177,7 @@ class AdvancedRunArgs(BaseModel):
 
     def to_docker_args(self) -> dict[str, Any]:
         """Transforms the object into :meth:`client.containers.run` kwargs."""
-        kwargs = self.dict(exclude_none=True)
+        kwargs = self.model_dump(exclude_none=True)
         if "log_config" in kwargs:
             kwargs["log_config"] = LogConfig(**kwargs["log_config"])
         if "ulimits" in kwargs:
@@ -211,27 +218,20 @@ class AdvancedBuildArgs(BaseModel):
 
     def to_docker_args(self) -> dict[str, Any]:
         """Transforms the object into :meth:`client.images.build` kwargs."""
-        return self.dict(exclude_none=True)
+        return self.model_dump(exclude_none=True)
 
 
 class ProgramConfig(BaseModel):
     """Config options relevant to the way programs are run and built."""
 
-    build_timeout: float | None = None
+    build_timeout: NoneFloat = None
     strict_timeouts: bool = False
-    set_cpus: str | list[str] | None = None
-    image_size: int | None = None
+    set_cpus: NoneStr | list[str] | None = None
+    image_size: NoneInt = None
     generator: RunParameters = RunParameters()
     solver: RunParameters = RunParameters()
     advanced_build_params: AdvancedBuildArgs = AdvancedBuildArgs()
     advanced_run_params: AdvancedRunArgs = AdvancedRunArgs()
-
-    _parse_zero = validator("build_timeout", "image_size", allow_reuse=True)(parse_zero_to_none)
-
-    @field_validator("set_cpus")
-    @classmethod
-    def _parse_empty_str(cls, value):
-        return None if value == "" else value
 
 
 def client() -> DockerClient:
@@ -421,7 +421,7 @@ class Image:
     def __enter__(self):
         return self
 
-    def __exit__(self, _type, _value_, _traceback):
+    def __exit__(self, _type: type[Exception], _value: Exception, _traceback: TracebackType):
         self.remove()
 
     async def run(
@@ -517,7 +517,7 @@ class Image:
         start_time = default_timer()
         elapsed_time = 0
         try:
-            response = container.wait(timeout=timeout)
+            response = cast(dict[str, Any], container.wait(timeout=timeout))
             elapsed_time = round(default_timer() - start_time, 2)
             if response["StatusCode"] == 0:
                 return elapsed_time
@@ -544,7 +544,7 @@ class ProgramRunInfo(BaseModel):
 
 
 @dataclass
-class ProgramResult(Generic[InstanceT, SolutionT]):
+class ProgramResult:
     """The result of a program execution."""
 
     info: ProgramRunInfo
@@ -552,35 +552,35 @@ class ProgramResult(Generic[InstanceT, SolutionT]):
 
 
 @dataclass
-class GeneratorResult(ProgramResult[InstanceT, SolutionT]):
+class GeneratorResult(ProgramResult):
     """Result of a single generator execution."""
 
-    instance: InstanceT | None = None
-    solution: SolutionT | None = None
+    instance: Instance | None = None
+    solution: AnySolution | None = None
 
 
 @dataclass
-class SolverResult(ProgramResult[InstanceT, SolutionT]):
+class SolverResult(ProgramResult):
     """Result of a single solver execution."""
 
-    solution: SolutionT | None = None
+    solution: AnySolution | None = None
 
 
 @dataclass
-class _GenResData(Generic[InstanceT, SolutionT]):
-    problem: InstanceT
-    solution: SolutionT | None
+class _GenResData:
+    problem: Instance
+    solution: AnySolution | None
 
 
 @dataclass
-class Program(ABC, Generic[InstanceT, SolutionT]):
+class Program(ABC):
     """A higher level interface for a team's programs."""
 
     image: Image
     """The underlying docker image."""
     config: RunParameters
     """The default config options this program will be executed with."""
-    problem: Problem[InstanceT, SolutionT]
+    problem: AnyProblem
     """The problem this program creates instances and/or solutions for."""
 
     role: ClassVar[Role]
@@ -590,7 +590,7 @@ class Program(ABC, Generic[InstanceT, SolutionT]):
     async def build(
         cls,
         image: Path | Image,
-        problem: Problem[InstanceT, SolutionT],
+        problem: AnyProblem,
         config: RunParameters,
         timeout: float | None = None,
         team_name: str | None = None,
@@ -621,21 +621,19 @@ class Program(ABC, Generic[InstanceT, SolutionT]):
         return cls(image, config, problem)
 
     @abstractmethod
-    def _encode_input(self, input: Path, max_size: int, instance: InstanceT | None) -> None:
+    def _encode_input(self, input: Path, max_size: int, instance: Instance | None) -> None:
         """Sets up the i/o folders as required for the specific type of program."""
         raise NotImplementedError
 
     @abstractmethod
-    def _parse_output(
-        self, output: Path, max_size: int, instance: InstanceT | None
-    ) -> _GenResData[InstanceT, SolutionT] | SolutionT:
+    def _parse_output(self, output: Path, max_size: int, instance: Instance | None) -> _GenResData | AnySolution:
         """Parses the data in the output folder into problem instances/solutions."""
         raise NotImplementedError
 
     async def _run(
         self,
         max_size: int,
-        input_instance: InstanceT | None = None,
+        input_instance: Instance | None = None,
         *,
         timeout: float | None = ...,
         space: int | None = ...,
@@ -644,7 +642,7 @@ class Program(ABC, Generic[InstanceT, SolutionT]):
         battle_output: type[Encodable] | None = None,
         set_cpus: str | None = None,
         ui: ProgramUiProxy | None = None,
-    ) -> GeneratorResult[InstanceT, SolutionT] | SolverResult[InstanceT, SolutionT]:
+    ) -> GeneratorResult | SolverResult:
         """Execute the program, processing input and output data."""
         if timeout is Ellipsis:
             timeout = self.config.timeout
@@ -751,34 +749,32 @@ class Program(ABC, Generic[InstanceT, SolutionT]):
     def __enter__(self):
         return self
 
-    def __exit__(self, _type, _value_, _traceback):
+    def __exit__(self, _type: Any, _value: Any, _traceback: Any):
         self.remove()
 
 
-class Generator(Program[InstanceT, SolutionT]):
+class Generator(Program):
     """A higher level interface for a team's generator."""
 
     role: ClassVar[Role] = Role.generator
 
-    def _encode_input(self, input: Path, max_size: int, instance: InstanceT | None) -> None:
+    def _encode_input(self, input: Path, max_size: int, instance: Instance | None) -> None:
         assert instance is None
         with open(input / "max_size.txt", "w+") as f:
             f.write(str(max_size))
 
-    def _parse_output(
-        self, output: Path, max_size: int, instance: InstanceT | None
-    ) -> _GenResData[InstanceT, SolutionT]:
+    def _parse_output(self, output: Path, max_size: int, instance: Instance | None) -> _GenResData:
         assert instance is None
         try:
-            instance = self.problem.instance_cls.decode(output / "instance", max_size, self.role)
+            instance_ = self.problem.instance_cls.decode(output / "instance", max_size, self.role)
         except EncodingError:
             raise
         except Exception as e:
             raise EncodingError("Error thrown while decoding the problem instance.", detail=str(e)) from e
-        if instance.size > max_size:
-            raise EncodingError("Instance is too large.", detail=f"Generated: {instance.size}, maximum: {max_size}")
+        if instance_.size > max_size:
+            raise EncodingError("Instance is too large.", detail=f"Generated: {instance_.size}, maximum: {max_size}")
         try:
-            instance.validate_instance()
+            instance_.validate_instance()
         except ValidationError:
             raise
         except Exception as e:
@@ -792,14 +788,14 @@ class Generator(Program[InstanceT, SolutionT]):
             except Exception as e:
                 raise EncodingError("Error thrown while decoding the solution.", detail=str(e)) from e
             try:
-                solution.validate_solution(instance, Role.generator)
+                solution.validate_solution(instance_, Role.generator)
             except ValidationError:
                 raise
             except Exception as e:
                 raise ValidationError("Unknown error during solution validation.", detail=str(e)) from e
         else:
             solution = None
-        return _GenResData(instance, solution)
+        return _GenResData(instance_, solution)
 
     async def run(
         self,
@@ -812,7 +808,7 @@ class Generator(Program[InstanceT, SolutionT]):
         battle_output: type[Encodable] | None = None,
         set_cpus: str | None = None,
         ui: ProgramUiProxy | None = None,
-    ) -> GeneratorResult[InstanceT, SolutionT]:
+    ) -> GeneratorResult:
         """Executes the generator and parses its output into a problem instance.
 
         Args:
@@ -830,7 +826,7 @@ class Generator(Program[InstanceT, SolutionT]):
             Datastructure containing all info about the generator execution and the created problem instance.
         """
         return cast(
-            GeneratorResult[InstanceT, SolutionT],
+            GeneratorResult,
             await self._run(
                 max_size=max_size,
                 input_instance=None,
@@ -845,16 +841,16 @@ class Generator(Program[InstanceT, SolutionT]):
         )
 
 
-class Solver(Program[InstanceT, SolutionT]):
+class Solver(Program):
     """A higher level interface for a team's solver."""
 
     role: ClassVar[Role] = Role.solver
 
-    def _encode_input(self, input: Path, max_size: int, instance: InstanceT | None) -> None:
+    def _encode_input(self, input: Path, max_size: int, instance: Instance | None) -> None:
         assert instance is not None
         instance.encode(input / "instance", self.role)
 
-    def _parse_output(self, output: Path, max_size: int, instance: InstanceT | None) -> SolutionT:
+    def _parse_output(self, output: Path, max_size: int, instance: Instance | None) -> AnySolution:
         assert instance is not None
         try:
             solution = self.problem.solution_cls.decode(output / "solution", max_size, self.role, instance)
@@ -872,7 +868,7 @@ class Solver(Program[InstanceT, SolutionT]):
 
     async def run(
         self,
-        instance: InstanceT,
+        instance: Instance,
         max_size: int,
         *,
         timeout: float | None = ...,
@@ -882,7 +878,7 @@ class Solver(Program[InstanceT, SolutionT]):
         battle_output: type[Encodable] | None = None,
         set_cpus: str | None = None,
         ui: ProgramUiProxy | None = None,
-    ) -> SolverResult[InstanceT, SolutionT]:
+    ) -> SolverResult:
         """Executes the solver on the given problem instance and parses its output into a problem solution.
 
         Args:
@@ -900,7 +896,7 @@ class Solver(Program[InstanceT, SolutionT]):
             Datastructure containing all info about the solver execution and the solution it computed.
         """
         return cast(
-            SolverResult[InstanceT, SolutionT],
+            SolverResult,
             await self._run(
                 max_size=max_size,
                 input_instance=instance,

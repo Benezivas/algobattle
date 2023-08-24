@@ -3,13 +3,14 @@
 Provides a command line interface to start matches and observe them. See `battle --help` for further options.
 """
 from argparse import ArgumentParser
+from types import TracebackType
 import curses
 from dataclasses import dataclass, field
 from functools import partial
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, ParamSpec, Self, TypeVar
+from typing import Callable, ParamSpec, Self, TypeVar
 from importlib.metadata import version as pkg_version
 
 from prettytable import DOUBLE_BORDER, PrettyTable
@@ -19,13 +20,9 @@ from anyio.abc import TaskGroup
 from algobattle.battle import Battle, Fight
 from algobattle.docker_util import GeneratorResult, ProgramRunInfo, SolverResult
 from algobattle.match import BaseConfig, Match, Ui
-from algobattle.problem import Problem
+from algobattle.problem import Problem, AnyProblem
 from algobattle.team import Matchup, TeamInfo
 from algobattle.util import Role, TimerInfo, check_path, flat_intersperse
-
-
-AnyProblem = Problem[Any, Any]
-AnyMatchup = Matchup[Any, Any]
 
 
 @dataclass
@@ -159,8 +156,8 @@ class CliUi(Ui):
     Uses curses to continually draw a basic text based ui to the terminal.
     """
 
-    battle_data: dict[AnyMatchup, Battle.UiData] = field(default_factory=dict, init=False)
-    fight_data: dict[AnyMatchup, _FightUiData] = field(default_factory=dict, init=False)
+    battle_data: dict[Matchup, Battle.UiData] = field(default_factory=dict, init=False)
+    fight_data: dict[Matchup, _FightUiData] = field(default_factory=dict, init=False)
     task_group: TaskGroup | None = field(default=None, init=False)
     build_status: _BuildInfo | str | None = field(default=None, init=False)
 
@@ -176,7 +173,7 @@ class CliUi(Ui):
 
         return self
 
-    async def __aexit__(self, _type, _value, _traceback) -> None:
+    async def __aexit__(self, _type: type[Exception], _value: Exception, _traceback: TracebackType) -> None:
         """Restore the console."""
         if self.task_group is not None:
             self.task_group.cancel_scope.cancel()
@@ -196,23 +193,23 @@ class CliUi(Ui):
         self.build_status = None
 
     @check_for_terminal
-    def battle_completed(self, matchup: AnyMatchup) -> None:
+    def battle_completed(self, matchup: Matchup) -> None:
         """Notifies the Ui that a specific battle has been completed."""
         self.battle_data.pop(matchup, None)
         self.fight_data.pop(matchup, None)
         super().battle_completed(matchup)
 
-    def update_battle_data(self, matchup: AnyMatchup, data: Battle.UiData) -> None:
+    def update_battle_data(self, matchup: Matchup, data: Battle.UiData) -> None:
         """Passes new custom battle data to the Ui."""
         self.battle_data[matchup] = data
 
-    def start_fight(self, matchup: AnyMatchup, max_size: int) -> None:
+    def start_fight(self, matchup: Matchup, max_size: int) -> None:
         """Informs the Ui of a newly started fight."""
         self.fight_data[matchup] = _FightUiData(max_size, None, None)
 
     def update_curr_fight(
         self,
-        matchup: AnyMatchup,
+        matchup: Matchup,
         role: Role | None = None,
         data: TimerInfo | float | ProgramRunInfo | None = None,
     ) -> None:
@@ -314,7 +311,7 @@ class CliUi(Ui):
         out += f" {state_glyph}"
         return out
 
-    def display_current_fight(self, matchup: AnyMatchup) -> list[str]:
+    def display_current_fight(self, matchup: Matchup) -> list[str]:
         """Formats the current fight of a battle into a compact overview."""
         fight = self.fight_data[matchup]
         return [
@@ -334,7 +331,7 @@ class CliUi(Ui):
             exec_info = ""
         return f"Fight {index} at size {fight.max_size}: {fight.score}{exec_info}"
 
-    def display_battle(self, matchup: AnyMatchup) -> list[str]:
+    def display_battle(self, matchup: Matchup) -> list[str]:
         """Formats the battle data into a string that can be printed to the terminal."""
         if self.match is None:
             return []
@@ -343,7 +340,7 @@ class CliUi(Ui):
         sections: list[list[str]] = []
 
         if matchup in self.battle_data:
-            sections.append([f"{key}: {val}" for key, val in self.battle_data[matchup].dict().items()])
+            sections.append([f"{key}: {val}" for key, val in self.battle_data[matchup].model_dump().items()])
 
         if matchup in self.fight_data:
             sections.append(self.display_current_fight(matchup))
