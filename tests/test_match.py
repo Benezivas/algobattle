@@ -172,19 +172,28 @@ class Execution(IsolatedAsyncioTestCase):
     async def test_basic(self):
         self.config.teams = {"team_0": TeamInfo(generator=self.generator, solver=self.solver)}
         self.config.match.battle_type = "Iterated"
-        await Match.run(self.config, TestProblem)
+        res = await Match.run(self.config, TestProblem)
+        for res_dict in res.results.values():
+            for result in res_dict.values():
+                self.assertIsNone(result.run_exception)
 
     async def test_multi_team(self):
         team0 = TeamInfo(generator=self.generator, solver=self.solver)
         team1 = TeamInfo(generator=self.generator, solver=self.solver)
         self.config.teams = {"team_0": team0, "team_1": team1}
         self.config.match.battle_type = "Iterated"
-        await Match.run(self.config, TestProblem)
+        res = await Match.run(self.config, TestProblem)
+        for res_dict in res.results.values():
+            for result in res_dict.values():
+                self.assertIsNone(result.run_exception)
 
     async def test_averaged(self):
         self.config.teams = {"team_0": TeamInfo(generator=self.generator, solver=self.solver)}
         self.config.match.battle_type = "Averaged"
-        await Match.run(self.config, TestProblem)
+        res = await Match.run(self.config, TestProblem)
+        for res_dict in res.results.values():
+            for result in res_dict.values():
+                self.assertIsNone(result.run_exception)
 
 
 class Parsing(TestCase):
