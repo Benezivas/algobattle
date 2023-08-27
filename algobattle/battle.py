@@ -6,15 +6,22 @@ some basic battle types, and related classed.
 from dataclasses import dataclass
 from importlib.metadata import entry_points
 from abc import abstractmethod
+from inspect import isclass
 from typing import (
     Any,
     ClassVar,
+    Hashable,
+    Literal,
     Protocol,
+    Self,
     TypeAlias,
     TypeVar,
 )
 
-from pydantic import Field
+from pydantic import Field, GetCoreSchemaHandler
+from pydantic.main import BaseModel as PydanticBase
+from pydantic_core import CoreSchema
+from pydantic_core.core_schema import tagged_union_schema
 
 from algobattle.docker_util import (
     Generator,
@@ -35,6 +42,7 @@ When creating your own battle type it is recommended to not use this alias and i
 the new battle type directly.
 """
 T = TypeVar("T")
+Type = type
 
 
 class Fight(BaseModel):
@@ -207,16 +215,43 @@ class Battle(BaseModel):
     run_exception: str | None = None
     """The description of an otherwise unhandeled exception that occured during the execution of :meth:`Battle.run`."""
 
-    _battle_types: ClassVar[dict[str, type["Battle"]]] = {}
+    _battle_types: ClassVar[dict[str, type[Self]]] = {}
     """Dictionary mapping the names of all registered battle types to their python classes."""
 
-    class BattleConfig(BaseModel):
+    class Config(BaseModel):
         """Config object for each specific battle type.
 
         A custom battle type can override this class to specify config options it uses. They will be parsed from a
-        dictionary located at `battle.NAME` in the main config file, where NAME is the specific batle type's name.
-        The created object will then be passed to the :meth:`Battle.run` method with its fields set accordingly.
+        dictionary located at `battle` in the main config file. The created object will then be passed to the
+        :meth:`Battle.run` method with its fields set accordingly.
         """
+
+        type: str = "Iterated"
+        """Type of battle that will be used."""
+
+        @classmethod
+        def __get_pydantic_core_schema__(cls, source: Type[PydanticBase], handler: GetCoreSchemaHandler) -> CoreSchema:
+            # there's two bugs we need to catch:
+            # 1. this function is called during the pydantic BaseModel metaclass's __new__, so the Battle class
+            # won't be ready at that point and be missing in the namespace
+            # 2. pydantic uses the core schema to build child classes core schema. for them we want to behave like a
+            # normal model, only our own schema gets modified
+            try:
+                if cls != Battle.Config:
+                    return handler(source)
+            except NameError:
+                return handler(source)
+            battle_classes = Battle.all()
+            match len(battle_classes):
+                case 0:
+                    return handler(source)
+                case 1:
+                    return handler(next(iter(battle_classes.values())).Config)
+                case _:
+                    choices: dict[Hashable, CoreSchema] = {
+                        name: handler(sublass.Config) for name, sublass in battle_classes.items()
+                    }
+                    return tagged_union_schema(choices=choices, discriminator="type")
 
     class UiData(BaseModel):
         """Object containing custom diplay data.
@@ -232,15 +267,20 @@ class Battle(BaseModel):
         It includes all subclasses of :class:`Battle` that have been initialized so far, including ones exposed to the
         algobattle module via the `algobattle.battle` entrypoint hook.
         """
-        for entrypoint in entry_points(group="algobattle.battle"):
-            if entrypoint.name not in Battle._battle_types:
-                battle: type[Battle] = entrypoint.load()
-                Battle._battle_types[battle.name()] = battle
         return Battle._battle_types
+
+    @classmethod
+    def load_entrypoints(cls) -> None:
+        """Loads all battle types presented via entrypoints."""
+        for entrypoint in entry_points(group="algobattle.battle"):
+            battle = entrypoint.load()
+            if not (isclass(battle) and issubclass(battle, Battle)):
+                raise ValueError(f"Entrypoint {entrypoint.name} targets something other than a Battle type")
 
     def __init_subclass__(cls) -> None:
         if cls.name() not in Battle._battle_types:
             Battle._battle_types[cls.name()] = cls
+            Battle.Config.model_rebuild(force=True)
         return super().__init_subclass__()
 
     @abstractmethod
@@ -289,8 +329,11 @@ class Iterated(Battle):
 
     results: list[int] = Field(default_factory=list)
 
-    @inherit_docs
-    class BattleConfig(Battle.BattleConfig):
+    class Config(Battle.Config):
+        """Config options for Iterated battles."""
+
+        type: Literal["Iterated"] = "Iterated"
+
         rounds: int = 5
         """Number of times the instance size will be increased until the solver fails to produce correct solutions."""
         maximum_size: int = 50_000
@@ -305,7 +348,7 @@ class Iterated(Battle):
         reached: list[int]
         cap: int
 
-    async def run_battle(self, fight: FightHandler, config: BattleConfig, min_size: int, ui: BattleUiProxy) -> None:
+    async def run_battle(self, fight: FightHandler, config: Config, min_size: int, ui: BattleUiProxy) -> None:
         """Execute an iterated battle.
 
         Incrementally tries to search for the highest n for which the solver is still able to solve instances.
@@ -366,8 +409,11 @@ class Iterated(Battle):
 class Averaged(Battle):
     """Class that executes an averaged battle."""
 
-    @inherit_docs
-    class BattleConfig(Battle.BattleConfig):
+    class Config(Battle.Config):
+        """Config options for Averaged battles."""
+
+        type: Literal["Averaged"] = "Averaged"
+
         instance_size: int = 10
         """Instance size that will be fought at."""
         num_fights: int = 10
@@ -377,7 +423,7 @@ class Averaged(Battle):
     class UiData(Battle.UiData):
         round: int
 
-    async def run_battle(self, fight: FightHandler, config: BattleConfig, min_size: int, ui: BattleUiProxy) -> None:
+    async def run_battle(self, fight: FightHandler, config: Config, min_size: int, ui: BattleUiProxy) -> None:
         """Execute an averaged battle.
 
         This simple battle type just executes `iterations` many fights after each other at size `instance_size`.

@@ -5,13 +5,13 @@ from datetime import datetime
 from itertools import combinations
 from pathlib import Path
 import tomllib
-from typing import Annotated, Any, Mapping, Self, cast, overload
+from typing import Annotated, Self, cast, overload
 
-from pydantic import field_validator, Field, model_validator
+from pydantic import Field, model_validator
 from anyio import create_task_group, CapacityLimiter
 from anyio.to_thread import current_default_thread_limiter
 
-from algobattle.battle import Battle, FightHandler, FightUiProxy, BattleUiProxy
+from algobattle.battle import Battle, FightHandler, FightUiProxy, BattleUiProxy, Iterated
 from algobattle.docker_util import ProgramConfig, ProgramRunInfo, ProgramUiProxy, set_docker_config
 from algobattle.team import Matchup, Team, TeamHandler, TeamInfos
 from algobattle.problem import InstanceT, Problem, SolutionT
@@ -24,21 +24,10 @@ class MatchConfig(BaseModel):
     It will be parsed from the given config file and contains all settings that specify how the match is run.
     """
 
-    battle_type: str = "Iterated"
-    """Name of the battle type used for the match."""
     points: int = 100
     """Highest number of points each team can achieve."""
     parallel_battles: int = 1
     mode: MatchMode = "testing"
-
-    @field_validator("battle_type", mode="after")
-    @classmethod
-    def validate_battle_type(cls, value: str) -> str:
-        """Validates that the given battle type is a correct name of a battle class."""
-        if value in Battle.all():
-            return value
-        else:
-            raise ValueError
 
 
 class BaseConfig(BaseModel):
@@ -47,20 +36,7 @@ class BaseConfig(BaseModel):
     teams: TeamInfos = {}
     match: MatchConfig = MatchConfig()
     program: ProgramConfig = ProgramConfig()
-    battle: dict[str, Battle.BattleConfig] = {n: b.BattleConfig() for n, b in Battle.all().items()}
-
-    @field_validator("battle", mode="before")
-    @classmethod
-    def val_battle_configs(cls, vals: object) -> dict[str, Battle.BattleConfig]:
-        """Parses the dict of battle configs into their corresponding config objects."""
-        battle_types = Battle.all()
-        if not isinstance(vals, Mapping):
-            raise ValueError
-        out: dict[str, Battle.BattleConfig] = {}
-        for name, battle_cls in battle_types.items():
-            data: Any = vals.get(name, {})
-            out[name] = battle_cls.BattleConfig.model_validate(data)
-        return out
+    battle: Battle.Config = Iterated.Config()
 
     @model_validator(mode="after")
     def val_set_cpus(self) -> Self:
@@ -80,6 +56,7 @@ class BaseConfig(BaseModel):
                 config_dict = tomllib.load(f)
             except tomllib.TOMLDecodeError as e:
                 raise ValueError(f"The config file at {file} is not a properly formatted TOML file!\n{e}")
+        Battle.load_entrypoints()
         return cls.model_validate(config_dict)
 
 
@@ -96,7 +73,7 @@ class Match(BaseModel):
         self,
         battle: Battle,
         matchup: Matchup,
-        config: Battle.BattleConfig,
+        config: Battle.Config,
         problem: Problem[InstanceT, SolutionT],
         cpus: list[str | None],
         ui: "Ui",
@@ -150,8 +127,7 @@ class Match(BaseModel):
                 excluded_teams=teams.excluded,
             )
             ui.match = result
-            battle_cls = Battle.all()[config.match.battle_type]
-            battle_config = config.battle[config.match.battle_type]
+            battle_cls = Battle.all()[config.battle.type]
             limiter = CapacityLimiter(config.match.parallel_battles)
             current_default_thread_limiter().total_tokens = config.match.parallel_battles
             set_cpus = config.program.set_cpus
@@ -163,7 +139,7 @@ class Match(BaseModel):
                 for matchup in teams.matchups:
                     battle = battle_cls()
                     result.results[matchup.generator.name][matchup.solver.name] = battle
-                    tg.start_soon(result._run_battle, battle, matchup, battle_config, problem, match_cpus, ui, limiter)
+                    tg.start_soon(result._run_battle, battle, matchup, config.battle, problem, match_cpus, ui, limiter)
                 return result
 
     @overload

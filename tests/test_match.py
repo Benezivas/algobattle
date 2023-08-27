@@ -159,20 +159,20 @@ class Execution(IsolatedAsyncioTestCase):
         problem_path = Path(__file__).parent / "testsproblem"
         cls.problem = TestProblem
         run_params = RunParameters(timeout=2)
-        cls.config = BaseConfig(
+        cls.config_iter = BaseConfig(
             program=ProgramConfig(generator=run_params, solver=run_params),
-            battle={
-                "Iterated": Iterated.BattleConfig(maximum_size=10, rounds=2),
-                "Averaged": Averaged.BattleConfig(instance_size=5, num_fights=3),
-            },
+            battle=Iterated.Config(maximum_size=10, rounds=2),
+        )
+        cls.config_avg = BaseConfig(
+            program=ProgramConfig(generator=run_params, solver=run_params),
+            battle=Averaged.Config(instance_size=5, num_fights=3),
         )
         cls.generator = problem_path / "generator"
         cls.solver = problem_path / "solver"
 
     async def test_basic(self):
-        self.config.teams = {"team_0": TeamInfo(generator=self.generator, solver=self.solver)}
-        self.config.match.battle_type = "Iterated"
-        res = await Match.run(self.config, TestProblem)
+        self.config_iter.teams = {"team_0": TeamInfo(generator=self.generator, solver=self.solver)}
+        res = await Match.run(self.config_iter, TestProblem)
         for res_dict in res.results.values():
             for result in res_dict.values():
                 self.assertIsNone(result.run_exception)
@@ -180,17 +180,15 @@ class Execution(IsolatedAsyncioTestCase):
     async def test_multi_team(self):
         team0 = TeamInfo(generator=self.generator, solver=self.solver)
         team1 = TeamInfo(generator=self.generator, solver=self.solver)
-        self.config.teams = {"team_0": team0, "team_1": team1}
-        self.config.match.battle_type = "Iterated"
-        res = await Match.run(self.config, TestProblem)
+        self.config_iter.teams = {"team_0": team0, "team_1": team1}
+        res = await Match.run(self.config_iter, TestProblem)
         for res_dict in res.results.values():
             for result in res_dict.values():
                 self.assertIsNone(result.run_exception)
 
     async def test_averaged(self):
-        self.config.teams = {"team_0": TeamInfo(generator=self.generator, solver=self.solver)}
-        self.config.match.battle_type = "Averaged"
-        res = await Match.run(self.config, TestProblem)
+        self.config_avg.teams = {"team_0": TeamInfo(generator=self.generator, solver=self.solver)}
+        res = await Match.run(self.config_avg, TestProblem)
         for res_dict in res.results.values():
             for result in res_dict.values():
                 self.assertIsNone(result.run_exception)
@@ -222,12 +220,9 @@ class Parsing(TestCase):
                 teams=self.teams,
                 match=MatchConfig(
                     points=10,
-                    battle_type="Averaged",
                 ),
                 program=ProgramConfig(generator=RunParameters(space=10)),
-                battle={
-                    "Averaged": Averaged.BattleConfig(num_fights=1),
-                },
+                battle=Averaged.Config(num_fights=1),
             ),
         )
 
