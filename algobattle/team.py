@@ -8,14 +8,14 @@ from typing import Any, Iterator, Protocol, Self, TypeAlias
 from pydantic import BaseModel
 
 from algobattle.docker_util import ProgramConfig, Generator, Solver
-from algobattle.problem import AnyProblem, InstanceT, Problem, SolutionT
+from algobattle.problem import AnyProblem
 from algobattle.util import ExceptionInfo, MatchMode, Role
 
 
 _team_names: set[str] = set()
 
 
-class BuildUiProxy(Protocol):
+class BuildUi(Protocol):
     """Provides and interface for the build process to update the ui."""
 
     @abstractmethod
@@ -36,10 +36,10 @@ class TeamInfo(BaseModel):
     async def build(
         self,
         name: str,
-        problem: Problem[InstanceT, SolutionT],
+        problem: AnyProblem,
         config: ProgramConfig,
         name_programs: bool,
-        ui: BuildUiProxy,
+        ui: BuildUi,
     ) -> "Team":
         """Builds the specified docker files into images and return the corresponding team.
 
@@ -60,11 +60,11 @@ class TeamInfo(BaseModel):
             raise ValueError
         tag_name = name.lower().replace(" ", "_") if name_programs else None
         ui.start_build(name, Role.generator, config.build_timeout)
-        generator = await Generator.build(self.generator, problem, config.generator, config.build_timeout, tag_name)
+        generator = await Generator.build(self.generator, problem, config, tag_name)
         ui.finish_build()
         try:
             ui.start_build(name, Role.solver, config.build_timeout)
-            solver = await Solver.build(self.solver, problem, config.solver, config.build_timeout, tag_name)
+            solver = await Solver.build(self.solver, problem, config, tag_name)
             ui.finish_build()
         except Exception:
             generator.remove()
@@ -150,7 +150,7 @@ class TeamHandler:
         problem: AnyProblem,
         mode: MatchMode,
         config: ProgramConfig,
-        ui: BuildUiProxy,
+        ui: BuildUi,
     ) -> Self:
         """Builds the programs of every team.
 

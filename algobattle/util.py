@@ -4,17 +4,18 @@ In particular, the base classes :class:`BaseModel`, :class:`Encodable`, :class:`
 """
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 from inspect import Parameter, Signature, signature
 from itertools import chain
 import json
 from pathlib import Path
 from traceback import format_exception
-from typing import Any, Callable, ClassVar, Iterable, Literal, LiteralString, TypeVar, Self, cast, get_args
+from typing import Annotated, Any, Callable, ClassVar, Iterable, Literal, LiteralString, TypeVar, Self, cast, get_args
 from annotated_types import GroupedMetadata
 
 from pydantic import (
+    ByteSize,
     ConfigDict,
     BaseModel as PydandticBaseModel,
     Extra,
@@ -23,7 +24,7 @@ from pydantic import (
     ValidationInfo,
 )
 from pydantic_core import CoreSchema
-from pydantic_core.core_schema import general_after_validator_function
+from pydantic_core.core_schema import general_after_validator_function, union_schema, no_info_after_validator_function
 
 
 class Role(Enum):
@@ -319,8 +320,8 @@ class EncodableModel(BaseModel, Encodable, ABC):
 
 
 @dataclass
-class TimerInfo:
-    """Basic data holding info on a timer."""
+class RunningTimer:
+    """Basic data holding info on a currently running timer."""
 
     start: datetime
     timeout: float | None
@@ -417,3 +418,21 @@ def count_positional_params(sig: Signature) -> int:
 def can_be_positional(param: Parameter) -> bool:
     """Checks whether a parameter is positional."""
     return param.kind in (Parameter.POSITIONAL_ONLY, Parameter.POSITIONAL_OR_KEYWORD)
+
+
+class TimeFloat:
+    """A float specifying a number of seconds.
+
+    Can be parsed from pydantic either as a number of seconds or a timedelta specifier.
+    """
+
+    @classmethod
+    def __get_pydantic_core_schema__(cls, source: type, handler: GetCoreSchemaHandler) -> CoreSchema:
+        def convert(val: float | timedelta) -> float:
+            return val.total_seconds() if isinstance(val, timedelta) else val
+
+        return no_info_after_validator_function(convert, union_schema([handler(float), handler(timedelta)]))
+
+
+TimeDeltaFloat = Annotated[float, TimeFloat]
+ByteSizeInt = Annotated[int, ByteSize]

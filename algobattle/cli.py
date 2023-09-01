@@ -18,11 +18,10 @@ from anyio import create_task_group, run, sleep
 from anyio.abc import TaskGroup
 
 from algobattle.battle import Battle, Fight
-from algobattle.docker_util import GeneratorResult, ProgramRunInfo, SolverResult
 from algobattle.match import BaseConfig, Match, Ui
 from algobattle.problem import Problem, AnyProblem
 from algobattle.team import Matchup, TeamInfo
-from algobattle.util import Role, TimerInfo, check_path, flat_intersperse
+from algobattle.util import Role, RunningTimer, check_path, flat_intersperse
 
 
 @dataclass
@@ -112,7 +111,7 @@ def main():
             t = datetime.now()
             filename = f"{t.year:04d}-{t.month:02d}-{t.day:02d}_{t.hour:02d}-{t.minute:02d}-{t.second:02d}.json"
             with open(exec_config.result / filename, "w+") as f:
-                f.write(result.model_dump_json())
+                f.write(result.model_dump_json(exclude_defaults=True))
 
     except KeyboardInterrupt:
         raise SystemExit("Received keyboard interrupt, terminating execution.")
@@ -145,8 +144,10 @@ class _BuildInfo:
 @dataclass
 class _FightUiData:
     max_size: int
-    generator: TimerInfo | float | ProgramRunInfo | None = None
-    solver: TimerInfo | float | ProgramRunInfo | None = None
+    generator: RunningTimer | None = None
+    gen_runtime: float | None = None
+    solver: RunningTimer | None = None
+    sol_runtime: float | None = None
 
 
 @dataclass
@@ -205,21 +206,24 @@ class CliUi(Ui):
 
     def start_fight(self, matchup: Matchup, max_size: int) -> None:
         """Informs the Ui of a newly started fight."""
-        self.fight_data[matchup] = _FightUiData(max_size, None, None)
+        self.fight_data[matchup] = _FightUiData(max_size)
 
-    def update_curr_fight(
-        self,
-        matchup: Matchup,
-        role: Role | None = None,
-        data: TimerInfo | float | ProgramRunInfo | None = None,
-    ) -> None:
-        """Passes new info about the current fight to the Ui."""
-        if role == Role.generator or role is None:
-            assert not isinstance(data, SolverResult)
-            self.fight_data[matchup].generator = data
-        if role == Role.solver or role is None:
-            assert not isinstance(data, GeneratorResult)
-            self.fight_data[matchup].solver = data
+    def end_fight(self, matchup: Matchup) -> None:  # noqa: D102
+        del self.fight_data[matchup]
+
+    def start_program(self, matchup: Matchup, role: Role, data: RunningTimer) -> None:  # noqa: D102
+        match role:
+            case Role.generator:
+                self.fight_data[matchup].generator = data
+            case Role.solver:
+                self.fight_data[matchup].solver = data
+
+    def end_program(self, matchup: Matchup, role: Role, runtime: float) -> None:  # noqa: D102
+        match role:
+            case Role.generator:
+                self.fight_data[matchup].gen_runtime = runtime
+            case Role.solver:
+                self.fight_data[matchup].sol_runtime = runtime
 
     async def loop(self) -> None:
         """Periodically updates the Ui with the current match info."""
@@ -282,42 +286,38 @@ class CliUi(Ui):
         return str(table).split("\n")
 
     @staticmethod
-    def display_program(role: Role, data: TimerInfo | float | ProgramRunInfo | None) -> str:
+    def display_program(role: Role, timer: RunningTimer | None, runtime: float | None) -> str:
         """Formats program runtime data."""
         role_str = role.name.capitalize() + ": "
         out = f"{role_str: <11}"
-        if data is None:
+
+        if timer is None:
             return out
 
-        if isinstance(data, TimerInfo):
-            runtime = (datetime.now() - data.start).total_seconds()
-            timeout = data.timeout
-            state_glyph = "…"
-        elif isinstance(data, float):
-            runtime = data
-            timeout = None
+        if runtime is None:
+            # currently running fight
+            runtime = (datetime.now() - timer.start).total_seconds()
             state_glyph = "…"
         else:
-            runtime = data.runtime
-            timeout = data.params.timeout
-            state_glyph = "✓" if data.error is None else "🗙"
+            runtime = runtime
+            state_glyph = "✓"
 
         out += f"{runtime:3.1f}s"
-        if timeout is None:
+        if timer.timeout is None:
             out += "         "  # same length padding as timeout info string
         else:
-            out += f" / {timeout:3.1f}s"
+            out += f" / {timer.timeout:3.1f}s"
 
         out += f" {state_glyph}"
         return out
 
-    def display_current_fight(self, matchup: Matchup) -> list[str]:
+    @staticmethod
+    def display_current_fight(fight: _FightUiData) -> list[str]:
         """Formats the current fight of a battle into a compact overview."""
-        fight = self.fight_data[matchup]
         return [
             f"Current fight at size {fight.max_size}:",
-            self.display_program(Role.generator, fight.generator),
-            self.display_program(Role.solver, fight.solver),
+            CliUi.display_program(Role.generator, fight.generator, fight.gen_runtime),
+            CliUi.display_program(Role.solver, fight.solver, fight.sol_runtime),
         ]
 
     @staticmethod
@@ -336,18 +336,18 @@ class CliUi(Ui):
         if self.match is None:
             return []
         battle = self.match.results[matchup.generator.name][matchup.solver.name]
-        fights = battle.fight_results[-3:] if len(battle.fight_results) >= 3 else battle.fight_results
+        fights = battle.fights[-3:] if len(battle.fights) >= 3 else battle.fights
         sections: list[list[str]] = []
 
         if matchup in self.battle_data:
             sections.append([f"{key}: {val}" for key, val in self.battle_data[matchup].model_dump().items()])
 
         if matchup in self.fight_data:
-            sections.append(self.display_current_fight(matchup))
+            sections.append(self.display_current_fight(self.fight_data[matchup]))
 
         if fights:
             fight_history: list[str] = []
-            for i, fight in enumerate(fights, max(len(battle.fight_results) - 2, 1)):
+            for i, fight in enumerate(fights, max(len(battle.fights) - 2, 1)):
                 fight_history.append(self.display_fight(fight, i))
             fight_display = [
                 "Most recent fight results:",

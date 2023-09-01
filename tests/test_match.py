@@ -4,11 +4,13 @@ from typing import Any
 from unittest import IsolatedAsyncioTestCase, TestCase, main
 from pathlib import Path
 
+from pydantic import ByteSize
+
 from algobattle.cli import parse_cli_args
 from algobattle.battle import Fight, Iterated, Averaged
 from algobattle.match import BaseConfig, Match, MatchConfig
 from algobattle.team import Team, Matchup, TeamHandler, TeamInfo
-from algobattle.docker_util import ProgramConfig, ProgramRunInfo, RunParameters
+from algobattle.docker_util import ProgramConfig, ProgramRunInfo, RunConfig
 from .testsproblem.problem import TestProblem
 
 
@@ -25,14 +27,8 @@ def dummy_result(*score: float) -> list[Fight]:
         Fight(
             score=s,
             max_size=0,
-            generator=ProgramRunInfo(
-                params=RunParameters(),
-                runtime=0,
-            ),
-            solver=ProgramRunInfo(
-                params=RunParameters(),
-                runtime=0,
-            ),
+            generator=ProgramRunInfo(),
+            solver=ProgramRunInfo(),
         )
         for s in score
     ]
@@ -112,7 +108,7 @@ class Matchtests(TestCase):
         """Two teams should get an equal amount of points if nobody solved anything."""
         match = Match(**self.team_dict)
         battle = Averaged()
-        battle.fight_results = dummy_result(0, 0, 0)
+        battle.fights = dummy_result(0, 0, 0)
         match.insert_battle(battle, self.matchup0)
         match.insert_battle(battle, self.matchup1)
         self.assertEqual(match.calculate_points(100), {self.team0.name: 50, self.team1.name: 50})
@@ -121,7 +117,7 @@ class Matchtests(TestCase):
         """Two teams should get an equal amount of points if both solved a problem equally well."""
         match = Match(**self.team_dict)
         battle = Averaged()
-        battle.fight_results = dummy_result(0.5, 0.5, 0.5)
+        battle.fights = dummy_result(0.5, 0.5, 0.5)
         match.insert_battle(battle, self.matchup0)
         match.insert_battle(battle, self.matchup1)
         self.assertEqual(match.calculate_points(100), {self.team0.name: 50, self.team1.name: 50})
@@ -130,9 +126,9 @@ class Matchtests(TestCase):
         """One team should get all points if it solved anything and the other team nothing."""
         match = Match(**self.team_dict)
         battle = Averaged()
-        battle.fight_results = dummy_result(0, 0, 0)
+        battle.fights = dummy_result(0, 0, 0)
         battle2 = Averaged()
-        battle2.fight_results = dummy_result(1, 1, 1)
+        battle2.fights = dummy_result(1, 1, 1)
         match.insert_battle(battle, self.matchup0)
         match.insert_battle(battle2, self.matchup1)
         self.assertEqual(match.calculate_points(100), {self.team0.name: 100, self.team1.name: 0})
@@ -141,9 +137,9 @@ class Matchtests(TestCase):
         """One team should get more points than the other if it performed better."""
         match = Match(**self.team_dict)
         battle = Averaged()
-        battle.fight_results = dummy_result(0.6, 0.6, 0.6)
+        battle.fights = dummy_result(0.6, 0.6, 0.6)
         battle2 = Averaged()
-        battle2.fight_results = dummy_result(0.4, 0.4, 0.4)
+        battle2.fights = dummy_result(0.4, 0.4, 0.4)
         match.insert_battle(battle, self.matchup0)
         match.insert_battle(battle2, self.matchup1)
         self.assertEqual(match.calculate_points(100), {self.team0.name: 40, self.team1.name: 60})
@@ -158,7 +154,7 @@ class Execution(IsolatedAsyncioTestCase):
     def setUpClass(cls) -> None:
         problem_path = Path(__file__).parent / "testsproblem"
         cls.problem = TestProblem
-        run_params = RunParameters(timeout=2)
+        run_params = RunConfig(timeout=2)
         cls.config_iter = BaseConfig(
             program=ProgramConfig(generator=run_params, solver=run_params),
             battle=Iterated.Config(maximum_size=10, rounds=2),
@@ -221,7 +217,7 @@ class Parsing(TestCase):
                 match=MatchConfig(
                     points=10,
                 ),
-                program=ProgramConfig(generator=RunParameters(space=10)),
+                program=ProgramConfig(generator=RunConfig(space=ByteSize(10))),
                 battle=Averaged.Config(num_fights=1),
             ),
         )

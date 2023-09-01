@@ -4,8 +4,8 @@ from os import environ
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from timeit import default_timer
-from types import TracebackType
-from typing import Annotated, Any, ClassVar, Iterator, Protocol, Self, cast
+from types import EllipsisType
+from typing import Annotated, Any, ClassVar, Iterator, Protocol, Self, TypeVar, cast
 from typing_extensions import TypedDict
 from uuid import uuid4
 import json
@@ -24,12 +24,14 @@ from urllib3.exceptions import ReadTimeoutError
 from algobattle.util import (
     AlgobattleBaseException,
     BuildError,
+    ByteSizeInt,
     DockerError,
     Encodable,
     EncodingError,
     ExceptionInfo,
     ExecutionError,
     ExecutionTimeout,
+    TimeDeltaFloat,
     ValidationError,
     Role,
     inherit_docs,
@@ -49,17 +51,8 @@ def parse_none(value: Any) -> Any | None:
     return None if not value else value
 
 
-NoneFloat = Annotated[float | None, AfterValidator(parse_none)]
-NoneInt = Annotated[int | None, AfterValidator(parse_none)]
-NoneStr = Annotated[str | None, AfterValidator(parse_none)]
-
-
-class RunParameters(BaseModel):
-    """The parameters determining how a program is run."""
-
-    timeout: NoneFloat = 30
-    space: NoneInt = None
-    cpus: int = 1
+T = TypeVar("T")
+WithNone = Annotated[T | None, AfterValidator(parse_none)]
 
 
 class AdvancedRunArgs(BaseModel):
@@ -93,7 +86,10 @@ class AdvancedRunArgs(BaseModel):
         soft: int
         hard: int
 
+    # defaults set by us
     network_mode: str = "none"
+
+    # actual docker defaults
     command: str | list[str] | None = None
     auto_remove: bool | None = None
     blkio_weight_device: list[_BlockIOWeight] | None = None
@@ -197,19 +193,22 @@ class AdvancedBuildArgs(BaseModel):
         cpushares: int
         cpusetcpus: str
 
-    quiet: bool = True
-    nocache: bool | None = None
+    # defaults set by us
     rm: bool = True
-    encoding: str | None = None
-    pull: bool | None = True
     forcerm: bool = True
+    quiet: bool = True
+    network_mode: str = "host"
+    pull: bool | None = True
+
+    # actual Docker defaults
+    nocache: bool | None = None
+    encoding: str | None = None
     buildargs: dict[Any, Any] | None = None
     container_limits: _ContainerLimits | None = None
     shmsize: int | None = None
     labels: dict[Any, Any] | None = None
     cache_from: list[Any] | None = None
     target: str | None = None
-    network_mode: str = "host"
     squash: bool | None = None
     extra_hosts: dict[Any, Any] | None = None
     platform: str | None = None
@@ -221,17 +220,43 @@ class AdvancedBuildArgs(BaseModel):
         return self.model_dump(exclude_none=True)
 
 
+class RunConfig(BaseModel):
+    """Parameters determining how a program is run."""
+
+    timeout: WithNone[TimeDeltaFloat] = 30
+    """Timeout in seconds, or `false` for no timeout."""
+    space: WithNone[ByteSizeInt] = None
+    """Maximum memory space available, or `false` for no limitation.
+
+    Can be either an plain number of bytes like `30000` or a string including
+    a unit like `30 kB`.
+    """
+    cpus: int = 1
+    """Number of cpu cores available."""
+
+
 class ProgramConfig(BaseModel):
     """Config options relevant to the way programs are run and built."""
 
-    build_timeout: NoneFloat = None
+    build_timeout: WithNone[TimeDeltaFloat] = None
+    """Timeout for building each docker image."""
+    image_size: WithNone[ByteSizeInt] = None
+    """Maximum size a built program image is allowed to be."""
     strict_timeouts: bool = False
-    set_cpus: NoneStr | list[str] | None = None
-    image_size: NoneInt = None
-    generator: RunParameters = RunParameters()
-    solver: RunParameters = RunParameters()
+    """Whether to raise an error if a program runs into the timeout."""
+    set_cpus: str | list[str] | None = None
+    generator: RunConfig = RunConfig()
+    solver: RunConfig = RunConfig()
     advanced_build_params: AdvancedBuildArgs = AdvancedBuildArgs()
     advanced_run_params: AdvancedRunArgs = AdvancedRunArgs()
+
+
+class RunConfigOverride(TypedDict, total=False):
+    """Run parameters that were overriden by the battle type."""
+
+    timeout: float | None
+    space: int | None
+    cpus: int
 
 
 def client() -> DockerClient:
@@ -247,27 +272,15 @@ def client() -> DockerClient:
     return _client_var
 
 
-def set_docker_config(config: ProgramConfig) -> None:
-    """Sets up the static docker config attributes.
-
-    Various classes in the docker_util module need statically set config options, e.g. advanced build/run arguments or
-    the strict_timeout option. This function propagates initializes all of these correctly.
-    """
-    Image.build_kwargs = config.advanced_build_params.to_docker_args()
-    Image.run_kwargs = config.advanced_run_params.to_docker_args()
-    Program.docker_config = config
-    Image.docker_config = config
-
-
-class ProgramUiProxy(Protocol):
+class ProgramUi(Protocol):
     """Provides an interface for :class:`Program` to update the Ui."""
 
     @abstractmethod
-    def start(self, timeout: float | None) -> None:
+    def start_program(self, role: Role, timeout: float | None) -> None:
         """Signals that the program execution has been started."""
 
     @abstractmethod
-    def stop(self, runtime: float) -> None:
+    def stop_program(self, role: Role, runtime: float) -> None:
         """Signals that the program execution has been finished."""
 
 
@@ -329,28 +342,12 @@ class Image:
 
     id: str
     path: Path
-
-    docker_config: ClassVar[ProgramConfig] = ProgramConfig()
-
-    run_kwargs: ClassVar[dict[str, Any]] = {
-        "network_mode": "none",
-    }
-    """Advanced docker options passed to the docker run command.
-
-    A full description can be found at the docker api reference."""
-    build_kwargs: ClassVar[dict[str, Any]] = {
-        "rm": True,
-        "forcerm": True,
-        "quiet": True,
-        "network_mode": "host",
-        "pull": True,
-    }
-    """Advanced docker options passed to the docker build command.
-
-    A full description can be found at the docker api reference."""
+    role: Role
 
     @classmethod
-    def _build_image(cls, path: str, tag: str | None, timeout: float | None, dockerfile: str | None) -> DockerImage:
+    def _build_image(
+        cls, path: str, tag: str | None, timeout: float | None, dockerfile: str | None, build_kwargs: dict[str, Any]
+    ) -> DockerImage:
         image, _logs = cast(
             tuple[DockerImage, Iterator[Any]],
             client().images.build(
@@ -358,7 +355,7 @@ class Image:
                 tag=tag,
                 timeout=timeout,
                 dockerfile=dockerfile,
-                **cls.build_kwargs,
+                **build_kwargs,
             ),
         )
         return image
@@ -367,15 +364,22 @@ class Image:
     async def build(
         cls,
         path: Path,
+        *,
         name: str | None = None,
         timeout: float | None = None,
+        advanced_args: dict[str, Any],
+        max_size: int | None,
+        role: Role,
     ) -> Self:
         """Builds a docker image using the dockerfile found at the provided path.
 
         Args:
             path: The path to the directory containing a `Dockerfile`, or a path to such a file itself.
             name: A tag assigned to the docker image, if set to `None` the image will receive no tag.
-            timeout: Timeout in seconds for the build process.
+            timeout: Timeout for the build process in seconds, or None for no timeout.
+            advanced_args: Advanced args passed to the docker Daemon.
+            max_size: Size limit on the built container in bytes, or None for no limit.
+            role: Role of the program.
 
         Raises:
             BuildError: On all errors that are expected to happen during the build process.
@@ -395,7 +399,14 @@ class Image:
                     old_image = None
             else:
                 old_image = None
-            image = await run_sync(cls._build_image, str(path), name, timeout, dockerfile)
+            image = await run_sync(
+                cls._build_image,
+                str(path),
+                name,
+                timeout,
+                dockerfile,
+                advanced_args,
+            )
             if old_image is not None:
                 old_image.reload()
                 if len(old_image.tags) == 0:
@@ -408,38 +419,38 @@ class Image:
         except APIError as e:
             raise BuildError("Docker APIError thrown while building.", detail=str(e)) from e
 
-        self = cls(cast(str, image.id), path=path)
-        size_limit = cls.docker_config.image_size
+        self = cls(cast(str, image.id), path=path, role=role)
         used_size = cast(dict[str, Any], image.attrs).get("Size", 0)
-        if size_limit is not None and used_size > size_limit:
+        if max_size is not None and used_size > max_size:
             try:
                 self.remove()
             finally:
-                raise BuildError("Built image is too large.", detail=f"Built size: {used_size}, limit: {size_limit}.")
+                raise BuildError("Built image is too large.", detail=f"Size: {used_size}B, limit: {max_size}B.")
         return self
 
     def __enter__(self):
         return self
 
-    def __exit__(self, _type: type[Exception], _value: Exception, _traceback: TracebackType):
+    def __exit__(self, *args: Any):
         self.remove()
 
     async def run(
         self,
         io: ProgramIO | None = None,
         *,
-        timeout: float | None = None,
-        memory: int | None = None,
-        cpus: int = 1,
-        set_cpus: str | None = None,
-        ui: ProgramUiProxy | None = None,
+        timeout: float | None,
+        space: int | None,
+        cpus: int,
+        run_kwargs: dict[str, Any],
+        set_cpus: str | None,
+        ui: ProgramUi | None = None,
     ) -> float:
         """Runs a docker image.
 
         Args:
             io: ProgramIO object tracking an input directory with data for the container and one for its output data.
             timeout: Timeout in seconds.
-            memory: Memory limit in MB.
+            space: Memory limit in bytes.
             cpus: Number of physical cpus the container can use.
             set_cpus: Which cpus to execute the container on. Either a comma separated list or a hyphen-separated range.
                 A value of `None` means the container can use any core (but still only `cpus` many of them).
@@ -455,9 +466,6 @@ class Image:
             The runtime of the program.
         """
         name = f"algobattle_{uuid4().hex[:8]}"
-        if memory is not None:
-            memory = memory * 1_000_000
-        cpus = cpus * 1_000_000_000
 
         container: DockerContainer | None = None
         elapsed_time = 0
@@ -467,20 +475,20 @@ class Image:
                 client().containers.create(
                     image=self.id,
                     name=name,
-                    mem_limit=memory,
-                    nano_cpus=cpus,
+                    mem_limit=space,
+                    nano_cpus=cpus * 1_000_000_000,
                     detach=True,
                     mounts=io.mounts if io else None,
                     cpuset_cpus=set_cpus,
-                    **self.run_kwargs,
+                    **run_kwargs,
                 ),
             )
 
             if ui is not None:
-                ui.start(timeout)
+                ui.start_program(self.role, timeout)
             elapsed_time = await run_sync(self._run_container, container, timeout)
             if ui is not None:
-                ui.stop(elapsed_time)
+                ui.stop_program(self.role, elapsed_time)
 
         except ImageNotFound as e:
             raise RuntimeError("Image (id: {self.id}) does not exist.") from e
@@ -538,8 +546,8 @@ class Image:
 class ProgramRunInfo(BaseModel):
     """Data about a program's execution."""
 
-    params: RunParameters
-    runtime: float
+    runtime: float = 0
+    overriden: RunConfigOverride = Field(default_factory=dict)
     error: ExceptionInfo | None = None
 
 
@@ -572,27 +580,48 @@ class _GenResData:
     solution: AnySolution | None
 
 
-@dataclass
+@dataclass(frozen=True)
 class Program(ABC):
     """A higher level interface for a team's programs."""
 
     image: Image
     """The underlying docker image."""
-    config: RunParameters
-    """The default config options this program will be executed with."""
     problem: AnyProblem
     """The problem this program creates instances and/or solutions for."""
+    config: ProgramConfig
+    """Config settings this program will use to run."""
 
     role: ClassVar[Role]
-    docker_config: ClassVar[ProgramConfig] = ProgramConfig()
+
+    def run_config(
+        self,
+        timeout: float | None | EllipsisType,
+        space: int | None | EllipsisType,
+        cpus: int | EllipsisType,
+    ) -> tuple[RunConfig, RunConfigOverride]:
+        """Merges the overriden config options with the parsed ones."""
+        overriden = RunConfigOverride()
+        run_config: RunConfig = getattr(self.config, self.role.name)
+        if timeout is ...:
+            timeout = run_config.timeout
+        else:
+            overriden["timeout"] = timeout
+        if space is ...:
+            space = run_config.space
+        else:
+            overriden["space"] = space
+        if cpus is ...:
+            cpus = run_config.cpus
+        else:
+            overriden["cpus"] = cpus
+        return RunConfig(timeout=timeout, space=space, cpus=cpus), overriden
 
     @classmethod
     async def build(
         cls,
         image: Path | Image,
         problem: AnyProblem,
-        config: RunParameters,
-        timeout: float | None = None,
+        config: ProgramConfig = ProgramConfig(),
         team_name: str | None = None,
     ) -> Self:
         """Creates a program by building the specified docker image.
@@ -600,8 +629,8 @@ class Program(ABC):
         Args:
             image: Path to a Dockerfile (or folder containing one) from which to build the image.
                 Or an already built image.
-            problem_class: Problem class this program is solving/generating instances for.
-            config: Config options for this program.
+            problem: Problem this program is solving/generating instances for.
+            config: Config options for building this program.
             team_name: If set the image will be given a descriptive name.
 
         Returns:
@@ -615,10 +644,13 @@ class Program(ABC):
             image = await Image.build(
                 path=image,
                 name=name,
-                timeout=timeout,
+                timeout=config.build_timeout,
+                advanced_args=config.advanced_build_params.to_docker_args(),
+                max_size=config.image_size,
+                role=cls.role,
             )
 
-        return cls(image, config, problem)
+        return cls(image, problem, config)
 
     @abstractmethod
     def _encode_input(self, input: Path, max_size: int, instance: Instance | None) -> None:
@@ -632,39 +664,35 @@ class Program(ABC):
 
     async def _run(
         self,
-        max_size: int,
-        input_instance: Instance | None = None,
         *,
-        timeout: float | None = ...,
-        space: int | None = ...,
-        cpus: int = ...,
-        battle_input: Encodable | None = None,
-        battle_output: type[Encodable] | None = None,
-        set_cpus: str | None = None,
-        ui: ProgramUiProxy | None = None,
+        max_size: int,
+        input_instance: Instance | None,
+        timeout: float | None | EllipsisType,
+        space: int | None | EllipsisType,
+        cpus: int | EllipsisType,
+        battle_input: Encodable | None,
+        battle_output: type[Encodable] | None,
+        set_cpus: str | None,
+        ui: ProgramUi | None,
     ) -> GeneratorResult | SolverResult:
         """Execute the program, processing input and output data."""
-        if timeout is Ellipsis:
-            timeout = self.config.timeout
-        if space is Ellipsis:
-            space = self.config.space
-        if cpus is Ellipsis:
-            cpus = self.config.cpus
-        run_params = RunParameters(timeout=timeout, space=space, cpus=cpus)
         result_class = GeneratorResult if self.role == Role.generator else SolverResult
+        config, overriden = self.run_config(timeout, space, cpus)
 
         with ProgramIO() as io:
             try:
                 self._encode_input(io.input, max_size, input_instance)
             except AlgobattleBaseException as e:
-                return result_class(ProgramRunInfo(params=run_params, runtime=0, error=ExceptionInfo.from_exception(e)))
+                return result_class(
+                    ProgramRunInfo(overriden=overriden, runtime=0, error=ExceptionInfo.from_exception(e))
+                )
             with open(io.input / "info.json", "w+") as f:
                 json.dump(
                     {
                         "max_size": max_size,
-                        "timeout": timeout,
-                        "space": space,
-                        "cpus": cpus,
+                        "timeout": config.timeout,
+                        "space": config.space,
+                        "cpus": config.cpus,
                     },
                     f,
                 )
@@ -674,25 +702,33 @@ class Program(ABC):
                 except Exception as e:
                     return result_class(
                         ProgramRunInfo(
-                            params=run_params,
+                            overriden=overriden,
                             runtime=0,
                             error=ExceptionInfo(type="EncodingError", message=f"Battle data couldn't be encoded:\n{e}"),
                         )
                     )
 
             try:
-                runtime = await self.image.run(io, timeout=timeout, memory=space, cpus=cpus, ui=ui, set_cpus=set_cpus)
+                runtime = await self.image.run(
+                    io,
+                    timeout=config.timeout,
+                    space=config.space,
+                    cpus=config.cpus,
+                    ui=ui,
+                    set_cpus=set_cpus,
+                    run_kwargs=self.config.advanced_run_params.to_docker_args(),
+                )
             except ExecutionTimeout as e:
-                if self.docker_config.strict_timeouts:
+                if self.config.strict_timeouts:
                     return result_class(
-                        ProgramRunInfo(params=run_params, runtime=e.runtime, error=ExceptionInfo.from_exception(e))
+                        ProgramRunInfo(overriden=overriden, runtime=e.runtime, error=ExceptionInfo.from_exception(e))
                     )
                 else:
                     runtime = e.runtime
             except ExecutionError as e:
                 return result_class(
                     ProgramRunInfo(
-                        params=run_params,
+                        overriden=overriden,
                         runtime=e.runtime,
                         error=ExceptionInfo.from_exception(e),
                     )
@@ -700,7 +736,7 @@ class Program(ABC):
             except AlgobattleBaseException as e:
                 return result_class(
                     ProgramRunInfo(
-                        params=run_params,
+                        overriden=overriden,
                         runtime=0,
                         error=ExceptionInfo.from_exception(e),
                     )
@@ -711,7 +747,7 @@ class Program(ABC):
             except AlgobattleBaseException as e:
                 return result_class(
                     ProgramRunInfo(
-                        params=run_params,
+                        overriden=overriden,
                         runtime=runtime,
                         error=ExceptionInfo.from_exception(e),
                     )
@@ -725,7 +761,7 @@ class Program(ABC):
         if isinstance(output_data, _GenResData):
             return GeneratorResult(
                 ProgramRunInfo(
-                    params=run_params,
+                    overriden=overriden,
                     runtime=runtime,
                 ),
                 battle_data=decoded_battle_output,
@@ -735,7 +771,7 @@ class Program(ABC):
         else:
             return SolverResult(
                 ProgramRunInfo(
-                    params=run_params,
+                    overriden=overriden,
                     runtime=runtime,
                 ),
                 battle_data=decoded_battle_output,
@@ -801,26 +837,25 @@ class Generator(Program):
         self,
         max_size: int,
         *,
-        timeout: float | None = ...,
-        space: int | None = ...,
-        cpus: int = ...,
+        timeout: float | None | EllipsisType = ...,
+        space: int | None | EllipsisType = ...,
+        cpus: int | EllipsisType = ...,
         battle_input: Encodable | None = None,
         battle_output: type[Encodable] | None = None,
+        ui: ProgramUi | None = None,
         set_cpus: str | None = None,
-        ui: ProgramUiProxy | None = None,
     ) -> GeneratorResult:
         """Executes the generator and parses its output into a problem instance.
 
         Args:
             max_size: Maximum size of the instance that the generator is allowed to generate.
-            timeout: Timeout in seconds.
-            space: Memory limit in MB.
-            cpus: Number of physical cpus the generator can use.
+            timeout: Timeout for the program in seconds.
+            space: Maximum amount of memory space this program can use in bytes.
+            cpus: Number of cpu cores this program can use.
             battle_input: Additional data that will be given to the generator.
             battle_output: Class that will be used to parse additional data the generator outputs.
-            set_cpus: Which cpus to execute the container on. Either a comma separated list or a hyphen-separated range.
-                A value of `None` means the container can use any core (but still only `cpus` many of them).
             ui: Interface the program execution uses to update the ui.
+            set_cpus: A docker format string specifying what cpu cores the program should use, or None for any cores.
 
         Returns:
             Datastructure containing all info about the generator execution and the created problem instance.
@@ -871,26 +906,25 @@ class Solver(Program):
         instance: Instance,
         max_size: int,
         *,
-        timeout: float | None = ...,
-        space: int | None = ...,
-        cpus: int = ...,
+        timeout: float | None | EllipsisType = ...,
+        space: int | None | EllipsisType = ...,
+        cpus: int | EllipsisType = ...,
         battle_input: Encodable | None = None,
         battle_output: type[Encodable] | None = None,
+        ui: ProgramUi | None = None,
         set_cpus: str | None = None,
-        ui: ProgramUiProxy | None = None,
     ) -> SolverResult:
         """Executes the solver on the given problem instance and parses its output into a problem solution.
 
         Args:
             max_size: Maximum size of the instance that the generator is allowed to generate.
-            timeout: Timeout in seconds.
-            space: Memory limit in MB.
-            cpus: Number of physical cpus the solver can use.
+            timeout: Timeout for the program in seconds.
+            space: Maximum amount of memory space this program can use in bytes.
+            cpus: Number of cpu cores this program can use.
             battle_input: Additional data that will be given to the solver.
             battle_output: Class that will be used to parse additional data the solver outputs.
-            set_cpus: Which cpus to execute the container on. Either a comma separated list or a hyphen-separated range.
-                A value of `None` means the container can use any core (but still only `cpus` many of them).
             ui: Interface the program execution uses to update the ui.
+            set_cpus: A docker format string specifying what cpu cores the program should use, or None for any cores.
 
         Returns:
             Datastructure containing all info about the solver execution and the solution it computed.
