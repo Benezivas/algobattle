@@ -1,5 +1,6 @@
 """Module providing an interface to interact with the teams' programs."""
 from abc import ABC, abstractmethod
+from functools import cached_property
 from os import environ
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -16,8 +17,10 @@ from docker.errors import APIError, BuildError as DockerBuildError, DockerExcept
 from docker.models.images import Image as DockerImage
 from docker.models.containers import Container as DockerContainer
 from docker.types import Mount, LogConfig, Ulimit
+from pydantic_core import CoreSchema
+from pydantic_core.core_schema import no_info_after_validator_function
 from requests import Timeout, ConnectionError
-from pydantic import AfterValidator, Field
+from pydantic import AfterValidator, Field, GetCoreSchemaHandler
 from anyio.to_thread import run_sync
 from urllib3.exceptions import ReadTimeoutError
 
@@ -55,6 +58,35 @@ T = TypeVar("T")
 WithNone = Annotated[T | None, AfterValidator(parse_none)]
 
 
+class _Adapter:
+    """Turns a docker library config class into a pydantic parseable one."""
+
+    _Args: ClassVar[type[TypedDict]]
+
+    @classmethod
+    def _construct(cls, kwargs: dict[str, Any]) -> Self:
+        return cls(**kwargs)
+
+    @classmethod
+    def __get_pydantic_core_schema__(cls, source: type, handler: GetCoreSchemaHandler) -> CoreSchema:
+        return no_info_after_validator_function(cls._construct, handler(cls._Args))
+
+
+class PydanticLogConfig(LogConfig, _Adapter):   # noqa: D101
+
+    class _Args(TypedDict):
+        type: str
+        conifg: dict[Any, Any]
+
+
+class PydanticUlimit(Ulimit, _Adapter):     # noqa: D101
+
+    class _Args(TypedDict):
+        name: str
+        soft: int
+        hard: int
+
+
 class AdvancedRunArgs(BaseModel):
     """Advanced docker run options.
 
@@ -76,15 +108,6 @@ class AdvancedRunArgs(BaseModel):
         timeout: int
         retries: int
         start_period: int
-
-    class _LogConfigArgs(TypedDict):
-        type: str
-        conifg: dict[Any, Any]
-
-    class _UlimitArgs(TypedDict):
-        name: str
-        soft: int
-        hard: int
 
     # defaults set by us
     network_mode: str = "none"
@@ -129,7 +152,7 @@ class AdvancedRunArgs(BaseModel):
     kernel_memory: int | str | None = None
     labels: dict[str, str] | list[str] | None = None
     links: dict[str, str] | None = None
-    log_config: _LogConfigArgs | None = None
+    log_config: PydanticLogConfig | None = None
     lxc_conf: dict[Any, Any] | None = None
     mac_address: str | None = None
     mem_limit: int | str | None = None
@@ -160,7 +183,7 @@ class AdvancedRunArgs(BaseModel):
     sysctls: dict[Any, Any] | None = None
     tmpfs: dict[Any, Any] | None = None
     tty: bool | None = None
-    ulimits: list[_UlimitArgs] | None = None
+    ulimits: list[PydanticUlimit] | None = None
     use_config_proxy: bool | None = None
     user: str | int | None = None
     userns_mode: str | None = None
@@ -171,14 +194,10 @@ class AdvancedRunArgs(BaseModel):
     volumes_from: list[Any] | None = None
     working_dir: str | None = None
 
-    def to_docker_args(self) -> dict[str, Any]:
+    @cached_property
+    def kwargs(self) -> dict[str, Any]:
         """Transforms the object into :meth:`client.containers.run` kwargs."""
-        kwargs = self.model_dump(exclude_none=True)
-        if "log_config" in kwargs:
-            kwargs["log_config"] = LogConfig(**kwargs["log_config"])
-        if "ulimits" in kwargs:
-            kwargs["ulimits"] = Ulimit(**kwargs["ulimits"])
-        return kwargs
+        return self.model_dump(exclude_none=True)
 
 
 class AdvancedBuildArgs(BaseModel):
@@ -215,7 +234,8 @@ class AdvancedBuildArgs(BaseModel):
     isolation: str | None = None
     use_config_proxy: bool | None = None
 
-    def to_docker_args(self) -> dict[str, Any]:
+    @cached_property
+    def kwargs(self) -> dict[str, Any]:
         """Transforms the object into :meth:`client.images.build` kwargs."""
         return self.model_dump(exclude_none=True)
 
@@ -645,7 +665,7 @@ class Program(ABC):
                 path=image,
                 name=name,
                 timeout=config.build_timeout,
-                advanced_args=config.advanced_build_params.to_docker_args(),
+                advanced_args=config.advanced_build_params.kwargs,
                 max_size=config.image_size,
                 role=cls.role,
             )
@@ -716,7 +736,7 @@ class Program(ABC):
                     cpus=config.cpus,
                     ui=ui,
                     set_cpus=set_cpus,
-                    run_kwargs=self.config.advanced_run_params.to_docker_args(),
+                    run_kwargs=self.config.advanced_run_params.kwargs,
                 )
             except ExecutionTimeout as e:
                 if self.config.strict_timeouts:
