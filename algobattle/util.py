@@ -11,10 +11,13 @@ from itertools import chain
 import json
 from pathlib import Path
 from traceback import format_exception
+from types import EllipsisType
 from typing import Annotated, Any, Callable, ClassVar, Iterable, Literal, LiteralString, TypeVar, Self, cast, get_args
+from typing_extensions import TypedDict
 from annotated_types import GroupedMetadata
 
 from pydantic import (
+    AfterValidator,
     ByteSize,
     ConfigDict,
     BaseModel as PydandticBaseModel,
@@ -434,5 +437,74 @@ class TimeFloat:
         return no_info_after_validator_function(convert, union_schema([handler(float), handler(timedelta)]))
 
 
+def parse_none(value: Any) -> Any | None:
+    """Used as a validator to parse false-y values into Python None objects."""
+    return None if not value else value
+
+
 TimeDeltaFloat = Annotated[float, TimeFloat]
 ByteSizeInt = Annotated[int, ByteSize]
+WithNone = Annotated[T | None, AfterValidator(parse_none)]
+
+
+class RunConfigOverride(TypedDict, total=False):
+    """Run parameters that were overriden by the battle type."""
+
+    timeout: float | None
+    space: int | None
+    cpus: int
+
+
+class RunConfig(BaseModel):
+    """Parameters determining how a program is run."""
+
+    timeout: WithNone[TimeDeltaFloat] = 30
+    """Timeout in seconds, or `false` for no timeout."""
+    space: WithNone[ByteSizeInt] = None
+    """Maximum memory space available, or `false` for no limitation.
+
+    Can be either an plain number of bytes like `30000` or a string including
+    a unit like `30 kB`.
+    """
+    cpus: int = 1
+    """Number of cpu cores available."""
+
+    def reify(
+        self,
+        timeout: float | None | EllipsisType,
+        space: int | None | EllipsisType,
+        cpus: int | EllipsisType,
+    ) -> tuple[Self, RunConfigOverride]:
+        """Merges the overriden config options with the parsed ones."""
+        overriden = RunConfigOverride()
+        if timeout is ...:
+            timeout = self.timeout
+        else:
+            overriden["timeout"] = timeout
+        if space is ...:
+            space = self.space
+        else:
+            overriden["space"] = space
+        if cpus is ...:
+            cpus = self.cpus
+        else:
+            overriden["cpus"] = cpus
+        return RunConfig(timeout=timeout, space=space, cpus=cpus), overriden
+
+
+class MatchConfig(BaseModel):
+    """Parameters determining the match execution.
+
+    It will be parsed from the given config file and contains all settings that specify how the match is run.
+    """
+
+    points: int = 100
+    """Highest number of points each team can achieve."""
+    build_timeout: WithNone[TimeDeltaFloat] = 600
+    """Timeout for building each docker image."""
+    image_size: WithNone[ByteSizeInt] = None
+    """Maximum size a built program image is allowed to be."""
+    strict_timeouts: bool = False
+    """Whether to raise an error if a program runs into the timeout."""
+    generator: RunConfig = RunConfig()
+    solver: RunConfig = RunConfig()

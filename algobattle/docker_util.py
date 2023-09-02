@@ -6,7 +6,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from timeit import default_timer
 from types import EllipsisType
-from typing import Annotated, Any, ClassVar, Iterator, Protocol, Self, TypeVar, cast
+from typing import Any, ClassVar, Iterator, Protocol, Self, TypeVar, cast
 from typing_extensions import TypedDict
 from uuid import uuid4
 import json
@@ -20,21 +20,21 @@ from docker.types import Mount, LogConfig, Ulimit
 from pydantic_core import CoreSchema
 from pydantic_core.core_schema import no_info_after_validator_function
 from requests import Timeout, ConnectionError
-from pydantic import AfterValidator, Field, GetCoreSchemaHandler
+from pydantic import Field, GetCoreSchemaHandler
 from anyio.to_thread import run_sync
 from urllib3.exceptions import ReadTimeoutError
 
 from algobattle.util import (
     AlgobattleBaseException,
     BuildError,
-    ByteSizeInt,
     DockerError,
     Encodable,
     EncodingError,
     ExceptionInfo,
     ExecutionError,
     ExecutionTimeout,
-    TimeDeltaFloat,
+    RunConfig,
+    RunConfigOverride,
     ValidationError,
     Role,
     inherit_docs,
@@ -49,13 +49,7 @@ AnySolution = Solution[Instance]
 _client_var: DockerClient | None = None
 
 
-def parse_none(value: Any) -> Any | None:
-    """Used as a validator to parse false-y values into Python None objects."""
-    return None if not value else value
-
-
 T = TypeVar("T")
-WithNone = Annotated[T | None, AfterValidator(parse_none)]
 
 
 class _Adapter:
@@ -72,15 +66,13 @@ class _Adapter:
         return no_info_after_validator_function(cls._construct, handler(cls._Args))
 
 
-class PydanticLogConfig(LogConfig, _Adapter):   # noqa: D101
-
+class PydanticLogConfig(LogConfig, _Adapter):  # noqa: D101
     class _Args(TypedDict):
         type: str
         conifg: dict[Any, Any]
 
 
-class PydanticUlimit(Ulimit, _Adapter):     # noqa: D101
-
+class PydanticUlimit(Ulimit, _Adapter):  # noqa: D101
     class _Args(TypedDict):
         name: str
         soft: int
@@ -240,43 +232,11 @@ class AdvancedBuildArgs(BaseModel):
         return self.model_dump(exclude_none=True)
 
 
-class RunConfig(BaseModel):
-    """Parameters determining how a program is run."""
+class DockerConfig(BaseModel):
+    """Settings passed directly to the docker daemon."""
 
-    timeout: WithNone[TimeDeltaFloat] = 30
-    """Timeout in seconds, or `false` for no timeout."""
-    space: WithNone[ByteSizeInt] = None
-    """Maximum memory space available, or `false` for no limitation.
-
-    Can be either an plain number of bytes like `30000` or a string including
-    a unit like `30 kB`.
-    """
-    cpus: int = 1
-    """Number of cpu cores available."""
-
-
-class ProgramConfig(BaseModel):
-    """Config options relevant to the way programs are run and built."""
-
-    build_timeout: WithNone[TimeDeltaFloat] = None
-    """Timeout for building each docker image."""
-    image_size: WithNone[ByteSizeInt] = None
-    """Maximum size a built program image is allowed to be."""
-    strict_timeouts: bool = False
-    """Whether to raise an error if a program runs into the timeout."""
-    set_cpus: str | list[str] | None = None
-    generator: RunConfig = RunConfig()
-    solver: RunConfig = RunConfig()
-    advanced_build_params: AdvancedBuildArgs = AdvancedBuildArgs()
-    advanced_run_params: AdvancedRunArgs = AdvancedRunArgs()
-
-
-class RunConfigOverride(TypedDict, total=False):
-    """Run parameters that were overriden by the battle type."""
-
-    timeout: float | None
-    space: int | None
-    cpus: int
+    build: AdvancedBuildArgs = AdvancedBuildArgs()
+    run: AdvancedRunArgs = AdvancedRunArgs()
 
 
 def client() -> DockerClient:
@@ -608,40 +568,24 @@ class Program(ABC):
     """The underlying docker image."""
     problem: AnyProblem
     """The problem this program creates instances and/or solutions for."""
-    config: ProgramConfig
+    docker_config: DockerConfig
     """Config settings this program will use to run."""
+    strict_timeouts: bool
+    config: RunConfig
 
     role: ClassVar[Role]
-
-    def run_config(
-        self,
-        timeout: float | None | EllipsisType,
-        space: int | None | EllipsisType,
-        cpus: int | EllipsisType,
-    ) -> tuple[RunConfig, RunConfigOverride]:
-        """Merges the overriden config options with the parsed ones."""
-        overriden = RunConfigOverride()
-        run_config: RunConfig = getattr(self.config, self.role.name)
-        if timeout is ...:
-            timeout = run_config.timeout
-        else:
-            overriden["timeout"] = timeout
-        if space is ...:
-            space = run_config.space
-        else:
-            overriden["space"] = space
-        if cpus is ...:
-            cpus = run_config.cpus
-        else:
-            overriden["cpus"] = cpus
-        return RunConfig(timeout=timeout, space=space, cpus=cpus), overriden
 
     @classmethod
     async def build(
         cls,
+        *,
         image: Path | Image,
         problem: AnyProblem,
-        config: ProgramConfig = ProgramConfig(),
+        timeout: float | None = 600,
+        docker_config: DockerConfig = DockerConfig(),
+        strict_timeouts: bool = False,
+        config: RunConfig = RunConfig(),
+        max_size: int | None = None,
         team_name: str | None = None,
     ) -> Self:
         """Creates a program by building the specified docker image.
@@ -650,7 +594,10 @@ class Program(ABC):
             image: Path to a Dockerfile (or folder containing one) from which to build the image.
                 Or an already built image.
             problem: Problem this program is solving/generating instances for.
-            config: Config options for building this program.
+            docker_config: Docker config that will be used to build and run this program.
+            strict_timeouts: Wether to raise an error if the container times out but produces valid output.
+            config: Run config for this program.
+            max_size: Maximum size of the built image.
             team_name: If set the image will be given a descriptive name.
 
         Returns:
@@ -664,13 +611,15 @@ class Program(ABC):
             image = await Image.build(
                 path=image,
                 name=name,
-                timeout=config.build_timeout,
-                advanced_args=config.advanced_build_params.kwargs,
-                max_size=config.image_size,
+                timeout=timeout,
+                advanced_args=docker_config.build.kwargs,
+                max_size=max_size,
                 role=cls.role,
             )
 
-        return cls(image, problem, config)
+        return cls(
+            image=image, problem=problem, docker_config=docker_config, strict_timeouts=strict_timeouts, config=config
+        )
 
     @abstractmethod
     def _encode_input(self, input: Path, max_size: int, instance: Instance | None) -> None:
@@ -697,7 +646,7 @@ class Program(ABC):
     ) -> GeneratorResult | SolverResult:
         """Execute the program, processing input and output data."""
         result_class = GeneratorResult if self.role == Role.generator else SolverResult
-        config, overriden = self.run_config(timeout, space, cpus)
+        config, overriden = self.config.reify(timeout, space, cpus)
 
         with ProgramIO() as io:
             try:
@@ -736,10 +685,10 @@ class Program(ABC):
                     cpus=config.cpus,
                     ui=ui,
                     set_cpus=set_cpus,
-                    run_kwargs=self.config.advanced_run_params.kwargs,
+                    run_kwargs=self.docker_config.run.kwargs,
                 )
             except ExecutionTimeout as e:
-                if self.config.strict_timeouts:
+                if self.strict_timeouts:
                     return result_class(
                         ProgramRunInfo(overriden=overriden, runtime=e.runtime, error=ExceptionInfo.from_exception(e))
                     )

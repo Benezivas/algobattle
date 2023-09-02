@@ -7,9 +7,9 @@ from typing import Any, Iterator, Protocol, Self, TypeAlias
 
 from pydantic import BaseModel
 
-from algobattle.docker_util import ProgramConfig, Generator, Solver
+from algobattle.docker_util import DockerConfig, Generator, Solver
 from algobattle.problem import AnyProblem
-from algobattle.util import ExceptionInfo, MatchMode, Role
+from algobattle.util import ExceptionInfo, MatchConfig, MatchMode, Role
 
 
 _team_names: set[str] = set()
@@ -37,7 +37,8 @@ class TeamInfo(BaseModel):
         self,
         name: str,
         problem: AnyProblem,
-        config: ProgramConfig,
+        match_config: MatchConfig,
+        docker_config: DockerConfig,
         name_programs: bool,
         ui: BuildUi,
     ) -> "Team":
@@ -46,7 +47,8 @@ class TeamInfo(BaseModel):
         Args:
             name: Name of the team.
             problem: The problem class the current match is fought over.
-            config: Config for the current match.
+            match_config: Config for the current match.
+            docker_config: Advanced docker settings for the current match.
             name_programs: Whether the programs should be given deterministic names.
 
         Returns:
@@ -59,12 +61,30 @@ class TeamInfo(BaseModel):
         if name in _team_names:
             raise ValueError
         tag_name = name.lower().replace(" ", "_") if name_programs else None
-        ui.start_build(name, Role.generator, config.build_timeout)
-        generator = await Generator.build(self.generator, problem, config, tag_name)
+        ui.start_build(name, Role.generator, match_config.build_timeout)
+        generator = await Generator.build(
+            image=self.generator,
+            problem=problem,
+            docker_config=docker_config,
+            timeout=match_config.build_timeout,
+            strict_timeouts=match_config.strict_timeouts,
+            config=match_config.generator,
+            max_size=match_config.image_size,
+            team_name=tag_name,
+        )
         ui.finish_build()
         try:
-            ui.start_build(name, Role.solver, config.build_timeout)
-            solver = await Solver.build(self.solver, problem, config, tag_name)
+            ui.start_build(name, Role.solver, match_config.build_timeout)
+            solver = await Solver.build(
+                image=self.solver,
+                problem=problem,
+                docker_config=docker_config,
+                timeout=match_config.build_timeout,
+                strict_timeouts=match_config.strict_timeouts,
+                config=match_config.solver,
+                max_size=match_config.image_size,
+                team_name=tag_name,
+            )
             ui.finish_build()
         except Exception:
             generator.remove()
@@ -149,7 +169,8 @@ class TeamHandler:
         infos: TeamInfos,
         problem: AnyProblem,
         mode: MatchMode,
-        config: ProgramConfig,
+        match_config: MatchConfig,
+        docker_config: DockerConfig,
         ui: BuildUi,
     ) -> Self:
         """Builds the programs of every team.
@@ -169,7 +190,7 @@ class TeamHandler:
         handler = cls(cleanup=mode == "tournament")
         for name, info in infos.items():
             try:
-                team = await info.build(name, problem, config, mode == "testing", ui)
+                team = await info.build(name, problem, match_config, docker_config, mode == "testing", ui)
                 handler.active.append(team)
             except Exception as e:
                 handler.excluded[name] = ExceptionInfo.from_exception(e)

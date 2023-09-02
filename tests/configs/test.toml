@@ -1,7 +1,7 @@
 [match]
 points = 10
 
-[program.generator]
+[match.generator]
 space = 10
 
 [battle]

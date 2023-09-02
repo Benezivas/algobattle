@@ -12,39 +12,47 @@ from anyio import create_task_group, CapacityLimiter
 from anyio.to_thread import current_default_thread_limiter
 
 from algobattle.battle import Battle, FightHandler, FightUi, BattleUi, Iterated
-from algobattle.docker_util import ProgramConfig, ProgramUi
+from algobattle.docker_util import DockerConfig, ProgramUi
 from algobattle.team import BuildUi, Matchup, Team, TeamHandler, TeamInfos
 from algobattle.problem import InstanceT, Problem, SolutionT
-from algobattle.util import ExceptionInfo, MatchMode, Role, RunningTimer, BaseModel, str_with_traceback
+from algobattle.util import (
+    ExceptionInfo,
+    MatchConfig,
+    MatchMode,
+    Role,
+    RunningTimer,
+    BaseModel,
+    str_with_traceback,
+)
 
 
-class MatchConfig(BaseModel):
-    """Parameters determining the match execution.
+class ExecutionConfig(BaseModel):
+    """Settings that only determine how a match is run, not its result."""
 
-    It will be parsed from the given config file and contains all settings that specify how the match is run.
-    """
-
-    points: int = 100
-    """Highest number of points each team can achieve."""
     parallel_battles: int = 1
+    """Number of battles exectuted in parallel."""
     mode: MatchMode = "testing"
+    """Mode of the match."""
+    set_cpus: str | list[str] | None = None
+    """Wich cpus to run programs on, if a list is specified each battle will use a different cpu specification in it."""
+
+    @model_validator(mode="after")
+    def val_set_cpus(self) -> Self:
+        """Validates that each battle that is being executed is assigned some cpu cores."""
+        if isinstance(self.set_cpus, list) and self.parallel_battles > len(self.set_cpus):
+            raise ValueError("Number of parallel battles exceeds the number of set_cpu specifier strings.")
+        else:
+            return self
 
 
 class BaseConfig(BaseModel):
     """Base that contains all config options and can be parsed from config files."""
 
     teams: TeamInfos = {}
+    execution: ExecutionConfig = ExecutionConfig()
     match: MatchConfig = MatchConfig()
-    program: ProgramConfig = ProgramConfig()
     battle: Battle.Config = Iterated.Config()
-
-    @model_validator(mode="after")
-    def val_set_cpus(self) -> Self:
-        """Validates that each battle that is being executed is assigned some cpu cores."""
-        if isinstance(self.program.set_cpus, list) and self.match.parallel_battles > len(self.program.set_cpus):
-            raise ValueError("Number of parallel battles exceeds the number of set_cpu specifier strings.")
-        else:
-            return self
+    docker: DockerConfig = DockerConfig()
 
     @classmethod
     def from_file(cls, file: Path) -> Self:
@@ -125,20 +133,22 @@ class Match(BaseModel):
         if ui is None:
             ui = Ui()
 
-        with await TeamHandler.build(config.teams, problem, config.match.mode, config.program, ui) as teams:
+        with await TeamHandler.build(
+            config.teams, problem, config.execution.mode, config.match, config.docker, ui
+        ) as teams:
             result = cls(
                 active_teams=[t.name for t in teams.active],
                 excluded_teams=teams.excluded,
             )
             ui.match = result
             battle_cls = Battle.all()[config.battle.type]
-            limiter = CapacityLimiter(config.match.parallel_battles)
-            current_default_thread_limiter().total_tokens = config.match.parallel_battles
-            set_cpus = config.program.set_cpus
+            limiter = CapacityLimiter(config.execution.parallel_battles)
+            current_default_thread_limiter().total_tokens = config.execution.parallel_battles
+            set_cpus = config.execution.set_cpus
             if isinstance(set_cpus, list):
-                match_cpus = cast(list[str | None], set_cpus[: config.match.parallel_battles])
+                match_cpus = cast(list[str | None], set_cpus[: config.execution.parallel_battles])
             else:
-                match_cpus = [set_cpus] * config.match.parallel_battles
+                match_cpus = [set_cpus] * config.execution.parallel_battles
             async with create_task_group() as tg:
                 for matchup in teams.matchups:
                     battle = battle_cls()
