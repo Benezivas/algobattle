@@ -25,6 +25,7 @@ from pydantic import (
     GetCoreSchemaHandler,
     ValidationError as PydanticValidationError,
     ValidationInfo,
+    model_validator,
 )
 from pydantic_core import CoreSchema
 from pydantic_core.core_schema import general_after_validator_function, union_schema, no_info_after_validator_function
@@ -508,3 +509,22 @@ class MatchConfig(BaseModel):
     """Whether to raise an error if a program runs into the timeout."""
     generator: RunConfig = RunConfig()
     solver: RunConfig = RunConfig()
+
+
+class ExecutionConfig(BaseModel):
+    """Settings that only determine how a match is run, not its result."""
+
+    parallel_battles: int = 1
+    """Number of battles exectuted in parallel."""
+    mode: MatchMode = "testing"
+    """Mode of the match."""
+    set_cpus: str | list[str] | None = None
+    """Wich cpus to run programs on, if a list is specified each battle will use a different cpu specification in it."""
+
+    @model_validator(mode="after")
+    def val_set_cpus(self) -> Self:
+        """Validates that each battle that is being executed is assigned some cpu cores."""
+        if isinstance(self.set_cpus, list) and self.parallel_battles > len(self.set_cpus):
+            raise ValueError("Number of parallel battles exceeds the number of set_cpu specifier strings.")
+        else:
+            return self

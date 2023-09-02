@@ -7,7 +7,7 @@ from pathlib import Path
 import tomllib
 from typing import Annotated, Self, cast, overload
 
-from pydantic import Field, model_validator
+from pydantic import Field
 from anyio import create_task_group, CapacityLimiter
 from anyio.to_thread import current_default_thread_limiter
 
@@ -17,32 +17,13 @@ from algobattle.team import BuildUi, Matchup, Team, TeamHandler, TeamInfos
 from algobattle.problem import InstanceT, Problem, SolutionT
 from algobattle.util import (
     ExceptionInfo,
+    ExecutionConfig,
     MatchConfig,
-    MatchMode,
     Role,
     RunningTimer,
     BaseModel,
     str_with_traceback,
 )
-
-
-class ExecutionConfig(BaseModel):
-    """Settings that only determine how a match is run, not its result."""
-
-    parallel_battles: int = 1
-    """Number of battles exectuted in parallel."""
-    mode: MatchMode = "testing"
-    """Mode of the match."""
-    set_cpus: str | list[str] | None = None
-    """Wich cpus to run programs on, if a list is specified each battle will use a different cpu specification in it."""
-
-    @model_validator(mode="after")
-    def val_set_cpus(self) -> Self:
-        """Validates that each battle that is being executed is assigned some cpu cores."""
-        if isinstance(self.set_cpus, list) and self.parallel_battles > len(self.set_cpus):
-            raise ValueError("Number of parallel battles exceeds the number of set_cpu specifier strings.")
-        else:
-            return self
 
 
 class BaseConfig(BaseModel):
