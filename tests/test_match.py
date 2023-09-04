@@ -157,11 +157,11 @@ class Execution(IsolatedAsyncioTestCase):
         cls.problem = TestProblem
         run_params = RunConfig(timeout=2)
         cls.config_iter = BaseConfig(
-            match=MatchConfig(generator=run_params, solver=run_params),
+            match=MatchConfig(generator=run_params, solver=run_params, problem="Test Problem"),
             battle=Iterated.Config(maximum_size=10, rounds=2),
         )
         cls.config_avg = BaseConfig(
-            match=MatchConfig(generator=run_params, solver=run_params),
+            match=MatchConfig(generator=run_params, solver=run_params, problem="Test Problem"),
             battle=Averaged.Config(instance_size=5, num_fights=3),
         )
         cls.generator = problem_path / "generator"
