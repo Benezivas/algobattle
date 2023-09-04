@@ -11,6 +11,7 @@ from algobattle.battle import Fight, Iterated, Averaged
 from algobattle.match import BaseConfig, Match, MatchConfig
 from algobattle.team import Team, Matchup, TeamHandler, TeamInfo
 from algobattle.docker_util import ProgramRunInfo, RunConfig
+from algobattle.util import ExecutionConfig
 from .testsproblem.problem import TestProblem
 
 
@@ -217,11 +218,11 @@ class Parsing(TestCase):
                     "team_0": TeamInfo(generator=self.configs_path / "generator", solver=self.configs_path / "solver")
                 },
                 match=MatchConfig(
-                    points=10,
                     generator=RunConfig(space=ByteSize(10)),
                     problem="Test Problem",
                 ),
                 battle=Averaged.Config(num_fights=1),
+                execution=ExecutionConfig(points=10),
             ),
         )
 

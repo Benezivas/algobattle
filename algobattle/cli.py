@@ -83,8 +83,8 @@ def main():
             result = run(_run_with_ui, config, exec_config.problem)
         print("\n".join(CliUi.display_match(result)))
 
-        if config.match.points > 0:
-            points = result.calculate_points(config.match.points)
+        if config.execution.points > 0:
+            points = result.calculate_points(config.execution.points)
             for team, pts in points.items():
                 print(f"Team {team} gained {pts:.1f} points.")
 

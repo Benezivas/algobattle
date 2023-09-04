@@ -493,8 +493,6 @@ class MatchConfigBase(BaseModel):
     It will be parsed from the given config file and contains all settings that specify how the match is run.
     """
 
-    points: int = 100
-    """Highest number of points each team can achieve."""
     build_timeout: WithNone[TimeDeltaFloat] = 600
     """Timeout for building each docker image."""
     image_size: WithNone[ByteSizeInt] = None
@@ -514,6 +512,8 @@ class ExecutionConfig(BaseModel):
     """Mode of the match."""
     set_cpus: str | list[str] | None = None
     """Wich cpus to run programs on, if a list is specified each battle will use a different cpu specification in it."""
+    points: int = 100
+    """Highest number of points each team can achieve."""
 
     @model_validator(mode="after")
     def val_set_cpus(self) -> Self:
