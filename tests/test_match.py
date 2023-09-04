@@ -10,7 +10,7 @@ from algobattle.cli import parse_cli_args
 from algobattle.battle import Fight, Iterated, Averaged
 from algobattle.match import BaseConfig, Match, MatchConfig
 from algobattle.team import Team, Matchup, TeamHandler, TeamInfo
-from algobattle.docker_util import ProgramRunInfo, RunConfig
+from algobattle.program import ProgramRunInfo, RunConfig
 from algobattle.util import ExecutionConfig
 from .testsproblem.problem import TestProblem
 

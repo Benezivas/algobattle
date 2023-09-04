@@ -6,7 +6,7 @@ from typing import Annotated, Any, Iterator, Protocol, Self, TypeAlias
 
 from pydantic import BaseModel, Field
 
-from algobattle.docker_util import DockerConfig, Generator, Solver
+from algobattle.program import DockerConfig, Generator, Solver
 from algobattle.problem import AnyProblem
 from algobattle.util import ExceptionInfo, MatchConfigBase, MatchMode, RelativePath, Role
 

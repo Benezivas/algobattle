@@ -28,7 +28,7 @@ from pydantic.main import BaseModel as PydanticBase
 from pydantic_core import CoreSchema
 from pydantic_core.core_schema import tagged_union_schema
 
-from algobattle.docker_util import (
+from algobattle.program import (
     Generator,
     ProgramRunInfo,
     ProgramUi,

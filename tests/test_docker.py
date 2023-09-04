@@ -3,7 +3,7 @@ from unittest import IsolatedAsyncioTestCase, main as run_tests
 import random
 from pathlib import Path
 
-from algobattle.docker_util import (
+from algobattle.program import (
     AdvancedBuildArgs,
     AdvancedRunArgs,
     ExecutionTimeout,
