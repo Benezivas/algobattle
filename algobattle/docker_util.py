@@ -37,7 +37,6 @@ from algobattle.util import (
     RunConfigOverride,
     ValidationError,
     Role,
-    inherit_docs,
     BaseModel,
 )
 from algobattle.problem import AnyProblem, Instance, Solution
@@ -747,8 +746,7 @@ class Program(ABC):
                 solution=output_data,
             )
 
-    @inherit_docs
-    def remove(self) -> None:
+    def remove(self) -> None:  # noqa: D102
         self.image.remove()
 
     def __enter__(self):

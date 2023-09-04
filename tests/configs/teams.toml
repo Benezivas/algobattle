@@ -5,3 +5,6 @@ solver = "."
 [teams."team 2"]
 generator = "."
 solver = "."
+
+[match]
+problem = "Test Problem"

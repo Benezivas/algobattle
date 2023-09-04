@@ -1,5 +1,6 @@
 [match]
 points = 10
+problem = "Test Problem"
 
 [match.generator]
 space = 10

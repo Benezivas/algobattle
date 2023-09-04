@@ -22,11 +22,13 @@ from pydantic import (
     ConfigDict,
     BaseModel as PydandticBaseModel,
     Extra,
+    Field,
     GetCoreSchemaHandler,
     ValidationError as PydanticValidationError,
     ValidationInfo,
     model_validator,
 )
+from pydantic.types import PathType
 from pydantic_core import CoreSchema
 from pydantic_core.core_schema import general_after_validator_function, union_schema, no_info_after_validator_function
 
@@ -65,11 +67,14 @@ class BaseModel(PydandticBaseModel):
 
     model_config = ConfigDict(extra=Extra.forbid, from_attributes=True)
 
+
+class InstanceSolutionModel(BaseModel):
+    """Base class for Instance and solution models."""
+
     _algobattle_model_type: ClassVar[ModelType] = "other"
 
-    @inherit_docs
     @classmethod
-    def model_validate(
+    def model_validate(  # noqa: D102
         cls,
         obj: Any,
         *,
@@ -208,33 +213,6 @@ InstanceRef = AttributeReferenceMaker("instance")
 
 
 SolutionRef = AttributeReferenceMaker("solution")
-
-
-def check_path(path: str, *, type: Literal["file", "dir", "exists"] = "exists") -> Path:
-    """Parses a string into a :class:`Path` and checks that it is valid.
-
-    Args:
-        path: The string to be parsed.
-        type: What kind of check to perform on the path.
-
-    Raises:
-        ValueError: If the path fails the check.
-
-    Returns:
-        The parsed path object.
-    """
-    _path = Path(path)
-    match type:
-        case "file":
-            test = _path.is_file
-        case "dir":
-            test = _path.is_dir
-        case "exists":
-            test = _path.exists
-    if test():
-        return _path
-    else:
-        raise ValueError
 
 
 class Encodable(ABC):
@@ -448,6 +426,22 @@ ByteSizeInt = Annotated[int, ByteSize]
 WithNone = Annotated[T | None, AfterValidator(parse_none)]
 
 
+def _relativize_path(path: Path, info: ValidationInfo) -> Path:
+    """If the passed path is relative to the current directory it gets relativized to the `base_path` instead."""
+    if info.context and isinstance(info.context["base_path"], Path) and not path.is_absolute():
+        return info.context["base_path"] / path
+    return path
+
+
+def _relativize_file(path: Path, info: ValidationInfo) -> Path:
+    path = _relativize_path(path, info)
+    return PathType.validate_file(path, info)
+
+
+RelativePath = Annotated[Path, AfterValidator(_relativize_path), Field(validate_default=True)]
+RelativeFilePath = Annotated[Path, AfterValidator(_relativize_file), Field(validate_default=True)]
+
+
 class RunConfigOverride(TypedDict, total=False):
     """Run parameters that were overriden by the battle type."""
 
@@ -493,7 +487,7 @@ class RunConfig(BaseModel):
         return RunConfig(timeout=timeout, space=space, cpus=cpus), overriden
 
 
-class MatchConfig(BaseModel):
+class MatchConfigBase(BaseModel):
     """Parameters determining the match execution.
 
     It will be parsed from the given config file and contains all settings that specify how the match is run.

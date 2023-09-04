@@ -11,14 +11,13 @@ from pydantic import Field
 from anyio import create_task_group, CapacityLimiter
 from anyio.to_thread import current_default_thread_limiter
 
-from algobattle.battle import Battle, FightHandler, FightUi, BattleUi, Iterated
+from algobattle.battle import Battle, FightHandler, FightUi, BattleUi
 from algobattle.docker_util import DockerConfig, ProgramUi
 from algobattle.team import BuildUi, Matchup, Team, TeamHandler, TeamInfos
-from algobattle.problem import InstanceT, Problem, SolutionT
+from algobattle.problem import InstanceT, MatchConfig, Problem, SolutionT
 from algobattle.util import (
     ExceptionInfo,
     ExecutionConfig,
-    MatchConfig,
     Role,
     RunningTimer,
     BaseModel,
@@ -29,24 +28,29 @@ from algobattle.util import (
 class BaseConfig(BaseModel):
     """Base that contains all config options and can be parsed from config files."""
 
-    teams: TeamInfos = {}
-    execution: ExecutionConfig = ExecutionConfig()
-    match: MatchConfig = MatchConfig()
-    battle: Battle.Config = Iterated.Config()
-    docker: DockerConfig = DockerConfig()
+    # funky defaults to force their validation with context info present
+    teams: TeamInfos = Field(default={"team_0": {"generator": Path("generator"), "solver": Path("solver")}})
+    execution: ExecutionConfig = Field(default_factory=dict, validate_default=True)
+    match: MatchConfig = Field(default_factory=dict, validate_default=True)
+    battle: Battle.Config = Field(default={"type": "Iterated"}, validate_default=True)
+    docker: DockerConfig = Field(default_factory=dict, validate_default=True)
 
     @classmethod
     def from_file(cls, file: Path) -> Self:
-        """Parses a config object from a toml file."""
+        """Parses a config object from a toml file.
+
+        If the file doesn't exist it returns a default instance instead of raising an error.
+        """
         if not file.is_file():
-            raise ValueError("Path doesn't point to a file.")
-        with open(file, "rb") as f:
-            try:
-                config_dict = tomllib.load(f)
-            except tomllib.TOMLDecodeError as e:
-                raise ValueError(f"The config file at {file} is not a properly formatted TOML file!\n{e}")
+            config_dict = {}
+        else:
+            with open(file, "rb") as f:
+                try:
+                    config_dict = tomllib.load(f)
+                except tomllib.TOMLDecodeError as e:
+                    raise ValueError(f"The config file at {file} is not a properly formatted TOML file!\n{e}")
         Battle.load_entrypoints()
-        return cls.model_validate(config_dict)
+        return cls.model_validate(config_dict, context={"base_path": file.parent})
 
 
 class Match(BaseModel):

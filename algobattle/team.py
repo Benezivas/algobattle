@@ -2,14 +2,13 @@
 from abc import abstractmethod
 from dataclasses import dataclass, field
 from itertools import combinations
-from pathlib import Path
-from typing import Any, Iterator, Protocol, Self, TypeAlias
+from typing import Annotated, Any, Iterator, Protocol, Self, TypeAlias
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from algobattle.docker_util import DockerConfig, Generator, Solver
 from algobattle.problem import AnyProblem
-from algobattle.util import ExceptionInfo, MatchConfig, MatchMode, Role
+from algobattle.util import ExceptionInfo, MatchConfigBase, MatchMode, RelativePath, Role
 
 
 _team_names: set[str] = set()
@@ -30,14 +29,14 @@ class BuildUi(Protocol):
 class TeamInfo(BaseModel):
     """The config parameters defining a team."""
 
-    generator: Path
-    solver: Path
+    generator: RelativePath
+    solver: RelativePath
 
     async def build(
         self,
         name: str,
         problem: AnyProblem,
-        match_config: MatchConfig,
+        match_config: MatchConfigBase,
         docker_config: DockerConfig,
         name_programs: bool,
         ui: BuildUi,
@@ -92,7 +91,7 @@ class TeamInfo(BaseModel):
         return Team(name, generator, solver)
 
 
-TeamInfos: TypeAlias = dict[str, TeamInfo]
+TeamInfos: TypeAlias = Annotated[dict[str, TeamInfo], Field(validate_default=True)]
 
 
 @dataclass
@@ -169,7 +168,7 @@ class TeamHandler:
         infos: TeamInfos,
         problem: AnyProblem,
         mode: MatchMode,
-        match_config: MatchConfig,
+        match_config: MatchConfigBase,
         docker_config: DockerConfig,
         ui: BuildUi,
     ) -> Self:

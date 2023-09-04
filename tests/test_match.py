@@ -4,7 +4,7 @@ from typing import Any
 from unittest import IsolatedAsyncioTestCase, TestCase, main
 from pathlib import Path
 
-from pydantic import ByteSize
+from pydantic import ByteSize, ValidationError
 
 from algobattle.cli import parse_cli_args
 from algobattle.battle import Fight, Iterated, Averaged
@@ -202,21 +202,24 @@ class Parsing(TestCase):
 
     def test_no_cfg_default(self):
         _, cfg = parse_cli_args([str(self.problem_path)])
-        self.assertEqual(cfg, BaseConfig(teams=self.teams))
+        self.assertEqual(cfg, BaseConfig(teams=self.teams, match=MatchConfig(problem=self.problem_path / "problem.py")))
 
     def test_empty_cfg(self):
-        _, cfg = parse_cli_args([str(self.problem_path), "--config", str(self.configs_path / "empty.toml")])
-        self.assertEqual(cfg, BaseConfig(teams=self.teams))
+        with self.assertRaises(ValidationError):
+            parse_cli_args([str(self.configs_path / "empty.toml")])
 
     def test_cfg(self):
-        _, cfg = parse_cli_args([str(self.problem_path), "--config", str(self.configs_path / "test.toml")])
+        _, cfg = parse_cli_args([str(self.configs_path / "test.toml")])
         self.assertEqual(
             cfg,
             BaseConfig(
-                teams=self.teams,
+                teams={
+                    "team_0": TeamInfo(generator=self.configs_path / "generator", solver=self.configs_path / "solver")
+                },
                 match=MatchConfig(
                     points=10,
                     generator=RunConfig(space=ByteSize(10)),
+                    problem="Test Problem",
                 ),
                 battle=Averaged.Config(num_fights=1),
             ),
@@ -231,20 +234,23 @@ class Parsing(TestCase):
             parse_cli_args([])
 
     def test_cfg_team(self):
-        _, cfg = parse_cli_args([str(self.problem_path), f"--config={self.configs_path / 'teams.toml'}"])
+        _, cfg = parse_cli_args([str(self.configs_path / "teams.toml")])
         self.assertEqual(
             cfg,
             BaseConfig(
                 teams={
-                    "team 1": TeamInfo(generator=Path(), solver=Path()),
-                    "team 2": TeamInfo(generator=Path(), solver=Path()),
-                }
+                    "team 1": TeamInfo(generator=self.configs_path, solver=self.configs_path),
+                    "team 2": TeamInfo(generator=self.configs_path, solver=self.configs_path),
+                },
+                match=MatchConfig(
+                    problem="Test Problem",
+                ),
             ),
         )
 
     def test_cfg_team_no_name(self):
         with self.assertRaises(ValueError):
-            parse_cli_args([str(self.problem_path), f"--config={self.configs_path / 'teams_incorrect.toml'}"])
+            parse_cli_args([str(self.configs_path / "teams_incorrect.toml")])
 
 
 if __name__ == "__main__":

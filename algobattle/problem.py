@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
+    Annotated,
     Any,
     Callable,
     ClassVar,
@@ -20,7 +21,25 @@ from typing import (
 )
 from math import inf, isnan
 
-from algobattle.util import EncodableModel, Role, Encodable, inherit_docs
+from pydantic import AfterValidator, Field
+
+from algobattle.util import (
+    EncodableModel,
+    InstanceSolutionModel,
+    MatchConfigBase,
+    RelativeFilePath,
+    Role,
+    Encodable,
+)
+
+
+def _check_problem_name(val: str) -> str:
+    if val not in Problem.all():
+        raise ValueError("Value is not the name of an installed Problem.")
+    return val
+
+
+ProblemName = Annotated[str, AfterValidator(_check_problem_name)]
 
 
 class Instance(Encodable, ABC):
@@ -51,10 +70,9 @@ P = ParamSpec("P")
 class Solution(Encodable, Generic[InstanceT], ABC):
     """A proposed solution for an instance of this problem."""
 
-    @inherit_docs
     @classmethod
     @abstractmethod
-    def decode(cls, source: Path, max_size: int, role: Role, instance: InstanceT | None = None) -> Self:
+    def decode(cls, source: Path, max_size: int, role: Role, instance: InstanceT | None = None) -> Self:  # noqa: D102
         raise NotImplementedError
 
     def validate_solution(self, instance: InstanceT, role: Role) -> None:
@@ -202,9 +220,8 @@ def default_score(
 class Problem(Generic[InstanceT, SolutionT]):
     """The definition of a problem."""
 
-    @inherit_docs
     @overload
-    def __init__(
+    def __init__(  # noqa: D107
         self,
         *,
         name: str,
@@ -217,9 +234,8 @@ class Problem(Generic[InstanceT, SolutionT]):
     ) -> None:
         ...
 
-    @inherit_docs
     @overload
-    def __init__(
+    def __init__(  # noqa: D107
         self,
         *,
         name: str,
@@ -354,6 +370,17 @@ class Problem(Generic[InstanceT, SolutionT]):
             sys.modules.pop("_problem")
 
     @classmethod
+    def get(cls, problem: ProblemName | Path) -> "AnyProblem":
+        """Gets either an installed problem instance using its name or imports a problem file."""
+        if isinstance(problem, Path):
+            return cls.import_from_path(problem)
+        else:
+            all = cls.all()
+            if problem not in all:
+                raise ValueError("Problem name is not valid.")
+            return all[problem]
+
+    @classmethod
     def all(cls) -> "dict[str, AnyProblem]":
         """Returns a dictionary mapping the names of all installed problems to their python objects.
 
@@ -377,13 +404,13 @@ class Problem(Generic[InstanceT, SolutionT]):
 AnyProblem = Problem[Any, Any]
 
 
-class InstanceModel(Instance, EncodableModel, ABC):
+class InstanceModel(Instance, EncodableModel, InstanceSolutionModel, ABC):
     """An instance that can easily be parsed to/from a json file."""
 
     _algobattle_model_type: ClassVar[Literal["instance"]] = "instance"
 
 
-class SolutionModel(Solution[InstanceT], EncodableModel, ABC):
+class SolutionModel(Solution[InstanceT], EncodableModel, InstanceSolutionModel, ABC):
     """A solution that can easily be parsed to/from a json file."""
 
     _algobattle_model_type: ClassVar[Literal["solution"]] = "solution"
@@ -395,3 +422,13 @@ class SolutionModel(Solution[InstanceT], EncodableModel, ABC):
         if instance is not None:
             context["instance"] = instance
         return cls._decode(source, **context)
+
+
+class MatchConfig(MatchConfigBase):
+    """Match config settings with problem setting."""
+
+    problem: ProblemName | RelativeFilePath = Field(default=Path("problem.py"), validate_default=True)
+    """The problem this match is over.
+
+    Either the name of an installed problem, or the path to a problem file
+    """

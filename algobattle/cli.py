@@ -6,7 +6,6 @@ from argparse import ArgumentParser
 from types import TracebackType
 import curses
 from dataclasses import dataclass, field
-from functools import partial
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -19,9 +18,9 @@ from anyio.abc import TaskGroup
 
 from algobattle.battle import Battle, Fight
 from algobattle.match import BaseConfig, Match, Ui
-from algobattle.problem import Problem, AnyProblem
-from algobattle.team import Matchup, TeamInfo
-from algobattle.util import Role, RunningTimer, check_path, flat_intersperse
+from algobattle.problem import AnyProblem, Problem
+from algobattle.team import Matchup
+from algobattle.util import Role, RunningTimer, flat_intersperse
 
 
 @dataclass
@@ -36,49 +35,31 @@ class CliOptions:
 def parse_cli_args(args: list[str]) -> tuple[CliOptions, BaseConfig]:
     """Parse a given CLI arg list into config objects."""
     parser = ArgumentParser()
-    parser.add_argument("problem", help="Either the name of an installed problem, or a path to a problem file.")
     parser.add_argument(
-        "--config",
-        "-c",
-        type=partial(check_path, type="file"),
-        help="Path to a config file, defaults to '{problem} / config.toml'.",
+        "path",
+        type=Path,
+        help="Path to either a config file or a directory containing one and/or the other necessary files.",
     )
     parser.add_argument("--silent", "-s", action="store_true", help="Disable the cli Ui.")
     parser.add_argument(
-        "--result", "-r", type=check_path, help="If set, the match result object will be saved to the specified file."
+        "--result", "-r", type=Path, help="If set, the match result object will be saved to the specified file."
     )
 
     parsed = parser.parse_args(args)
-    installed_problems = Problem.all()
-    if parsed.problem in installed_problems:
-        problem = installed_problems[parsed.problem]
-        base_path = Path()
-    else:
-        problem_path = Path(parsed.problem)
-        if not problem_path.exists():
-            raise ValueError(
-                f"Passed argument '{parsed.problem}' is neither the name of an installed problem nor a path to one."
-            )
-        problem = Problem.import_from_path(problem_path)
-        base_path = problem_path if problem_path.is_dir() else problem_path.parent
+    path: Path = parsed.path
+    if not path.exists():
+        raise ValueError("Passed path does not exist.")
+    if path.is_dir():
+        path /= "config.toml"
+
+    config = BaseConfig.from_file(path)
+    problem = Problem.get(config.match.problem)
 
     exec_config = CliOptions(
         problem=problem,
         silent=parsed.silent,
         result=parsed.result,
     )
-    cfg_path: Path = parsed.config or base_path / "config.toml"
-
-    if cfg_path.is_file():
-        try:
-            config = BaseConfig.from_file(cfg_path)
-        except Exception as e:
-            raise ValueError(f"Invalid config file, terminating execution.\n{e}")
-    else:
-        config = BaseConfig()
-
-    if not config.teams:
-        config.teams["team_0"] = TeamInfo(generator=base_path / "generator", solver=base_path / "solver")
 
     return exec_config, config
 

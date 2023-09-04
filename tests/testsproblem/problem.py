@@ -35,7 +35,7 @@ def score(instance: TestInstance, solution: TestSolution) -> float:
 
 
 TestProblem = Problem(
-    name="Tests",
+    name="Test Problem",
     instance_cls=TestInstance,
     solution_cls=TestSolution,
     with_solution=False,
