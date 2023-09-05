@@ -4,27 +4,38 @@ This module contains the :class:`Battle` class, which speciefies how each type o
 some basic battle types, and related classed.
 """
 from dataclasses import dataclass
+from functools import wraps
 from importlib.metadata import entry_points
 from abc import abstractmethod
+from inspect import isclass
 from typing import (
     Any,
+    Awaitable,
+    Callable,
     ClassVar,
-    Generic,
+    Concatenate,
+    Hashable,
+    Literal,
+    ParamSpec,
     Protocol,
+    Self,
     TypeAlias,
     TypeVar,
 )
 
-from pydantic import Field
+from pydantic import Field, GetCoreSchemaHandler
+from pydantic.main import BaseModel as PydanticBase
+from pydantic_core import CoreSchema
+from pydantic_core.core_schema import tagged_union_schema
 
 from algobattle.docker_util import (
     Generator,
     ProgramRunInfo,
-    ProgramUiProxy,
+    ProgramUi,
     Solver,
 )
-from algobattle.problem import InstanceT, Problem, SolutionT
-from algobattle.util import Encodable, Role, inherit_docs, BaseModel
+from algobattle.problem import AnyProblem
+from algobattle.util import Encodable, inherit_docs, BaseModel
 
 
 _BattleConfig: TypeAlias = Any
@@ -36,6 +47,9 @@ When creating your own battle type it is recommended to not use this alias and i
 the new battle type directly.
 """
 T = TypeVar("T")
+P = ParamSpec("P")
+RunFight: TypeAlias = "Callable[Concatenate[FightHandler, P], Awaitable[Fight]]"
+Type = type
 
 
 class Fight(BaseModel):
@@ -57,41 +71,41 @@ class Fight(BaseModel):
     """Data about the solver's execution."""
 
 
-class FightUiProxy(Protocol):
+class FightUi(ProgramUi, Protocol):
     """Provides an interface for :class:`Fight` to update the ui."""
 
-    generator: ProgramUiProxy
-    solver: ProgramUiProxy
-
     @abstractmethod
-    def start(self, max_size: int) -> None:
+    def start_fight(self, max_size: int) -> None:
         """Informs the ui that a new fight has been started."""
 
     @abstractmethod
-    def update(self, role: Role, data: ProgramRunInfo) -> None:
-        """Updates the ui's current fight section with new data about a program."""
-
-    @abstractmethod
-    def end(self) -> None:
+    def end_fight(self) -> None:
         """Informs the ui that the fight has finished running and has been added to the battle's `.fight_results`."""
 
 
+def _save_result(func: "RunFight[P]") -> "RunFight[P]":
+    @wraps(func)
+    async def inner(self: "FightHandler", *args: P.args, **kwargs: P.kwargs) -> Fight:
+        res = await func(self, *args, **kwargs)
+        self.battle.fights.append(res)
+        self.ui.end_fight()
+        return res
+
+    return inner
+
+
 @dataclass
-class FightHandler(Generic[InstanceT, SolutionT]):
+class FightHandler:
     """Helper class to run fights of a given battle."""
 
-    _problem: Problem[InstanceT, SolutionT]
-    _generator: Generator[InstanceT, SolutionT]
-    _solver: Solver[InstanceT, SolutionT]
-    _battle: "Battle"
-    _ui: FightUiProxy
-    _set_cpus: str | None = None
+    problem: AnyProblem
+    generator: Generator
+    solver: Solver
+    battle: "Battle"
+    ui: FightUi
+    set_cpus: str | None
 
-    def _saved(self, fight: Fight) -> Fight:
-        self._battle.fight_results.append(fight)
-        self._ui.end()
-        return fight
-
+    @_save_result
     async def run(
         self,
         max_size: int,
@@ -134,29 +148,28 @@ class FightHandler(Generic[InstanceT, SolutionT]):
         Returns:
             The resulting info about the executed fight.
         """
-        min_size = self._problem.min_size
+        min_size = self.problem.min_size
         if max_size < min_size:
             raise ValueError(
                 f"Cannot run battle at size {max_size} since it is smaller than the smallest "
-                "size the problem allows ({min_size})."
+                f"size the problem allows ({min_size})."
             )
-        ui = self._ui
-        ui.start(max_size)
-        gen_result = await self._generator.run(
+        ui = self.ui
+        ui.start_fight(max_size)
+        gen_result = await self.generator.run(
             max_size=max_size,
             timeout=timeout_generator,
             space=space_generator,
             cpus=cpus_generator,
             battle_input=generator_battle_input,
             battle_output=generator_battle_output,
-            set_cpus=self._set_cpus,
-            ui=ui.generator,
+            set_cpus=self.set_cpus,
+            ui=ui,
         )
-        ui.update(Role.generator, gen_result.info)
         if gen_result.instance is None:
-            return self._saved(Fight(score=1, max_size=max_size, generator=gen_result.info, solver=None))
+            return Fight(score=1, max_size=max_size, generator=gen_result.info, solver=None)
 
-        sol_result = await self._solver.run(
+        sol_result = await self.solver.run(
             gen_result.instance,
             max_size=max_size,
             timeout=timeout_solver,
@@ -164,32 +177,29 @@ class FightHandler(Generic[InstanceT, SolutionT]):
             cpus=cpus_solver,
             battle_input=solver_battle_input,
             battle_output=solver_battle_output,
-            set_cpus=self._set_cpus,
-            ui=ui.solver,
+            set_cpus=self.set_cpus,
+            ui=ui,
         )
-        ui.update(Role.solver, sol_result.info)
         if sol_result.solution is None:
-            return self._saved(Fight(score=0, max_size=max_size, generator=gen_result.info, solver=sol_result.info))
+            return Fight(score=0, max_size=max_size, generator=gen_result.info, solver=sol_result.info)
 
-        if self._problem.with_solution:
+        if self.problem.with_solution:
             assert gen_result.solution is not None
-            score = self._problem.score(
+            score = self.problem.score(
                 gen_result.instance, solver_solution=sol_result.solution, generator_solution=gen_result.solution
             )
         else:
-            score = self._problem.score(gen_result.instance, solution=sol_result.solution)
+            score = self.problem.score(gen_result.instance, solution=sol_result.solution)
         score = max(0, min(1, float(score)))
-        return self._saved(Fight(score=score, max_size=max_size, generator=gen_result.info, solver=sol_result.info))
+        return Fight(score=score, max_size=max_size, generator=gen_result.info, solver=sol_result.info)
 
 
 # We need this to be here to prevent an import cycle between match.py and battle.py
-class BattleUiProxy(Protocol):
+class BattleUi(Protocol):
     """Provides an interface for :class:`Battle` to update the Ui."""
 
-    fight_ui: FightUiProxy
-
     @abstractmethod
-    def update_data(self, data: "Battle.UiData") -> None:
+    def update_battle_data(self, data: "Battle.UiData") -> None:
         """Passes new custom display data to the Ui.
 
         See :class:`Battle.UiData` for further details.
@@ -203,21 +213,48 @@ class Battle(BaseModel):
     they will ultimately be scored.
     """
 
-    fight_results: list[Fight] = Field(default_factory=list)
+    fights: list[Fight] = Field(default_factory=list)
     """The list of fights that have been fought in this battle."""
     run_exception: str | None = None
     """The description of an otherwise unhandeled exception that occured during the execution of :meth:`Battle.run`."""
 
-    _battle_types: ClassVar[dict[str, type["Battle"]]] = {}
+    _battle_types: ClassVar[dict[str, type[Self]]] = {}
     """Dictionary mapping the names of all registered battle types to their python classes."""
 
-    class BattleConfig(BaseModel):
+    class Config(BaseModel):
         """Config object for each specific battle type.
 
         A custom battle type can override this class to specify config options it uses. They will be parsed from a
-        dictionary located at `battle.NAME` in the main config file, where NAME is the specific batle type's name.
-        The created object will then be passed to the :meth:`Battle.run` method with its fields set accordingly.
+        dictionary located at `battle` in the main config file. The created object will then be passed to the
+        :meth:`Battle.run` method with its fields set accordingly.
         """
+
+        type: str = "Iterated"
+        """Type of battle that will be used."""
+
+        @classmethod
+        def __get_pydantic_core_schema__(cls, source: Type[PydanticBase], handler: GetCoreSchemaHandler) -> CoreSchema:
+            # there's two bugs we need to catch:
+            # 1. this function is called during the pydantic BaseModel metaclass's __new__, so the Battle class
+            # won't be ready at that point and be missing in the namespace
+            # 2. pydantic uses the core schema to build child classes core schema. for them we want to behave like a
+            # normal model, only our own schema gets modified
+            try:
+                if cls != Battle.Config:
+                    return handler(source)
+            except NameError:
+                return handler(source)
+            battle_classes = Battle.all()
+            match len(battle_classes):
+                case 0:
+                    return handler(source)
+                case 1:
+                    return handler(next(iter(battle_classes.values())).Config)
+                case _:
+                    choices: dict[Hashable, CoreSchema] = {
+                        name: handler(sublass.Config) for name, sublass in battle_classes.items()
+                    }
+                    return tagged_union_schema(choices=choices, discriminator="type")
 
     class UiData(BaseModel):
         """Object containing custom diplay data.
@@ -233,15 +270,20 @@ class Battle(BaseModel):
         It includes all subclasses of :class:`Battle` that have been initialized so far, including ones exposed to the
         algobattle module via the `algobattle.battle` entrypoint hook.
         """
-        for entrypoint in entry_points(group="algobattle.battle"):
-            if entrypoint.name not in Battle._battle_types:
-                battle: type[Battle] = entrypoint.load()
-                Battle._battle_types[battle.name()] = battle
         return Battle._battle_types
+
+    @classmethod
+    def load_entrypoints(cls) -> None:
+        """Loads all battle types presented via entrypoints."""
+        for entrypoint in entry_points(group="algobattle.battle"):
+            battle = entrypoint.load()
+            if not (isclass(battle) and issubclass(battle, Battle)):
+                raise ValueError(f"Entrypoint {entrypoint.name} targets something other than a Battle type")
 
     def __init_subclass__(cls) -> None:
         if cls.name() not in Battle._battle_types:
             Battle._battle_types[cls.name()] = cls
+            Battle.Config.model_rebuild(force=True)
         return super().__init_subclass__()
 
     @abstractmethod
@@ -270,9 +312,7 @@ class Battle(BaseModel):
         return cls.__name__
 
     @abstractmethod
-    async def run_battle(
-        self, fight: FightHandler[InstanceT, SolutionT], config: _BattleConfig, min_size: int, ui: BattleUiProxy
-    ) -> None:
+    async def run_battle(self, fight: FightHandler, config: _BattleConfig, min_size: int, ui: BattleUi) -> None:
         """Executes one battle.
 
         Args:
@@ -292,8 +332,11 @@ class Iterated(Battle):
 
     results: list[int] = Field(default_factory=list)
 
-    @inherit_docs
-    class BattleConfig(Battle.BattleConfig):
+    class Config(Battle.Config):
+        """Config options for Iterated battles."""
+
+        type: Literal["Iterated"] = "Iterated"
+
         rounds: int = 5
         """Number of times the instance size will be increased until the solver fails to produce correct solutions."""
         maximum_size: int = 50_000
@@ -308,9 +351,7 @@ class Iterated(Battle):
         reached: list[int]
         cap: int
 
-    async def run_battle(
-        self, fight: FightHandler[InstanceT, SolutionT], config: BattleConfig, min_size: int, ui: BattleUiProxy
-    ) -> None:
+    async def run_battle(self, fight: FightHandler, config: Config, min_size: int, ui: BattleUi) -> None:
         """Execute an iterated battle.
 
         Incrementally tries to search for the highest n for which the solver is still able to solve instances.
@@ -329,7 +370,7 @@ class Iterated(Battle):
             cap = config.maximum_size
             current = min_size
             while alive:
-                ui.update_data(self.UiData(reached=self.results + [reached], cap=cap))
+                ui.update_battle_data(self.UiData(reached=self.results + [reached], cap=cap))
                 result = await fight.run(current)
                 score = result.score
                 if score < config.minimum_score:
@@ -357,7 +398,6 @@ class Iterated(Battle):
                         base_increment = 1
             self.results.append(reached)
 
-    @inherit_docs
     def score(self) -> float:
         """Averages the highest instance size reached in each round."""
         return 0 if len(self.results) == 0 else sum(self.results) / len(self.results)
@@ -371,8 +411,11 @@ class Iterated(Battle):
 class Averaged(Battle):
     """Class that executes an averaged battle."""
 
-    @inherit_docs
-    class BattleConfig(Battle.BattleConfig):
+    class Config(Battle.Config):
+        """Config options for Averaged battles."""
+
+        type: Literal["Averaged"] = "Averaged"
+
         instance_size: int = 10
         """Instance size that will be fought at."""
         num_fights: int = 10
@@ -382,9 +425,7 @@ class Averaged(Battle):
     class UiData(Battle.UiData):
         round: int
 
-    async def run_battle(
-        self, fight: FightHandler[InstanceT, SolutionT], config: BattleConfig, min_size: int, ui: BattleUiProxy
-    ) -> None:
+    async def run_battle(self, fight: FightHandler, config: Config, min_size: int, ui: BattleUi) -> None:
         """Execute an averaged battle.
 
         This simple battle type just executes `iterations` many fights after each other at size `instance_size`.
@@ -392,16 +433,15 @@ class Averaged(Battle):
         if config.instance_size < min_size:
             raise ValueError(f"size {config.instance_size} is smaller than the smallest valid size, {min_size}.")
         for i in range(config.num_fights):
-            ui.update_data(self.UiData(round=i + 1))
+            ui.update_battle_data(self.UiData(round=i + 1))
             await fight.run(config.instance_size)
 
-    @inherit_docs
     def score(self) -> float:
         """Averages the score of each fight."""
-        if len(self.fight_results) == 0:
+        if len(self.fights) == 0:
             return 0
         else:
-            return sum(f.score for f in self.fight_results) / len(self.fight_results)
+            return sum(f.score for f in self.fights) / len(self.fights)
 
     @inherit_docs
     @staticmethod

@@ -2,20 +2,19 @@
 from abc import abstractmethod
 from dataclasses import dataclass, field
 from itertools import combinations
-from pathlib import Path
-from typing import Generic, Iterator, Protocol, Self, TypeAlias
+from typing import Annotated, Any, Iterator, Protocol, Self, TypeAlias
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from algobattle.docker_util import ProgramConfig, Generator, Solver
-from algobattle.problem import InstanceT, Problem, SolutionT
-from algobattle.util import ExceptionInfo, MatchMode, Role
+from algobattle.docker_util import DockerConfig, Generator, Solver
+from algobattle.problem import AnyProblem
+from algobattle.util import ExceptionInfo, MatchConfigBase, MatchMode, RelativePath, Role
 
 
 _team_names: set[str] = set()
 
 
-class BuildUiProxy(Protocol):
+class BuildUi(Protocol):
     """Provides and interface for the build process to update the ui."""
 
     @abstractmethod
@@ -30,23 +29,25 @@ class BuildUiProxy(Protocol):
 class TeamInfo(BaseModel):
     """The config parameters defining a team."""
 
-    generator: Path
-    solver: Path
+    generator: RelativePath
+    solver: RelativePath
 
     async def build(
         self,
         name: str,
-        problem: Problem[InstanceT, SolutionT],
-        config: ProgramConfig,
+        problem: AnyProblem,
+        match_config: MatchConfigBase,
+        docker_config: DockerConfig,
         name_programs: bool,
-        ui: BuildUiProxy,
-    ) -> "Team[InstanceT, SolutionT]":
+        ui: BuildUi,
+    ) -> "Team":
         """Builds the specified docker files into images and return the corresponding team.
 
         Args:
             name: Name of the team.
             problem: The problem class the current match is fought over.
-            config: Config for the current match.
+            match_config: Config for the current match.
+            docker_config: Advanced docker settings for the current match.
             name_programs: Whether the programs should be given deterministic names.
 
         Returns:
@@ -59,12 +60,30 @@ class TeamInfo(BaseModel):
         if name in _team_names:
             raise ValueError
         tag_name = name.lower().replace(" ", "_") if name_programs else None
-        ui.start_build(name, Role.generator, config.build_timeout)
-        generator = await Generator.build(self.generator, problem, config.generator, config.build_timeout, tag_name)
+        ui.start_build(name, Role.generator, match_config.build_timeout)
+        generator = await Generator.build(
+            image=self.generator,
+            problem=problem,
+            docker_config=docker_config,
+            timeout=match_config.build_timeout,
+            strict_timeouts=match_config.strict_timeouts,
+            config=match_config.generator,
+            max_size=match_config.image_size,
+            team_name=tag_name,
+        )
         ui.finish_build()
         try:
-            ui.start_build(name, Role.solver, config.build_timeout)
-            solver = await Solver.build(self.solver, problem, config.solver, config.build_timeout, tag_name)
+            ui.start_build(name, Role.solver, match_config.build_timeout)
+            solver = await Solver.build(
+                image=self.solver,
+                problem=problem,
+                docker_config=docker_config,
+                timeout=match_config.build_timeout,
+                strict_timeouts=match_config.strict_timeouts,
+                config=match_config.solver,
+                max_size=match_config.image_size,
+                team_name=tag_name,
+            )
             ui.finish_build()
         except Exception:
             generator.remove()
@@ -72,16 +91,16 @@ class TeamInfo(BaseModel):
         return Team(name, generator, solver)
 
 
-TeamInfos: TypeAlias = dict[str, TeamInfo]
+TeamInfos: TypeAlias = Annotated[dict[str, TeamInfo], Field(validate_default=True)]
 
 
 @dataclass
-class Team(Generic[InstanceT, SolutionT]):
+class Team:
     """Team class responsible for holding basic information of a specific team."""
 
     name: str
-    generator: Generator[InstanceT, SolutionT]
-    solver: Solver[InstanceT, SolutionT]
+    generator: Generator
+    solver: Solver
 
     def __post_init__(self) -> None:
         """Creates a team object.
@@ -110,7 +129,7 @@ class Team(Generic[InstanceT, SolutionT]):
     def __enter__(self):
         return self
 
-    def __exit__(self, _type, _value_, _traceback):
+    def __exit__(self, _type: Any, _value: Any, _traceback: Any):
         self.cleanup()
 
     def cleanup(self) -> None:
@@ -121,13 +140,13 @@ class Team(Generic[InstanceT, SolutionT]):
 
 
 @dataclass(frozen=True)
-class Matchup(Generic[InstanceT, SolutionT]):
+class Matchup:
     """Represents an individual matchup of teams."""
 
-    generator: Team[InstanceT, SolutionT]
-    solver: Team[InstanceT, SolutionT]
+    generator: Team
+    solver: Team
 
-    def __iter__(self) -> Iterator[Team[InstanceT, SolutionT]]:
+    def __iter__(self) -> Iterator[Team]:
         yield self.generator
         yield self.solver
 
@@ -136,10 +155,10 @@ class Matchup(Generic[InstanceT, SolutionT]):
 
 
 @dataclass
-class TeamHandler(Generic[InstanceT, SolutionT]):
+class TeamHandler:
     """Handles building teams and cleaning them up."""
 
-    active: list[Team[InstanceT, SolutionT]] = field(default_factory=list)
+    active: list[Team] = field(default_factory=list)
     excluded: dict[str, ExceptionInfo] = field(default_factory=dict)
     cleanup: bool = True
 
@@ -147,10 +166,11 @@ class TeamHandler(Generic[InstanceT, SolutionT]):
     async def build(
         cls,
         infos: TeamInfos,
-        problem: Problem[InstanceT, SolutionT],
+        problem: AnyProblem,
         mode: MatchMode,
-        config: ProgramConfig,
-        ui: BuildUiProxy,
+        match_config: MatchConfigBase,
+        docker_config: DockerConfig,
+        ui: BuildUi,
     ) -> Self:
         """Builds the programs of every team.
 
@@ -169,7 +189,7 @@ class TeamHandler(Generic[InstanceT, SolutionT]):
         handler = cls(cleanup=mode == "tournament")
         for name, info in infos.items():
             try:
-                team = await info.build(name, problem, config, mode == "testing", ui)
+                team = await info.build(name, problem, match_config, docker_config, mode == "testing", ui)
                 handler.active.append(team)
             except Exception as e:
                 handler.excluded[name] = ExceptionInfo.from_exception(e)
@@ -178,13 +198,13 @@ class TeamHandler(Generic[InstanceT, SolutionT]):
     def __enter__(self) -> Self:
         return self
 
-    def __exit__(self, _type, _value_, _traceback):
+    def __exit__(self, _type: Any, _value: Any, _traceback: Any):
         if self.cleanup:
             for team in self.active:
                 team.cleanup()
 
     @property
-    def grouped_matchups(self) -> list[tuple[Matchup[InstanceT, SolutionT], Matchup[InstanceT, SolutionT]]]:
+    def grouped_matchups(self) -> list[tuple[Matchup, Matchup]]:
         """All matchups, grouped by the involved teams.
 
         Each tuple's first matchup has the first team in the group generating, the second has it solving.
@@ -192,7 +212,7 @@ class TeamHandler(Generic[InstanceT, SolutionT]):
         return [(Matchup(*g), Matchup(*g[::-1])) for g in combinations(self.active, 2)]
 
     @property
-    def matchups(self) -> list[Matchup[InstanceT, SolutionT]]:
+    def matchups(self) -> list[Matchup]:
         """All matchups that will be fought."""
         if len(self.active) == 1:
             return [Matchup(self.active[0], self.active[0])]

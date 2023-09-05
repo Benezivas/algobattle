@@ -5,86 +5,52 @@ from datetime import datetime
 from itertools import combinations
 from pathlib import Path
 import tomllib
-from typing import Annotated, Any, Mapping, Self, cast, overload
+from typing import Annotated, Self, cast, overload
 
-from pydantic import field_validator, Field
+from pydantic import Field
 from anyio import create_task_group, CapacityLimiter
 from anyio.to_thread import current_default_thread_limiter
 
-from algobattle.battle import Battle, FightHandler, FightUiProxy, BattleUiProxy
-from algobattle.docker_util import ProgramConfig, ProgramRunInfo, ProgramUiProxy, set_docker_config
-from algobattle.team import Matchup, Team, TeamHandler, TeamInfos
-from algobattle.problem import InstanceT, Problem, SolutionT
-from algobattle.util import ExceptionInfo, MatchMode, Role, TimerInfo, inherit_docs, BaseModel, str_with_traceback
-
-
-AnyMatchup = Matchup[Any, Any]
-
-
-class MatchConfig(BaseModel):
-    """Parameters determining the match execution.
-
-    It will be parsed from the given config file and contains all settings that specify how the match is run.
-    """
-
-    battle_type: str = "Iterated"
-    """Name of the battle type used for the match."""
-    points: int = 100
-    """Highest number of points each team can achieve."""
-    parallel_battles: int = 1
-    mode: MatchMode = "testing"
-
-    @field_validator("battle_type", mode="before")
-    @classmethod
-    def validate_battle_type(cls, value):
-        """Validates that the given battle type is a correct name of a battle class."""
-        if value in Battle.all():
-            return value
-        else:
-            raise ValueError
+from algobattle.battle import Battle, FightHandler, FightUi, BattleUi
+from algobattle.docker_util import DockerConfig, ProgramUi
+from algobattle.team import BuildUi, Matchup, Team, TeamHandler, TeamInfos
+from algobattle.problem import InstanceT, MatchConfig, Problem, SolutionT
+from algobattle.util import (
+    ExceptionInfo,
+    ExecutionConfig,
+    Role,
+    RunningTimer,
+    BaseModel,
+    str_with_traceback,
+)
 
 
 class BaseConfig(BaseModel):
     """Base that contains all config options and can be parsed from config files."""
 
-    teams: TeamInfos = {}
-    match: MatchConfig = MatchConfig()
-    program: ProgramConfig = ProgramConfig()
-    battle: dict[str, Battle.BattleConfig] = {n: b.BattleConfig() for n, b in Battle.all().items()}
-
-    @field_validator("battle", mode="before")
-    @classmethod
-    def val_battle_configs(cls, vals):
-        """Parses the dict of battle configs into their corresponding config objects."""
-        battle_types = Battle.all()
-        if not isinstance(vals, Mapping):
-            raise TypeError
-        out = {}
-        for name, battle_cls in battle_types.items():
-            data = vals.get(name, {})
-            out[name] = battle_cls.BattleConfig.model_validate(data)
-        return out
-
-    @field_validator("program", mode="after")
-    @classmethod
-    def val_set_cpus(cls, v: ProgramConfig, values) -> ProgramConfig:
-        """Validates that each battle that is being executed is assigned some cpu cores."""
-        if isinstance(v.set_cpus, list) and values["match"]["parallel_battles"] > len(v.set_cpus):
-            raise ValueError("Number of parallel battles exceeds the number of set_cpu specifier strings.")
-        else:
-            return v
+    # funky defaults to force their validation with context info present
+    teams: TeamInfos = Field(default={"team_0": {"generator": Path("generator"), "solver": Path("solver")}})
+    execution: ExecutionConfig = Field(default_factory=dict, validate_default=True)
+    match: MatchConfig = Field(default_factory=dict, validate_default=True)
+    battle: Battle.Config = Field(default={"type": "Iterated"}, validate_default=True)
+    docker: DockerConfig = Field(default_factory=dict, validate_default=True)
 
     @classmethod
     def from_file(cls, file: Path) -> Self:
-        """Parses a config object from a toml file."""
+        """Parses a config object from a toml file.
+
+        If the file doesn't exist it returns a default instance instead of raising an error.
+        """
         if not file.is_file():
-            raise ValueError("Path doesn't point to a file.")
-        with open(file, "rb") as f:
-            try:
-                config_dict = tomllib.load(f)
-            except tomllib.TOMLDecodeError as e:
-                raise ValueError(f"The config file at {file} is not a properly formatted TOML file!\n{e}")
-        return cls.model_validate(config_dict)
+            config_dict = {}
+        else:
+            with open(file, "rb") as f:
+                try:
+                    config_dict = tomllib.load(f)
+                except tomllib.TOMLDecodeError as e:
+                    raise ValueError(f"The config file at {file} is not a properly formatted TOML file!\n{e}")
+        Battle.load_entrypoints()
+        return cls.model_validate(config_dict, context={"base_path": file.parent})
 
 
 class Match(BaseModel):
@@ -99,8 +65,8 @@ class Match(BaseModel):
     async def _run_battle(
         self,
         battle: Battle,
-        matchup: Matchup[InstanceT, SolutionT],
-        config: Battle.BattleConfig,
+        matchup: Matchup,
+        config: BaseConfig,
         problem: Problem[InstanceT, SolutionT],
         cpus: list[str | None],
         ui: "Ui",
@@ -109,14 +75,19 @@ class Match(BaseModel):
         async with limiter:
             set_cpus = cpus.pop()
             ui.start_battle(matchup)
-            battle_ui = ui.BattleObserver(ui, matchup)
+            battle_ui = BattleObserver(ui, matchup)
             handler = FightHandler(
-                problem, matchup.generator.generator, matchup.solver.solver, battle, battle_ui.fight_ui, set_cpus
+                problem=problem,
+                generator=matchup.generator.generator,
+                solver=matchup.solver.solver,
+                battle=battle,
+                ui=battle_ui,
+                set_cpus=set_cpus,
             )
             try:
                 await battle.run_battle(
                     handler,
-                    config,
+                    config.battle,
                     problem.min_size,
                     battle_ui,
                 )
@@ -146,44 +117,44 @@ class Match(BaseModel):
         """
         if ui is None:
             ui = Ui()
-        set_docker_config(config.program)
 
-        with await TeamHandler.build(config.teams, problem, config.match.mode, config.program, ui) as teams:
+        with await TeamHandler.build(
+            config.teams, problem, config.execution.mode, config.match, config.docker, ui
+        ) as teams:
             result = cls(
                 active_teams=[t.name for t in teams.active],
                 excluded_teams=teams.excluded,
             )
             ui.match = result
-            battle_cls = Battle.all()[config.match.battle_type]
-            battle_config = config.battle[config.match.battle_type]
-            limiter = CapacityLimiter(config.match.parallel_battles)
-            current_default_thread_limiter().total_tokens = config.match.parallel_battles
-            set_cpus = config.program.set_cpus
+            battle_cls = Battle.all()[config.battle.type]
+            limiter = CapacityLimiter(config.execution.parallel_battles)
+            current_default_thread_limiter().total_tokens = config.execution.parallel_battles
+            set_cpus = config.execution.set_cpus
             if isinstance(set_cpus, list):
-                match_cpus = cast(list[str | None], set_cpus[: config.match.parallel_battles])
+                match_cpus = cast(list[str | None], set_cpus[: config.execution.parallel_battles])
             else:
-                match_cpus = [set_cpus] * config.match.parallel_battles
+                match_cpus = [set_cpus] * config.execution.parallel_battles
             async with create_task_group() as tg:
                 for matchup in teams.matchups:
                     battle = battle_cls()
                     result.results[matchup.generator.name][matchup.solver.name] = battle
-                    tg.start_soon(result._run_battle, battle, matchup, battle_config, problem, match_cpus, ui, limiter)
+                    tg.start_soon(result._run_battle, battle, matchup, config, problem, match_cpus, ui, limiter)
                 return result
 
     @overload
-    def battle(self, matchup: Matchup[InstanceT, SolutionT]) -> Battle | None:
+    def battle(self, matchup: Matchup) -> Battle | None:
         ...
 
     @overload
-    def battle(self, *, generating: Team[InstanceT, SolutionT], solving: Team[InstanceT, SolutionT]) -> Battle | None:
+    def battle(self, *, generating: Team, solving: Team) -> Battle | None:
         ...
 
     def battle(
         self,
-        matchup: Matchup[InstanceT, SolutionT] | None = None,
+        matchup: Matchup | None = None,
         *,
-        generating: Team[InstanceT, SolutionT] | None = None,
-        solving: Team[InstanceT, SolutionT] | None = None,
+        generating: Team | None = None,
+        solving: Team | None = None,
     ) -> Battle | None:
         """Helper method to look up the battle between a specific matchup.
 
@@ -200,22 +171,20 @@ class Match(BaseModel):
             return None
 
     @overload
-    def insert_battle(self, battle: Battle, matchup: Matchup[InstanceT, SolutionT]) -> None:
+    def insert_battle(self, battle: Battle, matchup: Matchup) -> None:
         ...
 
     @overload
-    def insert_battle(
-        self, battle: Battle, *, generating: Team[InstanceT, SolutionT], solving: Team[InstanceT, SolutionT]
-    ) -> None:
+    def insert_battle(self, battle: Battle, *, generating: Team, solving: Team) -> None:
         ...
 
     def insert_battle(
         self,
         battle: Battle,
-        matchup: Matchup[InstanceT, SolutionT] | None = None,
+        matchup: Matchup | None = None,
         *,
-        generating: Team[InstanceT, SolutionT] | None = None,
-        solving: Team[InstanceT, SolutionT] | None = None,
+        generating: Team | None = None,
+        solving: Team | None = None,
     ) -> None:
         """Helper method to insert a new battle for a specific matchup."""
         if matchup is not None:
@@ -269,7 +238,7 @@ class Match(BaseModel):
 
 
 @dataclass
-class Ui:
+class Ui(BuildUi):
     """Base class for a UI that observes a Match and displays its data.
 
     The Ui object both observes the match object as it's being built and receives additional updates through
@@ -279,7 +248,7 @@ class Ui:
     """
 
     match: Match | None = field(default=None, init=False)
-    active_battles: list[AnyMatchup] = field(default_factory=list, init=False)
+    active_battles: list[Matchup] = field(default_factory=list, init=False)
 
     def start_build(self, team: str, role: Role, timeout: float | None) -> None:
         """Informs the ui that a new program is being built."""
@@ -289,89 +258,62 @@ class Ui:
         """Informs the ui that the current build has been finished."""
         return
 
-    def start_battle(self, matchup: Matchup[InstanceT, SolutionT]) -> None:
+    def start_battle(self, matchup: Matchup) -> None:
         """Notifies the Ui that a battle has been started."""
         self.active_battles.append(matchup)
 
-    def battle_completed(self, matchup: Matchup[InstanceT, SolutionT]) -> None:
+    def battle_completed(self, matchup: Matchup) -> None:
         """Notifies the Ui that a specific battle has been completed."""
         self.active_battles.remove(matchup)
 
-    def update_fights(self, matchup: Matchup[InstanceT, SolutionT]) -> None:
+    def update_fights(self, matchup: Matchup) -> None:
         """Notifies the Ui to update the display of fight results for a specific battle."""
         return
 
-    def update_battle_data(self, matchup: Matchup[InstanceT, SolutionT], data: Battle.UiData) -> None:
+    def update_battle_data(self, matchup: Matchup, data: Battle.UiData) -> None:
         """Passes new custom battle data to the Ui."""
         return
 
-    def start_fight(self, matchup: Matchup[InstanceT, SolutionT], max_size: int) -> None:
+    def start_fight(self, matchup: Matchup, max_size: int) -> None:
         """Informs the Ui of a newly started fight."""
         return
 
-    def update_curr_fight(
-        self,
-        matchup: AnyMatchup,
-        role: Role | None = None,
-        data: TimerInfo | float | ProgramRunInfo | None = None,
-    ) -> None:
-        """Passes new info about the current fight to the Ui."""
+    def end_fight(self, matchup: Matchup) -> None:
+        """Informs the Ui that the current fight has finished."""
         return
 
-    @dataclass
-    class BattleObserver(BattleUiProxy):
-        """Tracks updates for a specific battle."""
+    def start_program(
+        self,
+        matchup: Matchup,
+        role: Role,
+        data: RunningTimer,
+    ) -> None:
+        """Passes new info about programs in the current fight to the Ui."""
+        return
 
-        ui: "Ui"
-        matchup: AnyMatchup
-        fight_ui: "Ui.FightObserver" = field(init=False)
+    def end_program(self, matchup: Matchup, role: Role, runtime: float) -> None:
+        """Informs the Ui that the currently running programmes has finished."""
+        return
 
-        def __post_init__(self) -> None:
-            self.fight_ui = Ui.FightObserver(self)
 
-        @inherit_docs
-        def update_data(self, data: Battle.UiData) -> None:
-            self.ui.update_battle_data(self.matchup, data)
+@dataclass
+class BattleObserver(BattleUi, FightUi, ProgramUi):
+    """Tracks updates for a specific battle."""
 
-    @dataclass
-    class FightObserver(FightUiProxy):
-        """Tracks updates for the currently executed fight of a battle."""
+    ui: Ui
+    matchup: Matchup
 
-        battle_ui: "Ui.BattleObserver"
-        generator: "Ui.ProgramObserver" = field(init=False)
-        solver: "Ui.ProgramObserver" = field(init=False)
+    def update_battle_data(self, data: Battle.UiData) -> None:  # noqa: D102
+        self.ui.update_battle_data(self.matchup, data)
 
-        def __post_init__(self) -> None:
-            self.generator = Ui.ProgramObserver(self.battle_ui, Role.generator)
-            self.solver = Ui.ProgramObserver(self.battle_ui, Role.solver)
+    def start_fight(self, max_size: int) -> None:  # noqa: D102
+        self.ui.start_fight(self.matchup, max_size)
 
-        @inherit_docs
-        def start(self, max_size: int) -> None:
-            self.battle_ui.ui.start_fight(self.battle_ui.matchup, max_size)
+    def end_fight(self) -> None:  # noqa: D102
+        self.ui.update_fights(self.matchup)
 
-        @inherit_docs
-        def update(
-            self,
-            role: Role | None = None,
-            data: TimerInfo | float | ProgramRunInfo | None = None,
-        ) -> None:
-            self.battle_ui.ui.update_curr_fight(self.battle_ui.matchup, role, data)
+    def start_program(self, role: Role, timeout: float | None) -> None:  # noqa: D102
+        self.ui.start_program(self.matchup, role, RunningTimer(datetime.now(), timeout))
 
-        @inherit_docs
-        def end(self) -> None:
-            self.battle_ui.ui.update_fights(self.battle_ui.matchup)
-
-    @dataclass
-    class ProgramObserver(ProgramUiProxy):
-        """Tracks state of a specific program execution."""
-
-        battle: "Ui.BattleObserver"
-        role: Role
-
-        @inherit_docs
-        def start(self, timeout: float | None) -> None:
-            self.battle.ui.update_curr_fight(self.battle.matchup, self.role, TimerInfo(datetime.now(), timeout))
-
-        @inherit_docs
-        def stop(self, runtime: float) -> None:
-            self.battle.ui.update_curr_fight(self.battle.matchup, self.role, runtime)
+    def stop_program(self, role: Role, runtime: float) -> None:  # noqa: D102
+        self.ui.end_program(self.matchup, role, runtime)

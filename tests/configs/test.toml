@@ -1,9 +1,12 @@
 [match]
-points = 10
-battle_type = "Averaged"
+problem = "Test Problem"
 
-[program.generator]
+[match.generator]
 space = 10
 
-[battle.Averaged]
+[battle]
+type = "Averaged"
 num_fights = 1
+
+[execution]
+points = 10

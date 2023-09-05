@@ -1,6 +1,5 @@
 """Module defining the Problem and Solution base classes and related objects."""
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from functools import wraps
 from importlib.metadata import entry_points
 import importlib.util
@@ -8,6 +7,7 @@ import sys
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
+    Annotated,
     Any,
     Callable,
     ClassVar,
@@ -21,7 +21,25 @@ from typing import (
 )
 from math import inf, isnan
 
-from algobattle.util import EncodableModel, Role, Encodable, inherit_docs
+from pydantic import AfterValidator, Field
+
+from algobattle.util import (
+    EncodableModel,
+    InstanceSolutionModel,
+    MatchConfigBase,
+    RelativeFilePath,
+    Role,
+    Encodable,
+)
+
+
+def _check_problem_name(val: str) -> str:
+    if val not in Problem.all():
+        raise ValueError("Value is not the name of an installed Problem.")
+    return val
+
+
+ProblemName = Annotated[str, AfterValidator(_check_problem_name)]
 
 
 class Instance(Encodable, ABC):
@@ -52,10 +70,9 @@ P = ParamSpec("P")
 class Solution(Encodable, Generic[InstanceT], ABC):
     """A proposed solution for an instance of this problem."""
 
-    @inherit_docs
     @classmethod
     @abstractmethod
-    def decode(cls, source: Path, max_size: int, role: Role, instance: InstanceT | None = None) -> Self:
+    def decode(cls, source: Path, max_size: int, role: Role, instance: InstanceT | None = None) -> Self:  # noqa: D102
         raise NotImplementedError
 
     def validate_solution(self, instance: InstanceT, role: Role) -> None:
@@ -200,49 +217,80 @@ def default_score(
         return max(0, min(1, solution.score(instance, Role.solver)))
 
 
-@dataclass(kw_only=True)
-class ProblemBase(Generic[InstanceT, SolutionT]):
+class Problem(Generic[InstanceT, SolutionT]):
     """The definition of a problem."""
 
-    name: str
-    """The name of the problem."""
+    @overload
+    def __init__(  # noqa: D107
+        self,
+        *,
+        name: str,
+        instance_cls: type[InstanceT],
+        solution_cls: type[SolutionT],
+        min_size: int = 0,
+        with_solution: Literal[True] = True,
+        export: bool = True,
+        score_function: ScoreFunctionWithSol[InstanceT, SolutionT] = default_score,
+    ) -> None:
+        ...
 
-    instance_cls: type[InstanceT]
-    """Class defining what instances of this problem look like."""
+    @overload
+    def __init__(  # noqa: D107
+        self,
+        *,
+        name: str,
+        instance_cls: type[InstanceT],
+        solution_cls: type[SolutionT],
+        min_size: int = 0,
+        with_solution: Literal[False],
+        export: bool = True,
+        score_function: ScoreFunctionNoSol[InstanceT, SolutionT] = default_score,
+    ) -> None:
+        ...
 
-    solution_cls: type[SolutionT]
-    """Class definitng what solutions of this problem look like."""
+    def __init__(
+        self,
+        *,
+        name: str,
+        instance_cls: type[InstanceT],
+        solution_cls: type[SolutionT],
+        min_size: int = 0,
+        with_solution: bool = True,
+        export: bool = True,
+        score_function: ScoreFunction[InstanceT, SolutionT] = default_score,
+    ) -> None:
+        """The definition of a problem.
 
-    min_size: int = 0
-    """Minimum size of valid instances of this problem."""
+        Args:
+            name: The name of the problem.
+            instance_cls: Class defining what instances of this problem look like.
+            solution_cls: Class definitng what solutions of this problem look like.
+            min_size: Minimum size of valid instances of this problem.
+            with_solution: Whether the generator should also create a solution.
+            export: Wether the class should be exported.
+                If a battle is run by specifying a module, exactly one Problem in it must have `export=True`. It will
+                then be used to run the battle.
+            score_function: Function used to score how well a solution solves a problem instance.
 
-    with_solution: bool = True
-    """Whether the generator should also create a solution."""
+                The default scoring function returns the quotient of the solver's to the generator's solution score.
 
-    export: bool = True
-    """Wether the class should be exported.
+                The score function always takes the instance as the first argument. If `with_solution` is set it then
+                gets the generated solutions at `generator_solution` and `solver_solution`. If it is not set it receives
+                the solver's solution at `solution`. It should return the calculated score, a number in [0, 1] with a
+                value of 0 indicating that the solver failed completely and 1 that it solved the instance perfectly.
+        """
+        self.name = name
+        self.instance_cls = instance_cls
+        self.solution_cls = solution_cls
+        self.min_size = min_size
+        self.with_solution = with_solution
+        self.export = export
+        self.score_function = score_function
+        if self.export and self.name not in self._installed:
+            self._installed[self.name] = self
 
-    If a battle is run by specifying a module, exactly one Problem in it must have `export=True`. It will then be used
-    to run the battle.
-    """
-
-    score_function: ScoreFunction[InstanceT, SolutionT] = default_score
-    """Function used to score how well a solution solves a problem instance.
-
-    The default scoring function uses the `Scored` protocol to compare the solver's solution to the generator's. If the
-    used solution class does not support this, it  will always return 1 and thus score all valid solutions equally.
-
-    The score function always takes the instance as the first argument. If `with_solution` is set it then gets the
-    generated solutions at `generator_solution` and `solver_solution`. If it is not set it receives the solver's
-    solution at `solution`. It should return the calculated score, a number in [0, 1] with a value of 0 indicating that
-    the solver failed completely and 1 that it solved the instance perfectly.
-    """
-
-    _installed: ClassVar[dict[str, Self]] = {}
-
-    def __post_init__(self) -> None:
-        if self.export and self.name not in ProblemBase._installed:
-            ProblemBase._installed[self.name] = self
+    __slots__ = ("name", "instance_cls", "solution_cls", "min_size", "with_solution", "export", "score_function")
+    _installed: "ClassVar[dict[str, AnyProblem]]" = {}
 
     @overload
     def score(self, instance: InstanceT, *, solution: SolutionT) -> float:
@@ -275,7 +323,7 @@ class ProblemBase(Generic[InstanceT, SolutionT]):
             return self.score_function(instance, solution=solution)
 
     @classmethod
-    def import_from_path(cls, path: Path) -> Self:
+    def import_from_path(cls, path: Path) -> "AnyProblem":
         """Try to import a Problem from a given path.
 
         The specified file will be imported using the standard python loaders. If the created module contains exactly
@@ -322,7 +370,18 @@ class ProblemBase(Generic[InstanceT, SolutionT]):
             sys.modules.pop("_problem")
 
     @classmethod
-    def all(cls) -> dict[str, Self]:
+    def get(cls, problem: ProblemName | Path) -> "AnyProblem":
+        """Gets either an installed problem instance using its name or imports a problem file."""
+        if isinstance(problem, Path):
+            return cls.import_from_path(problem)
+        else:
+            all = cls.all()
+            if problem not in all:
+                raise ValueError("Problem name is not valid.")
+            return all[problem]
+
+    @classmethod
+    def all(cls) -> "dict[str, AnyProblem]":
         """Returns a dictionary mapping the names of all installed problems to their python objects.
 
         It includes all Problem objects that have been created so far and ones exposed to the algobattle module via the
@@ -342,52 +401,16 @@ class ProblemBase(Generic[InstanceT, SolutionT]):
         return cls._installed
 
 
-# Helper class to provide overloads for the __init__ so that score function type and with_solution match up
-class Problem(ProblemBase[InstanceT, SolutionT]):
-    """The definition of a problem."""
-
-    @inherit_docs
-    @overload
-    def __init__(
-        self,
-        *,
-        name: str,
-        instance_cls: type[InstanceT],
-        solution_cls: type[SolutionT],
-        min_size: int = 0,
-        with_solution: Literal[True] = True,
-        export: bool = True,
-        score_function: ScoreFunctionWithSol[InstanceT, SolutionT] = default_score,
-    ) -> None:
-        ...
-
-    @inherit_docs
-    @overload
-    def __init__(
-        self,
-        *,
-        name: str,
-        instance_cls: type[InstanceT],
-        solution_cls: type[SolutionT],
-        min_size: int = 0,
-        with_solution: Literal[False],
-        export: bool = True,
-        score_function: ScoreFunctionNoSol[InstanceT, SolutionT] = default_score,
-    ) -> None:
-        ...
-
-    @inherit_docs
-    def __init__(self, *args, **kwargs) -> None:
-        return super().__init__(*args, **kwargs)
+AnyProblem = Problem[Any, Any]
 
 
-class InstanceModel(Instance, EncodableModel, ABC):
+class InstanceModel(Instance, EncodableModel, InstanceSolutionModel, ABC):
     """An instance that can easily be parsed to/from a json file."""
 
     _algobattle_model_type: ClassVar[Literal["instance"]] = "instance"
 
 
-class SolutionModel(Solution[InstanceT], EncodableModel, ABC):
+class SolutionModel(Solution[InstanceT], EncodableModel, InstanceSolutionModel, ABC):
     """A solution that can easily be parsed to/from a json file."""
 
     _algobattle_model_type: ClassVar[Literal["solution"]] = "solution"
@@ -395,7 +418,17 @@ class SolutionModel(Solution[InstanceT], EncodableModel, ABC):
     @classmethod
     def decode(cls, source: Path, max_size: int, role: Role, instance: InstanceT | None = None) -> Self:
         """Uses pydantic to create a python object from a `.json` file."""
-        context = {"max_size": max_size, "role": role}
+        context: dict[str, Any] = {"max_size": max_size, "role": role}
         if instance is not None:
             context["instance"] = instance
         return cls._decode(source, **context)
+
+
+class MatchConfig(MatchConfigBase):
+    """Match config settings with problem setting."""
+
+    problem: ProblemName | RelativeFilePath = Field(default=Path("problem.py"), validate_default=True)
+    """The problem this match is over.
+
+    Either the name of an installed problem, or the path to a problem file
+    """

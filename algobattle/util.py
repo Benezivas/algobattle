@@ -4,26 +4,33 @@ In particular, the base classes :class:`BaseModel`, :class:`Encodable`, :class:`
 """
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 from inspect import Parameter, Signature, signature
 from itertools import chain
 import json
 from pathlib import Path
 from traceback import format_exception
-from typing import Any, Callable, ClassVar, Iterable, Literal, LiteralString, TypeVar, Self, cast, get_args
+from types import EllipsisType
+from typing import Annotated, Any, Callable, ClassVar, Iterable, Literal, LiteralString, TypeVar, Self, cast, get_args
+from typing_extensions import TypedDict
 from annotated_types import GroupedMetadata
 
 from pydantic import (
+    AfterValidator,
+    ByteSize,
     ConfigDict,
     BaseModel as PydandticBaseModel,
     Extra,
+    Field,
     GetCoreSchemaHandler,
     ValidationError as PydanticValidationError,
     ValidationInfo,
+    model_validator,
 )
+from pydantic.types import PathType
 from pydantic_core import CoreSchema
-from pydantic_core.core_schema import general_after_validator_function
+from pydantic_core.core_schema import general_after_validator_function, union_schema, no_info_after_validator_function
 
 
 class Role(Enum):
@@ -60,11 +67,14 @@ class BaseModel(PydandticBaseModel):
 
     model_config = ConfigDict(extra=Extra.forbid, from_attributes=True)
 
+
+class InstanceSolutionModel(BaseModel):
+    """Base class for Instance and solution models."""
+
     _algobattle_model_type: ClassVar[ModelType] = "other"
 
-    @inherit_docs
     @classmethod
-    def model_validate(
+    def model_validate(  # noqa: D102
         cls,
         obj: Any,
         *,
@@ -205,33 +215,6 @@ InstanceRef = AttributeReferenceMaker("instance")
 SolutionRef = AttributeReferenceMaker("solution")
 
 
-def check_path(path: str, *, type: Literal["file", "dir", "exists"] = "exists") -> Path:
-    """Parses a string into a :class:`Path` and checks that it is valid.
-
-    Args:
-        path: The string to be parsed.
-        type: What kind of check to perform on the path.
-
-    Raises:
-        ValueError: If the path fails the check.
-
-    Returns:
-        The parsed path object.
-    """
-    _path = Path(path)
-    match type:
-        case "file":
-            test = _path.is_file
-        case "dir":
-            test = _path.is_dir
-        case "exists":
-            test = _path.exists
-    if test():
-        return _path
-    else:
-        raise ValueError
-
-
 class Encodable(ABC):
     """Represents data that docker containers can interact with."""
 
@@ -319,8 +302,8 @@ class EncodableModel(BaseModel, Encodable, ABC):
 
 
 @dataclass
-class TimerInfo:
-    """Basic data holding info on a timer."""
+class RunningTimer:
+    """Basic data holding info on a currently running timer."""
 
     start: datetime
     timeout: float | None
@@ -417,3 +400,125 @@ def count_positional_params(sig: Signature) -> int:
 def can_be_positional(param: Parameter) -> bool:
     """Checks whether a parameter is positional."""
     return param.kind in (Parameter.POSITIONAL_ONLY, Parameter.POSITIONAL_OR_KEYWORD)
+
+
+class TimeFloat:
+    """A float specifying a number of seconds.
+
+    Can be parsed from pydantic either as a number of seconds or a timedelta specifier.
+    """
+
+    @classmethod
+    def __get_pydantic_core_schema__(cls, source: type, handler: GetCoreSchemaHandler) -> CoreSchema:
+        def convert(val: float | timedelta) -> float:
+            return val.total_seconds() if isinstance(val, timedelta) else val
+
+        return no_info_after_validator_function(convert, union_schema([handler(float), handler(timedelta)]))
+
+
+def parse_none(value: Any) -> Any | None:
+    """Used as a validator to parse false-y values into Python None objects."""
+    return None if not value else value
+
+
+TimeDeltaFloat = Annotated[float, TimeFloat]
+ByteSizeInt = Annotated[int, ByteSize]
+WithNone = Annotated[T | None, AfterValidator(parse_none)]
+
+
+def _relativize_path(path: Path, info: ValidationInfo) -> Path:
+    """If the passed path is relative to the current directory it gets relativized to the `base_path` instead."""
+    if info.context and isinstance(info.context["base_path"], Path) and not path.is_absolute():
+        return info.context["base_path"] / path
+    return path
+
+
+def _relativize_file(path: Path, info: ValidationInfo) -> Path:
+    path = _relativize_path(path, info)
+    return PathType.validate_file(path, info)
+
+
+RelativePath = Annotated[Path, AfterValidator(_relativize_path), Field(validate_default=True)]
+RelativeFilePath = Annotated[Path, AfterValidator(_relativize_file), Field(validate_default=True)]
+
+
+class RunConfigOverride(TypedDict, total=False):
+    """Run parameters that were overriden by the battle type."""
+
+    timeout: float | None
+    space: int | None
+    cpus: int
+
+
+class RunConfig(BaseModel):
+    """Parameters determining how a program is run."""
+
+    timeout: WithNone[TimeDeltaFloat] = 30
+    """Timeout in seconds, or `false` for no timeout."""
+    space: WithNone[ByteSizeInt] = None
+    """Maximum memory space available, or `false` for no limitation.
+
+    Can be either an plain number of bytes like `30000` or a string including
+    a unit like `30 kB`.
+    """
+    cpus: int = 1
+    """Number of cpu cores available."""
+
+    def reify(
+        self,
+        timeout: float | None | EllipsisType,
+        space: int | None | EllipsisType,
+        cpus: int | EllipsisType,
+    ) -> tuple[Self, RunConfigOverride]:
+        """Merges the overriden config options with the parsed ones."""
+        overriden = RunConfigOverride()
+        if timeout is ...:
+            timeout = self.timeout
+        else:
+            overriden["timeout"] = timeout
+        if space is ...:
+            space = self.space
+        else:
+            overriden["space"] = space
+        if cpus is ...:
+            cpus = self.cpus
+        else:
+            overriden["cpus"] = cpus
+        return RunConfig(timeout=timeout, space=space, cpus=cpus), overriden
+
+
+class MatchConfigBase(BaseModel):
+    """Parameters determining the match execution.
+
+    It will be parsed from the given config file and contains all settings that specify how the match is run.
+    """
+
+    build_timeout: WithNone[TimeDeltaFloat] = 600
+    """Timeout for building each docker image."""
+    image_size: WithNone[ByteSizeInt] = None
+    """Maximum size a built program image is allowed to be."""
+    strict_timeouts: bool = False
+    """Whether to raise an error if a program runs into the timeout."""
+    generator: RunConfig = RunConfig()
+    solver: RunConfig = RunConfig()
+
+
+class ExecutionConfig(BaseModel):
+    """Settings that only determine how a match is run, not its result."""
+
+    parallel_battles: int = 1
+    """Number of battles exectuted in parallel."""
+    mode: MatchMode = "testing"
+    """Mode of the match."""
+    set_cpus: str | list[str] | None = None
+    """Wich cpus to run programs on, if a list is specified each battle will use a different cpu specification in it."""
+    points: int = 100
+    """Highest number of points each team can achieve."""
+
+    @model_validator(mode="after")
+    def val_set_cpus(self) -> Self:
+        """Validates that each battle that is being executed is assigned some cpu cores."""
+        if isinstance(self.set_cpus, list) and self.parallel_battles > len(self.set_cpus):
+            raise ValueError("Number of parallel battles exceeds the number of set_cpu specifier strings.")
+        else:
+            return self

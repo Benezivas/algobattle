@@ -12,24 +12,20 @@ how the match should behave as a cli program, the actual match config is done th
 Running `algobattle --help` will bring up a short description of each of these inside your terminal.
 ///
 
-`problem`
+`path`
 
-:   This is the only positional argument. It is either the name of the problem you want to use or a path to it.
-    A more detailed explanation can be found [here](match.md#selecting-a-problem)
+: This is the only positional argument. It should either be the path to a config file or one to a directory containing
+one that is called `config.toml`.
 
 `--silent` / `-s`
 
-:   Setting this will hide the match output in the terminal.
+: Setting this will hide the match output in the terminal.
 
 `--result` / `-r`
 
-:   This accepts a path to some directory. If it is set the match will be saved as a json file in that directory. It
-    includes a lot of useful info that is not displayed to the terminal during execution such as error messages from
-    programs that failed.
-
-`--config` / `-c`
-
-:   This accepts a path to a config toml file. What exactly it can contain is explained in the next section.
+: This accepts a path to some directory. If it is set the match will be saved as a json file in that directory. It
+includes a lot of useful info that is not displayed to the terminal during execution such as error messages from
+programs that failed.
 
 ## Config files
 
@@ -45,17 +41,20 @@ Toml syntax can be a bit confusing if you're unfamiliar with it, a full explanat
 An example config file filled with default values looks like this:
 
 /// example
+
 ```toml
 {!> config.toml !}
 ```
+
 ///
 
 ### Teams
 
-The `teams` table contains keys that are the team's name. Values are tables containing paths to the generators and
+The teams table contains keys that are each team's name. Values are tables containing paths to the generators and
 solvers.
 
 /// example
+
 ```toml
 [teams.cats]
 generator = "cats/generator"
@@ -65,114 +64,145 @@ solver = "cats/solver"
 generator = "dogs/generator"
 solver = "dogs/solver"
 ```
+
 ///
 
 ### Match
 
-`battle_type`
+The match table contains settings that specify what the match is like. These can drastically change what happens during
+execution and what the result looks like. Because of this, students should use the same match settings as are used during
+in the tournament.
 
-:   This is the name of the battle type that is used for the match. Read [this](battle_types.md) to get an overview of
-    the different possible options.
+`problem`
 
-`points`
-
-:   An integer specifying the maximum number of points a team can achieve during this match. How points are calculated
-    is explained in more detail [here](match.md#points-calculation).
-
-`parallel_battles`
-
-:   To speed up battle execution you can let Algobattle run multiple battles in parallel. Note that while programs can 
-    not directly interact with each other, they might still end up interfering with other programs that are being run at
-    the same time. In particular, they might attempt to use the same cpu, memory, or disk resources as another program
-    being run at the same time. You can use the `program.set_cpus` option to mitigate this risk.
-
-`mode`
-
-:   Either `"tournament"` or `"testing"`. When set to tournament the docker containers are not given tags and are
-    cleaned up after the match to prevent potential exploits. Using the testing mode often is nicer since it lets Docker
-    use the build cache and thus massively speeds up development.
-
-### Program
+: The problem this match is about. Can either be specified as the name of an installed problem, or a path to a
+file containing one.
 
 `build_timeout`
 
-:   Number of seconds each program's Docker image has to complete its build step. Set to 0 to indicate no timeout.
+: Time limit each program's image has to build, or `#!toml false` for no limit. Can either be a number of seconds or a
+string in `HH:MM:SS` format.
 
 `strict_timeouts`
 
-:   Programs may run into their timeout despite already having generated their output. For example, a solver might try
-    to incrementally improve the solution it has found. This setting determines how these cases are handled, if it's set
-    to `#!toml true` trying to exceed the time limit is considered a completely unsuccessful program execution and
-    is treated similar to if it had crashed completely. If it is `#!toml false`, the program will just be halted after
-    the allotted time and any solution it may have generated is treated as is.
+: Programs may run into their timeout despite already having generated their output. For example, a solver might try
+to incrementally improve the solution it has found. This setting determines how these cases are handled, if it's set
+to `#!toml true` trying to exceed the time limit is considered a completely unsuccessful program execution and
+is treated similar to if it had crashed completely. If it is `#!toml false`, the program will just be halted after
+the allotted time and any solution it may have generated is treated as is.
 
 `image_size`
 
-:   An integer (in MB) that limits the maximum size a Docker image may be. Set to 0 to allow arbitrarily large programs.
-    Note that this limits the disk space each image may take up, not the memory used during program execution.
+: Limit the maximum size a Docker image may be, or `#!toml false` to allow arbitrarily large programs. Note that this
+limits the disk space each image may take up, not the memory used during program execution. Can be specified as
+either a number of bytes or a string with a unit such as `#!toml "2.5 GB"`.
+
+`generator` / `solver`
+
+: Both of these fields accept the same type of dictionary. It can contain `timeout`, `space`, and `cpus` keys that
+limit the corresponding resource access to the generator and solver programs. Timeouts are specified in the same
+format as `build_timeout` and memory space limits the same as `image_size`. Cpus limit the number of physical cpu
+cores the program can use and has to be an integer.
+
+### Battle
+
+This contains the setting specifying what battle type to use and further options for each battle type. Each type can
+specify its own settings and the available battle types are user extensible. Here we list the settings used by the
+included types. Their full behavior is documented at the [battle types page](battle_types.md).
+
+`type`
+
+: Selects the battle type the match uses. Must be the name of an installed battle type, by default these are
+`Iterated` and `Averaged` but more can be installed.
+
+#### Iterated
+
+`rounds`
+
+: Number of rounds that will be run and averaged. A _round_ is one sequence of fights until a size has been found
+where the solver succeeds at all smaller sizes and fails at all bigger ones.
+
+`maximum_size`
+
+: Maximum size that will be iterated to.
+
+`exponent`
+
+: An integer that determines how quickly the size increases. For example, an exponent of 2 results in a size sequence
+of 1, 2, 6, 15, 31, etc. while an exponent of 3 leads to 1, 2, 9, 36, 100, 255, etc.
+
+`minimum_score`
+
+: A float between 0 and 1 (inclusive) that is the minimum score a solver needs to achieve to "successfully" solve
+an instance.
+
+#### Averaged
+
+`instance_size`
+
+: The instance size every match will be fought at.
+
+`num_fights`
+
+: The number of fights that will be fought in each match.
+
+### Execution
+
+These are settings that purely determine _how_ a match is fought. Students can freely change these without creating
+any differences in how their code runs locally and in tournaments.
+
+`points`
+
+: An integer specifying the maximum number of points a team can achieve during this match. How points are calculated
+is explained in more detail [here](match.md#points-calculation). The point total for each team will be displayed in
+the terminal after the match.
+
+`parallel_battles`
+
+: To speed up battle execution you can let Algobattle run multiple battles in parallel. Note that while programs can
+not directly interact with each other, they might still end up interfering with other programs that are being run at
+the same time. In particular, they might attempt to use the same cpu, memory, or disk resources as another program
+being run at the same time. You can use the `set_cpus` option to mitigate this risk.
 
 `set_cpus`
 
-:   Similar to the Docker `--cpuset-cpus` option documented
-    [here](https://docs.docker.com/config/containers/resource_constraints/). Many modern cpus have different types of
-    physical cores with different performance characteristics. To provide a level playing field it can be good to limit
-    Algobattle to only use certain cores. To do this, specify either a comma separated list of cores (the first is
-    numbered 0) such as `0,1,3,5` or a range like `0-4`. Note that the formatting is very important here, you can not
-    mix the two styles or add any spaces or similar.
+: Similar to the Docker `--cpuset-cpus` option documented
+[here](https://docs.docker.com/config/containers/resource_constraints/). Many modern cpus have different types of
+physical cores with different performance characteristics. To provide a level playing field it can be good to limit
+Algobattle to only use certain cores. To do this, specify either a comma separated list of cores (the first is
+numbered 0) such as `0,1,3,5` or a range like `0-4`. Note that the formatting is very important here, you can not
+mix the two styles or add any spaces or similar.
 
     This option accepts either a single such string, or a list of them. If a list is provided each battle that is run
     in parallel will use one of the provided set of cores. For example, if this option is `["0,1", "2-3", "4,5"]` and
     there are two battles executed at the same time, the first would use the first two physical cpus and the second the
     next two.
 
-///danger
-`advanced_build_params` / `advanced_run_params`
+`mode`
 
-:   This option lets you modify the exact parameters used to build images and run containers. The possible keys and
-    values are essentially the same as the ones the Docker cli accepts. You generally should not need to use this, and
-    we highly recommend trying to use the other Algobattle options instead of directly using these. Misconfiguring these
-    options may lead to giving other people, including but not limited to students whose programs are being run, access
-    to everything on your computer! Only use these options if you are familiar with Docker and its intricacies.
+: Either `"tournament"` or `"testing"`. When set to tournament the docker containers are not given tags and are
+cleaned up after the match to prevent potential exploits. Using the testing mode often is nicer since it lets Docker
+use the build cache and thus massively speeds up development.
+
+### Docker
+
+The docker table contains settings that are passed through to the Docker daemon without influencing Algobattle itself.
+You generally should not need to use these settings. If you are running into a problem you cannot solve without them,
+we recommend first opening a discussion on [our GitHub](https://github.com/Benezivas/algobattle/discussions) to see if
+we can add this functionality to Algobattle directly.
+
+///danger
+Many of these settings are very complicated and have potentially disasterous consequences. We recommend not using any of
+these settings unless you are absolutely sure what the ones you are modifying do. Improper Docker Daemon configuration
+may not only break Algobattle but can give attackers root access to your host machine.
 ///
 
-`generator` / `solver`
+`build`
 
-:   Both of these fields accept the same type of dictionary. It can contain `timeout`, `space`, and `cpus` keys that
-    limit the corresponding resource access to the generator and solver programs. Timeouts are given in seconds, memory
-    space limits in MB, and cpus are natural numbers.
+: Table containing parameters passed to the docker build command. Further documentation can be found on
+[the Docker build site](https://docs.docker.com/engine/reference/commandline/build/).
 
-### Battle
+`run`
 
-Each battle type has different config options it can specify. Here we list the ones used by the included types. Their
-full behavior is documented [here](battle_types.md)
-
-#### Iterated
-
-`rounds`
-
-:   Number of rounds that will be run and averaged. A _round_ is one sequence of fights until a size has been found
-    where the solver succeeds at all smaller sizes and fails at all bigger ones.
-
-`maximum_size`
-
-:   Maximum size that will be iterated to.
-
-`exponent`
-
-:   An integer that determines how quickly the size increases. For example, an exponent of 2 results in a size sequence
-    of 1, 2, 6, 15, 31, etc. while an exponent of 3 leads to 1, 2, 9, 36, 100, 255, etc.
-
-`minimum_score`
-
-:   A float between 0 and 1 (inclusive) that is the minimum score a solver needs to achieve to "successfully" solve
-    an instance.
-
-#### Averaged
-
-`instance_size`
-
-:   The instance size every match will be fought at.
-
-`num_fights`
-
-:   The number of fights that will be fought in each match.
+: Table containing parameters passed to the docker run command. Further documentation can be found on
+[the Docker run site](https://docs.docker.com/engine/reference/commandline/run/).
