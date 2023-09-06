@@ -25,7 +25,6 @@ from anyio.to_thread import run_sync
 from urllib3.exceptions import ReadTimeoutError
 
 from algobattle.util import (
-    AlgobattleBaseException,
     BuildError,
     DockerError,
     Encodable,
@@ -648,78 +647,68 @@ class Generator(Program):
             Datastructure containing all info about the generator execution and the created problem instance.
         """
         specs = self.config.reify(timeout, space, cpus)
+        runtime = 0
+        battle_data = None
+        instance = None
+        solution = None
+        exception_info = None
         with ProgramIO() as io:
-            with open(io.input / "max_size.txt", "w+") as f:
-                f.write(str(max_size))
-
-            inner_result = await self._run_inner(
-                io=io,
-                max_size=max_size,
-                specs=specs,
-                battle_input=battle_input,
-                battle_output=battle_output,
-                ui=ui,
-                set_cpus=set_cpus,
-            )
-            if inner_result.info.error:
-                return GeneratorResult(info=inner_result.info)
-            info = inner_result.info
-
             try:
-                instance = self.problem.instance_cls.decode(io.output / "instance", max_size, self.role)
-            except EncodingError as e:
-                info.error = ExceptionInfo.from_exception(e)
-                return GeneratorResult(info=info, battle_data=inner_result.battle_data)
-            except Exception as e:
-                info.error = ExceptionInfo.from_exception(
-                    EncodingError("Error thrown while decoding the problem instance.", detail=str(e))
-                )
-                return GeneratorResult(info=info, battle_data=inner_result.battle_data)
-            if instance.size > max_size:
-                info.error = ExceptionInfo.from_exception(
-                    EncodingError("Instance is too large.", detail=f"Generated: {instance.size}, maximum: {max_size}")
-                )
-                return GeneratorResult(info=info, battle_data=inner_result.battle_data)
-            try:
-                instance.validate_instance()
-            except ValidationError as e:
-                info.error = ExceptionInfo.from_exception(e)
-                return GeneratorResult(info=info, battle_data=inner_result.battle_data, instance=instance)
-            except Exception as e:
-                info.error = ExceptionInfo.from_exception(
-                    ValidationError("Unknown error during instance validation.", detail=str(e))
-                )
-                return GeneratorResult(info=info, battle_data=inner_result.battle_data, instance=instance)
+                with open(io.input / "max_size.txt", "w+") as f:
+                    f.write(str(max_size))
 
-            if self.problem.with_solution:
+                inner_result = await self._run_inner(
+                    io=io,
+                    max_size=max_size,
+                    specs=specs,
+                    battle_input=battle_input,
+                    battle_output=battle_output,
+                    ui=ui,
+                    set_cpus=set_cpus,
+                )
+                if inner_result.info.error:
+                    return GeneratorResult(info=inner_result.info, battle_data=inner_result.battle_data)
+                else:
+                    runtime = inner_result.info.runtime
+                    battle_data = inner_result.battle_data
+
                 try:
-                    solution = self.problem.solution_cls.decode(io.output / "solution", max_size, self.role)
-                except EncodingError as e:
-                    info.error = ExceptionInfo.from_exception(e)
-                    return GeneratorResult(info=info, battle_data=inner_result.battle_data, instance=instance)
+                    instance = self.problem.instance_cls.decode(io.output / "instance", max_size, self.role)
+                except EncodingError:
+                    raise
                 except Exception as e:
-                    info.error = ExceptionInfo.from_exception(
-                        EncodingError("Error thrown while decoding the solution.", detail=str(e))
-                    )
-                    return GeneratorResult(info=info, battle_data=inner_result.battle_data, instance=instance)
+                    raise EncodingError("Unknown error thrown while decoding the problem instance.", detail=str(e))
                 try:
-                    solution.validate_solution(instance, Role.generator)
-                except ValidationError as e:
-                    info.error = ExceptionInfo.from_exception(e)
-                    return GeneratorResult(
-                        info=info, battle_data=inner_result.battle_data, instance=instance, solution=solution
-                    )
+                    instance.validate_instance()
+                except ValidationError:
+                    raise
                 except Exception as e:
-                    info.error = ExceptionInfo.from_exception(
-                        ValidationError("Unknown error during solution validation.", detail=str(e))
+                    raise ValidationError("Unknown error thrown during instance validation.", detail=str(e))
+                if instance.size > max_size:
+                    raise ValidationError(
+                        "Instance is too large.", detail=f"Generated: {instance.size}, maximum: {max_size}"
                     )
-                    return GeneratorResult(
-                        info=info, battle_data=inner_result.battle_data, instance=instance, solution=solution
-                    )
-            else:
-                solution = None
+                if self.problem.with_solution:
+                    try:
+                        solution = self.problem.solution_cls.decode(io.output / "solution", max_size, self.role)
+                    except EncodingError:
+                        raise
+                    except Exception as e:
+                        raise EncodingError("Unknown error thrown while decoding the solution.", detail=str(e))
+                    try:
+                        solution.validate_solution(instance, Role.generator)
+                    except ValidationError:
+                        raise
+                    except Exception as e:
+                        raise ValidationError("Unknown error thrown during solution validation.", detail=str(e))
+
+            except Exception as e:
+                exception_info = ExceptionInfo.from_exception(e)
             return GeneratorResult(
-                info=inner_result.info, battle_data=inner_result.battle_data, instance=instance, solution=solution
+                info=ProgramRunInfo(runtime=runtime, overriden=specs.overriden, error=exception_info),
+                battle_data=battle_data,
+                instance=instance,
+                solution=solution,
             )
 
 
@@ -777,44 +766,44 @@ class Solver(Program):
             Datastructure containing all info about the solver execution and the solution it computed.
         """
         specs = self.config.reify(timeout, space, cpus)
-        info = ProgramRunInfo(runtime=0, overriden=specs.overriden)
+        runtime = 0
+        battle_data = None
+        solution = None
+        exception_info = None
         with ProgramIO() as io:
             try:
                 instance.encode(io.input / "instance", self.role)
-            except AlgobattleBaseException as e:
-                info.error = ExceptionInfo.from_exception(e)
-                return SolverResult(info=info)
+                inner_result = await self._run_inner(
+                    io=io,
+                    max_size=max_size,
+                    specs=specs,
+                    battle_input=battle_input,
+                    battle_output=battle_output,
+                    ui=ui,
+                    set_cpus=set_cpus,
+                )
+                if inner_result.info.error:
+                    return SolverResult(info=inner_result.info, battle_data=inner_result.battle_data)
+                else:
+                    runtime = inner_result.info.runtime
+                    battle_data = inner_result.battle_data
+                try:
+                    solution = self.problem.solution_cls.decode(io.output / "solution", max_size, self.role, instance)
+                except EncodingError:
+                    raise
+                except Exception as e:
+                    raise EncodingError("Unexpected error thrown while decoding the solution.", detail=str(e))
+                try:
+                    solution.validate_solution(instance, Role.solver)
+                except ValidationError:
+                    raise
+                except Exception as e:
+                    raise ValidationError("Unexpected error during solution validation.", detail=str(e))
 
-            inner_result = await self._run_inner(
-                io=io,
-                max_size=max_size,
-                specs=specs,
-                battle_input=battle_input,
-                battle_output=battle_output,
-                ui=ui,
-                set_cpus=set_cpus,
+            except Exception as e:
+                exception_info = ExceptionInfo.from_exception(e)
+            return SolverResult(
+                info=ProgramRunInfo(runtime=runtime, overriden=specs.overriden, error=exception_info),
+                battle_data=battle_data,
+                solution=solution,
             )
-            if inner_result.info.error:
-                return SolverResult(info=inner_result.info)
-
-            try:
-                solution = self.problem.solution_cls.decode(io.output / "solution", max_size, self.role, instance)
-            except EncodingError as e:
-                info.error = ExceptionInfo.from_exception(e)
-                return SolverResult(info=info, battle_data=inner_result.battle_data)
-            except Exception as e:
-                info.error = ExceptionInfo.from_exception(
-                    EncodingError("Error thrown while decoding the solution.", detail=str(e))
-                )
-                return SolverResult(info=info, battle_data=inner_result.battle_data)
-            try:
-                solution.validate_solution(instance, Role.solver)
-            except ValidationError as e:
-                info.error = ExceptionInfo.from_exception(e)
-                return SolverResult(info=info, battle_data=inner_result.battle_data, solution=solution)
-            except Exception as e:
-                info.error = ExceptionInfo.from_exception(
-                    ValidationError("Unknown error during solution validation.", detail=str(e))
-                )
-                return SolverResult(info=info, battle_data=inner_result.battle_data, solution=solution)
-            return SolverResult(info=info, battle_data=inner_result.battle_data, solution=solution)
