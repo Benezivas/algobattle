@@ -62,7 +62,7 @@ class TeamInfo(BaseModel):
         tag_name = name.lower().replace(" ", "_") if name_programs else None
         ui.start_build(name, Role.generator, match_config.build_timeout)
         generator = await Generator.build(
-            image=self.generator,
+            path=self.generator,
             problem=problem,
             docker_config=docker_config,
             timeout=match_config.build_timeout,
@@ -75,7 +75,7 @@ class TeamInfo(BaseModel):
         try:
             ui.start_build(name, Role.solver, match_config.build_timeout)
             solver = await Solver.build(
-                image=self.solver,
+                path=self.solver,
                 problem=problem,
                 docker_config=docker_config,
                 timeout=match_config.build_timeout,

@@ -35,11 +35,12 @@ from algobattle.util import (
     ExecutionTimeout,
     RunConfig,
     RunConfigOverride,
+    RunSpecs,
     ValidationError,
     Role,
     BaseModel,
 )
-from algobattle.problem import AnyProblem, Instance, Solution
+from algobattle.problem import AnyProblem, Instance, Problem, Solution
 
 
 AnySolution = Solution[Instance]
@@ -311,217 +312,6 @@ class ProgramIO:
         self._output.__exit__(exc, val, tb)
 
 
-@dataclass
-class Image:
-    """Class defining a docker image.
-
-    Instances may outlive the actual docker images in the daemon!
-    To prevent this don't use the object after calling `.remove()`.
-    """
-
-    id: str
-    path: Path
-    role: Role
-
-    @classmethod
-    def _build_image(
-        cls, path: str, tag: str | None, timeout: float | None, dockerfile: str | None, build_kwargs: dict[str, Any]
-    ) -> DockerImage:
-        image, _logs = cast(
-            tuple[DockerImage, Iterator[Any]],
-            client().images.build(
-                path=str(path),
-                tag=tag,
-                timeout=timeout,
-                dockerfile=dockerfile,
-                **build_kwargs,
-            ),
-        )
-        return image
-
-    @classmethod
-    async def build(
-        cls,
-        path: Path,
-        *,
-        name: str | None = None,
-        timeout: float | None = None,
-        advanced_args: dict[str, Any],
-        max_size: int | None,
-        role: Role,
-    ) -> Self:
-        """Builds a docker image using the dockerfile found at the provided path.
-
-        Args:
-            path: The path to the directory containing a `Dockerfile`, or a path to such a file itself.
-            name: A tag assigned to the docker image, if set to `None` the image will receive no tag.
-            timeout: Timeout for the build process in seconds, or None for no timeout.
-            advanced_args: Advanced args passed to the docker Daemon.
-            max_size: Size limit on the built container in bytes, or None for no limit.
-            role: Role of the program.
-
-        Raises:
-            BuildError: On all errors that are expected to happen during the build process.
-        """
-        if not path.exists():
-            raise RuntimeError
-        if path.is_file():
-            dockerfile = path.name
-            path = path.parent
-        else:
-            dockerfile = None
-        try:
-            if name is not None:
-                try:
-                    old_image = cast(DockerImage, client().images.get(name))
-                except ImageNotFound:
-                    old_image = None
-            else:
-                old_image = None
-            image = await run_sync(
-                cls._build_image,
-                str(path),
-                name,
-                timeout,
-                dockerfile,
-                advanced_args,
-            )
-            if old_image is not None:
-                old_image.reload()
-                if len(old_image.tags) == 0:
-                    old_image.remove(force=True)
-
-        except Timeout as e:
-            raise BuildError("Build ran into a timeout.") from e
-        except DockerBuildError as e:
-            raise BuildError("Build did not complete successfully.", detail=e.msg) from e
-        except APIError as e:
-            raise BuildError("Docker APIError thrown while building.", detail=str(e)) from e
-
-        self = cls(cast(str, image.id), path=path, role=role)
-        used_size = cast(dict[str, Any], image.attrs).get("Size", 0)
-        if max_size is not None and used_size > max_size:
-            try:
-                self.remove()
-            finally:
-                raise BuildError("Built image is too large.", detail=f"Size: {used_size}B, limit: {max_size}B.")
-        return self
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args: Any):
-        self.remove()
-
-    async def run(
-        self,
-        io: ProgramIO | None = None,
-        *,
-        timeout: float | None,
-        space: int | None,
-        cpus: int,
-        run_kwargs: dict[str, Any],
-        set_cpus: str | None,
-        ui: ProgramUi | None = None,
-    ) -> float:
-        """Runs a docker image.
-
-        Args:
-            io: ProgramIO object tracking an input directory with data for the container and one for its output data.
-            timeout: Timeout in seconds.
-            space: Memory limit in bytes.
-            cpus: Number of physical cpus the container can use.
-            set_cpus: Which cpus to execute the container on. Either a comma separated list or a hyphen-separated range.
-                A value of `None` means the container can use any core (but still only `cpus` many of them).
-            ui: Interface to update the ui with new data about the executing program.
-
-        Raises:
-            RuntimeError: If the image does not actually exist in the docker daemon.
-            ExecutionError: If the program does not execute successfully.
-            ExecutionTimeout: If the program times out.
-            DockerError: If there is some kind of error originating from the docker daemon.
-
-        Returns:
-            The runtime of the program.
-        """
-        name = f"algobattle_{uuid4().hex[:8]}"
-
-        container: DockerContainer | None = None
-        elapsed_time = 0
-        try:
-            container = cast(
-                DockerContainer,
-                client().containers.create(
-                    image=self.id,
-                    name=name,
-                    mem_limit=space,
-                    nano_cpus=cpus * 1_000_000_000,
-                    detach=True,
-                    mounts=io.mounts if io else None,
-                    cpuset_cpus=set_cpus,
-                    **run_kwargs,
-                ),
-            )
-
-            if ui is not None:
-                ui.start_program(self.role, timeout)
-            elapsed_time = await run_sync(self._run_container, container, timeout)
-            if ui is not None:
-                ui.stop_program(self.role, elapsed_time)
-
-        except ImageNotFound as e:
-            raise RuntimeError("Image (id: {self.id}) does not exist.") from e
-        except APIError as e:
-            raise DockerError("Docker APIError thrown while running container.", detail=str(e)) from e
-        finally:
-            if container is not None:
-                try:
-                    container.remove(force=True)
-                except APIError as e:
-                    raise DockerError("Couldn't remove container.", detail=str(e)) from e
-
-        return elapsed_time
-
-    def remove(self) -> None:
-        """Removes the image from the docker daemon.
-
-        **This will not cause the python object to be deleted.**
-        Attempting to run the image after it has been removed will cause runtime errors.
-        Will not throw an error if the image has been removed already.
-
-        Raises:
-            DockerError: When removing the image fails.
-        """
-        try:
-            client().images.remove(image=self.id, force=True)
-        except ImageNotFound:
-            pass
-        except APIError as e:
-            raise DockerError("Docker APIError thrown while removing image.", detail=str(e)) from e
-
-    def _run_container(self, container: DockerContainer, timeout: float | None = None) -> float:
-        container.start()
-        start_time = default_timer()
-        elapsed_time = 0
-        try:
-            response = cast(dict[str, Any], container.wait(timeout=timeout))
-            elapsed_time = round(default_timer() - start_time, 2)
-            if response["StatusCode"] == 0:
-                return elapsed_time
-            else:
-                raise ExecutionError(
-                    "The program executed in the container crashed.",
-                    detail=f"exit code: {response['StatusCode']}, error message:\n{container.logs().decode()}",
-                    runtime=elapsed_time,
-                )
-        except (Timeout, ConnectionError) as e:
-            container.kill()
-            elapsed_time = round(default_timer() - start_time, 2)
-            if len(e.args) != 1 or not isinstance(e.args[0], ReadTimeoutError):
-                raise
-            raise ExecutionTimeout("The docker container exceeded the time limit.", runtime=elapsed_time)
-
-
 class ProgramRunInfo(BaseModel):
     """Data about a program's execution."""
 
@@ -553,201 +343,270 @@ class SolverResult(ProgramResult):
     solution: AnySolution | None = None
 
 
-@dataclass
-class _GenResData:
-    problem: Instance
-    solution: AnySolution | None
-
-
 @dataclass(frozen=True)
 class Program(ABC):
     """A higher level interface for a team's programs."""
 
-    image: Image
-    """The underlying docker image."""
-    problem: AnyProblem
+    id: str
+    """The id of the Docker image."""
+    problem: Problem[Instance, Solution[Instance]]
     """The problem this program creates instances and/or solutions for."""
-    docker_config: DockerConfig
-    """Config settings this program will use to run."""
-    strict_timeouts: bool
     config: RunConfig
+    """Config settings this program will use."""
+    strict_timeouts: bool
+    """Wether this program will raise an exception if the container times out."""
+    docker_config: DockerConfig
+    """Advanced config settings this program will use to run."""
 
     role: ClassVar[Role]
+    """Role of this program."""
 
     @classmethod
     async def build(
         cls,
+        path: Path,
         *,
-        image: Path | Image,
-        problem: AnyProblem,
         timeout: float | None = 600,
-        docker_config: DockerConfig = DockerConfig(),
-        strict_timeouts: bool = False,
-        config: RunConfig = RunConfig(),
         max_size: int | None = None,
         team_name: str | None = None,
+        problem: AnyProblem,
+        config: RunConfig = RunConfig(),
+        strict_timeouts: bool = False,
+        docker_config: DockerConfig = DockerConfig(),
     ) -> Self:
         """Creates a program by building the specified docker image.
 
         Args:
-            image: Path to a Dockerfile (or folder containing one) from which to build the image.
-                Or an already built image.
-            problem: Problem this program is solving/generating instances for.
-            docker_config: Docker config that will be used to build and run this program.
-            strict_timeouts: Wether to raise an error if the container times out but produces valid output.
-            config: Run config for this program.
+            path: Path to a Dockerfile (or folder containing one) from which to build the image.
+            timeout: Build timeout.
             max_size: Maximum size of the built image.
             team_name: If set the image will be given a descriptive name.
+            problem: Problem this program is solving/generating instances for.
+            config: Run config for this program.
+            strict_timeouts: Wether to raise an error if the container times out but produces valid output.
+            docker_config: Docker config that will be used to build and run this program.
 
         Returns:
             The built Program.
+
+        Raises:
+            BuildError: If the build fails for any reason.
         """
-        if isinstance(image, Path):
-            if team_name is not None:
-                name = f"algobattle_{team_name}_{cls.role.name}"
-            else:
-                name = None
-            image = await Image.build(
-                path=image,
-                name=name,
-                timeout=timeout,
-                advanced_args=docker_config.build.kwargs,
-                max_size=max_size,
-                role=cls.role,
+        if not path.exists():
+            raise RuntimeError
+        if path.is_file():
+            dockerfile = path.name
+            path = path.parent
+        else:
+            dockerfile = None
+
+        if team_name is not None:
+            name = f"algobattle_{team_name}_{cls.role.name}"
+            try:
+                old_image = cast(DockerImage, client().images.get(name))
+            except ImageNotFound:
+                old_image = None
+        else:
+            name = None
+            old_image = None
+
+        try:
+            image = await run_sync(
+                cls._build_daemon_call,
+                str(path),
+                name,
+                timeout,
+                dockerfile,
+                docker_config.build.kwargs,
             )
+            if old_image is not None:
+                old_image.reload()
+                if len(old_image.tags) == 0:
+                    old_image.remove(force=True)
 
-        return cls(
-            image=image, problem=problem, docker_config=docker_config, strict_timeouts=strict_timeouts, config=config
+        except Timeout as e:
+            raise BuildError("Build ran into a timeout.") from e
+        except DockerBuildError as e:
+            raise BuildError("Build did not complete successfully.", detail=e.msg) from e
+        except APIError as e:
+            raise BuildError("Docker APIError thrown while building.", detail=str(e)) from e
+
+        self = cls(
+            cast(str, image.id),
+            problem=problem,
+            config=config,
+            strict_timeouts=strict_timeouts,
+            docker_config=docker_config,
         )
+        used_size = cast(dict[str, Any], image.attrs).get("Size", 0)
+        if max_size is not None and used_size > max_size:
+            try:
+                self.remove()
+            finally:
+                raise BuildError("Built image is too large.", detail=f"Size: {used_size}B, limit: {max_size}B.")
+        return self
 
-    @abstractmethod
-    def _encode_input(self, input: Path, max_size: int, instance: Instance | None) -> None:
-        """Sets up the i/o folders as required for the specific type of program."""
-        raise NotImplementedError
+    @classmethod
+    def _build_daemon_call(
+        cls, path: str, tag: str | None, timeout: float | None, dockerfile: str | None, build_kwargs: dict[str, Any]
+    ) -> DockerImage:
+        image, _logs = cast(
+            tuple[DockerImage, Iterator[Any]],
+            client().images.build(
+                path=str(path),
+                tag=tag,
+                timeout=timeout,
+                dockerfile=dockerfile,
+                **build_kwargs,
+            ),
+        )
+        return image
 
-    @abstractmethod
-    def _parse_output(self, output: Path, max_size: int, instance: Instance | None) -> _GenResData | AnySolution:
-        """Parses the data in the output folder into problem instances/solutions."""
-        raise NotImplementedError
-
-    async def _run(
+    async def _run_inner(
         self,
         *,
+        io: ProgramIO,
         max_size: int,
-        input_instance: Instance | None,
-        timeout: float | None | EllipsisType,
-        space: int | None | EllipsisType,
-        cpus: int | EllipsisType,
+        specs: RunSpecs,
         battle_input: Encodable | None,
         battle_output: type[Encodable] | None,
         set_cpus: str | None,
         ui: ProgramUi | None,
-    ) -> GeneratorResult | SolverResult:
-        """Execute the program, processing input and output data."""
-        result_class = GeneratorResult if self.role == Role.generator else SolverResult
-        config, overriden = self.config.reify(timeout, space, cpus)
-
-        with ProgramIO() as io:
+    ) -> ProgramResult:
+        """Encodes the metadata, runs the docker container, and decodes battle metadata."""
+        with open(io.input / "info.json", "w+") as f:
+            json.dump(
+                {
+                    "max_size": max_size,
+                    "timeout": specs.timeout,
+                    "space": specs.space,
+                    "cpus": specs.cpus,
+                },
+                f,
+            )
+        if battle_input is not None:
             try:
-                self._encode_input(io.input, max_size, input_instance)
-            except AlgobattleBaseException as e:
-                return result_class(
-                    ProgramRunInfo(overriden=overriden, runtime=0, error=ExceptionInfo.from_exception(e))
-                )
-            with open(io.input / "info.json", "w+") as f:
-                json.dump(
-                    {
-                        "max_size": max_size,
-                        "timeout": config.timeout,
-                        "space": config.space,
-                        "cpus": config.cpus,
-                    },
-                    f,
-                )
-            if battle_input is not None:
-                try:
-                    battle_input.encode(io.input / "battle_data", self.role)
-                except Exception as e:
-                    return result_class(
-                        ProgramRunInfo(
-                            overriden=overriden,
-                            runtime=0,
-                            error=ExceptionInfo(type="EncodingError", message=f"Battle data couldn't be encoded:\n{e}"),
-                        )
-                    )
-
-            try:
-                runtime = await self.image.run(
-                    io,
-                    timeout=config.timeout,
-                    space=config.space,
-                    cpus=config.cpus,
-                    ui=ui,
-                    set_cpus=set_cpus,
-                    run_kwargs=self.docker_config.run.kwargs,
-                )
-            except ExecutionTimeout as e:
-                if self.strict_timeouts:
-                    return result_class(
-                        ProgramRunInfo(overriden=overriden, runtime=e.runtime, error=ExceptionInfo.from_exception(e))
-                    )
-                else:
-                    runtime = e.runtime
-            except ExecutionError as e:
-                return result_class(
+                battle_input.encode(io.input / "battle_data", self.role)
+            except Exception as e:
+                return ProgramResult(
                     ProgramRunInfo(
-                        overriden=overriden,
+                        overriden=specs.overriden,
+                        runtime=0,
+                        error=ExceptionInfo(type="EncodingError", message=f"Battle data couldn't be encoded:\n{e}"),
+                    )
+                )
+
+        runtime = 0
+        try:
+            container = cast(
+                DockerContainer,
+                client().containers.create(
+                    image=self.id,
+                    name=f"algobattle_{uuid4().hex[:8]}",
+                    mem_limit=specs.space,
+                    nano_cpus=specs.cpus * 1_000_000_000,
+                    detach=True,
+                    mounts=io.mounts if io else None,
+                    cpuset_cpus=set_cpus,
+                    **self.docker_config.run.kwargs,
+                ),
+            )
+
+            if ui is not None:
+                ui.start_program(self.role, specs.timeout)
+            try:
+                runtime = await run_sync(self._run_daemon_call, container, specs.timeout)
+            except ExecutionError as e:
+                return ProgramResult(
+                    ProgramRunInfo(
+                        overriden=specs.overriden,
                         runtime=e.runtime,
                         error=ExceptionInfo.from_exception(e),
                     )
                 )
-            except AlgobattleBaseException as e:
-                return result_class(
-                    ProgramRunInfo(
-                        overriden=overriden,
-                        runtime=0,
-                        error=ExceptionInfo.from_exception(e),
-                    )
+            finally:
+                container.remove(force=True)
+                if ui is not None:
+                    ui.stop_program(self.role, runtime)
+        except APIError as e:
+            return ProgramResult(
+                ProgramRunInfo(
+                    overriden=specs.overriden,
+                    runtime=runtime,
+                    error=ExceptionInfo.from_exception(
+                        DockerError("Docker APIError thrown while running container.", detail=str(e))
+                    ),
                 )
+            )
 
+        if battle_output:
             try:
-                output_data = self._parse_output(io.output, max_size, input_instance)
-            except AlgobattleBaseException as e:
-                return result_class(
+                decoded_battle_output = battle_output.decode(io.output / "battle_data", max_size, self.role)
+            except Exception as e:
+                return ProgramResult(
                     ProgramRunInfo(
-                        overriden=overriden,
+                        overriden=specs.overriden,
                         runtime=runtime,
                         error=ExceptionInfo.from_exception(e),
                     )
                 )
-
-            if battle_output:
-                decoded_battle_output = battle_output.decode(io.output / "battle_data", max_size, self.role)
-            else:
-                decoded_battle_output = None
-
-        if isinstance(output_data, _GenResData):
-            return GeneratorResult(
-                ProgramRunInfo(
-                    overriden=overriden,
-                    runtime=runtime,
-                ),
-                battle_data=decoded_battle_output,
-                instance=output_data.problem,
-                solution=output_data.solution,
-            )
         else:
-            return SolverResult(
-                ProgramRunInfo(
-                    overriden=overriden,
-                    runtime=runtime,
-                ),
-                battle_data=decoded_battle_output,
-                solution=output_data,
-            )
+            decoded_battle_output = None
+        return ProgramResult(
+            ProgramRunInfo(overriden=specs.overriden, runtime=runtime), battle_data=decoded_battle_output
+        )
 
-    def remove(self) -> None:  # noqa: D102
-        self.image.remove()
+    def _run_daemon_call(self, container: DockerContainer, timeout: float | None = None) -> float:
+        """Runs the container.
+
+        Returns:
+            The container runtime
+        Raises:
+            ExecutionTimeout: When the container runs into the timeout.
+            ExecutionError: When the process inside the container crashes.
+            DockerException: When the daeomon raises some other error.
+        """
+        # this method has to be a thicker wrapper since we have to kill the container asap, not just when the
+        # async manager gives us back control.
+        container.start()
+        start_time = default_timer()
+        elapsed_time = 0
+        try:
+            response = cast(dict[str, Any], container.wait(timeout=timeout))
+            elapsed_time = round(default_timer() - start_time, 2)
+            if response["StatusCode"] == 0:
+                return elapsed_time
+            else:
+                raise ExecutionError(
+                    "The program executed in the container crashed.",
+                    detail=f"exit code: {response['StatusCode']}, error message:\n{container.logs().decode()}",
+                    runtime=elapsed_time,
+                )
+        except (Timeout, ConnectionError) as e:
+            container.kill()
+            elapsed_time = round(default_timer() - start_time, 2)
+            if len(e.args) != 1 or not isinstance(e.args[0], ReadTimeoutError):
+                raise
+            if self.strict_timeouts:
+                raise ExecutionTimeout("The docker container exceeded the time limit.", runtime=elapsed_time)
+            return elapsed_time
+
+    def remove(self) -> None:
+        """Removes the image from the docker daemon.
+
+        **This will not cause the python object to be deleted.**
+        Attempting to run the image after it has been removed will cause runtime errors.
+        Will not throw an error if the image has been removed already.
+
+        Raises:
+            DockerError: When removing the image fails.
+        """
+        try:
+            client().images.remove(image=self.id, force=True)
+        except ImageNotFound:
+            pass
+        except APIError as e:
+            raise DockerError("Docker APIError thrown while removing image.", detail=str(e)) from e
 
     def __enter__(self):
         return self
@@ -760,45 +619,6 @@ class Generator(Program):
     """A higher level interface for a team's generator."""
 
     role: ClassVar[Role] = Role.generator
-
-    def _encode_input(self, input: Path, max_size: int, instance: Instance | None) -> None:
-        assert instance is None
-        with open(input / "max_size.txt", "w+") as f:
-            f.write(str(max_size))
-
-    def _parse_output(self, output: Path, max_size: int, instance: Instance | None) -> _GenResData:
-        assert instance is None
-        try:
-            instance_ = self.problem.instance_cls.decode(output / "instance", max_size, self.role)
-        except EncodingError:
-            raise
-        except Exception as e:
-            raise EncodingError("Error thrown while decoding the problem instance.", detail=str(e)) from e
-        if instance_.size > max_size:
-            raise EncodingError("Instance is too large.", detail=f"Generated: {instance_.size}, maximum: {max_size}")
-        try:
-            instance_.validate_instance()
-        except ValidationError:
-            raise
-        except Exception as e:
-            raise ValidationError("Unknown error during instance validation.", detail=str(e)) from e
-
-        if self.problem.with_solution:
-            try:
-                solution = self.problem.solution_cls.decode(output / "solution", max_size, self.role)
-            except EncodingError:
-                raise
-            except Exception as e:
-                raise EncodingError("Error thrown while decoding the solution.", detail=str(e)) from e
-            try:
-                solution.validate_solution(instance_, Role.generator)
-            except ValidationError:
-                raise
-            except Exception as e:
-                raise ValidationError("Unknown error during solution validation.", detail=str(e)) from e
-        else:
-            solution = None
-        return _GenResData(instance_, solution)
 
     async def run(
         self,
@@ -827,20 +647,80 @@ class Generator(Program):
         Returns:
             Datastructure containing all info about the generator execution and the created problem instance.
         """
-        return cast(
-            GeneratorResult,
-            await self._run(
+        specs = self.config.reify(timeout, space, cpus)
+        with ProgramIO() as io:
+            with open(io.input / "max_size.txt", "w+") as f:
+                f.write(str(max_size))
+
+            inner_result = await self._run_inner(
+                io=io,
                 max_size=max_size,
-                input_instance=None,
-                timeout=timeout,
-                space=space,
-                cpus=cpus,
+                specs=specs,
                 battle_input=battle_input,
                 battle_output=battle_output,
-                set_cpus=set_cpus,
                 ui=ui,
-            ),
-        )
+                set_cpus=set_cpus,
+            )
+            if inner_result.info.error:
+                return GeneratorResult(info=inner_result.info)
+            info = inner_result.info
+
+            try:
+                instance = self.problem.instance_cls.decode(io.output / "instance", max_size, self.role)
+            except EncodingError as e:
+                info.error = ExceptionInfo.from_exception(e)
+                return GeneratorResult(info=info, battle_data=inner_result.battle_data)
+            except Exception as e:
+                info.error = ExceptionInfo.from_exception(
+                    EncodingError("Error thrown while decoding the problem instance.", detail=str(e))
+                )
+                return GeneratorResult(info=info, battle_data=inner_result.battle_data)
+            if instance.size > max_size:
+                info.error = ExceptionInfo.from_exception(
+                    EncodingError("Instance is too large.", detail=f"Generated: {instance.size}, maximum: {max_size}")
+                )
+                return GeneratorResult(info=info, battle_data=inner_result.battle_data)
+            try:
+                instance.validate_instance()
+            except ValidationError as e:
+                info.error = ExceptionInfo.from_exception(e)
+                return GeneratorResult(info=info, battle_data=inner_result.battle_data, instance=instance)
+            except Exception as e:
+                info.error = ExceptionInfo.from_exception(
+                    ValidationError("Unknown error during instance validation.", detail=str(e))
+                )
+                return GeneratorResult(info=info, battle_data=inner_result.battle_data, instance=instance)
+
+            if self.problem.with_solution:
+                try:
+                    solution = self.problem.solution_cls.decode(io.output / "solution", max_size, self.role)
+                except EncodingError as e:
+                    info.error = ExceptionInfo.from_exception(e)
+                    return GeneratorResult(info=info, battle_data=inner_result.battle_data, instance=instance)
+                except Exception as e:
+                    info.error = ExceptionInfo.from_exception(
+                        EncodingError("Error thrown while decoding the solution.", detail=str(e))
+                    )
+                    return GeneratorResult(info=info, battle_data=inner_result.battle_data, instance=instance)
+                try:
+                    solution.validate_solution(instance, Role.generator)
+                except ValidationError as e:
+                    info.error = ExceptionInfo.from_exception(e)
+                    return GeneratorResult(
+                        info=info, battle_data=inner_result.battle_data, instance=instance, solution=solution
+                    )
+                except Exception as e:
+                    info.error = ExceptionInfo.from_exception(
+                        ValidationError("Unknown error during solution validation.", detail=str(e))
+                    )
+                    return GeneratorResult(
+                        info=info, battle_data=inner_result.battle_data, instance=instance, solution=solution
+                    )
+            else:
+                solution = None
+            return GeneratorResult(
+                info=inner_result.info, battle_data=inner_result.battle_data, instance=instance, solution=solution
+            )
 
 
 class Solver(Program):
@@ -896,17 +776,45 @@ class Solver(Program):
         Returns:
             Datastructure containing all info about the solver execution and the solution it computed.
         """
-        return cast(
-            SolverResult,
-            await self._run(
+        specs = self.config.reify(timeout, space, cpus)
+        info = ProgramRunInfo(runtime=0, overriden=specs.overriden)
+        with ProgramIO() as io:
+            try:
+                instance.encode(io.input / "instance", self.role)
+            except AlgobattleBaseException as e:
+                info.error = ExceptionInfo.from_exception(e)
+                return SolverResult(info=info)
+
+            inner_result = await self._run_inner(
+                io=io,
                 max_size=max_size,
-                input_instance=instance,
-                timeout=timeout,
-                space=space,
-                cpus=cpus,
+                specs=specs,
                 battle_input=battle_input,
                 battle_output=battle_output,
-                set_cpus=set_cpus,
                 ui=ui,
-            ),
-        )
+                set_cpus=set_cpus,
+            )
+            if inner_result.info.error:
+                return SolverResult(info=inner_result.info)
+
+            try:
+                solution = self.problem.solution_cls.decode(io.output / "solution", max_size, self.role, instance)
+            except EncodingError as e:
+                info.error = ExceptionInfo.from_exception(e)
+                return SolverResult(info=info, battle_data=inner_result.battle_data)
+            except Exception as e:
+                info.error = ExceptionInfo.from_exception(
+                    EncodingError("Error thrown while decoding the solution.", detail=str(e))
+                )
+                return SolverResult(info=info, battle_data=inner_result.battle_data)
+            try:
+                solution.validate_solution(instance, Role.solver)
+            except ValidationError as e:
+                info.error = ExceptionInfo.from_exception(e)
+                return SolverResult(info=info, battle_data=inner_result.battle_data, solution=solution)
+            except Exception as e:
+                info.error = ExceptionInfo.from_exception(
+                    ValidationError("Unknown error during solution validation.", detail=str(e))
+                )
+                return SolverResult(info=info, battle_data=inner_result.battle_data, solution=solution)
+            return SolverResult(info=info, battle_data=inner_result.battle_data, solution=solution)

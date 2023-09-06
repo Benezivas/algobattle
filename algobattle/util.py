@@ -450,6 +450,16 @@ class RunConfigOverride(TypedDict, total=False):
     cpus: int
 
 
+@dataclass(frozen=True, slots=True)
+class RunSpecs:
+    """Actual specification of a program run."""
+
+    timeout: float | None
+    space: int | None
+    cpus: int
+    overriden: RunConfigOverride
+
+
 class RunConfig(BaseModel):
     """Parameters determining how a program is run."""
 
@@ -469,7 +479,7 @@ class RunConfig(BaseModel):
         timeout: float | None | EllipsisType,
         space: int | None | EllipsisType,
         cpus: int | EllipsisType,
-    ) -> tuple[Self, RunConfigOverride]:
+    ) -> RunSpecs:
         """Merges the overriden config options with the parsed ones."""
         overriden = RunConfigOverride()
         if timeout is ...:
@@ -484,7 +494,7 @@ class RunConfig(BaseModel):
             cpus = self.cpus
         else:
             overriden["cpus"] = cpus
-        return RunConfig(timeout=timeout, space=space, cpus=cpus), overriden
+        return RunSpecs(timeout=timeout, space=space, cpus=cpus, overriden=overriden)
 
 
 class MatchConfigBase(BaseModel):
