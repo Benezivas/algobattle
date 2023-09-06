@@ -342,6 +342,14 @@ class SolverResult(ProgramResult):
     solution: AnySolution | None = None
 
 
+@dataclass
+class _WrappedException(Exception):
+    """Wraps an inner exception such that we can recover the runtime from outer methods easily."""
+
+    inner: Exception
+    runtime: float
+
+
 @dataclass(frozen=True)
 class Program(ABC):
     """A higher level interface for a team's programs."""
@@ -471,7 +479,7 @@ class Program(ABC):
         battle_output: type[Encodable] | None,
         set_cpus: str | None,
         ui: ProgramUi | None,
-    ) -> ProgramResult:
+    ) -> tuple[float, Encodable | None]:
         """Encodes the metadata, runs the docker container, and decodes battle metadata."""
         with open(io.input / "info.json", "w+") as f:
             json.dump(
@@ -487,13 +495,7 @@ class Program(ABC):
             try:
                 battle_input.encode(io.input / "battle_data", self.role)
             except Exception as e:
-                return ProgramResult(
-                    ProgramRunInfo(
-                        overriden=specs.overriden,
-                        runtime=0,
-                        error=ExceptionInfo(type="EncodingError", message=f"Battle data couldn't be encoded:\n{e}"),
-                    )
-                )
+                raise EncodingError("Battle data couldn't be encoded.", detail=str(e))
 
         runtime = 0
         try:
@@ -516,44 +518,24 @@ class Program(ABC):
             try:
                 runtime = await run_sync(self._run_daemon_call, container, specs.timeout)
             except ExecutionError as e:
-                return ProgramResult(
-                    ProgramRunInfo(
-                        overriden=specs.overriden,
-                        runtime=e.runtime,
-                        error=ExceptionInfo.from_exception(e),
-                    )
-                )
+                raise _WrappedException(e, e.runtime)
             finally:
                 container.remove(force=True)
                 if ui is not None:
                     ui.stop_program(self.role, runtime)
         except APIError as e:
-            return ProgramResult(
-                ProgramRunInfo(
-                    overriden=specs.overriden,
-                    runtime=runtime,
-                    error=ExceptionInfo.from_exception(
-                        DockerError("Docker APIError thrown while running container.", detail=str(e))
-                    ),
-                )
+            raise _WrappedException(
+                DockerError("Docker APIError thrown while running container.", detail=str(e)), runtime
             )
 
         if battle_output:
             try:
                 decoded_battle_output = battle_output.decode(io.output / "battle_data", max_size, self.role)
             except Exception as e:
-                return ProgramResult(
-                    ProgramRunInfo(
-                        overriden=specs.overriden,
-                        runtime=runtime,
-                        error=ExceptionInfo.from_exception(e),
-                    )
-                )
+                raise _WrappedException(e, runtime)
         else:
             decoded_battle_output = None
-        return ProgramResult(
-            ProgramRunInfo(overriden=specs.overriden, runtime=runtime), battle_data=decoded_battle_output
-        )
+        return runtime, decoded_battle_output
 
     def _run_daemon_call(self, container: DockerContainer, timeout: float | None = None) -> float:
         """Runs the container.
@@ -657,7 +639,7 @@ class Generator(Program):
                 with open(io.input / "max_size.txt", "w+") as f:
                     f.write(str(max_size))
 
-                inner_result = await self._run_inner(
+                runtime, battle_data = await self._run_inner(
                     io=io,
                     max_size=max_size,
                     specs=specs,
@@ -666,11 +648,6 @@ class Generator(Program):
                     ui=ui,
                     set_cpus=set_cpus,
                 )
-                if inner_result.info.error:
-                    return GeneratorResult(info=inner_result.info, battle_data=inner_result.battle_data)
-                else:
-                    runtime = inner_result.info.runtime
-                    battle_data = inner_result.battle_data
 
                 try:
                     instance = self.problem.instance_cls.decode(io.output / "instance", max_size, self.role)
@@ -702,6 +679,9 @@ class Generator(Program):
                     except Exception as e:
                         raise ValidationError("Unknown error thrown during solution validation.", detail=str(e))
 
+            except _WrappedException as e:
+                runtime = e.runtime
+                exception_info = ExceptionInfo.from_exception(e.inner)
             except Exception as e:
                 exception_info = ExceptionInfo.from_exception(e)
             return GeneratorResult(
@@ -773,7 +753,7 @@ class Solver(Program):
         with ProgramIO() as io:
             try:
                 instance.encode(io.input / "instance", self.role)
-                inner_result = await self._run_inner(
+                runtime, battle_data = await self._run_inner(
                     io=io,
                     max_size=max_size,
                     specs=specs,
@@ -782,11 +762,6 @@ class Solver(Program):
                     ui=ui,
                     set_cpus=set_cpus,
                 )
-                if inner_result.info.error:
-                    return SolverResult(info=inner_result.info, battle_data=inner_result.battle_data)
-                else:
-                    runtime = inner_result.info.runtime
-                    battle_data = inner_result.battle_data
                 try:
                     solution = self.problem.solution_cls.decode(io.output / "solution", max_size, self.role, instance)
                 except EncodingError:
@@ -800,6 +775,9 @@ class Solver(Program):
                 except Exception as e:
                     raise ValidationError("Unexpected error during solution validation.", detail=str(e))
 
+            except _WrappedException as e:
+                runtime = e.runtime
+                exception_info = ExceptionInfo.from_exception(e.inner)
             except Exception as e:
                 exception_info = ExceptionInfo.from_exception(e)
             return SolverResult(
