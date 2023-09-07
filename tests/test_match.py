@@ -173,6 +173,10 @@ class Execution(IsolatedAsyncioTestCase):
         for res_dict in res.results.values():
             for result in res_dict.values():
                 self.assertIsNone(result.run_exception)
+                for fight in result.fights:
+                    self.assertIsNone(fight.generator.error)
+                    assert fight.solver is not None
+                    self.assertIsNone(fight.solver.error)
 
     async def test_multi_team(self):
         team0 = TeamInfo(generator=self.generator, solver=self.solver)
@@ -182,6 +186,10 @@ class Execution(IsolatedAsyncioTestCase):
         for res_dict in res.results.values():
             for result in res_dict.values():
                 self.assertIsNone(result.run_exception)
+                for fight in result.fights:
+                    self.assertIsNone(fight.generator.error)
+                    assert fight.solver is not None
+                    self.assertIsNone(fight.solver.error)
 
     async def test_averaged(self):
         self.config_avg.teams = {"team_0": TeamInfo(generator=self.generator, solver=self.solver)}
@@ -189,6 +197,10 @@ class Execution(IsolatedAsyncioTestCase):
         for res_dict in res.results.values():
             for result in res_dict.values():
                 self.assertIsNone(result.run_exception)
+                for fight in result.fights:
+                    self.assertIsNone(fight.generator.error)
+                    assert fight.solver is not None
+                    self.assertIsNone(fight.solver.error)
 
 
 class Parsing(TestCase):
