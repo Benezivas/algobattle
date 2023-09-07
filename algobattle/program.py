@@ -1,16 +1,19 @@
 """Module providing an interface to interact with the teams' programs."""
 from abc import ABC, abstractmethod
+from contextlib import contextmanager
 from functools import cached_property
 from os import environ
 from pathlib import Path
+from tarfile import TarFile, is_tarfile
 from tempfile import TemporaryDirectory
 from timeit import default_timer
 from types import EllipsisType
-from typing import Any, ClassVar, Iterator, Protocol, Self, TypeVar, cast
+from typing import Any, ClassVar, Iterator, Protocol, Self, TypeVar, cast, Generator as PyGenerator
 from typing_extensions import TypedDict
 from uuid import uuid4
 import json
 from dataclasses import dataclass
+from zipfile import ZipFile, is_zipfile
 
 from docker import DockerClient
 from docker.errors import APIError, BuildError as DockerBuildError, DockerException, ImageNotFound
@@ -369,6 +372,32 @@ class Program(ABC):
     """Role of this program."""
 
     @classmethod
+    @contextmanager
+    def _setup_docker_env(cls, source: Path) -> PyGenerator[tuple[Path, str | None], None, None]:
+        """Creates a folder containing the actual docker environment used to build a program."""
+        if not source.exists():
+            raise ValueError
+        if source.is_dir():
+            yield source, None
+            return
+        if source.name == "Dockerfile" or source.suffix == ".dockerfile":
+            yield source.parent, source.name
+            return
+
+        with TemporaryDirectory() as build_folder:
+            build_folder = Path(build_folder)
+            if is_zipfile(source):
+                with ZipFile(source, "r") as f:
+                    f.extractall(build_folder)
+            elif is_tarfile(source):
+                with TarFile(source, "r") as f:
+                    f.extractall(build_folder)
+            else:
+                raise ValueError(f"The file {source} is not recognisable as a dockerfile.")
+
+            yield build_folder, None
+
+    @classmethod
     async def build(
         cls,
         path: Path,
@@ -399,14 +428,6 @@ class Program(ABC):
         Raises:
             BuildError: If the build fails for any reason.
         """
-        if not path.exists():
-            raise RuntimeError
-        if path.is_file():
-            dockerfile = path.name
-            path = path.parent
-        else:
-            dockerfile = None
-
         if team_name is not None:
             name = f"algobattle_{team_name}_{cls.role.name}"
             try:
@@ -417,26 +438,27 @@ class Program(ABC):
             name = None
             old_image = None
 
-        try:
-            image = await run_sync(
-                cls._build_daemon_call,
-                str(path),
-                name,
-                timeout,
-                dockerfile,
-                docker_config.build.kwargs,
-            )
-            if old_image is not None:
-                old_image.reload()
-                if len(old_image.tags) == 0:
-                    old_image.remove(force=True)
+        with cls._setup_docker_env(path) as (path, dockerfile):
+            try:
+                image = await run_sync(
+                    cls._build_daemon_call,
+                    str(path),
+                    name,
+                    timeout,
+                    dockerfile,
+                    docker_config.build.kwargs,
+                )
+                if old_image is not None:
+                    old_image.reload()
+                    if len(old_image.tags) == 0:
+                        old_image.remove(force=True)
 
-        except Timeout as e:
-            raise BuildError("Build ran into a timeout.") from e
-        except DockerBuildError as e:
-            raise BuildError("Build did not complete successfully.", detail=e.msg) from e
-        except APIError as e:
-            raise BuildError("Docker APIError thrown while building.", detail=str(e)) from e
+            except Timeout as e:
+                raise BuildError("Build ran into a timeout.") from e
+            except DockerBuildError as e:
+                raise BuildError("Build did not complete successfully.", detail=e.msg) from e
+            except APIError as e:
+                raise BuildError("Docker APIError thrown while building.", detail=str(e)) from e
 
         self = cls(
             cast(str, image.id),
