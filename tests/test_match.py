@@ -221,10 +221,10 @@ class Parsing(TestCase):
 
     def test_empty_cfg(self):
         with self.assertRaises(ValidationError):
-            BaseConfig.from_file(self.problem_path / "empty.toml")
+            BaseConfig.from_file(self.configs_path / "empty.toml")
 
     def test_cfg(self):
-        cfg = BaseConfig.from_file(self.problem_path / "test.toml")
+        cfg = BaseConfig.from_file(self.configs_path / "test.toml")
         self.assertEqual(
             cfg,
             BaseConfig(
@@ -241,7 +241,7 @@ class Parsing(TestCase):
         )
 
     def test_cfg_team(self):
-        cfg = BaseConfig.from_file(self.problem_path / "teams.toml")
+        cfg = BaseConfig.from_file(self.configs_path / "teams.toml")
         self.assertEqual(
             cfg,
             BaseConfig(
@@ -257,7 +257,7 @@ class Parsing(TestCase):
 
     def test_cfg_team_no_name(self):
         with self.assertRaises(ValueError):
-            BaseConfig.from_file(self.problem_path / "teams_incorrect.toml")
+            BaseConfig.from_file(self.configs_path / "teams_incorrect.toml")
 
 
 if __name__ == "__main__":
