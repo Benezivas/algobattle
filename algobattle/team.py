@@ -2,7 +2,7 @@
 from abc import abstractmethod
 from dataclasses import dataclass, field
 from itertools import combinations
-from typing import Annotated, Any, Iterator, Protocol, Self, TypeAlias
+from typing import Annotated, Any, Iterable, Iterator, Protocol, Self, TypeAlias
 
 from pydantic import BaseModel, Field
 
@@ -18,11 +18,15 @@ class BuildUi(Protocol):
     """Provides and interface for the build process to update the ui."""
 
     @abstractmethod
-    def start_build(self, team: str, role: Role, timeout: float | None) -> None:
+    def start_build_step(self, teams: Iterable[str], timeout: float | None) -> None:
+        """Tells the ui that the build process has started."""
+
+    @abstractmethod
+    def start_build(self, team: str, role: Role) -> None:
         """Informs the ui that a new program is being built."""
 
     @abstractmethod
-    def finish_build(self) -> None:
+    def finish_build(self, team: str, success: bool) -> None:
         """Informs the ui that the current build has been finished."""
 
 
@@ -60,7 +64,7 @@ class TeamInfo(BaseModel):
         if name in _team_names:
             raise ValueError
         tag_name = name.lower().replace(" ", "_") if name_programs else None
-        ui.start_build(name, Role.generator, match_config.build_timeout)
+        ui.start_build(name, Role.generator)
         generator = await Generator.build(
             path=self.generator,
             problem=problem,
@@ -71,9 +75,8 @@ class TeamInfo(BaseModel):
             max_size=match_config.image_size,
             team_name=tag_name,
         )
-        ui.finish_build()
         try:
-            ui.start_build(name, Role.solver, match_config.build_timeout)
+            ui.start_build(name, Role.solver)
             solver = await Solver.build(
                 path=self.solver,
                 problem=problem,
@@ -84,7 +87,6 @@ class TeamInfo(BaseModel):
                 max_size=match_config.image_size,
                 team_name=tag_name,
             )
-            ui.finish_build()
         except Exception:
             generator.remove()
             raise
@@ -153,6 +155,9 @@ class Matchup:
     def __repr__(self) -> str:
         return f"Matchup({self.generator.name}, {self.solver.name})"
 
+    def __str__(self) -> str:
+        return f"{self.generator.name} vs {self.solver.name}"
+
 
 @dataclass
 class TeamHandler:
@@ -187,12 +192,16 @@ class TeamHandler:
             :class:`TeamHandler` containing the info about the participating teams.
         """
         handler = cls(cleanup=mode == "tournament")
+        ui.start_build_step(infos.keys(), match_config.build_timeout)
         for name, info in infos.items():
             try:
                 team = await info.build(name, problem, match_config, docker_config, mode == "testing", ui)
                 handler.active.append(team)
             except Exception as e:
                 handler.excluded[name] = ExceptionInfo.from_exception(e)
+                ui.finish_build(name, False)
+            else:
+                ui.finish_build(name, True)
         return handler
 
     def __enter__(self) -> Self:

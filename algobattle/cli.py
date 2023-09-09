@@ -2,344 +2,342 @@
 
 Provides a command line interface to start matches and observe them. See `battle --help` for further options.
 """
-from argparse import ArgumentParser
-from types import TracebackType
-import curses
-from dataclasses import dataclass, field
-import sys
+from contextlib import ExitStack
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, ParamSpec, Self, TypeVar
+from typing import Annotated, Any, Iterable, Literal, Optional, Self, cast
+from typing_extensions import override
 from importlib.metadata import version as pkg_version
 
-from prettytable import DOUBLE_BORDER, PrettyTable
-from anyio import create_task_group, run, sleep
-from anyio.abc import TaskGroup
+from anyio import run as run_async_fn
+from typer import Typer, Argument, Option
+from rich.console import Group, RenderableType, Console
+from rich.live import Live
+from rich.table import Table, Column
+from rich.progress import (
+    Progress,
+    TextColumn,
+    SpinnerColumn,
+    BarColumn,
+    MofNCompleteColumn,
+    TimeElapsedColumn,
+    TaskID,
+    ProgressColumn,
+    Task,
+)
+from rich.panel import Panel
+from rich.text import Text
+from rich.columns import Columns
 
-from algobattle.battle import Battle, Fight
+from algobattle.battle import Battle
 from algobattle.match import BaseConfig, Match, Ui
-from algobattle.problem import AnyProblem, Problem
+from algobattle.problem import Problem
 from algobattle.team import Matchup
-from algobattle.util import Role, RunningTimer, flat_intersperse
+from algobattle.util import Role, RunningTimer
 
 
-@dataclass
-class CliOptions:
-    """Options used by the cli."""
-
-    problem: AnyProblem
-    silent: bool = False
-    result: Path | None = None
+__all__ = ("app",)
 
 
-def parse_cli_args(args: list[str]) -> tuple[CliOptions, BaseConfig]:
-    """Parse a given CLI arg list into config objects."""
-    parser = ArgumentParser()
-    parser.add_argument(
-        "path",
-        type=Path,
-        help="Path to either a config file or a directory containing one and/or the other necessary files.",
-    )
-    parser.add_argument("--silent", "-s", action="store_true", help="Disable the cli Ui.")
-    parser.add_argument(
-        "--result", "-r", type=Path, help="If set, the match result object will be saved to the specified file."
-    )
+app = Typer(pretty_exceptions_show_locals=False)
+console = Console()
 
-    parsed = parser.parse_args(args)
-    path: Path = parsed.path
-    if not path.exists():
-        raise ValueError("Passed path does not exist.")
+
+@app.command()
+def run(
+    path: Annotated[Path, Argument(exists=True, help="Path to either a config file or a directory containing one.")],
+    ui: Annotated[bool, Option(help="Whether to show the CLI UI during match execution.")] = True,
+    result_path: Annotated[
+        Optional[Path],  # typer doesn't support union syntax
+        Option(
+            "--result",
+            "-r",
+            exists=True,
+            dir_okay=True,
+            file_okay=False,
+            writable=True,
+            help="If set, the match result object will be saved in the folder.",
+        ),
+    ] = None,
+) -> Match:
     if path.is_dir():
         path /= "config.toml"
 
     config = BaseConfig.from_file(path)
     problem = Problem.get(config.match.problem)
 
-    exec_config = CliOptions(
-        problem=problem,
-        silent=parsed.silent,
-        result=parsed.result,
-    )
-
-    return exec_config, config
-
-
-async def _run_with_ui(
-    match_config: BaseConfig,
-    problem: AnyProblem,
-) -> Match:
-    async with CliUi() as ui:
-        return await Match.run(match_config, problem, ui)
-
-
-def main():
-    """Entrypoint of `algobattle` CLI."""
     try:
-        exec_config, config = parse_cli_args(sys.argv[1:])
+        result = None
+        with ExitStack() as stack:
+            if ui:
+                ui_obj = stack.enter_context(CliUi())
+            else:
+                ui_obj = None
+            result = run_async_fn(Match.run, config, problem, ui_obj)
+        assert result is not None
 
-        if exec_config.silent:
-            result = run(Match.run, config, exec_config.problem)
-        else:
-            result = run(_run_with_ui, config, exec_config.problem)
-        print("\n".join(CliUi.display_match(result)))
-
+        console.print(CliUi.display_match(result))
         if config.execution.points > 0:
             points = result.calculate_points(config.execution.points)
             for team, pts in points.items():
                 print(f"Team {team} gained {pts:.1f} points.")
 
-        if exec_config.result is not None:
+        if result_path is not None:
             t = datetime.now()
             filename = f"{t.year:04d}-{t.month:02d}-{t.day:02d}_{t.hour:02d}-{t.minute:02d}-{t.second:02d}.json"
-            with open(exec_config.result / filename, "w+") as f:
+            with open(result_path / filename, "w+") as f:
                 f.write(result.model_dump_json(exclude_defaults=True))
+        return result
 
     except KeyboardInterrupt:
         raise SystemExit("Received keyboard interrupt, terminating execution.")
 
 
-P = ParamSpec("P")
-R = TypeVar("R")
+@dataclass
+class _BuildState:
+    overall_progress: Progress
+    overall_task: TaskID
+    team_progress: Progress
+    team_tasks: dict[str, TaskID]
+    group: Group
 
 
-def check_for_terminal(function: Callable[P, R]) -> Callable[P, R | None]:
-    """Ensure that we are attached to a terminal."""
+class TimerTotalColumn(ProgressColumn):
+    """Renders time elapsed."""
 
-    def wrapper(*args: P.args, **kwargs: P.kwargs):
-        if not sys.stdout.isatty():
-            return None
+    def render(self, task: Task) -> Text:
+        """Show time elapsed."""
+        if not task.started:
+            return Text("")
+        elapsed = task.finished_time if task.finished else task.elapsed
+        total = f" / {task.fields['total_time']}" if "total_time" in task.fields else ""
+        current = f"{elapsed:.1f}" if elapsed is not None else ""
+        return Text(current + total, style="progress.elapsed")
+
+
+class LazySpinnerColumn(SpinnerColumn):
+    """Spinner that only starts once the task starts."""
+
+    @override
+    def render(self, task: Task) -> RenderableType:
+        if not task.started:
+            return " "
+        return super().render(task)
+
+
+class FightPanel(Panel):
+    """Panel displaying a currently running fight."""
+
+    def __init__(self, max_size: int) -> None:
+        self.max_size = max_size
+        self.progress = Progress(
+            TextColumn("[progress.description]{task.description}"),
+            LazySpinnerColumn(),
+            TimerTotalColumn(),
+            TextColumn("{task.fields[message]}"),
+            transient=True,
+        )
+        self.generator = self.progress.add_task("Generator", start=False, total=1, message="")
+        self.solver = self.progress.add_task("Solver", start=False, total=1, message="")
+        super().__init__(self.progress, title="Current Fight", width=35)
+
+
+class BattlePanel(Panel):
+    """Panel that displays the state of a battle."""
+
+    def __init__(self, matchup: Matchup) -> None:
+        self.matchup = matchup
+        self._battle_data: RenderableType = ""
+        self._curr_fight: FightPanel | Literal[""] = ""
+        self._past_fights = self._fights_table()
+        super().__init__(self._make_renderable(), title=f"Battle {self.matchup}")
+
+    def _make_renderable(self) -> RenderableType:
+        return Group(
+            Columns((self._battle_data, self._curr_fight), expand=True, equal=True, column_first=True, align="center"),
+            self._past_fights,
+        )
+
+    @property
+    def battle_data(self) -> RenderableType:
+        return self._battle_data
+
+    @battle_data.setter
+    def battle_data(self, value: RenderableType) -> None:
+        self._battle_data = value
+        self.renderable = self._make_renderable()
+
+    @property
+    def curr_fight(self) -> FightPanel | Literal[""]:
+        return self._curr_fight
+
+    @curr_fight.setter
+    def curr_fight(self, value: FightPanel | Literal[""]) -> None:
+        self._curr_fight = value
+        self.renderable = self._make_renderable()
+
+    @property
+    def past_fights(self) -> Table:
+        return self._past_fights
+
+    @past_fights.setter
+    def past_fights(self, value: Table) -> None:
+        self._past_fights = value
+        self.renderable = self._make_renderable()
+
+    def _fights_table(self) -> Table:
+        return Table(
+            Column("Fight", justify="right"),
+            Column("Max size", justify="right"),
+            Column("Score", justify="right"),
+            "Detail",
+            title="Most recent fights",
+        )
+
+
+class CliUi(Live, Ui):
+    """Ui that uses rich to draw to the console."""
+
+    def __init__(self) -> None:
+        self.match = None
+        self.build: _BuildState | None = None
+        self.battle_panels: dict[Matchup, BattlePanel] = {}
+        super().__init__(None, refresh_per_second=10, transient=False)
+
+    def __enter__(self) -> Self:
+        return cast(Self, super().__enter__())
+
+    def _update_renderable(self) -> None:
+        if self.build:
+            r = self.build.group
         else:
-            return function(*args, **kwargs)
-
-    return wrapper
-
-
-@dataclass
-class _BuildInfo:
-    team: str
-    role: Role
-    timeout: float | None
-    start: datetime
-
-
-@dataclass
-class _FightUiData:
-    max_size: int
-    generator: RunningTimer | None = None
-    gen_runtime: float | None = None
-    solver: RunningTimer | None = None
-    sol_runtime: float | None = None
-
-
-@dataclass
-class CliUi(Ui):
-    """A :class:`Ui` displaying the data to the cli.
-
-    Uses curses to continually draw a basic text based ui to the terminal.
-    """
-
-    battle_data: dict[Matchup, Battle.UiData] = field(default_factory=dict, init=False)
-    fight_data: dict[Matchup, _FightUiData] = field(default_factory=dict, init=False)
-    task_group: TaskGroup | None = field(default=None, init=False)
-    build_status: _BuildInfo | str | None = field(default=None, init=False)
-
-    async def __aenter__(self) -> Self:
-        self.stdscr = curses.initscr()
-        curses.cbreak()
-        curses.noecho()
-        self.stdscr.keypad(True)
-
-        self.task_group = create_task_group()
-        await self.task_group.__aenter__()
-        self.task_group.start_soon(self.loop)
-
-        return self
-
-    async def __aexit__(self, _type: type[Exception], _value: Exception, _traceback: TracebackType) -> None:
-        """Restore the console."""
-        if self.task_group is not None:
-            self.task_group.cancel_scope.cancel()
-            await self.task_group.__aexit__(_type, _value, _traceback)
-
-        curses.nocbreak()
-        self.stdscr.keypad(False)
-        curses.echo()
-        curses.endwin()
-
-    def start_build(self, team: str, role: Role, timeout: float | None) -> None:
-        """Informs the ui that a new program is being built."""
-        self.build_status = _BuildInfo(team, role, timeout, datetime.now())
-
-    def finish_build(self) -> None:
-        """Informs the ui that the current build has been finished."""
-        self.build_status = None
-
-    @check_for_terminal
-    def battle_completed(self, matchup: Matchup) -> None:
-        """Notifies the Ui that a specific battle has been completed."""
-        self.battle_data.pop(matchup, None)
-        self.fight_data.pop(matchup, None)
-        super().battle_completed(matchup)
-
-    def update_battle_data(self, matchup: Matchup, data: Battle.UiData) -> None:
-        """Passes new custom battle data to the Ui."""
-        self.battle_data[matchup] = data
-
-    def start_fight(self, matchup: Matchup, max_size: int) -> None:
-        """Informs the Ui of a newly started fight."""
-        self.fight_data[matchup] = _FightUiData(max_size)
-
-    def end_fight(self, matchup: Matchup) -> None:  # noqa: D102
-        del self.fight_data[matchup]
-
-    def start_program(self, matchup: Matchup, role: Role, data: RunningTimer) -> None:  # noqa: D102
-        match role:
-            case Role.generator:
-                self.fight_data[matchup].generator = data
-            case Role.solver:
-                self.fight_data[matchup].solver = data
-
-    def end_program(self, matchup: Matchup, role: Role, runtime: float) -> None:  # noqa: D102
-        match role:
-            case Role.generator:
-                self.fight_data[matchup].gen_runtime = runtime
-            case Role.solver:
-                self.fight_data[matchup].sol_runtime = runtime
-
-    async def loop(self) -> None:
-        """Periodically updates the Ui with the current match info."""
-        while True:
-            self.update()
-            await sleep(0.1)
-
-    @check_for_terminal
-    def update(self) -> None:
-        """Disaplys the current status of the match to the cli."""
-        terminal_height, _ = self.stdscr.getmaxyx()
-        out: list[str] = []
-        out.append(f"Algobattle version {pkg_version('algobattle_base')}")
-        status = self.build_status
-        if isinstance(status, str):
-            out.append(status)
-        elif isinstance(status, _BuildInfo):
-            runtime = (datetime.now() - status.start).total_seconds()
-            status_str = f"Building {status.role.name} of team {status.team}: {runtime:3.1f}s"
-            if status.timeout is not None:
-                status_str += f" / {status.timeout:3.1f}s"
-            out.append(status_str)
-
-        if self.match is not None:
-            out += self.display_match(self.match)
-        for matchup in self.active_battles:
-            out += [
-                "",
-            ] + self.display_battle(matchup)
-
-        if len(out) > terminal_height:
-            out = out[:terminal_height]
-        self.stdscr.clear()
-        self.stdscr.addstr(0, 0, "\n".join(out))
-        self.stdscr.refresh()
-        self.stdscr.nodelay(True)
-
-        # on windows curses swallows the ctrl+C event, we need to manually check for the control sequence
-        c = self.stdscr.getch()
-        if c == 3:
-            raise KeyboardInterrupt
-        else:
-            curses.flushinp()
+            assert self.match is not None
+            r = Group(self.display_match(self.match), *self.battle_panels.values())
+        self.update(Panel(r, title=f"[orange1]Algobattle {pkg_version('algobattle_base')}"))
 
     @staticmethod
-    def display_match(match: Match) -> list[str]:
+    def display_match(match: Match) -> RenderableType:
         """Formats the match data into a table that can be printed to the terminal."""
-        table = PrettyTable(field_names=["Generator", "Solver", "Result"], min_width=5)
-        table.set_style(DOUBLE_BORDER)
-        table.align["Result"] = "r"
-
+        table = Table(
+            Column("Generating", justify="center"),
+            Column("Solving", justify="center"),
+            Column("Result", justify="right"),
+            title="[blue]Match overview",
+        )
         for generating, battles in match.results.items():
             for solving, result in battles.items():
                 if result.run_exception is None:
                     res = result.format_score(result.score())
                 else:
-                    res = "Error!"
-                table.add_row([generating, solving, res])
+                    res = ":warning:"
+                table.add_row(generating, solving, res)
+        return table
 
-        return str(table).split("\n")
+    @override
+    def start_build_step(self, teams: Iterable[str], timeout: float | None) -> None:
+        team_dict: dict[str, Any] = {t: "none" for t in teams}
+        overall_progress = Progress(
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            MofNCompleteColumn(),
+            transient=True,
+        )
+        team_progress = Progress(
+            TextColumn("[cyan]{task.fields[name]}"),
+            TimeElapsedColumn(),
+            SpinnerColumn(),
+            TextColumn("{task.fields[failed]}"),
+        )
+        group = Group(overall_progress, team_progress)
+        overall = overall_progress.add_task("[blue]Building team programs", total=len(team_dict))
 
-    @staticmethod
-    def display_program(role: Role, timer: RunningTimer | None, runtime: float | None) -> str:
-        """Formats program runtime data."""
-        role_str = role.name.capitalize() + ": "
-        out = f"{role_str: <11}"
+        team_tasks = {}
+        for team in team_dict:
+            team_tasks[team] = team_progress.add_task(team, start=False, total=3, failed="", name=team)
 
-        if timer is None:
-            return out
+        self.build = _BuildState(overall_progress, overall, team_progress, team_tasks, group)
+        self._update_renderable()
 
-        if runtime is None:
-            # currently running fight
-            runtime = (datetime.now() - timer.start).total_seconds()
-            state_glyph = "…"
-        else:
-            runtime = runtime
-            state_glyph = "✓"
+    @override
+    def start_build(self, team: str, role: Role) -> None:
+        if self.build is not None:
+            task = self.build.team_tasks[team]
+            self.build.team_progress.start_task(task)
+            self.build.team_progress.advance(task)
 
-        out += f"{runtime:3.1f}s"
-        if timer.timeout is None:
-            out += "         "  # same length padding as timeout info string
-        else:
-            out += f" / {timer.timeout:3.1f}s"
+    @override
+    def finish_build(self, team: str, success: bool) -> None:
+        if self.build is not None:
+            task = self.build.team_tasks[team]
+            self.build.team_progress.update(task, completed=3, failed="" if success else ":warning:")
+            self.build.overall_progress.advance(self.build.overall_task)
 
-        out += f" {state_glyph}"
-        return out
+    @override
+    def start_battles(self) -> None:
+        self.build = None
+        self._update_renderable()
 
-    @staticmethod
-    def display_current_fight(fight: _FightUiData) -> list[str]:
-        """Formats the current fight of a battle into a compact overview."""
-        return [
-            f"Current fight at size {fight.max_size}:",
-            CliUi.display_program(Role.generator, fight.generator, fight.gen_runtime),
-            CliUi.display_program(Role.solver, fight.solver, fight.sol_runtime),
-        ]
+    @override
+    def start_battle(self, matchup: Matchup) -> None:
+        self.battle_panels[matchup] = BattlePanel(matchup)
+        self._update_renderable()
 
-    @staticmethod
-    def display_fight(fight: Fight, index: int) -> str:
-        """Formats a completed fight into a compact overview."""
-        if fight.generator.error is not None:
-            exec_info = ", generator failed!"
-        elif fight.solver is not None and fight.solver.error is not None:
-            exec_info = ", solver failed!"
-        else:
-            exec_info = ""
-        return f"Fight {index} at size {fight.max_size}: {fight.score}{exec_info}"
+    @override
+    def battle_completed(self, matchup: Matchup) -> None:
+        del self.battle_panels[matchup]
+        self._update_renderable()
 
-    def display_battle(self, matchup: Matchup) -> list[str]:
-        """Formats the battle data into a string that can be printed to the terminal."""
-        if self.match is None:
-            return []
-        battle = self.match.results[matchup.generator.name][matchup.solver.name]
-        fights = battle.fights[-3:] if len(battle.fights) >= 3 else battle.fights
-        sections: list[list[str]] = []
+    @override
+    def start_fight(self, matchup: Matchup, max_size: int) -> None:
+        self.battle_panels[matchup].curr_fight = FightPanel(max_size)
 
-        if matchup in self.battle_data:
-            sections.append([f"{key}: {val}" for key, val in self.battle_data[matchup].model_dump().items()])
+    @override
+    def end_fight(self, matchup: Matchup) -> None:
+        assert self.match is not None
+        battle = self.match.battle(matchup)
+        assert battle is not None
+        fights = battle.fights[-1:-6:-1]
+        panel = self.battle_panels[matchup]
+        table = panel._fights_table()
+        for i, fight in zip(range(len(battle.fights), len(battle.fights) - len(fights), -1), fights):
+            if fight.generator.error:
+                info = f"Generator failed: {fight.generator.error.message}"
+            elif fight.solver and fight.solver.error:
+                info = f"Solver failed: {fight.solver.error.message}"
+            else:
+                info = ""
+            table.add_row(str(i), str(fight.max_size), f"{fight.score:.1%}", info)
+        panel.past_fights = table
 
-        if matchup in self.fight_data:
-            sections.append(self.display_current_fight(self.fight_data[matchup]))
+    @override
+    def start_program(self, matchup: Matchup, role: Role, data: RunningTimer) -> None:
+        fight = self.battle_panels[matchup].curr_fight
+        assert fight != ""
+        match role:
+            case Role.generator:
+                fight.progress.update(fight.generator, total_time=data.timeout)
+                fight.progress.start_task(fight.generator)
+            case Role.solver:
+                fight.progress.update(fight.solver, total_time=data.timeout)
+                fight.progress.start_task(fight.solver)
 
-        if fights:
-            fight_history: list[str] = []
-            for i, fight in enumerate(fights, max(len(battle.fights) - 2, 1)):
-                fight_history.append(self.display_fight(fight, i))
-            fight_display = [
-                "Most recent fight results:",
-            ] + fight_history[::-1]
-            sections.append(fight_display)
+    @override
+    def end_program(self, matchup: Matchup, role: Role, runtime: float) -> None:
+        fight = self.battle_panels[matchup].curr_fight
+        assert fight != ""
+        match role:
+            case Role.generator:
+                fight.progress.update(fight.generator, completed=1, message=":heavy_check_mark:")
+            case Role.solver:
+                fight.progress.update(fight.solver, completed=1)
 
-        combined_sections = list(flat_intersperse(sections, ""))
-        return [
-            f"Battle {matchup.generator.name} vs {matchup.solver.name}:",
-        ] + combined_sections
+    @override
+    def update_battle_data(self, matchup: Matchup, data: Battle.UiData) -> None:
+        self.battle_panels[matchup].battle_data = Group(
+            "[green]Battle Data:", *(f"[orchid]{key}[/]: [cyan]{value}" for key, value in data.model_dump().items())
+        )
 
 
 if __name__ == "__main__":
-    main()
+    app(prog_name="algobattle")

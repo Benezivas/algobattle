@@ -6,7 +6,6 @@ from pathlib import Path
 
 from pydantic import ByteSize, ValidationError
 
-from algobattle.cli import parse_cli_args
 from algobattle.battle import Fight, Iterated, Averaged
 from algobattle.match import BaseConfig, Match, MatchConfig
 from algobattle.team import Team, Matchup, TeamHandler, TeamInfo
@@ -214,15 +213,15 @@ class Parsing(TestCase):
         cls.teams = {"team_0": TeamInfo(generator=cls.problem_path / "generator", solver=cls.problem_path / "solver")}
 
     def test_no_cfg_default(self):
-        _, cfg = parse_cli_args([str(self.problem_path)])
+        cfg = BaseConfig.from_file(self.problem_path)
         self.assertEqual(cfg, BaseConfig(teams=self.teams, match=MatchConfig(problem=self.problem_path / "problem.py")))
 
     def test_empty_cfg(self):
         with self.assertRaises(ValidationError):
-            parse_cli_args([str(self.configs_path / "empty.toml")])
+            BaseConfig.from_file(self.problem_path / "empty.toml")
 
     def test_cfg(self):
-        _, cfg = parse_cli_args([str(self.configs_path / "test.toml")])
+        cfg = BaseConfig.from_file(self.problem_path / "test.toml")
         self.assertEqual(
             cfg,
             BaseConfig(
@@ -238,16 +237,8 @@ class Parsing(TestCase):
             ),
         )
 
-    def test_cli(self):
-        exec_config, _ = parse_cli_args([str(self.problem_path), "-s"])
-        self.assertTrue(exec_config.silent)
-
-    def test_cli_no_problem_path(self):
-        with self.assertRaises(SystemExit):
-            parse_cli_args([])
-
     def test_cfg_team(self):
-        _, cfg = parse_cli_args([str(self.configs_path / "teams.toml")])
+        cfg = BaseConfig.from_file(self.problem_path / "teams.toml")
         self.assertEqual(
             cfg,
             BaseConfig(
@@ -263,7 +254,7 @@ class Parsing(TestCase):
 
     def test_cfg_team_no_name(self):
         with self.assertRaises(ValueError):
-            parse_cli_args([str(self.configs_path / "teams_incorrect.toml")])
+            BaseConfig.from_file(self.problem_path / "teams_incorrect.toml")
 
 
 if __name__ == "__main__":

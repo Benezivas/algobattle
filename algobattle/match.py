@@ -5,7 +5,8 @@ from datetime import datetime
 from itertools import combinations
 from pathlib import Path
 import tomllib
-from typing import Annotated, Self, cast, overload
+from typing import Annotated, Iterable, Protocol, Self, cast, overload
+from typing_extensions import override
 
 from pydantic import Field
 from anyio import create_task_group, CapacityLimiter
@@ -116,7 +117,7 @@ class Match(BaseModel):
             A :class:`Match` object with its fields populated to reflect the result of the match.
         """
         if ui is None:
-            ui = Ui()
+            ui = EmptyUi()
 
         with await TeamHandler.build(
             config.teams, problem, config.execution.mode, config.match, config.docker, ui
@@ -134,6 +135,7 @@ class Match(BaseModel):
                 match_cpus = cast(list[str | None], set_cpus[: config.execution.parallel_battles])
             else:
                 match_cpus = [set_cpus] * config.execution.parallel_battles
+            ui.start_battles()
             async with create_task_group() as tg:
                 for matchup in teams.matchups:
                     battle = battle_cls()
@@ -237,8 +239,7 @@ class Match(BaseModel):
         return points
 
 
-@dataclass
-class Ui(BuildUi):
+class Ui(BuildUi, Protocol):
     """Base class for a UI that observes a Match and displays its data.
 
     The Ui object both observes the match object as it's being built and receives additional updates through
@@ -247,27 +248,30 @@ class Ui(BuildUi):
     by just subclassing :class:`Ui` and implementing its methods.
     """
 
-    match: Match | None = field(default=None, init=False)
-    active_battles: list[Matchup] = field(default_factory=list, init=False)
+    match: Match | None
 
-    def start_build(self, team: str, role: Role, timeout: float | None) -> None:
+    def start_build_step(self, teams: Iterable[str], timeout: float | None) -> None:
+        """Tells the ui that the build process has started."""
+        return
+
+    def start_build(self, team: str, role: Role) -> None:
         """Informs the ui that a new program is being built."""
         return
 
-    def finish_build(self) -> None:
+    def finish_build(self, team: str, success: bool) -> None:
         """Informs the ui that the current build has been finished."""
+        return
+
+    def start_battles(self) -> None:
+        """Tells the UI that building the programs has finished and battles will start now."""
         return
 
     def start_battle(self, matchup: Matchup) -> None:
         """Notifies the Ui that a battle has been started."""
-        self.active_battles.append(matchup)
+        return
 
     def battle_completed(self, matchup: Matchup) -> None:
         """Notifies the Ui that a specific battle has been completed."""
-        self.active_battles.remove(matchup)
-
-    def update_fights(self, matchup: Matchup) -> None:
-        """Notifies the Ui to update the display of fight results for a specific battle."""
         return
 
     def update_battle_data(self, matchup: Matchup, data: Battle.UiData) -> None:
@@ -297,23 +301,35 @@ class Ui(BuildUi):
 
 
 @dataclass
+class EmptyUi(Ui):
+    """A dummy Ui."""
+
+    match: Match | None = field(default=None, init=False)
+
+
+@dataclass
 class BattleObserver(BattleUi, FightUi, ProgramUi):
     """Tracks updates for a specific battle."""
 
     ui: Ui
     matchup: Matchup
 
+    @override
     def update_battle_data(self, data: Battle.UiData) -> None:  # noqa: D102
         self.ui.update_battle_data(self.matchup, data)
 
+    @override
     def start_fight(self, max_size: int) -> None:  # noqa: D102
         self.ui.start_fight(self.matchup, max_size)
 
+    @override
     def end_fight(self) -> None:  # noqa: D102
-        self.ui.update_fights(self.matchup)
+        self.ui.end_fight(self.matchup)
 
+    @override
     def start_program(self, role: Role, timeout: float | None) -> None:  # noqa: D102
         self.ui.start_program(self.matchup, role, RunningTimer(datetime.now(), timeout))
 
+    @override
     def stop_program(self, role: Role, runtime: float) -> None:  # noqa: D102
         self.ui.end_program(self.matchup, role, runtime)
