@@ -2,7 +2,6 @@
 
 Provides a command line interface to start matches and observe them. See `battle --help` for further options.
 """
-from contextlib import ExitStack
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -11,7 +10,7 @@ from typing_extensions import override
 from importlib.metadata import version as pkg_version
 
 from anyio import run as run_async_fn
-from typer import Typer, Argument, Option
+from typer import Exit, Typer, Argument, Option
 from rich.console import Group, RenderableType, Console
 from rich.live import Live
 from rich.table import Table, Column
@@ -31,7 +30,7 @@ from rich.text import Text
 from rich.columns import Columns
 
 from algobattle.battle import Battle
-from algobattle.match import BaseConfig, Match, Ui
+from algobattle.match import BaseConfig, EmptyUi, Match, Ui
 from algobattle.problem import Problem
 from algobattle.team import Matchup
 from algobattle.util import Role, RunningTimer
@@ -64,32 +63,28 @@ def run(
     """Runs a match using the config found at the provided path and displays it to the cli."""
     config = BaseConfig.from_file(path)
     problem = Problem.get(config.match.problem)
-
+    result = Match()
     try:
-        result = None
-        with ExitStack() as stack:
-            if ui:
-                ui_obj = stack.enter_context(CliUi())
-            else:
-                ui_obj = None
-            result = run_async_fn(Match.run, config, problem, ui_obj)
-        assert result is not None
-
-        console.print(CliUi.display_match(result))
-        if config.execution.points > 0:
-            points = result.calculate_points(config.execution.points)
-            for team, pts in points.items():
-                print(f"Team {team} gained {pts:.1f} points.")
-
-        if result_path is not None:
-            t = datetime.now()
-            filename = f"{t.year:04d}-{t.month:02d}-{t.day:02d}_{t.hour:02d}-{t.minute:02d}-{t.second:02d}.json"
-            with open(result_path / filename, "w+") as f:
-                f.write(result.model_dump_json(exclude_defaults=True))
-        return result
-
+        with CliUi() if ui else EmptyUi() as ui_obj:
+            run_async_fn(result.run, config, problem, ui_obj)
     except KeyboardInterrupt:
-        raise SystemExit("Received keyboard interrupt, terminating execution.")
+        console.print("Received keyboard interrupt, terminating execution.")
+    finally:
+        try:
+            console.print(CliUi.display_match(result))
+            if config.execution.points > 0:
+                points = result.calculate_points(config.execution.points)
+                for team, pts in points.items():
+                    print(f"Team {team} gained {pts:.1f} points.")
+
+            if result_path is not None:
+                t = datetime.now()
+                filename = f"{t.year:04d}-{t.month:02d}-{t.day:02d}_{t.hour:02d}-{t.minute:02d}-{t.second:02d}.json"
+                with open(result_path / filename, "w+") as f:
+                    f.write(result.model_dump_json(exclude_defaults=True))
+            return result
+        except KeyboardInterrupt:
+            raise Exit
 
 
 @dataclass
@@ -201,7 +196,7 @@ class CliUi(Live, Ui):
         self.match = None
         self.build: _BuildState | None = None
         self.battle_panels: dict[Matchup, BattlePanel] = {}
-        super().__init__(None, refresh_per_second=10, transient=False)
+        super().__init__(None, refresh_per_second=10, transient=True)
 
     def __enter__(self) -> Self:
         return cast(Self, super().__enter__())

@@ -5,7 +5,7 @@ from datetime import datetime
 from itertools import combinations
 from pathlib import Path
 import tomllib
-from typing import Annotated, Iterable, Protocol, Self, cast, overload
+from typing import Annotated, Any, Iterable, Protocol, Self, cast, overload
 from typing_extensions import override
 
 from pydantic import Field
@@ -41,7 +41,7 @@ class BaseConfig(BaseModel):
         """Parses a config object from a toml file."""
         if not source.exists():
             raise ValueError
-        if source.is_dir() and (source / "config.toml").is_file():
+        if source.is_dir():
             source /= "config.toml"
         if not source.is_file():
             config_dict = {}
@@ -58,8 +58,8 @@ class BaseConfig(BaseModel):
 class Match(BaseModel):
     """The Result of a whole Match."""
 
-    active_teams: list[str]
-    excluded_teams: dict[str, ExceptionInfo]
+    active_teams: list[str] = field(default_factory=list)
+    excluded_teams: dict[str, ExceptionInfo] = field(default_factory=dict)
     results: defaultdict[str, Annotated[dict[str, Battle], Field(default_factory=dict)]] = Field(
         default_factory=lambda: defaultdict(dict)
     )
@@ -98,13 +98,12 @@ class Match(BaseModel):
             cpus.append(set_cpus)
             ui.battle_completed(matchup)
 
-    @classmethod
     async def run(
-        cls,
+        self,
         config: BaseConfig,
         problem: Problem[InstanceT, SolutionT],
         ui: "Ui | None" = None,
-    ) -> Self:
+    ) -> None:
         """Runs a match with the given config settings and problem type.
 
         The first step is building the docker images for each team in `config.teams`. Any teams where this process fails
@@ -113,21 +112,16 @@ class Match(BaseModel):
         Since all of these battles are completely independent, you can set `config.parallel_battles` to have some number
         of them run in parallel. This will speed up the exection of the match, but can also make the match unfair if the
         hardware running it does not have the resources to adequately execute that many containers in parallel.
-
-        Returns:
-            A :class:`Match` object with its fields populated to reflect the result of the match.
         """
         if ui is None:
             ui = EmptyUi()
+        ui.match = self
 
         with await TeamHandler.build(
             config.teams, problem, config.execution.mode, config.match, config.docker, ui
         ) as teams:
-            result = cls(
-                active_teams=[t.name for t in teams.active],
-                excluded_teams=teams.excluded,
-            )
-            ui.match = result
+            self.active_teams = [t.name for t in teams.active]
+            self.excluded_teams = teams.excluded
             battle_cls = Battle.all()[config.battle.type]
             limiter = CapacityLimiter(config.execution.parallel_battles)
             current_default_thread_limiter().total_tokens = config.execution.parallel_battles
@@ -140,9 +134,8 @@ class Match(BaseModel):
             async with create_task_group() as tg:
                 for matchup in teams.matchups:
                     battle = battle_cls()
-                    result.results[matchup.generator.name][matchup.solver.name] = battle
-                    tg.start_soon(result._run_battle, battle, matchup, config, problem, match_cpus, ui, limiter)
-                return result
+                    self.results[matchup.generator.name][matchup.solver.name] = battle
+                    tg.start_soon(self._run_battle, battle, matchup, config, problem, match_cpus, ui, limiter)
 
     @overload
     def battle(self, matchup: Matchup) -> Battle | None:
@@ -306,6 +299,14 @@ class EmptyUi(Ui):
     """A dummy Ui."""
 
     match: Match | None = field(default=None, init=False)
+
+    def __enter__(self) -> Self:
+        """Starts displaying the Ui."""
+        return self
+
+    def __exit__(self, *args: Any) -> None:
+        """Stops the Ui."""
+        return
 
 
 @dataclass
