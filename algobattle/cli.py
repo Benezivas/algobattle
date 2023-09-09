@@ -3,13 +3,17 @@
 Provides a command line interface to start matches and observe them. See `battle --help` for further options.
 """
 from datetime import datetime
+from enum import StrEnum
+from importlib.abc import Traversable
+from importlib.resources import files
 from pathlib import Path
-from typing import Annotated, Iterable, Literal, Optional, Self, cast
-from typing_extensions import override
+from string import Template
+from typing import Annotated, Any, Iterable, Iterator, Literal, Optional, Self, cast
+from typing_extensions import TypedDict, override
 from importlib.metadata import version as pkg_version
 
 from anyio import run as run_async_fn
-from typer import Exit, Typer, Argument, Option
+from typer import Exit, Typer, Argument, Option, Abort
 from rich.console import Group, RenderableType, Console
 from rich.live import Live
 from rich.table import Table, Column
@@ -33,6 +37,7 @@ from algobattle.match import BaseConfig, EmptyUi, Match, Ui
 from algobattle.problem import Problem
 from algobattle.team import Matchup
 from algobattle.util import Role, RunningTimer
+from algobattle.templates import Language, TemplateArgs, write_templates
 
 
 __all__ = ("app",)
@@ -84,6 +89,47 @@ def run(
             return result
         except KeyboardInterrupt:
             raise Exit
+
+
+@app.command()
+def init(
+    target: Annotated[
+        Path, Argument(exists=True, file_okay=False, writable=True, help="The folder to initialize.")
+    ] = Path(),
+    problem: Annotated[
+        Optional[Path],
+        Option("--problem", "-p", exists=True, dir_okay=False, help="A problem spec zip file to use for this."),
+    ] = None,
+    language: Annotated[
+        Optional[Language], Option("--language", "-l", help="The language to use for the programs.")
+    ] = None,
+    generator: Annotated[
+        Optional[Language], Option("--generator", "-g", help="The language to use for the generator.")
+    ] = None,
+    solver: Annotated[Optional[Language], Option("--solver", "-s", help="The language to use for the solver.")] = None,
+) -> None:
+    """Initializes a project directory, setting up the problem files and program folders with docker files.
+
+    Generates dockerfiles and an initial project structure for the language(s) you choose. Either use `--language` to
+    use the same language for both, or specify each individually with `--generator` and `--solver`.
+    """
+    if language is not None and (generator is not None or solver is not None):
+        console.print("You cannot use both `--language` and `--generator`/`--solver` at the same time.")
+        raise Abort()
+    if language:
+        generator = solver = language
+    template_args: TemplateArgs = {
+        "program": "generator",
+        "problem": "Blep",
+        "team": "Wahs",
+    }
+
+    if generator is not None:
+        write_templates(target / "generator", generator, template_args)
+
+    template_args["program"] = "solver"
+    if solver is not None:
+        write_templates(target / "solver", solver, template_args)
 
 
 class TimerTotalColumn(ProgressColumn):

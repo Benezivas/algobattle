@@ -9,3 +9,4 @@ site
 docs/src/pairsum_solver/target
 docs/src/pairsum_solver/Cargo.lock
 .results
+.project
