@@ -2,10 +2,9 @@
 
 Provides a command line interface to start matches and observe them. See `battle --help` for further options.
 """
-from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Annotated, Any, Iterable, Literal, Optional, Self, cast
+from typing import Annotated, Iterable, Literal, Optional, Self, cast
 from typing_extensions import override
 from importlib.metadata import version as pkg_version
 
@@ -87,15 +86,6 @@ def run(
             raise Exit
 
 
-@dataclass
-class _BuildState:
-    overall_progress: Progress
-    overall_task: TaskID
-    team_progress: Progress
-    team_tasks: dict[str, TaskID]
-    group: Group
-
-
 class TimerTotalColumn(ProgressColumn):
     """Renders time elapsed."""
 
@@ -119,6 +109,31 @@ class LazySpinnerColumn(SpinnerColumn):
         return super().render(task)
 
 
+class BuildView(Group):
+    """Displays the build process."""
+
+    def __init__(self, teams: Iterable[str]) -> None:
+        teams = list(teams)
+        self.overall_progress = Progress(
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            MofNCompleteColumn(),
+            transient=True,
+        )
+        self.team_progress = Progress(
+            TextColumn("[cyan]{task.fields[name]}"),
+            LazySpinnerColumn(),
+            BarColumn(bar_width=10),
+            TimeElapsedColumn(),
+        )
+        self.overall_task = self.overall_progress.add_task("[blue]Building programs", total=2 * len(teams))
+        team_dict: dict[str, TaskID] = {}
+        for team in teams:
+            team_dict[team] = self.team_progress.add_task(team, start=False, total=2, failed="", name=team)
+        self.teams = team_dict
+        super().__init__(self.overall_progress, self.team_progress)
+
+
 class FightPanel(Panel):
     """Panel displaying a currently running fight."""
 
@@ -133,7 +148,7 @@ class FightPanel(Panel):
         )
         self.generator = self.progress.add_task("Generator", start=False, total=1, message="")
         self.solver = self.progress.add_task("Solver", start=False, total=1, message="")
-        super().__init__(self.progress, title="Current Fight", width=35)
+        super().__init__(self.progress, title="Current Fight", width=30)
 
 
 class BattlePanel(Panel):
@@ -148,7 +163,7 @@ class BattlePanel(Panel):
 
     def _make_renderable(self) -> RenderableType:
         return Group(
-            Columns((self._battle_data, self._curr_fight), expand=True, equal=True, column_first=True, align="center"),
+            Columns((self._battle_data, self._curr_fight), expand=True, equal=True, align="center"),
             self._past_fights,
         )
 
@@ -194,20 +209,17 @@ class CliUi(Live, Ui):
 
     def __init__(self) -> None:
         self.match = None
-        self.build: _BuildState | None = None
         self.battle_panels: dict[Matchup, BattlePanel] = {}
         super().__init__(None, refresh_per_second=10, transient=True)
 
     def __enter__(self) -> Self:
         return cast(Self, super().__enter__())
 
-    def _update_renderable(self) -> None:
-        if self.build:
-            r = self.build.group
-        else:
+    def _update_renderable(self, renderable: RenderableType | None = None) -> None:
+        if renderable is None:
             assert self.match is not None
-            r = Group(self.display_match(self.match), *self.battle_panels.values())
-        self.update(Panel(r, title=f"[orange1]Algobattle {pkg_version('algobattle_base')}"))
+            renderable = Group(self.display_match(self.match), *self.battle_panels.values())
+        self.update(Panel(renderable, title=f"[orange1]Algobattle {pkg_version('algobattle_base')}"))
 
     @staticmethod
     def display_match(match: Match) -> RenderableType:
@@ -229,42 +241,26 @@ class CliUi(Live, Ui):
 
     @override
     def start_build_step(self, teams: Iterable[str], timeout: float | None) -> None:
-        team_dict: dict[str, Any] = {t: "none" for t in teams}
-        overall_progress = Progress(
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            MofNCompleteColumn(),
-            transient=True,
-        )
-        team_progress = Progress(
-            TextColumn("[cyan]{task.fields[name]}"),
-            TimeElapsedColumn(),
-            SpinnerColumn(),
-            TextColumn("{task.fields[failed]}"),
-        )
-        group = Group(overall_progress, team_progress)
-        overall = overall_progress.add_task("[blue]Building team programs", total=len(team_dict))
-
-        team_tasks = {}
-        for team in team_dict:
-            team_tasks[team] = team_progress.add_task(team, start=False, total=3, failed="", name=team)
-
-        self.build = _BuildState(overall_progress, overall, team_progress, team_tasks, group)
-        self._update_renderable()
+        self._update_renderable(BuildView(teams))
 
     @override
     def start_build(self, team: str, role: Role) -> None:
-        if self.build is not None:
-            task = self.build.team_tasks[team]
-            self.build.team_progress.start_task(task)
-            self.build.team_progress.advance(task)
+        assert isinstance(self.renderable, Panel)
+        view = self.renderable.renderable
+        assert isinstance(view, BuildView)
+        task = view.teams[team]
+        view.team_progress.start_task(task)
+        view.team_progress.advance(task)
 
     @override
     def finish_build(self, team: str, success: bool) -> None:
-        if self.build is not None:
-            task = self.build.team_tasks[team]
-            self.build.team_progress.update(task, completed=3, failed="" if success else ":warning:")
-            self.build.overall_progress.advance(self.build.overall_task)
+        assert isinstance(self.renderable, Panel)
+        view = self.renderable.renderable
+        assert isinstance(view, BuildView)
+        task = view.teams[team]
+        current = view.team_progress._tasks[task].completed
+        view.team_progress.update(task, completed=2, failed="" if success else ":warning:")
+        view.overall_progress.advance(view.overall_task, 2 - current)
 
     @override
     def start_battles(self) -> None:
