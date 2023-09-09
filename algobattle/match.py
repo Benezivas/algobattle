@@ -37,21 +37,22 @@ class BaseConfig(BaseModel):
     docker: DockerConfig = Field(default_factory=dict, validate_default=True)
 
     @classmethod
-    def from_file(cls, file: Path) -> Self:
-        """Parses a config object from a toml file.
-
-        If the file doesn't exist it returns a default instance instead of raising an error.
-        """
-        if not file.is_file():
+    def from_file(cls, source: Path) -> Self:
+        """Parses a config object from a toml file."""
+        if not source.exists():
+            raise ValueError
+        if source.is_dir() and (source / "config.toml").is_file():
+            source /= "config.toml"
+        if not source.is_file():
             config_dict = {}
         else:
-            with open(file, "rb") as f:
+            with open(source, "rb") as f:
                 try:
                     config_dict = tomllib.load(f)
                 except tomllib.TOMLDecodeError as e:
-                    raise ValueError(f"The config file at {file} is not a properly formatted TOML file!\n{e}")
+                    raise ValueError(f"The config file at {source} is not a properly formatted TOML file!\n{e}")
         Battle.load_entrypoints()
-        return cls.model_validate(config_dict, context={"base_path": file.parent})
+        return cls.model_validate(config_dict, context={"base_path": source.parent})
 
 
 class Match(BaseModel):

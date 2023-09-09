@@ -61,9 +61,7 @@ def run(
         ),
     ] = None,
 ) -> Match:
-    if path.is_dir():
-        path /= "config.toml"
-
+    """Runs a match using the config found at the provided path and displays it to the cli."""
     config = BaseConfig.from_file(path)
     problem = Problem.get(config.match.problem)
 
