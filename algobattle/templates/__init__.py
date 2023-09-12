@@ -20,15 +20,21 @@ ENVS = {
 }
 
 
-class TemplateArgs(TypedDict):
-    """Template arguments."""
+class PartialTemplateArgs(TypedDict):
+    """Template arguments without the program role."""
 
     problem: str
     team: str
+
+
+class TemplateArgs(PartialTemplateArgs):
+    """Template arguments."""
+
     program: Literal["generator", "solver"]
 
 
 def normalize(s: str) -> str:
+    """Normalizes a name so it can be used in project names."""
     return s.lower().replace(" ", "-")
 
 

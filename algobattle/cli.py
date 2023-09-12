@@ -12,7 +12,7 @@ from importlib.metadata import version as pkg_version
 from textwrap import dedent
 
 from anyio import run as run_async_fn
-from typer import Exit, Typer, Argument, Option, Abort, get_app_dir, launch
+from typer import Exit, Typer, Argument, Option, Abort, get_app_dir, launch, confirm
 from rich.console import Group, RenderableType, Console
 from rich.live import Live
 from rich.table import Table, Column
@@ -37,7 +37,7 @@ from algobattle.match import BaseConfig, EmptyUi, Match, Ui
 from algobattle.problem import Problem
 from algobattle.team import Matchup
 from algobattle.util import Role, RunningTimer
-from algobattle.templates import Language, TemplateArgs, write_templates
+from algobattle.templates import Language, PartialTemplateArgs, TemplateArgs, write_templates
 
 
 __all__ = ("app",)
@@ -61,7 +61,7 @@ class CliConfig:
             text = """
             # The Algobattle cli configuration
 
-            # team_name = "Some string" # the name of the team that you're in
+            team_name = "" # the name of the team that you're in, must be a non-empty string to be valid
             """
             cls.path.write_text(dedent(text))
 
@@ -137,6 +137,20 @@ def run(
             raise Exit
 
 
+def _init_program(target: Path, lang: Language, args: PartialTemplateArgs, role: Role) -> None:
+    dir = target / role.value
+    if dir.exists():
+        replace = confirm(f"The targeted directory already contains a {role}, do you want to replace it?")
+        if replace:
+            dir.unlink()
+            dir.mkdir()
+        else:
+            return
+    else:
+        dir.mkdir(parents=True, exist_ok=True)
+    write_templates(dir, lang, cast(TemplateArgs, args | {"program": role.value}))
+
+
 @app.command()
 def init(
     target: Annotated[
@@ -165,18 +179,16 @@ def init(
     if language:
         generator = solver = language
     config = CliConfig.load()
-    template_args: TemplateArgs = {
-        "program": "generator",
+    template_args: PartialTemplateArgs = {
         "problem": "Blep",
         "team": config.team_name or choice(("Dogs", "Cats", "Otters", "Red Pandas", "Possums", "Rats")),
     }
 
     if generator is not None:
-        write_templates(target / "generator", generator, template_args)
+        _init_program(target, generator, template_args, Role.generator)
 
-    template_args["program"] = "solver"
     if solver is not None:
-        write_templates(target / "solver", solver, template_args)
+        _init_program(target, solver, template_args, Role.solver)
 
 
 @app.command()
