@@ -49,7 +49,6 @@ console = Console()
 
 @dataclass
 class CliConfig:
-
     doc: TOMLDocument
 
     path: ClassVar[Path] = Path(get_app_dir("algobattle")) / "config.toml"
@@ -162,7 +161,7 @@ def init(
     """
     if language is not None and (generator is not None or solver is not None):
         console.print("You cannot use both `--language` and `--generator`/`--solver` at the same time.")
-        raise Abort()
+        raise Abort
     if language:
         generator = solver = language
     config = CliConfig.load()
