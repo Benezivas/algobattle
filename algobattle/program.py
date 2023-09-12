@@ -38,6 +38,7 @@ from algobattle.util import (
     RunConfig,
     RunConfigOverride,
     RunSpecs,
+    TempDir,
     ValidationError,
     Role,
     BaseModel,
@@ -384,8 +385,7 @@ class Program(ABC):
             yield source.parent, source.name
             return
 
-        with TemporaryDirectory() as build_folder:
-            build_folder = Path(build_folder)
+        with TempDir() as build_folder:
             if is_zipfile(source):
                 with ZipFile(source, "r") as f:
                     f.extractall(build_folder)

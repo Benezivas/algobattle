@@ -10,6 +10,7 @@ from inspect import Parameter, Signature, signature
 from itertools import chain
 import json
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from traceback import format_exception
 from types import EllipsisType
 from typing import Annotated, Any, Callable, ClassVar, Iterable, Literal, LiteralString, TypeVar, Self, cast, get_args
@@ -532,3 +533,10 @@ class ExecutionConfig(BaseModel):
             raise ValueError("Number of parallel battles exceeds the number of set_cpu specifier strings.")
         else:
             return self
+
+
+class TempDir(TemporaryDirectory):
+    """Python's `TemporaryDirectory` but with a contextmanager returning a Path."""
+
+    def __enter__(self) -> Path:
+        return Path(super().__enter__())
