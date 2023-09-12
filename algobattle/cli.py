@@ -2,18 +2,17 @@
 
 Provides a command line interface to start matches and observe them. See `battle --help` for further options.
 """
+from dataclasses import dataclass
 from datetime import datetime
-from enum import StrEnum
-from importlib.abc import Traversable
-from importlib.resources import files
 from pathlib import Path
-from string import Template
-from typing import Annotated, Any, Iterable, Iterator, Literal, Optional, Self, cast
-from typing_extensions import TypedDict, override
+from random import choice
+from typing import Annotated, Any, ClassVar, Iterable, Literal, Optional, Self, cast
+from typing_extensions import override
 from importlib.metadata import version as pkg_version
+from textwrap import dedent
 
 from anyio import run as run_async_fn
-from typer import Exit, Typer, Argument, Option, Abort
+from typer import Exit, Typer, Argument, Option, Abort, get_app_dir, launch
 from rich.console import Group, RenderableType, Console
 from rich.live import Live
 from rich.table import Table, Column
@@ -31,6 +30,7 @@ from rich.progress import (
 from rich.panel import Panel
 from rich.text import Text
 from rich.columns import Columns
+from tomlkit import TOMLDocument, parse as parse_toml, dumps as dumps_toml
 
 from algobattle.battle import Battle
 from algobattle.match import BaseConfig, EmptyUi, Match, Ui
@@ -43,8 +43,55 @@ from algobattle.templates import Language, TemplateArgs, write_templates
 __all__ = ("app",)
 
 
-app = Typer(pretty_exceptions_show_locals=False)
+app = Typer(pretty_exceptions_show_locals=True)
 console = Console()
+
+
+@dataclass
+class CliConfig:
+
+    doc: TOMLDocument
+
+    path: ClassVar[Path] = Path(get_app_dir("algobattle")) / "config.toml"
+
+    @classmethod
+    def init_file(cls) -> None:
+        """Initializes the config file if it does not exist."""
+        if not cls.path.is_file():
+            cls.path.parent.mkdir(parents=True, exist_ok=True)
+            text = """
+            # The Algobattle cli configuration
+
+            # team_name = "Some string" # the name of the team that you're in
+            """
+            cls.path.write_text(dedent(text))
+
+    @classmethod
+    def load(cls) -> Self:
+        """Parses a config object from a toml file."""
+        cls.init_file()
+        doc = parse_toml(cls.path.read_text())
+        return cls(doc)
+
+    def save(self) -> None:
+        """Saves the config to file."""
+        self.path.write_text(dumps_toml(self.doc))
+
+    @property
+    def team_name(self) -> str | None:
+        """Name of the user's team."""
+        name: Any = self.doc.get("team_name", None)
+        if not isinstance(name, str):
+            raise Abort(f"Bad configuration! Team name must be a string, not {name}.")
+        return name
+
+    @team_name.setter
+    def team_name(self, name: str | None) -> None:
+        if name is None:
+            if "team_name" in self.doc:
+                self.doc.remove("team_name")
+        else:
+            self.doc["team_name"] = name
 
 
 @app.command()
@@ -118,10 +165,11 @@ def init(
         raise Abort()
     if language:
         generator = solver = language
+    config = CliConfig.load()
     template_args: TemplateArgs = {
         "program": "generator",
         "problem": "Blep",
-        "team": "Wahs",
+        "team": config.team_name or choice(("Dogs", "Cats", "Otters", "Red Pandas", "Possums", "Rats")),
     }
 
     if generator is not None:
@@ -130,6 +178,14 @@ def init(
     template_args["program"] = "solver"
     if solver is not None:
         write_templates(target / "solver", solver, template_args)
+
+
+@app.command()
+def config() -> None:
+    """Opens the algobattle cli tool config file."""
+    CliConfig.init_file()
+    print(f"Opening the algobattle cli config file at {CliConfig.path}.")
+    launch(str(CliConfig.path))
 
 
 class TimerTotalColumn(ProgressColumn):

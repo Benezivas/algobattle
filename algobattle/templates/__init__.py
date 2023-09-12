@@ -28,10 +28,14 @@ class TemplateArgs(TypedDict):
     program: Literal["generator", "solver"]
 
 
+def normalize(s: str) -> str:
+    return s.lower().replace(" ", "-")
+
+
 def write_templates(target: Path, lang: Language, args: TemplateArgs) -> None:
     """Yields all templates and where they should be placed."""
     template_args = args | {
-        "project": f"{args['team'].lower()}-{args['problem'].lower()}-{args['program'].lower()}",
+        "project": f"{normalize(args['team'])}-{normalize(args['problem'])}-{normalize(args['program'])}",
     }
     env = ENVS[lang]
     for name in env.list_templates():
