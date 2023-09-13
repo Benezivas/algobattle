@@ -521,10 +521,12 @@ class ExecutionConfig(BaseModel):
     """Number of battles exectuted in parallel."""
     mode: MatchMode = "testing"
     """Mode of the match."""
-    set_cpus: str | list[str] | None = None
+    set_cpus: WithNone[str | list[str]] = None
     """Wich cpus to run programs on, if a list is specified each battle will use a different cpu specification in it."""
     points: int = 100
     """Highest number of points each team can achieve."""
+    results: RelativePath = Path("./results")
+    """Path to a folder where the results will be saved."""
 
     @model_validator(mode="after")
     def val_set_cpus(self) -> Self:

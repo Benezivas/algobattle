@@ -21,7 +21,7 @@ from typing import (
 )
 from math import inf, isnan
 
-from pydantic import AfterValidator, Field
+from pydantic import AfterValidator, Field, ValidationInfo
 
 from algobattle.util import (
     EncodableModel,
@@ -33,8 +33,8 @@ from algobattle.util import (
 )
 
 
-def _check_problem_name(val: str) -> str:
-    if val not in Problem.all():
+def _check_problem_name(val: str, info: ValidationInfo) -> str:
+    if info.context and info.context.get("check_problem", False) and val not in Problem.all():
         raise ValueError("Value is not the name of an installed Problem.")
     return val
 

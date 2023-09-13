@@ -52,7 +52,7 @@ class BaseConfig(BaseModel):
                 except tomllib.TOMLDecodeError as e:
                     raise ValueError(f"The config file at {source} is not a properly formatted TOML file!\n{e}")
         Battle.load_entrypoints()
-        return cls.model_validate(config_dict, context={"base_path": source.parent})
+        return cls.model_validate(config_dict, context={"base_path": source.parent, "check_problem": True})
 
 
 class Match(BaseModel):

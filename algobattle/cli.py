@@ -4,14 +4,20 @@ Provides a command line interface to start matches and observe them. See `battle
 """
 from dataclasses import dataclass
 from datetime import datetime
+from os import environ
 from pathlib import Path
 from random import choice
+from shutil import rmtree
+from subprocess import PIPE, run as run_process
+import sys
 from typing import Annotated, Any, ClassVar, Iterable, Literal, Optional, Self, cast
 from typing_extensions import override
 from importlib.metadata import version as pkg_version
 from textwrap import dedent
+from zipfile import ZipFile
 
 from anyio import run as run_async_fn
+from pydantic import Field, ValidationError, BaseModel
 from typer import Exit, Typer, Argument, Option, Abort, get_app_dir, launch, confirm
 from rich.console import Group, RenderableType, Console
 from rich.live import Live
@@ -30,13 +36,16 @@ from rich.progress import (
 from rich.panel import Panel
 from rich.text import Text
 from rich.columns import Columns
-from tomlkit import TOMLDocument, parse as parse_toml, dumps as dumps_toml
+from rich.status import Status
+from tomlkit import TOMLDocument, parse as parse_toml, dumps as dumps_toml, table
+from tomlkit.items import Table as TomlTable
+from tomlkit.container import Container as TomlContainer
 
 from algobattle.battle import Battle
 from algobattle.match import BaseConfig, EmptyUi, Match, Ui
 from algobattle.problem import Problem
 from algobattle.team import Matchup
-from algobattle.util import Role, RunningTimer
+from algobattle.util import ExecutionConfig, Role, RunningTimer, BaseModel as AlgobattleBaseModel, TempDir
 from algobattle.templates import Language, PartialTemplateArgs, TemplateArgs, write_templates
 
 
@@ -47,54 +56,48 @@ app = Typer(pretty_exceptions_show_locals=True)
 console = Console()
 
 
-@dataclass
-class CliConfig:
-    doc: TOMLDocument
+class _General(BaseModel):
+    team_name: str | None = None
+    install_command: list[str] = [sys.executable, "-m", "pip", "install"]
 
+
+class CliConfig(BaseModel, frozen=True):
+    general: _General = Field(default_factory=dict, validate_default=True)
+    execution: ExecutionConfig = Field(default_factory=dict, validate_default=True)
+
+    _doc: TOMLDocument
     path: ClassVar[Path] = Path(get_app_dir("algobattle")) / "config.toml"
+    model_config = AlgobattleBaseModel.model_config
 
     @classmethod
     def init_file(cls) -> None:
         """Initializes the config file if it does not exist."""
         if not cls.path.is_file():
             cls.path.parent.mkdir(parents=True, exist_ok=True)
-            text = """
-            # The Algobattle cli configuration
-
-            team_name = "" # the name of the team that you're in, must be a non-empty string to be valid
-            """
-            cls.path.write_text(dedent(text))
+            cls.path.write_text("# The Algobattle cli configuration\n")
 
     @classmethod
     def load(cls) -> Self:
         """Parses a config object from a toml file."""
         cls.init_file()
         doc = parse_toml(cls.path.read_text())
-        return cls(doc)
+        self = cls.model_validate(doc)
+        object.__setattr__(self, "_doc", doc)
+        return self
 
     def save(self) -> None:
         """Saves the config to file."""
-        self.path.write_text(dumps_toml(self.doc))
+        self.path.write_text(dumps_toml(self._doc))
 
     @property
-    def team_name(self) -> str | None:
-        """Name of the user's team."""
-        name: Any = self.doc.get("team_name", None)
-        if not isinstance(name, str):
-            raise Abort(f"Bad configuration! Team name must be a string, not {name}.")
-        return name
-
-    @team_name.setter
-    def team_name(self, name: str | None) -> None:
-        if name is None:
-            if "team_name" in self.doc:
-                self.doc.remove("team_name")
-        else:
-            self.doc["team_name"] = name
+    def default_exec(self) -> TomlTable | None:
+        """The default exec config for each problem."""
+        exec: Any = self._doc.get("exec", None)
+        return exec
 
 
-@app.command()
-def run(
+@app.command("run")
+def run_match(
     path: Annotated[Path, Argument(exists=True, help="Path to either a config file or a directory containing one.")],
     ui: Annotated[bool, Option(help="Whether to show the CLI UI during match execution.")] = True,
     result_path: Annotated[
@@ -140,9 +143,9 @@ def run(
 def _init_program(target: Path, lang: Language, args: PartialTemplateArgs, role: Role) -> None:
     dir = target / role.value
     if dir.exists():
-        replace = confirm(f"The targeted directory already contains a {role}, do you want to replace it?")
+        replace = confirm(f"The targeted directory already contains a {role}, do you want to replace it?", default=True)
         if replace:
-            dir.unlink()
+            rmtree(dir)
             dir.mkdir()
         else:
             return
@@ -154,11 +157,11 @@ def _init_program(target: Path, lang: Language, args: PartialTemplateArgs, role:
 @app.command()
 def init(
     target: Annotated[
-        Path, Argument(exists=True, file_okay=False, writable=True, help="The folder to initialize.")
-    ] = Path(),
+        Optional[Path], Argument(exists=True, file_okay=False, writable=True, help="The folder to initialize.")
+    ] = None,
     problem: Annotated[
         Optional[Path],
-        Option("--problem", "-p", exists=True, dir_okay=False, help="A problem spec zip file to use for this."),
+        Option("--problem", "-p", exists=True, dir_okay=False, help="A problem spec file to use for this."),
     ] = None,
     language: Annotated[
         Optional[Language], Option("--language", "-l", help="The language to use for the programs.")
@@ -179,16 +182,89 @@ def init(
     if language:
         generator = solver = language
     config = CliConfig.load()
+    team_name = config.general.team_name or choice(("Dogs", "Cats", "Otters", "Red Pandas", "Possums", "Rats"))
+
+    if problem is None and Path("problem.aprb").is_file():
+        problem = Path("problem.aprb")
+    if problem is not None:
+        with TempDir() as build_dir:
+            with Status("Extracting problem data"):
+                with ZipFile(problem) as problem_zip:
+                    problem_zip.extractall(build_dir)
+
+            problem_config = parse_toml((build_dir / "config.toml").read_text())
+            parsed_config = BaseConfig.model_validate(problem_config)  # ! paths in this arent properly relativized
+            problem_name = parsed_config.match.problem
+            assert isinstance(problem_name, str)
+            if target is None:
+                target = Path() if Path().name == problem_name else Path() / problem_name
+
+            new_problem = True
+            problem_data = list(build_dir.iterdir())
+            if any(((target / path.name).exists() for path in problem_data)):
+                replace = confirm(
+                    "The target directory already contains problem data, do you want to replace it?", default=True
+                )
+                if replace:
+                    for path in problem_data:
+                        if (file := target / path.name).is_file():
+                            file.unlink()
+                        elif (dir := target / path.name).is_dir():
+                            rmtree(dir)
+                else:
+                    new_problem = False
+
+            if new_problem:
+                with Status("Installing problem"):
+                    res = run_process(
+                        config.general.install_command + [build_dir.absolute()],
+                        shell=False,
+                        capture_output=True,
+                        text=True,
+                        env=environ.copy(),
+                    )
+                if res.returncode:
+                    print("Couldn't install the problem")
+                    console.print(f"[red]{res.stderr}")
+                    raise Abort
+                for path in problem_data:
+                    path.rename(target / path.name)
+    else:
+        problem_name = "Unknown Problem"
+        problem_config = TOMLDocument()
+        if target is None:
+            target = Path()
+        parsed_config = BaseConfig()  # ! paths in this arent properly relativized
+
+    with Status("Initializing metadata"):
+        problem_config.add(
+            "teams",
+            table().add(
+                team_name,
+                table().add("generator", "./generator").add("solver", "./solver"),
+            ),
+        )
+        if config.default_exec is not None:
+            problem_config.add(config.default_exec)
+        (target / "config.toml").write_text(dumps_toml(problem_config))
+        res_path = parsed_config.execution.results
+        if not res_path.is_absolute():
+            res_path = (target / res_path).resolve()
+        res_path.mkdir(parents=True, exist_ok=True)
+
     template_args: PartialTemplateArgs = {
-        "problem": "Blep",
-        "team": config.team_name or choice(("Dogs", "Cats", "Otters", "Red Pandas", "Possums", "Rats")),
+        "problem": problem_name,
+        "team": team_name,
     }
 
     if generator is not None:
-        _init_program(target, generator, template_args, Role.generator)
+        with Status("Initializing generator"):
+            _init_program(target, generator, template_args, Role.generator)
 
     if solver is not None:
-        _init_program(target, solver, template_args, Role.solver)
+        with Status("Initializing solver"):
+            _init_program(target, solver, template_args, Role.solver)
+    print(f"Initialized problem directory at {target}")
 
 
 @app.command()
