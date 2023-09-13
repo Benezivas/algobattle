@@ -321,7 +321,7 @@ class BattleConfig(BaseModel):
     :meth:`Battle.run` method with its fields set accordingly.
     """
 
-    type: str = "None"
+    type: str
     """Type of battle that will be used."""
 
     _children: ClassVar[list[Type[Self]]] = []
