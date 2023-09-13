@@ -8,11 +8,12 @@ from pydantic import ByteSize, ValidationError
 
 from algobattle.cli import parse_cli_args
 from algobattle.battle import Fight, Iterated, Averaged
-from algobattle.match import BaseConfig, Match, MatchConfig
+from algobattle.match import Match, AlgobattleConfig
 from algobattle.team import Team, Matchup, TeamHandler, TeamInfo
 from algobattle.program import ProgramRunInfo, RunConfig
-from algobattle.util import ExecutionConfig
+from algobattle.config import ExecutionConfig
 from .testsproblem.problem import TestProblem
+from algobattle.config import MatchConfig
 
 
 class TestTeam(Team):
@@ -156,11 +157,11 @@ class Execution(IsolatedAsyncioTestCase):
         problem_path = Path(__file__).parent / "testsproblem"
         cls.problem = TestProblem
         run_params = RunConfig(timeout=2)
-        cls.config_iter = BaseConfig(
+        cls.config_iter = AlgobattleConfig(
             match=MatchConfig(generator=run_params, solver=run_params, problem="Test Problem"),
             battle=Iterated.Config(maximum_size=10, rounds=2),
         )
-        cls.config_avg = BaseConfig(
+        cls.config_avg = AlgobattleConfig(
             match=MatchConfig(generator=run_params, solver=run_params, problem="Test Problem"),
             battle=Averaged.Config(instance_size=5, num_fights=3),
         )
@@ -215,7 +216,9 @@ class Parsing(TestCase):
 
     def test_no_cfg_default(self):
         _, cfg = parse_cli_args([str(self.problem_path)])
-        self.assertEqual(cfg, BaseConfig(teams=self.teams, match=MatchConfig(problem=self.problem_path / "problem.py")))
+        self.assertEqual(
+            cfg, AlgobattleConfig(teams=self.teams, match=MatchConfig(problem=self.problem_path / "problem.py"))
+        )
 
     def test_empty_cfg(self):
         with self.assertRaises(ValidationError):
@@ -225,7 +228,7 @@ class Parsing(TestCase):
         _, cfg = parse_cli_args([str(self.configs_path / "test.toml")])
         self.assertEqual(
             cfg,
-            BaseConfig(
+            AlgobattleConfig(
                 teams={
                     "team_0": TeamInfo(generator=self.configs_path / "generator", solver=self.configs_path / "solver")
                 },
@@ -250,7 +253,7 @@ class Parsing(TestCase):
         _, cfg = parse_cli_args([str(self.configs_path / "teams.toml")])
         self.assertEqual(
             cfg,
-            BaseConfig(
+            AlgobattleConfig(
                 teams={
                     "team 1": TeamInfo(generator=self.configs_path, solver=self.configs_path),
                     "team 2": TeamInfo(generator=self.configs_path, solver=self.configs_path),

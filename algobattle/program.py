@@ -1,7 +1,6 @@
 """Module providing an interface to interact with the teams' programs."""
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
-from functools import cached_property
 from os import environ
 from pathlib import Path
 from tarfile import TarFile, is_tarfile
@@ -9,7 +8,6 @@ from tempfile import TemporaryDirectory
 from timeit import default_timer
 from types import EllipsisType
 from typing import Any, ClassVar, Iterator, Protocol, Self, TypeVar, cast, Generator as PyGenerator
-from typing_extensions import TypedDict
 from uuid import uuid4
 import json
 from dataclasses import dataclass
@@ -19,13 +17,12 @@ from docker import DockerClient
 from docker.errors import APIError, BuildError as DockerBuildError, DockerException, ImageNotFound
 from docker.models.images import Image as DockerImage
 from docker.models.containers import Container as DockerContainer
-from docker.types import Mount, LogConfig, Ulimit
-from pydantic_core import CoreSchema
-from pydantic_core.core_schema import no_info_after_validator_function
+from docker.types import Mount
 from requests import Timeout, ConnectionError
-from pydantic import Field, GetCoreSchemaHandler
+from pydantic import Field
 from anyio.to_thread import run_sync
 from urllib3.exceptions import ReadTimeoutError
+from algobattle.config import DockerConfig, RunConfig, RunConfigOverride, RunSpecs
 
 from algobattle.util import (
     BuildError,
@@ -35,9 +32,6 @@ from algobattle.util import (
     ExceptionInfo,
     ExecutionError,
     ExecutionTimeout,
-    RunConfig,
-    RunConfigOverride,
-    RunSpecs,
     ValidationError,
     Role,
     BaseModel,
@@ -52,193 +46,6 @@ _client_var: DockerClient | None = None
 
 
 T = TypeVar("T")
-
-
-class _Adapter:
-    """Turns a docker library config class into a pydantic parseable one."""
-
-    _Args: ClassVar[type[TypedDict]]
-
-    @classmethod
-    def _construct(cls, kwargs: dict[str, Any]) -> Self:
-        return cls(**kwargs)
-
-    @classmethod
-    def __get_pydantic_core_schema__(cls, source: type, handler: GetCoreSchemaHandler) -> CoreSchema:
-        return no_info_after_validator_function(cls._construct, handler(cls._Args))
-
-
-class PydanticLogConfig(LogConfig, _Adapter):  # noqa: D101
-    class _Args(TypedDict):
-        type: str
-        conifg: dict[Any, Any]
-
-
-class PydanticUlimit(Ulimit, _Adapter):  # noqa: D101
-    class _Args(TypedDict):
-        name: str
-        soft: int
-        hard: int
-
-
-class AdvancedRunArgs(BaseModel):
-    """Advanced docker run options.
-
-    Contains all options exposed on the python docker run api, except `device_requests`
-    and those set by :meth:`Image.run` itself.
-    """
-
-    class _BlockIOWeight(TypedDict):
-        Path: str
-        Weight: int
-
-    class _DeviceRate(TypedDict):
-        Path: str
-        Rate: int
-
-    class _HealthCheck(TypedDict):
-        test: list[str] | str
-        interval: int
-        timeout: int
-        retries: int
-        start_period: int
-
-    # defaults set by us
-    network_mode: str = "none"
-
-    # actual docker defaults
-    command: str | list[str] | None = None
-    auto_remove: bool | None = None
-    blkio_weight_device: list[_BlockIOWeight] | None = None
-    blkio_weight: int | None = Field(default=None, ge=10, le=1000)
-    cap_add: list[str] | None = None
-    cap_drop: list[str] | None = None
-    cgroup_parent: str | None = None
-    cgroupns: str | None = None
-    cpu_count: int | None = None
-    cpu_percent: int | None = None
-    cpu_period: int | None = None
-    cpu_quota: int | None = None
-    cpu_rt_period: int | None = None
-    cpu_rt_runtime: int | None = None
-    cpu_shares: int | None = None
-    cpuset_mems: str | None = None
-    device_cgroup_rules: list[str] | None = None
-    device_read_bps: list[_DeviceRate] | None = None
-    device_read_iops: list[_DeviceRate] | None = None
-    device_write_bps: list[_DeviceRate] | None = None
-    device_write_iops: list[_DeviceRate] | None = None
-    devices: list[str] | None = None
-    dns: list[str] | None = None
-    dns_opt: list[str] | None = None
-    dns_search: list[str] | None = None
-    domainname: str | list[str] | None = None
-    entrypoint: str | list[str] | None = None
-    environment: dict[str, str] | list[str] | None = None
-    extra_hosts: dict[str, str] | None = None
-    group_add: list[str] | None = None
-    healthcheck: _HealthCheck | None = None
-    hostname: str | None = None
-    init: bool | None = None
-    init_path: str | None = None
-    ipc_mode: str | None = None
-    isolation: str | None = None
-    kernel_memory: int | str | None = None
-    labels: dict[str, str] | list[str] | None = None
-    links: dict[str, str] | None = None
-    log_config: PydanticLogConfig | None = None
-    lxc_conf: dict[Any, Any] | None = None
-    mac_address: str | None = None
-    mem_limit: int | str | None = None
-    mem_reservation: int | str | None = None
-    mem_swappiness: int | None = None
-    memswap_limit: str | int | None = None
-    network: str | None = None
-    network_disabled: bool | None = None
-    oom_kill_disable: bool | None = None
-    oom_score_adj: int | None = None
-    pid_mode: str | None = None
-    pids_limit: int | None = None
-    platform: str | None = None
-    ports: dict[Any, Any] | None = None
-    privileged: bool | None = None
-    publish_all_ports: bool | None = None
-    read_only: bool | None = None
-    restart_policy: dict[Any, Any] | None = None
-    runtime: str | None = None
-    security_opt: list[str] | None = None
-    shm_size: str | int | None = None
-    stdin_open: bool | None = None
-    stdout: bool | None = None
-    stderr: bool | None = None
-    stop_signal: str | None = None
-    storage_opt: dict[Any, Any] | None = None
-    stream: bool | None = None
-    sysctls: dict[Any, Any] | None = None
-    tmpfs: dict[Any, Any] | None = None
-    tty: bool | None = None
-    ulimits: list[PydanticUlimit] | None = None
-    use_config_proxy: bool | None = None
-    user: str | int | None = None
-    userns_mode: str | None = None
-    uts_mode: str | None = None
-    version: str | None = None
-    volume_driver: str | None = None
-    volumes: dict[Any, Any] | list[Any] | None = None
-    volumes_from: list[Any] | None = None
-    working_dir: str | None = None
-
-    @cached_property
-    def kwargs(self) -> dict[str, Any]:
-        """Transforms the object into :meth:`client.containers.run` kwargs."""
-        return self.model_dump(exclude_none=True)
-
-
-class AdvancedBuildArgs(BaseModel):
-    """Advanced docker build options.
-
-    Contains all options exposed on the python docker build api, except those set by :meth:`Image.build` itself.
-    """
-
-    class _ContainerLimits(TypedDict):
-        memory: int
-        memswap: int
-        cpushares: int
-        cpusetcpus: str
-
-    # defaults set by us
-    rm: bool = True
-    forcerm: bool = True
-    quiet: bool = True
-    network_mode: str = "host"
-    pull: bool | None = True
-
-    # actual Docker defaults
-    nocache: bool | None = None
-    encoding: str | None = None
-    buildargs: dict[Any, Any] | None = None
-    container_limits: _ContainerLimits | None = None
-    shmsize: int | None = None
-    labels: dict[Any, Any] | None = None
-    cache_from: list[Any] | None = None
-    target: str | None = None
-    squash: bool | None = None
-    extra_hosts: dict[Any, Any] | None = None
-    platform: str | None = None
-    isolation: str | None = None
-    use_config_proxy: bool | None = None
-
-    @cached_property
-    def kwargs(self) -> dict[str, Any]:
-        """Transforms the object into :meth:`client.images.build` kwargs."""
-        return self.model_dump(exclude_none=True)
-
-
-class DockerConfig(BaseModel):
-    """Settings passed directly to the docker daemon."""
-
-    build: AdvancedBuildArgs = AdvancedBuildArgs()
-    run: AdvancedRunArgs = AdvancedRunArgs()
 
 
 def client() -> DockerClient:

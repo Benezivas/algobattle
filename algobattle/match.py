@@ -11,13 +11,13 @@ from pydantic import Field
 from anyio import create_task_group, CapacityLimiter
 from anyio.to_thread import current_default_thread_limiter
 
-from algobattle.battle import Battle, FightHandler, FightUi, BattleUi
-from algobattle.program import DockerConfig, ProgramUi
-from algobattle.team import BuildUi, Matchup, Team, TeamHandler, TeamInfos
-from algobattle.problem import InstanceT, MatchConfig, Problem, SolutionT
+from algobattle.battle import Battle, FightHandler, FightUi, BattleUi, Iterated
+from algobattle.config import AlgobattleConfigBase
+from algobattle.program import ProgramUi
+from algobattle.team import BuildUi, Matchup, Team, TeamHandler
+from algobattle.problem import InstanceT, Problem, SolutionT
 from algobattle.util import (
     ExceptionInfo,
-    ExecutionConfig,
     Role,
     RunningTimer,
     BaseModel,
@@ -25,15 +25,10 @@ from algobattle.util import (
 )
 
 
-class BaseConfig(BaseModel):
-    """Base that contains all config options and can be parsed from config files."""
+# need to define this here so we don't cause import cycles
+class AlgobattleConfig(AlgobattleConfigBase):   # noqa: D101
 
-    # funky defaults to force their validation with context info present
-    teams: TeamInfos = Field(default={"team_0": {"generator": Path("generator"), "solver": Path("solver")}})
-    execution: ExecutionConfig = Field(default_factory=dict, validate_default=True)
-    match: MatchConfig = Field(default_factory=dict, validate_default=True)
-    battle: Battle.Config = Field(default={"type": "Iterated"}, validate_default=True)
-    docker: DockerConfig = Field(default_factory=dict, validate_default=True)
+    battle: Battle.Config = Iterated.Config()
 
     @classmethod
     def from_file(cls, file: Path) -> Self:
@@ -66,7 +61,7 @@ class Match(BaseModel):
         self,
         battle: Battle,
         matchup: Matchup,
-        config: BaseConfig,
+        config: AlgobattleConfig,
         problem: Problem[InstanceT, SolutionT],
         cpus: list[str | None],
         ui: "Ui",
@@ -99,7 +94,7 @@ class Match(BaseModel):
     @classmethod
     async def run(
         cls,
-        config: BaseConfig,
+        config: AlgobattleConfig,
         problem: Problem[InstanceT, SolutionT],
         ui: "Ui | None" = None,
     ) -> Self:

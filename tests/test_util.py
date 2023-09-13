@@ -3,9 +3,10 @@ import unittest
 import random
 from pathlib import Path
 
-from algobattle.match import BaseConfig
-from algobattle.problem import MatchConfig, Problem
+from algobattle.problem import Problem
 from algobattle.battle import Battle, Iterated, Averaged
+from algobattle.match import AlgobattleConfig
+from algobattle.config import MatchConfig
 from . import testsproblem
 
 
@@ -15,7 +16,7 @@ class Utiltests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         """Set up a problem, default config, fight handler and get a file name not existing on the file system."""
-        cls.config = BaseConfig(match=MatchConfig(problem="Test Problem"))
+        cls.config = AlgobattleConfig(match=MatchConfig(problem="Test Problem"))
         cls.problem_path = Path(testsproblem.__file__).parent / "problem.py"
         cls.rand_file_name = str(random.randint(0, 2**80))
         while Path(cls.rand_file_name).exists():

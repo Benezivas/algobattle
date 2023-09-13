@@ -21,13 +21,11 @@ from typing import (
 )
 from math import inf, isnan
 
-from pydantic import AfterValidator, Field
+from pydantic import AfterValidator
 
 from algobattle.util import (
     EncodableModel,
     InstanceSolutionModel,
-    MatchConfigBase,
-    RelativeFilePath,
     Role,
     Encodable,
 )
@@ -422,13 +420,3 @@ class SolutionModel(Solution[InstanceT], EncodableModel, InstanceSolutionModel, 
         if instance is not None:
             context["instance"] = instance
         return cls._decode(source, **context)
-
-
-class MatchConfig(MatchConfigBase):
-    """Match config settings with problem setting."""
-
-    problem: ProblemName | RelativeFilePath = Field(default=Path("problem.py"), validate_default=True)
-    """The problem this match is over.
-
-    Either the name of an installed problem, or the path to a problem file
-    """

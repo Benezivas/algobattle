@@ -2,13 +2,13 @@
 from abc import abstractmethod
 from dataclasses import dataclass, field
 from itertools import combinations
-from typing import Annotated, Any, Iterator, Protocol, Self, TypeAlias
+from typing import Any, Iterator, Protocol, Self
 
-from pydantic import BaseModel, Field
+from algobattle.config import MatchConfig, TeamInfo, TeamInfos
 
 from algobattle.program import DockerConfig, Generator, Solver
 from algobattle.problem import AnyProblem
-from algobattle.util import ExceptionInfo, MatchConfigBase, MatchMode, RelativePath, Role
+from algobattle.util import ExceptionInfo, MatchMode, Role
 
 
 _team_names: set[str] = set()
@@ -26,17 +26,33 @@ class BuildUi(Protocol):
         """Informs the ui that the current build has been finished."""
 
 
-class TeamInfo(BaseModel):
-    """The config parameters defining a team."""
+@dataclass
+class Team:
+    """Team class responsible for holding basic information of a specific team."""
 
-    generator: RelativePath
-    solver: RelativePath
+    name: str
+    generator: Generator
+    solver: Solver
 
+    def __post_init__(self) -> None:
+        """Creates a team object.
+
+        Raises:
+            ValueError: If the team name is already in use.
+        """
+        super().__init__()
+        self.name = self.name.replace(" ", "_").lower()  # Lower case needed for docker tag created from name
+        if self.name in _team_names:
+            raise ValueError
+        _team_names.add(self.name)
+
+    @classmethod
     async def build(
-        self,
+        cls,
+        info: TeamInfo,
         name: str,
         problem: AnyProblem,
-        match_config: MatchConfigBase,
+        match_config: MatchConfig,
         docker_config: DockerConfig,
         name_programs: bool,
         ui: BuildUi,
@@ -62,7 +78,7 @@ class TeamInfo(BaseModel):
         tag_name = name.lower().replace(" ", "_") if name_programs else None
         ui.start_build(name, Role.generator, match_config.build_timeout)
         generator = await Generator.build(
-            path=self.generator,
+            path=info.generator,
             problem=problem,
             docker_config=docker_config,
             timeout=match_config.build_timeout,
@@ -75,7 +91,7 @@ class TeamInfo(BaseModel):
         try:
             ui.start_build(name, Role.solver, match_config.build_timeout)
             solver = await Solver.build(
-                path=self.solver,
+                path=info.solver,
                 problem=problem,
                 docker_config=docker_config,
                 timeout=match_config.build_timeout,
@@ -89,30 +105,6 @@ class TeamInfo(BaseModel):
             generator.remove()
             raise
         return Team(name, generator, solver)
-
-
-TeamInfos: TypeAlias = Annotated[dict[str, TeamInfo], Field(validate_default=True)]
-
-
-@dataclass
-class Team:
-    """Team class responsible for holding basic information of a specific team."""
-
-    name: str
-    generator: Generator
-    solver: Solver
-
-    def __post_init__(self) -> None:
-        """Creates a team object.
-
-        Raises:
-            ValueError: If the team name is already in use.
-        """
-        super().__init__()
-        self.name = self.name.replace(" ", "_").lower()  # Lower case needed for docker tag created from name
-        if self.name in _team_names:
-            raise ValueError
-        _team_names.add(self.name)
 
     def __str__(self) -> str:
         return self.name
@@ -168,7 +160,7 @@ class TeamHandler:
         infos: TeamInfos,
         problem: AnyProblem,
         mode: MatchMode,
-        match_config: MatchConfigBase,
+        match_config: MatchConfig,
         docker_config: DockerConfig,
         ui: BuildUi,
     ) -> Self:
@@ -189,7 +181,7 @@ class TeamHandler:
         handler = cls(cleanup=mode == "tournament")
         for name, info in infos.items():
             try:
-                team = await info.build(name, problem, match_config, docker_config, mode == "testing", ui)
+                team = await Team.build(info, name, problem, match_config, docker_config, mode == "testing", ui)
                 handler.active.append(team)
             except Exception as e:
                 handler.excluded[name] = ExceptionInfo.from_exception(e)
