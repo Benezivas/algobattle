@@ -8,6 +8,7 @@ from tempfile import TemporaryDirectory
 from timeit import default_timer
 from types import EllipsisType
 from typing import Any, ClassVar, Iterator, Protocol, Self, TypeVar, cast, Generator as PyGenerator
+from typing_extensions import TypedDict
 from uuid import uuid4
 import json
 from dataclasses import dataclass
@@ -22,7 +23,6 @@ from requests import Timeout, ConnectionError
 from pydantic import Field
 from anyio.to_thread import run_sync
 from urllib3.exceptions import ReadTimeoutError
-from algobattle.config import DockerConfig, RunConfig, RunConfigOverride, RunSpecs
 
 from algobattle.util import (
     BuildError,
@@ -36,7 +36,7 @@ from algobattle.util import (
     Role,
     BaseModel,
 )
-from algobattle.problem import AnyProblem, Instance, Problem, Solution
+from algobattle.problem import AnyProblem, Instance, Solution
 
 
 AnySolution = Solution[Instance]
@@ -59,6 +59,68 @@ def client() -> DockerClient:
     except (DockerException, APIError):
         raise SystemExit("Could not connect to the docker daemon. Is docker running?")
     return _client_var
+
+
+class RunConfigOverride(TypedDict, total=False):
+    """Run parameters that were overriden by the battle type."""
+
+    timeout: float | None
+    space: int | None
+    cpus: int
+
+
+@dataclass(frozen=True, slots=True)
+class RunSpecs:
+    """Actual specification of a program run."""
+
+    timeout: float | None
+    space: int | None
+    cpus: int
+    overriden: RunConfigOverride
+
+
+@dataclass(frozen=True, slots=True)
+class RunConfigView:
+    """Config view for single runs."""
+
+    timeout: float | None
+    space: int | None
+    cpus: int
+
+    def reify(
+        self,
+        timeout: float | None | EllipsisType,
+        space: int | None | EllipsisType,
+        cpus: int | EllipsisType,
+    ) -> RunSpecs:
+        """Merges the overriden config options with the parsed ones."""
+        overriden = RunConfigOverride()
+        if timeout is ...:
+            timeout = self.timeout
+        else:
+            overriden["timeout"] = timeout
+        if space is ...:
+            space = self.space
+        else:
+            overriden["space"] = space
+        if cpus is ...:
+            cpus = self.cpus
+        else:
+            overriden["cpus"] = cpus
+        return RunSpecs(timeout=timeout, space=space, cpus=cpus, overriden=overriden)
+
+
+@dataclass(frozen=True, slots=True)
+class ProgramConfigView:
+    """Config settings relevant to the program module."""
+
+    build_timeout: float | None
+    max_image_size: int | None
+    strict_timeouts: bool
+    build_kwargs: dict[str, Any]
+    run_kwargs: dict[str, Any]
+    generator: RunConfigView
+    solver: RunConfigView
 
 
 class ProgramUi(Protocol):
@@ -166,14 +228,10 @@ class Program(ABC):
 
     id: str
     """The id of the Docker image."""
-    problem: Problem[Instance, Solution[Instance]]
-    """The problem this program creates instances and/or solutions for."""
-    config: RunConfig
-    """Config settings this program will use."""
-    strict_timeouts: bool
-    """Wether this program will raise an exception if the container times out."""
-    docker_config: DockerConfig
-    """Advanced config settings this program will use to run."""
+    problem: AnyProblem
+    """The problem this program generates/solves."""
+    config: ProgramConfigView
+    """Config settings used for this program."""
 
     role: ClassVar[Role]
     """Role of this program."""
@@ -209,25 +267,17 @@ class Program(ABC):
         cls,
         path: Path,
         *,
-        timeout: float | None = 600,
-        max_size: int | None = None,
-        team_name: str | None = None,
         problem: AnyProblem,
-        config: RunConfig = RunConfig(),
-        strict_timeouts: bool = False,
-        docker_config: DockerConfig = DockerConfig(),
+        config: ProgramConfigView,
+        team_name: str | None = None,
     ) -> Self:
         """Creates a program by building the specified docker image.
 
         Args:
             path: Path to a Dockerfile (or folder containing one) from which to build the image.
-            timeout: Build timeout.
-            max_size: Maximum size of the built image.
+            problem: The problem this program generates/solves.
+            config: Settings for this program.
             team_name: If set the image will be given a descriptive name.
-            problem: Problem this program is solving/generating instances for.
-            config: Run config for this program.
-            strict_timeouts: Wether to raise an error if the container times out but produces valid output.
-            docker_config: Docker config that will be used to build and run this program.
 
         Returns:
             The built Program.
@@ -251,9 +301,9 @@ class Program(ABC):
                     cls._build_daemon_call,
                     str(path),
                     name,
-                    timeout,
+                    config.build_timeout,
                     dockerfile,
-                    docker_config.build.kwargs,
+                    config.build_kwargs,
                 )
                 if old_image is not None:
                     old_image.reload()
@@ -271,15 +321,15 @@ class Program(ABC):
             cast(str, image.id),
             problem=problem,
             config=config,
-            strict_timeouts=strict_timeouts,
-            docker_config=docker_config,
         )
         used_size = cast(dict[str, Any], image.attrs).get("Size", 0)
-        if max_size is not None and used_size > max_size:
+        if config.max_image_size is not None and used_size > config.max_image_size:
             try:
                 self.remove()
             finally:
-                raise BuildError("Built image is too large.", detail=f"Size: {used_size}B, limit: {max_size}B.")
+                raise BuildError(
+                    "Built image is too large.", detail=f"Size: {used_size}B, limit: {config.max_image_size}B."
+                )
         return self
 
     @classmethod
@@ -297,6 +347,33 @@ class Program(ABC):
             ),
         )
         return image
+
+    def run_specs(
+        self,
+        timeout: float | None | EllipsisType,
+        space: int | None | EllipsisType,
+        cpus: int | EllipsisType,
+    ) -> RunSpecs:
+        """Merges the overriden config options with the parsed ones."""
+        overriden = RunConfigOverride()
+        match self.role:
+            case Role.generator:
+                config = self.config.generator
+            case Role.solver:
+                config = self.config.solver
+        if timeout is ...:
+            timeout = config.timeout
+        else:
+            overriden["timeout"] = timeout
+        if space is ...:
+            space = config.space
+        else:
+            overriden["space"] = space
+        if cpus is ...:
+            cpus = config.cpus
+        else:
+            overriden["cpus"] = cpus
+        return RunSpecs(timeout=timeout, space=space, cpus=cpus, overriden=overriden)
 
     async def _run_inner(
         self,
@@ -338,7 +415,7 @@ class Program(ABC):
                     detach=True,
                     mounts=io.mounts if io else None,
                     cpuset_cpus=set_cpus,
-                    **self.docker_config.run.kwargs,
+                    **self.config.run_kwargs,
                 ),
             )
 
@@ -397,7 +474,7 @@ class Program(ABC):
             elapsed_time = round(default_timer() - start_time, 2)
             if len(e.args) != 1 or not isinstance(e.args[0], ReadTimeoutError):
                 raise
-            if self.strict_timeouts:
+            if self.config.strict_timeouts:
                 raise ExecutionTimeout("The docker container exceeded the time limit.", runtime=elapsed_time)
             return elapsed_time
 
@@ -457,7 +534,7 @@ class Generator(Program):
         Returns:
             Datastructure containing all info about the generator execution and the created problem instance.
         """
-        specs = self.config.reify(timeout, space, cpus)
+        specs = self.run_specs(timeout, space, cpus)
         runtime = 0
         battle_data = None
         instance = None
@@ -574,7 +651,7 @@ class Solver(Program):
         Returns:
             Datastructure containing all info about the solver execution and the solution it computed.
         """
-        specs = self.config.reify(timeout, space, cpus)
+        specs = self.run_specs(timeout, space, cpus)
         runtime = 0
         battle_data = None
         solution = None

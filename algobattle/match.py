@@ -6,13 +6,12 @@ from functools import cached_property
 from itertools import combinations
 from pathlib import Path
 import tomllib
-from types import EllipsisType
-from typing import Annotated, Any, ClassVar, Literal, Self, TypeAlias, TypeVar, TypedDict, cast, overload
+from typing import Annotated, Any, ClassVar, Self, TypeAlias, TypeVar, TypedDict, cast, overload
 
 from pydantic import AfterValidator, ByteSize, ConfigDict, Field, GetCoreSchemaHandler, ValidationInfo, model_validator
 from pydantic.types import PathType
 from pydantic_core import CoreSchema
-from pydantic_core.core_schema import no_info_after_validator_function, tagged_union_schema, union_schema
+from pydantic_core.core_schema import no_info_after_validator_function, union_schema
 from anyio import create_task_group, CapacityLimiter
 from anyio.to_thread import current_default_thread_limiter
 from docker.types import LogConfig, Ulimit
@@ -533,24 +532,6 @@ class DockerConfig(BaseModel):
     run: AdvancedRunArgs = AdvancedRunArgs()
 
 
-class RunConfigOverride(TypedDict, total=False):
-    """Run parameters that were overriden by the battle type."""
-
-    timeout: float | None
-    space: int | None
-    cpus: int
-
-
-@dataclass(frozen=True, slots=True)
-class RunSpecs:
-    """Actual specification of a program run."""
-
-    timeout: float | None
-    space: int | None
-    cpus: int
-    overriden: RunConfigOverride
-
-
 class RunConfig(BaseModel):
     """Parameters determining how a program is run."""
 
@@ -564,28 +545,6 @@ class RunConfig(BaseModel):
     """
     cpus: int = 1
     """Number of cpu cores available."""
-
-    def reify(
-        self,
-        timeout: float | None | EllipsisType,
-        space: int | None | EllipsisType,
-        cpus: int | EllipsisType,
-    ) -> RunSpecs:
-        """Merges the overriden config options with the parsed ones."""
-        overriden = RunConfigOverride()
-        if timeout is ...:
-            timeout = self.timeout
-        else:
-            overriden["timeout"] = timeout
-        if space is ...:
-            space = self.space
-        else:
-            overriden["space"] = space
-        if cpus is ...:
-            cpus = self.cpus
-        else:
-            overriden["cpus"] = cpus
-        return RunSpecs(timeout=timeout, space=space, cpus=cpus, overriden=overriden)
 
 
 class MatchConfig(BaseModel):
