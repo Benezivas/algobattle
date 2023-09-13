@@ -3,6 +3,7 @@
 Provides a command line interface to start matches and observe them. See `battle --help` for further options.
 """
 from datetime import datetime
+from enum import StrEnum
 from os import environ
 from pathlib import Path
 from random import choice
@@ -15,7 +16,7 @@ from importlib.metadata import version as pkg_version
 from zipfile import ZipFile
 
 from anyio import run as run_async_fn
-from pydantic import Field, BaseModel
+from pydantic import Field
 from typer import Exit, Typer, Argument, Option, Abort, get_app_dir, launch, confirm
 from rich.console import Group, RenderableType, Console
 from rich.live import Live
@@ -35,6 +36,7 @@ from rich.panel import Panel
 from rich.text import Text
 from rich.columns import Columns
 from rich.status import Status
+from rich.prompt import Prompt
 from tomlkit import TOMLDocument, parse as parse_toml, dumps as dumps_toml, table
 from tomlkit.items import Table as TomlTable
 
@@ -42,7 +44,7 @@ from algobattle.battle import Battle
 from algobattle.match import AlgobattleConfig, EmptyUi, Match, Ui
 from algobattle.problem import Problem
 from algobattle.team import Matchup
-from algobattle.util import ExecutionConfig, MatchConfig, Role, RunningTimer, BaseModel as AlgobattleBaseModel, TempDir
+from algobattle.util import ExecutionConfig, MatchConfig, Role, RunningTimer, BaseModel, TempDir
 from algobattle.templates import Language, PartialTemplateArgs, TemplateArgs, write_templates
 
 
@@ -53,18 +55,22 @@ app = Typer(pretty_exceptions_show_locals=True)
 console = Console()
 
 
+class _InstallMode(StrEnum):
+    normal = "normal"
+    user = "user"
+
+
 class _General(BaseModel):
     team_name: str | None = None
-    install_command: list[str] = [sys.executable, "-m", "pip", "install"]
+    install_mode: _InstallMode | None = None
 
 
-class CliConfig(BaseModel, frozen=True):
+class CliConfig(BaseModel):
     general: _General = Field(default_factory=dict, validate_default=True)
     execution: ExecutionConfig = Field(default_factory=dict, validate_default=True)
 
     _doc: TOMLDocument
     path: ClassVar[Path] = Path(get_app_dir("algobattle")) / "config.toml"
-    model_config = AlgobattleBaseModel.model_config
 
     @classmethod
     def init_file(cls) -> None:
@@ -91,6 +97,27 @@ class CliConfig(BaseModel, frozen=True):
         """The default exec config for each problem."""
         exec: Any = self._doc.get("exec", None)
         return exec
+
+    def install_cmd(self, target: Path) -> list[str]:
+        cmd = [sys.executable, "-m", "pip", "install"]
+        if self.general.install_mode is None:
+            command_str: str = Prompt.ask(
+                "[cyan]Do you want to install problems normally, or into the user directory?[/] If you're using an "
+                "environment manager like venv or conda you should install them normally, otherwise user installs "
+                "might be better.",
+                default="normal",
+                choices=["normal", "user"],
+            )
+            if command_str == "user":
+                cmd.append("--user")
+                self.general.install_mode = _InstallMode.user
+            else:
+                self.general.install_mode = _InstallMode.normal
+            if "general" not in self._doc:
+                self._doc.add("general", table())
+            cast(TomlTable, self._doc["general"])["install_mode"] = command_str
+            self.save()
+        return cmd + [str(target.resolve())]
 
 
 @app.command("run")
@@ -145,7 +172,7 @@ def _init_program(target: Path, lang: Language, args: PartialTemplateArgs, role:
 @app.command()
 def init(
     target: Annotated[
-        Optional[Path], Argument(exists=True, file_okay=False, writable=True, help="The folder to initialize.")
+        Optional[Path], Argument(file_okay=False, writable=True, help="The folder to initialize.")
     ] = None,
     problem: Annotated[
         Optional[Path],
@@ -187,6 +214,7 @@ def init(
             assert isinstance(problem_name, str)
             if target is None:
                 target = Path() if Path().name == problem_name else Path() / problem_name
+            target.mkdir(parents=True, exist_ok=True)
 
             new_problem = True
             problem_data = list(build_dir.iterdir())
@@ -204,9 +232,10 @@ def init(
                     new_problem = False
 
             if new_problem:
+                cmd = config.install_cmd(build_dir)
                 with Status("Installing problem"):
                     res = run_process(
-                        config.general.install_command + [build_dir.absolute()],
+                        cmd,
                         shell=False,
                         capture_output=True,
                         text=True,
