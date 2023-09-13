@@ -1,7 +1,6 @@
 """Module defining the Problem and Solution base classes and related objects."""
 from abc import ABC, abstractmethod
 from functools import wraps
-from importlib.metadata import entry_points
 import importlib.util
 import sys
 from pathlib import Path
@@ -28,16 +27,8 @@ from algobattle.util import (
     InstanceSolutionModel,
     Role,
     Encodable,
+    problem_entrypoints,
 )
-
-
-def _check_problem_name(val: str) -> str:
-    if val not in Problem.all():
-        raise ValueError("Value is not the name of an installed Problem.")
-    return val
-
-
-ProblemName = Annotated[str, AfterValidator(_check_problem_name)]
 
 
 class Instance(Encodable, ABC):
@@ -368,37 +359,29 @@ class Problem(Generic[InstanceT, SolutionT]):
             sys.modules.pop("_problem")
 
     @classmethod
-    def get(cls, problem: ProblemName | Path) -> "AnyProblem":
+    def load(cls, problem: "ProblemName | Path") -> "AnyProblem":
         """Gets either an installed problem instance using its name or imports a problem file."""
         if isinstance(problem, Path):
             return cls.import_from_path(problem)
+        elif problem in cls._installed:
+            return cls._installed[problem]
         else:
-            all = cls.all()
-            if problem not in all:
+            try:
+                loaded = problem_entrypoints()[problem].load()
+                if not isinstance(loaded, cls):
+                    raise RuntimeError(f"The entrypoint '{problem}' doesn't point to a problem but rather: {problem}.")
+                return loaded
+            except KeyError:
                 raise ValueError("Problem name is not valid.")
-            return all[problem]
-
-    @classmethod
-    def all(cls) -> "dict[str, AnyProblem]":
-        """Returns a dictionary mapping the names of all installed problems to their python objects.
-
-        It includes all Problem objects that have been created so far and ones exposed to the algobattle module via the
-        `algobattle.problem` entrypoint hook.
-
-        Raises:
-            RuntimeError: If an entrypoint is not a Problem.
-        """
-        for entrypoint in entry_points(group="algobattle.problem"):
-            if entrypoint.name not in cls._installed:
-                problem = entrypoint.load()
-                if not isinstance(problem, cls):
-                    raise RuntimeError(
-                        f"The entrypoint '{entrypoint.name}' doesn't point to a problem but rather: {problem}."
-                    )
-                cls._installed[entrypoint.name] = problem
-        return cls._installed
 
 
+def _check_problem_name(val: str) -> str:
+    if val not in Problem._installed and val not in problem_entrypoints():
+        raise ValueError("Value is not the name of an installed Problem.")
+    return val
+
+
+ProblemName = Annotated[str, AfterValidator(_check_problem_name)]
 AnyProblem = Problem[Any, Any]
 
 

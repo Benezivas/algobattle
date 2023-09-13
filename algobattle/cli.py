@@ -53,7 +53,7 @@ def parse_cli_args(args: list[str]) -> tuple[CliOptions, AlgobattleConfig]:
         path /= "config.toml"
 
     config = AlgobattleConfig.from_file(path)
-    problem = Problem.get(config.match.problem)
+    problem = Problem.load(config.match.problem)
 
     exec_config = CliOptions(
         problem=problem,

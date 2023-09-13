@@ -13,6 +13,7 @@ from pathlib import Path
 from traceback import format_exception
 from typing import Annotated, Any, Callable, ClassVar, Iterable, Literal, LiteralString, TypeVar, Self, cast, get_args
 from annotated_types import GroupedMetadata
+from importlib.metadata import EntryPoint, entry_points
 
 from pydantic import (
     AfterValidator,
@@ -437,3 +438,13 @@ def _relativize_file(path: Path, info: ValidationInfo) -> Path:
 
 RelativePath = Annotated[Path, AfterValidator(_relativize_path), Field(validate_default=True)]
 RelativeFilePath = Annotated[Path, AfterValidator(_relativize_file), Field(validate_default=True)]
+
+
+def problem_entrypoints() -> dict[str, EntryPoint]:
+    """Returns all currently registered problem entrypoints."""
+    return {e.name: e for e in entry_points(group="algobattle.problem")}
+
+
+def battle_entrypoints() -> dict[str, EntryPoint]:
+    """Returns all currently registered battle entrypoints."""
+    return {e.name: e for e in entry_points(group="algobattle.battle")}

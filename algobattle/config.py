@@ -386,8 +386,8 @@ class AlgobattleConfigBase(BaseModel):
     teams: TeamInfos = Field(
         default={"team_0": {"generator": Path("generator"), "solver": Path("solver")}}, validate_default=True
     )
-    execution: ExecutionConfig = Field(default_factory=ExecutionConfig, validate_default=True)
-    match: MatchConfig = Field(default_factory=MatchConfig, validate_default=True)
+    execution: ExecutionConfig = Field(default_factory=dict, validate_default=True)
+    match: MatchConfig = Field(default_factory=dict, validate_default=True)
     battle: BattleConfig = IteratedConfig()
     docker: DockerConfig = DockerConfig()
 
