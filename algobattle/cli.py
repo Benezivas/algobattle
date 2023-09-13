@@ -17,7 +17,7 @@ from zipfile import ZipFile
 
 from anyio import run as run_async_fn
 from pydantic import Field
-from typer import Exit, Typer, Argument, Option, Abort, get_app_dir, launch, confirm
+from typer import Exit, Typer, Argument, Option, Abort, get_app_dir, launch
 from rich.console import Group, RenderableType, Console
 from rich.live import Live
 from rich.table import Table, Column
@@ -36,7 +36,7 @@ from rich.panel import Panel
 from rich.text import Text
 from rich.columns import Columns
 from rich.status import Status
-from rich.prompt import Prompt
+from rich.prompt import Prompt, Confirm
 from tomlkit import TOMLDocument, parse as parse_toml, dumps as dumps_toml, table
 from tomlkit.items import Table as TomlTable
 
@@ -158,7 +158,9 @@ def run_match(
 def _init_program(target: Path, lang: Language, args: PartialTemplateArgs, role: Role) -> None:
     dir = target / role.value
     if dir.exists():
-        replace = confirm(f"The targeted directory already contains a {role}, do you want to replace it?", default=True)
+        replace = Confirm.ask(
+            f"[magenta2]The targeted directory already contains a {role}, do you want to replace it?", default=True
+        )
         if replace:
             rmtree(dir)
             dir.mkdir()
@@ -166,7 +168,8 @@ def _init_program(target: Path, lang: Language, args: PartialTemplateArgs, role:
             return
     else:
         dir.mkdir(parents=True, exist_ok=True)
-    write_templates(dir, lang, cast(TemplateArgs, args | {"program": role.value}))
+    with Status(f"Initializing {role}"):
+        write_templates(dir, lang, cast(TemplateArgs, args | {"program": role.value}))
 
 
 @app.command()
@@ -219,8 +222,9 @@ def init(
             new_problem = True
             problem_data = list(build_dir.iterdir())
             if any(((target / path.name).exists() for path in problem_data)):
-                replace = confirm(
-                    "The target directory already contains problem data, do you want to replace it?", default=True
+                replace = Confirm.ask(
+                    "[magenta2]The target directory already contains problem data, do you want to replace it?",
+                    default=True,
                 )
                 if replace:
                     for path in problem_data:
@@ -275,14 +279,11 @@ def init(
         "problem": problem_name,
         "team": team_name,
     }
-
     if generator is not None:
-        with Status("Initializing generator"):
-            _init_program(target, generator, template_args, Role.generator)
-
+        _init_program(target, generator, template_args, Role.generator)
     if solver is not None:
-        with Status("Initializing solver"):
-            _init_program(target, solver, template_args, Role.solver)
+        _init_program(target, solver, template_args, Role.solver)
+
     print(f"Initialized problem directory at {target}")
 
 
