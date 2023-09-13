@@ -100,18 +100,7 @@ class CliConfig(BaseModel, frozen=True):
 def run_match(
     path: Annotated[Path, Argument(exists=True, help="Path to either a config file or a directory containing one.")],
     ui: Annotated[bool, Option(help="Whether to show the CLI UI during match execution.")] = True,
-    result_path: Annotated[
-        Optional[Path],  # typer doesn't support union syntax
-        Option(
-            "--result",
-            "-r",
-            exists=True,
-            dir_okay=True,
-            file_okay=False,
-            writable=True,
-            help="If set, the match result object will be saved in the folder.",
-        ),
-    ] = None,
+    save: Annotated[bool, Option(help="Whether to save the match result.")] = True,
 ) -> Match:
     """Runs a match using the config found at the provided path and displays it to the cli."""
     config = BaseConfig.from_file(path)
@@ -130,10 +119,10 @@ def run_match(
                 for team, pts in points.items():
                     print(f"Team {team} gained {pts:.1f} points.")
 
-            if result_path is not None:
+            if save:
                 t = datetime.now()
                 filename = f"{t.year:04d}-{t.month:02d}-{t.day:02d}_{t.hour:02d}-{t.minute:02d}-{t.second:02d}.json"
-                with open(result_path / filename, "w+") as f:
+                with open(config.execution.results / filename, "w+") as f:
                     f.write(result.model_dump_json(exclude_defaults=True))
             return result
         except KeyboardInterrupt:
