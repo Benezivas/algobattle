@@ -12,6 +12,7 @@ from pydantic_core import CoreSchema
 from pydantic_core.core_schema import no_info_after_validator_function
 from docker.types import LogConfig, Ulimit
 
+from algobattle.problem import ProblemName
 from algobattle.util import BaseModel, ByteSizeInt, MatchMode, RelativeFilePath, RelativePath, TimeDeltaFloat, WithNone
 
 
@@ -263,7 +264,7 @@ class MatchConfig(BaseModel):
     It will be parsed from the given config file and contains all settings that specify how the match is run.
     """
 
-    problem: RelativeFilePath | str = Field(default=Path("problem.py"), validate_default=True)
+    problem: ProblemName | RelativeFilePath = Field(default=Path("problem.py"), validate_default=True)
     """The problem this match is over.
 
     Either the name of an installed problem, or the path to a problem file
