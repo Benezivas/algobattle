@@ -434,13 +434,7 @@ def _relativize_path(path: Path, info: ValidationInfo) -> Path:
     return path
 
 
-def _relativize_file(path: Path, info: ValidationInfo) -> Path:
-    path = _relativize_path(path, info)
-    return PathType.validate_file(path, info)
-
-
 RelativePath = Annotated[Path, AfterValidator(_relativize_path), Field(validate_default=True)]
-RelativeFilePath = Annotated[Path, AfterValidator(_relativize_file), Field(validate_default=True)]
 
 
 class RunConfigOverride(TypedDict, total=False):
@@ -529,6 +523,8 @@ class ExecutionConfig(BaseModel):
     """Highest number of points each team can achieve."""
     results: RelativePath = Path("./results")
     """Path to a folder where the results will be saved."""
+
+    model_config = ConfigDict(revalidate_instances="always")
 
     @model_validator(mode="after")
     def val_set_cpus(self) -> Self:

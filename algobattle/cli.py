@@ -39,10 +39,10 @@ from tomlkit import TOMLDocument, parse as parse_toml, dumps as dumps_toml, tabl
 from tomlkit.items import Table as TomlTable
 
 from algobattle.battle import Battle
-from algobattle.match import BaseConfig, EmptyUi, Match, Ui
+from algobattle.match import AlgobattleConfig, EmptyUi, Match, Ui
 from algobattle.problem import Problem
 from algobattle.team import Matchup
-from algobattle.util import ExecutionConfig, Role, RunningTimer, BaseModel as AlgobattleBaseModel, TempDir
+from algobattle.util import ExecutionConfig, MatchConfig, Role, RunningTimer, BaseModel as AlgobattleBaseModel, TempDir
 from algobattle.templates import Language, PartialTemplateArgs, TemplateArgs, write_templates
 
 
@@ -100,7 +100,7 @@ def run_match(
     save: Annotated[bool, Option(help="Whether to save the match result.")] = True,
 ) -> Match:
     """Runs a match using the config found at the provided path and displays it to the cli."""
-    config = BaseConfig.from_file(path)
+    config = AlgobattleConfig.from_file(path)
     problem = Problem.get(config.match.problem)
     result = Match()
     try:
@@ -179,7 +179,8 @@ def init(
                     problem_zip.extractall(build_dir)
 
             problem_config = parse_toml((build_dir / "config.toml").read_text())
-            parsed_config = BaseConfig.model_validate(problem_config)  # ! paths in this arent properly relativized
+            # ! paths in this config arent properly relativized
+            parsed_config = AlgobattleConfig.model_validate(problem_config)
             problem_name = parsed_config.match.problem
             assert isinstance(problem_name, str)
             if target is None:
@@ -220,7 +221,8 @@ def init(
         problem_config = TOMLDocument()
         if target is None:
             target = Path()
-        parsed_config = BaseConfig()  # ! paths in this arent properly relativized
+        # ! paths in this config arent properly relativized
+        parsed_config = AlgobattleConfig(match=MatchConfig(problem="Uknown Problem"))
 
     with Status("Initializing metadata"):
         problem_config.add(

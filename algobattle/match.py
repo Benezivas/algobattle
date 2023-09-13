@@ -12,7 +12,7 @@ from pydantic import Field
 from anyio import create_task_group, CapacityLimiter
 from anyio.to_thread import current_default_thread_limiter
 
-from algobattle.battle import Battle, FightHandler, FightUi, BattleUi
+from algobattle.battle import Battle, FightHandler, FightUi, BattleUi, Iterated
 from algobattle.program import DockerConfig, ProgramUi
 from algobattle.team import BuildUi, Matchup, Team, TeamHandler, TeamInfos
 from algobattle.problem import InstanceT, Problem, SolutionT
@@ -27,15 +27,14 @@ from algobattle.util import (
 )
 
 
-class BaseConfig(BaseModel):
+class AlgobattleConfig(BaseModel):
     """Base that contains all config options and can be parsed from config files."""
 
-    # funky defaults to force their validation with context info present
-    teams: TeamInfos = Field(default={"team_0": {"generator": Path("generator"), "solver": Path("solver")}})
-    execution: ExecutionConfig = Field(default_factory=dict, validate_default=True)
-    match: MatchConfig = Field(default_factory=dict, validate_default=True)
-    battle: Battle.Config = Field(default={"type": "Iterated"}, validate_default=True)
-    docker: DockerConfig = Field(default_factory=dict, validate_default=True)
+    teams: TeamInfos = Field(default_factory=dict)
+    execution: ExecutionConfig = Field(default=ExecutionConfig, validate_default=True)  # to force path relativization
+    match: MatchConfig
+    battle: Battle.Config = Iterated.Config()
+    docker: DockerConfig = DockerConfig()
 
     @classmethod
     def from_file(cls, source: Path) -> Self:
@@ -53,7 +52,7 @@ class BaseConfig(BaseModel):
                 except tomllib.TOMLDecodeError as e:
                     raise ValueError(f"The config file at {source} is not a properly formatted TOML file!\n{e}")
         Battle.load_entrypoints()
-        return cls.model_validate(config_dict, context={"base_path": source.parent, "check_problem": True})
+        return cls.model_validate(config_dict, context={"base_path": source.parent})
 
 
 class Match(BaseModel):
@@ -69,7 +68,7 @@ class Match(BaseModel):
         self,
         battle: Battle,
         matchup: Matchup,
-        config: BaseConfig,
+        config: AlgobattleConfig,
         problem: Problem[InstanceT, SolutionT],
         cpus: list[str | None],
         ui: "Ui",
@@ -101,7 +100,7 @@ class Match(BaseModel):
 
     async def run(
         self,
-        config: BaseConfig,
+        config: AlgobattleConfig,
         problem: Problem[InstanceT, SolutionT],
         ui: "Ui | None" = None,
     ) -> None:

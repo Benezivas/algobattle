@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from itertools import combinations
 from typing import Annotated, Any, Iterable, Iterator, Protocol, Self, TypeAlias
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from algobattle.program import DockerConfig, Generator, Solver
 from algobattle.problem import AnyProblem
@@ -35,6 +35,8 @@ class TeamInfo(BaseModel):
 
     generator: RelativePath
     solver: RelativePath
+
+    model_config = ConfigDict(revalidate_instances="always")
 
     async def build(
         self,
