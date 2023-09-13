@@ -9,7 +9,6 @@ from importlib.metadata import entry_points
 from abc import abstractmethod
 from inspect import isclass
 from typing import (
-    TYPE_CHECKING,
     Any,
     Awaitable,
     Callable,
@@ -23,9 +22,9 @@ from typing import (
     TypeVar,
 )
 
-from pydantic import Field
-
-from algobattle.config import BattleConfig, IteratedConfig
+from pydantic import Field, GetCoreSchemaHandler
+from pydantic_core import CoreSchema
+from pydantic_core.core_schema import tagged_union_schema
 
 from algobattle.program import (
     Generator,
@@ -220,10 +219,42 @@ class Battle(BaseModel):
     _battle_types: ClassVar[dict[str, type[Self]]] = {}
     """Dictionary mapping the names of all registered battle types to their python classes."""
 
-    if TYPE_CHECKING:
-        Config: TypeAlias = BattleConfig
-    else:
-        Config: ClassVar[TypeAlias] = BattleConfig
+    class Config(BaseModel):
+        """Config object for each specific battle type.
+
+        A custom battle type can override this class to specify config options it uses. They will be parsed from a
+        dictionary located at `battle` in the main config file. The created object will then be passed to the
+        :meth:`Battle.run` method with its fields set accordingly.
+        """
+
+        type: str
+        """Type of battle that will be used."""
+
+        @classmethod
+        def __get_pydantic_core_schema__(cls, source: Type, handler: GetCoreSchemaHandler) -> CoreSchema:
+            # there's two bugs we need to catch:
+            # 1. this function is called during the pydantic BaseModel metaclass's __new__, so the BattleConfig class
+            # won't be ready at that point and be missing in the namespace
+            # 2. pydantic uses the core schema to build child classes core schema. for them we want to behave like a
+            # normal model, only our own schema gets modified
+            try:
+                if cls != Battle.Config:
+                    return handler(source)
+            except NameError:
+                return handler(source)
+            match len(Battle._battle_types):
+                case 0:
+                    return handler(source)
+                case 1:
+                    return handler(next(iter(Battle._battle_types.values())))
+                case _:
+                    return tagged_union_schema(
+                        choices={
+                            subclass.model_fields["type"].default: subclass.__pydantic_core_schema__
+                            for subclass in Battle._battle_types.values()
+                        },
+                        discriminator="type",
+                    )
 
     class UiData(BaseModel):
         """Object containing custom diplay data.
@@ -252,6 +283,7 @@ class Battle(BaseModel):
     def __init_subclass__(cls) -> None:
         if cls.name() not in Battle._battle_types:
             Battle._battle_types[cls.name()] = cls
+            Battle.Config.model_rebuild(force=True)
         return super().__init_subclass__()
 
     @abstractmethod
@@ -300,10 +332,19 @@ class Iterated(Battle):
 
     results: list[int] = Field(default_factory=list)
 
-    if TYPE_CHECKING:
-        Config: TypeAlias = IteratedConfig
-    else:
-        Config: ClassVar[TypeAlias] = IteratedConfig
+    class Config(Battle.Config):
+        """Config options for Iterated battles."""
+
+        type: Literal["Iterated"] = "Iterated"
+
+        rounds: int = 5
+        """Number of times the instance size will be increased until the solver fails to produce correct solutions."""
+        maximum_size: int = 50_000
+        """Maximum instance size that will be tried."""
+        exponent: int = 2
+        """Determines how quickly the instance size grows."""
+        minimum_score: float = 1
+        """Minimum score that a solver needs to achieve in order to pass."""
 
     @inherit_docs
     class UiData(Battle.UiData):

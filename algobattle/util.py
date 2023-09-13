@@ -400,46 +400,6 @@ def can_be_positional(param: Parameter) -> bool:
     return param.kind in (Parameter.POSITIONAL_ONLY, Parameter.POSITIONAL_OR_KEYWORD)
 
 
-class TimeFloat:
-    """A float specifying a number of seconds.
-
-    Can be parsed from pydantic either as a number of seconds or a timedelta specifier.
-    """
-
-    @classmethod
-    def __get_pydantic_core_schema__(cls, source: type, handler: GetCoreSchemaHandler) -> CoreSchema:
-        def convert(val: float | timedelta) -> float:
-            return val.total_seconds() if isinstance(val, timedelta) else val
-
-        return no_info_after_validator_function(convert, union_schema([handler(float), handler(timedelta)]))
-
-
-def parse_none(value: Any) -> Any | None:
-    """Used as a validator to parse false-y values into Python None objects."""
-    return None if not value else value
-
-
-TimeDeltaFloat = Annotated[float, TimeFloat]
-ByteSizeInt = Annotated[int, ByteSize]
-WithNone = Annotated[T | None, AfterValidator(parse_none)]
-
-
-def _relativize_path(path: Path, info: ValidationInfo) -> Path:
-    """If the passed path is relative to the current directory it gets relativized to the `base_path` instead."""
-    if info.context and isinstance(info.context["base_path"], Path) and not path.is_absolute():
-        return info.context["base_path"] / path
-    return path
-
-
-def _relativize_file(path: Path, info: ValidationInfo) -> Path:
-    path = _relativize_path(path, info)
-    return PathType.validate_file(path, info)
-
-
-RelativePath = Annotated[Path, AfterValidator(_relativize_path), Field(validate_default=True)]
-RelativeFilePath = Annotated[Path, AfterValidator(_relativize_file), Field(validate_default=True)]
-
-
 def problem_entrypoints() -> dict[str, EntryPoint]:
     """Returns all currently registered problem entrypoints."""
     return {e.name: e for e in entry_points(group="algobattle.problem")}
