@@ -4,14 +4,14 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from itertools import combinations
 from pathlib import Path
-import tomllib
 from typing import Annotated, Self, cast, overload
+from typing_extensions import override
 
 from pydantic import Field
 from anyio import create_task_group, CapacityLimiter
 from anyio.to_thread import current_default_thread_limiter
 
-from algobattle.battle import Battle, FightHandler, FightUi, BattleUi, Iterated
+from algobattle.battle import Battle, FightHandler, FightUi, BattleUi
 from algobattle.config import AlgobattleConfigBase
 from algobattle.program import ProgramUi
 from algobattle.team import BuildUi, Matchup, Team, TeamHandler
@@ -28,24 +28,11 @@ from algobattle.util import (
 # need to define this here so we don't cause import cycles
 class AlgobattleConfig(AlgobattleConfigBase):   # noqa: D101
 
-    battle: Battle.Config = Iterated.Config()
-
+    @override
     @classmethod
-    def from_file(cls, file: Path) -> Self:
-        """Parses a config object from a toml file.
-
-        If the file doesn't exist it returns a default instance instead of raising an error.
-        """
-        if not file.is_file():
-            config_dict = {}
-        else:
-            with open(file, "rb") as f:
-                try:
-                    config_dict = tomllib.load(f)
-                except tomllib.TOMLDecodeError as e:
-                    raise ValueError(f"The config file at {file} is not a properly formatted TOML file!\n{e}")
+    def from_file(cls, file: Path) -> Self:  # noqa: D102
         Battle.load_entrypoints()
-        return cls.model_validate(config_dict, context={"base_path": file.parent})
+        return super().from_file(file)
 
 
 class Match(BaseModel):

@@ -3,13 +3,14 @@
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
+import tomllib
 from types import EllipsisType
-from typing import Any, ClassVar, Self, TypeAlias
+from typing import Any, ClassVar, Literal, Self, Type, TypeAlias
 from typing_extensions import TypedDict
 
-from pydantic import ConfigDict, Field, GetCoreSchemaHandler, model_validator
+from pydantic import ConfigDict, Field, GetCoreSchemaHandler, model_validator, BaseModel as PydanticBase
 from pydantic_core import CoreSchema
-from pydantic_core.core_schema import no_info_after_validator_function
+from pydantic_core.core_schema import no_info_after_validator_function, tagged_union_schema
 from docker.types import LogConfig, Ulimit
 
 from algobattle.problem import ProblemName
@@ -312,6 +313,72 @@ class TeamInfo(BaseModel):
 TeamInfos: TypeAlias = dict[str, TeamInfo]
 
 
+class BattleConfig(BaseModel):
+    """Config object for each specific battle type.
+
+    A custom battle type can override this class to specify config options it uses. They will be parsed from a
+    dictionary located at `battle` in the main config file. The created object will then be passed to the
+    :meth:`Battle.run` method with its fields set accordingly.
+    """
+
+    type: str = "None"
+    """Type of battle that will be used."""
+
+    _children: ClassVar[list[Type[Self]]] = []
+
+    @classmethod
+    def __pydantic_init_subclass__(cls, **kwargs: Any) -> None:
+        BattleConfig._children.append(cls)
+        BattleConfig.model_rebuild(force=True)
+        return super().__pydantic_init_subclass__(**kwargs)
+
+    @classmethod
+    def __get_pydantic_core_schema__(cls, source: Type[PydanticBase], handler: GetCoreSchemaHandler) -> CoreSchema:
+        # there's two bugs we need to catch:
+        # 1. this function is called during the pydantic BaseModel metaclass's __new__, so the BattleConfig class
+        # won't be ready at that point and be missing in the namespace
+        # 2. pydantic uses the core schema to build child classes core schema. for them we want to behave like a
+        # normal model, only our own schema gets modified
+        try:
+            if cls != BattleConfig:
+                return handler(source)
+        except NameError:
+            return handler(source)
+        try:
+            children = cls._children
+        except AttributeError:
+            children = []
+        match len(children):
+            case 0:
+                return handler(source)
+            case 1:
+                return handler(children[0])
+            case _:
+                return tagged_union_schema(
+                    choices={
+                        subclass.model_fields["type"].default: subclass.__pydantic_core_schema__
+                        for subclass in children
+                    },
+                    discriminator="type",
+                )
+
+
+# need to define this here to get nicer defaults
+class IteratedConfig(BattleConfig):
+    """Config options for Iterated battles."""
+
+    type: Literal["Iterated"] = "Iterated"
+
+    rounds: int = 5
+    """Number of times the instance size will be increased until the solver fails to produce correct solutions."""
+    maximum_size: int = 50_000
+    """Maximum instance size that will be tried."""
+    exponent: int = 2
+    """Determines how quickly the instance size grows."""
+    minimum_score: float = 1
+    """Minimum score that a solver needs to achieve in order to pass."""
+
+
 class AlgobattleConfigBase(BaseModel):
     """Base that contains all config options and can be parsed from config files."""
 
@@ -319,8 +386,25 @@ class AlgobattleConfigBase(BaseModel):
     teams: TeamInfos = Field(
         default={"team_0": {"generator": Path("generator"), "solver": Path("solver")}}, validate_default=True
     )
-    execution: ExecutionConfig = Field(default_factory=dict, validate_default=True)
-    match: MatchConfig = Field(default_factory=dict, validate_default=True)
+    execution: ExecutionConfig = Field(default_factory=ExecutionConfig, validate_default=True)
+    match: MatchConfig = Field(default_factory=MatchConfig, validate_default=True)
+    battle: BattleConfig = IteratedConfig()
     docker: DockerConfig = DockerConfig()
 
     model_config = ConfigDict(revalidate_instances="always")
+
+    @classmethod
+    def from_file(cls, file: Path) -> Self:
+        """Parses a config object from a toml file.
+
+        If the file doesn't exist it returns a default instance instead of raising an error.
+        """
+        if not file.is_file():
+            config_dict = {}
+        else:
+            with open(file, "rb") as f:
+                try:
+                    config_dict = tomllib.load(f)
+                except tomllib.TOMLDecodeError as e:
+                    raise ValueError(f"The config file at {file} is not a properly formatted TOML file!\n{e}")
+        return cls.model_validate(config_dict, context={"base_path": file.parent})
