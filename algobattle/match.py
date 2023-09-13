@@ -101,9 +101,8 @@ class Match(BaseModel):
     async def run(
         self,
         config: AlgobattleConfig,
-        problem: Problem[InstanceT, SolutionT],
         ui: "Ui | None" = None,
-    ) -> None:
+    ) -> Self:
         """Runs a match with the given config settings and problem type.
 
         The first step is building the docker images for each team in `config.teams`. Any teams where this process fails
@@ -116,6 +115,7 @@ class Match(BaseModel):
         if ui is None:
             ui = EmptyUi()
         ui.match = self
+        problem = Problem.all()[config.match.problem]
 
         with await TeamHandler.build(
             config.teams, problem, config.execution.mode, config.match, config.docker, ui
@@ -136,6 +136,7 @@ class Match(BaseModel):
                     battle = battle_cls()
                     self.results[matchup.generator.name][matchup.solver.name] = battle
                     tg.start_soon(self._run_battle, battle, matchup, config, problem, match_cpus, ui, limiter)
+        return self
 
     @overload
     def battle(self, matchup: Matchup) -> Battle | None:
@@ -242,7 +243,7 @@ class Ui(BuildUi, Protocol):
     by just subclassing :class:`Ui` and implementing its methods.
     """
 
-    match: Match | None
+    match: Match
 
     def start_build_step(self, teams: Iterable[str], timeout: float | None) -> None:
         """Tells the ui that the build process has started."""
@@ -294,11 +295,10 @@ class Ui(BuildUi, Protocol):
         return
 
 
-@dataclass
 class EmptyUi(Ui):
     """A dummy Ui."""
 
-    match: Match | None = field(default=None, init=False)
+    match: Match
 
     def __enter__(self) -> Self:
         """Starts displaying the Ui."""

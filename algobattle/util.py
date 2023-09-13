@@ -29,7 +29,6 @@ from pydantic import (
     ValidationInfo,
     model_validator,
 )
-from pydantic.types import PathType
 from pydantic_core import CoreSchema
 from pydantic_core.core_schema import general_after_validator_function, union_schema, no_info_after_validator_function
 

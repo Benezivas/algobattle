@@ -298,14 +298,6 @@ class Problem(Generic[InstanceT, SolutionT]):
             return self.score_function(instance, solution=solution)
 
     @classmethod
-    def get(cls, name: str) -> "AnyProblem":
-        """Gets an installed problem instance using its name or entrypoint."""
-        all = cls.all()
-        if name not in all:
-            raise ValueError("This problem is not installed.")
-        return all[name]
-
-    @classmethod
     def all(cls) -> "dict[str, AnyProblem]":
         """Returns a dictionary mapping the names of all installed problems to their python objects.
 

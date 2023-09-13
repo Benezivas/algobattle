@@ -168,8 +168,7 @@ class Execution(IsolatedAsyncioTestCase):
 
     async def test_basic(self):
         self.config_iter.teams = {"team_0": TeamInfo(generator=self.generator, solver=self.solver)}
-        res = Match()
-        await res.run(self.config_iter, TestProblem)
+        res = await Match().run(self.config_iter)
         for res_dict in res.results.values():
             for result in res_dict.values():
                 self.assertIsNone(result.run_exception)
@@ -182,8 +181,7 @@ class Execution(IsolatedAsyncioTestCase):
         team0 = TeamInfo(generator=self.generator, solver=self.solver)
         team1 = TeamInfo(generator=self.generator, solver=self.solver)
         self.config_iter.teams = {"team_0": team0, "team_1": team1}
-        res = Match()
-        await res.run(self.config_iter, TestProblem)
+        res = await Match().run(self.config_iter)
         for res_dict in res.results.values():
             for result in res_dict.values():
                 self.assertIsNone(result.run_exception)
@@ -194,8 +192,7 @@ class Execution(IsolatedAsyncioTestCase):
 
     async def test_averaged(self):
         self.config_avg.teams = {"team_0": TeamInfo(generator=self.generator, solver=self.solver)}
-        res = Match()
-        await res.run(self.config_avg, TestProblem)
+        res = await Match().run(self.config_avg)
         for res_dict in res.results.values():
             for result in res_dict.values():
                 self.assertIsNone(result.run_exception)

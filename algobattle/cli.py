@@ -101,11 +101,13 @@ def run_match(
 ) -> Match:
     """Runs a match using the config found at the provided path and displays it to the cli."""
     config = AlgobattleConfig.from_file(path)
-    problem = Problem.get(config.match.problem)
+    if config.match.problem not in Problem.all():
+        print("The problem specified in the config file ({config.match.problem}) is not installed")
+        raise Abort
     result = Match()
     try:
         with CliUi() if ui else EmptyUi() as ui_obj:
-            run_async_fn(result.run, config, problem, ui_obj)
+            run_async_fn(result.run, config, ui_obj)
     except KeyboardInterrupt:
         console.print("Received keyboard interrupt, terminating execution.")
     finally:
@@ -384,8 +386,9 @@ class BattlePanel(Panel):
 class CliUi(Live, Ui):
     """Ui that uses rich to draw to the console."""
 
+    match: Match
+
     def __init__(self) -> None:
-        self.match = None
         self.battle_panels: dict[Matchup, BattlePanel] = {}
         super().__init__(None, refresh_per_second=10, transient=True)
 
@@ -394,7 +397,6 @@ class CliUi(Live, Ui):
 
     def _update_renderable(self, renderable: RenderableType | None = None) -> None:
         if renderable is None:
-            assert self.match is not None
             renderable = Group(self.display_match(self.match), *self.battle_panels.values())
         self.update(Panel(renderable, title=f"[orange1]Algobattle {pkg_version('algobattle_base')}"))
 
@@ -460,7 +462,6 @@ class CliUi(Live, Ui):
 
     @override
     def end_fight(self, matchup: Matchup) -> None:
-        assert self.match is not None
         battle = self.match.battle(matchup)
         assert battle is not None
         fights = battle.fights[-1:-6:-1]
