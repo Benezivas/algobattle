@@ -2,12 +2,9 @@
 from abc import ABC, abstractmethod
 from functools import wraps
 from importlib.metadata import entry_points
-import importlib.util
-import sys
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
-    Annotated,
     Any,
     Callable,
     ClassVar,
@@ -21,25 +18,12 @@ from typing import (
 )
 from math import inf, isnan
 
-from pydantic import AfterValidator, Field, ValidationInfo
-
 from algobattle.util import (
     EncodableModel,
     InstanceSolutionModel,
-    MatchConfigBase,
-    RelativeFilePath,
     Role,
     Encodable,
 )
-
-
-def _check_problem_name(val: str, info: ValidationInfo) -> str:
-    if info.context and info.context.get("check_problem", False) and val not in Problem.all():
-        raise ValueError("Value is not the name of an installed Problem.")
-    return val
-
-
-ProblemName = Annotated[str, AfterValidator(_check_problem_name)]
 
 
 class Instance(Encodable, ABC):
@@ -229,7 +213,6 @@ class Problem(Generic[InstanceT, SolutionT]):
         solution_cls: type[SolutionT],
         min_size: int = 0,
         with_solution: Literal[True] = True,
-        export: bool = True,
         score_function: ScoreFunctionWithSol[InstanceT, SolutionT] = default_score,
     ) -> None:
         ...
@@ -243,7 +226,6 @@ class Problem(Generic[InstanceT, SolutionT]):
         solution_cls: type[SolutionT],
         min_size: int = 0,
         with_solution: Literal[False],
-        export: bool = True,
         score_function: ScoreFunctionNoSol[InstanceT, SolutionT] = default_score,
     ) -> None:
         ...
@@ -256,7 +238,6 @@ class Problem(Generic[InstanceT, SolutionT]):
         solution_cls: type[SolutionT],
         min_size: int = 0,
         with_solution: bool = True,
-        export: bool = True,
         score_function: ScoreFunction[InstanceT, SolutionT] = default_score,
     ) -> None:
         """The definition of a problem.
@@ -267,9 +248,6 @@ class Problem(Generic[InstanceT, SolutionT]):
             solution_cls: Class definitng what solutions of this problem look like.
             min_size: Minimum size of valid instances of this problem.
             with_solution: Whether the generator should also create a solution.
-            export: Wether the class should be exported.
-                If a battle is run by specifying a module, exactly one Problem in it must have `export=True`. It will
-                then be used to run the battle.
             score_function: Function used to score how well a solution solves a problem instance.
 
                 The default scoring function returns the quotient of the solver's to the generator's solution score.
@@ -284,12 +262,9 @@ class Problem(Generic[InstanceT, SolutionT]):
         self.solution_cls = solution_cls
         self.min_size = min_size
         self.with_solution = with_solution
-        self.export = export
         self.score_function = score_function
-        if self.export and self.name not in self._installed:
-            self._installed[self.name] = self
 
-    __slots__ = ("name", "instance_cls", "solution_cls", "min_size", "with_solution", "export", "score_function")
+    __slots__ = ("name", "instance_cls", "solution_cls", "min_size", "with_solution", "score_function")
     _installed: "ClassVar[dict[str, AnyProblem]]" = {}
 
     @overload
@@ -323,62 +298,12 @@ class Problem(Generic[InstanceT, SolutionT]):
             return self.score_function(instance, solution=solution)
 
     @classmethod
-    def import_from_path(cls, path: Path) -> "AnyProblem":
-        """Try to import a Problem from a given path.
-
-        The specified file will be imported using the standard python loaders. If the created module contains exactly
-        one Problem with the `export` flag set, it will be imported.
-
-        Args:
-            path: A path to a module, or a folder containing an `__init__.py` or `problem.py` file.
-
-        Raises:
-            ValueError: If the path doesn't point to a module or the file cannot be imported properly.
-        """
-        if path.is_file():
-            pass
-        elif (path / "problem.py").is_file():
-            path /= "problem.py"
-        else:
-            raise ValueError(f"'{path}' does not point to a python file or a proper parent folder of one.")
-
-        try:
-            spec = importlib.util.spec_from_file_location("_problem", path)
-            assert spec is not None
-            assert spec.loader is not None
-            problem_module = importlib.util.module_from_spec(spec)
-            sys.modules[spec.name] = problem_module
-            spec.loader.exec_module(problem_module)
-        except Exception as e:
-            raise ValueError from e
-
-        try:
-            problems = [obj for obj in vars(problem_module).values() if isinstance(obj, cls) and obj.export]
-            match len(problems):
-                case 0:
-                    raise ValueError(f"'{path}' contains no Problems.")
-                case 1:
-                    problem = problems[0]
-                case _:
-                    raise ValueError(
-                        f"'{path}' contains {len(problems)} different problems: {', '.join(p.name for p in problems)}."
-                    )
-
-            return problem
-
-        finally:
-            sys.modules.pop("_problem")
-
-    @classmethod
-    def get(cls, problem: ProblemName | Path) -> "AnyProblem":
-        """Gets either an installed problem instance using its name or imports a problem file."""
-        if isinstance(problem, Path):
-            return cls.import_from_path(problem)
-        else:
-            all = cls.all()
-            if problem not in all:
-                raise ValueError("Problem name is not valid.")
-            return all[problem]
+    def get(cls, name: str) -> "AnyProblem":
+        """Gets an installed problem instance using its name or entrypoint."""
+        all = cls.all()
+        if name not in all:
+            raise ValueError("This problem is not installed.")
+        return all[name]
 
     @classmethod
     def all(cls) -> "dict[str, AnyProblem]":
@@ -422,13 +347,3 @@ class SolutionModel(Solution[InstanceT], EncodableModel, InstanceSolutionModel, 
         if instance is not None:
             context["instance"] = instance
         return cls._decode(source, **context)
-
-
-class MatchConfig(MatchConfigBase):
-    """Match config settings with problem setting."""
-
-    problem: ProblemName | RelativeFilePath = Field(default=Path("problem.py"), validate_default=True)
-    """The problem this match is over.
-
-    Either the name of an installed problem, or the path to a problem file
-    """

@@ -2,22 +2,20 @@
 
 Provides a command line interface to start matches and observe them. See `battle --help` for further options.
 """
-from dataclasses import dataclass
 from datetime import datetime
 from os import environ
 from pathlib import Path
 from random import choice
 from shutil import rmtree
-from subprocess import PIPE, run as run_process
+from subprocess import run as run_process
 import sys
 from typing import Annotated, Any, ClassVar, Iterable, Literal, Optional, Self, cast
 from typing_extensions import override
 from importlib.metadata import version as pkg_version
-from textwrap import dedent
 from zipfile import ZipFile
 
 from anyio import run as run_async_fn
-from pydantic import Field, ValidationError, BaseModel
+from pydantic import Field, BaseModel
 from typer import Exit, Typer, Argument, Option, Abort, get_app_dir, launch, confirm
 from rich.console import Group, RenderableType, Console
 from rich.live import Live
@@ -39,7 +37,6 @@ from rich.columns import Columns
 from rich.status import Status
 from tomlkit import TOMLDocument, parse as parse_toml, dumps as dumps_toml, table
 from tomlkit.items import Table as TomlTable
-from tomlkit.container import Container as TomlContainer
 
 from algobattle.battle import Battle
 from algobattle.match import BaseConfig, EmptyUi, Match, Ui

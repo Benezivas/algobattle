@@ -217,7 +217,7 @@ class Parsing(TestCase):
 
     def test_no_cfg_default(self):
         cfg = BaseConfig.from_file(self.problem_path)
-        self.assertEqual(cfg, BaseConfig(teams=self.teams, match=MatchConfig(problem=self.problem_path / "problem.py")))
+        self.assertEqual(cfg, BaseConfig(teams=self.teams, match=MatchConfig(problem="Test Problem")))
 
     def test_empty_cfg(self):
         with self.assertRaises(ValidationError):

@@ -498,12 +498,14 @@ class RunConfig(BaseModel):
         return RunSpecs(timeout=timeout, space=space, cpus=cpus, overriden=overriden)
 
 
-class MatchConfigBase(BaseModel):
+class MatchConfig(BaseModel):
     """Parameters determining the match execution.
 
     It will be parsed from the given config file and contains all settings that specify how the match is run.
     """
 
+    problem: str
+    """The problem to be solved in this match."""
     build_timeout: WithNone[TimeDeltaFloat] = 600
     """Timeout for building each docker image."""
     image_size: WithNone[ByteSizeInt] = None

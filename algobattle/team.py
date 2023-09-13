@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 from algobattle.program import DockerConfig, Generator, Solver
 from algobattle.problem import AnyProblem
-from algobattle.util import ExceptionInfo, MatchConfigBase, MatchMode, RelativePath, Role
+from algobattle.util import ExceptionInfo, MatchConfig, MatchMode, RelativePath, Role
 
 
 _team_names: set[str] = set()
@@ -40,7 +40,7 @@ class TeamInfo(BaseModel):
         self,
         name: str,
         problem: AnyProblem,
-        match_config: MatchConfigBase,
+        match_config: MatchConfig,
         docker_config: DockerConfig,
         name_programs: bool,
         ui: BuildUi,
@@ -173,7 +173,7 @@ class TeamHandler:
         infos: TeamInfos,
         problem: AnyProblem,
         mode: MatchMode,
-        match_config: MatchConfigBase,
+        match_config: MatchConfig,
         docker_config: DockerConfig,
         ui: BuildUi,
     ) -> Self:
