@@ -35,7 +35,6 @@ from rich.progress import (
 from rich.panel import Panel
 from rich.text import Text
 from rich.columns import Columns
-from rich.status import Status
 from rich.prompt import Prompt, Confirm
 from tomlkit import TOMLDocument, parse as parse_toml, dumps as dumps_toml, table
 from tomlkit.items import Table as TomlTable
@@ -166,7 +165,7 @@ def _init_program(target: Path, lang: Language, args: PartialTemplateArgs, role:
             return
     else:
         dir.mkdir(parents=True, exist_ok=True)
-    with Status(f"Initializing {role}"):
+    with console.status(f"Initializing {role}"):
         write_templates(dir, lang, TemplateArgs(program=role.value, **args))
 
 
@@ -204,7 +203,7 @@ def init(
         problem = Path("problem.aprb")
     if problem is not None:
         with TempDir() as build_dir:
-            with Status("Extracting problem data"):
+            with console.status("Extracting problem data"):
                 with ZipFile(problem) as problem_zip:
                     problem_zip.extractall(build_dir)
 
@@ -234,14 +233,8 @@ def init(
 
             if new_problem:
                 cmd = config.install_cmd(build_dir)
-                with Status("Installing problem"):
-                    res = run_process(
-                        cmd,
-                        shell=False,
-                        capture_output=True,
-                        text=True,
-                        env=environ.copy(),
-                    )
+                with console.status("Installing problem"):
+                    res = run_process(cmd, env=environ.copy())
                 if res.returncode:
                     print("Couldn't install the problem")
                     console.print(f"[red]{res.stderr}")
@@ -258,7 +251,7 @@ def init(
         parsed_config = AlgobattleConfig.from_file(target / "config.toml", ignore_uninstalled=True)
         problem_name = parsed_config.match.problem
 
-    with Status("Initializing metadata"):
+    with console.status("Initializing metadata"):
         if "teams" not in problem_config:
             problem_config.add(
                 "teams",
@@ -323,11 +316,11 @@ def test(
     if generator:
 
         async def gen_builder() -> Generator:
-            with Status("Building generator"):
+            with console.status("Building generator"):
                 return await Generator.build(team_obj.generator, problem=problem, config=config.as_prog_config())
 
         with run_async_fn(gen_builder) as gen:
-            with Status("Running generator"):
+            with console.status("Running generator"):
                 gen_instance = gen.test()
             if isinstance(gen_instance, ExceptionInfo):
                 console.print("[red]The generator didn't run successfully.")
@@ -349,11 +342,11 @@ def test(
             instance = gen_instance
 
         async def sol_builder() -> Solver:
-            with Status("Building solver"):
+            with console.status("Building solver"):
                 return await Solver.build(team_obj.generator, problem=problem, config=config.as_prog_config())
 
         with run_async_fn(sol_builder) as sol:
-            with Status("Running solver"):
+            with console.status("Running solver"):
                 sol_error = sol.test(instance)
             if isinstance(sol_error, ExceptionInfo):
                 console.print("[red]The solver didn't run successfully.")
