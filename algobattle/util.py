@@ -4,7 +4,7 @@ In particular, the base classes :class:`BaseModel`, :class:`Encodable`, :class:`
 """
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
 from inspect import Parameter, Signature, signature
 from itertools import chain
@@ -12,25 +12,20 @@ import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from traceback import format_exception
-from types import EllipsisType
-from typing import Annotated, Any, Callable, ClassVar, Iterable, Literal, LiteralString, TypeVar, Self, cast, get_args
-from typing_extensions import TypedDict
+from typing import Any, Callable, ClassVar, Iterable, Literal, LiteralString, TypeVar, Self, cast, get_args
 from annotated_types import GroupedMetadata
+from importlib.metadata import EntryPoint, entry_points
 
 from pydantic import (
-    AfterValidator,
-    ByteSize,
     ConfigDict,
     BaseModel as PydandticBaseModel,
     Extra,
-    Field,
     GetCoreSchemaHandler,
     ValidationError as PydanticValidationError,
     ValidationInfo,
-    model_validator,
 )
 from pydantic_core import CoreSchema
-from pydantic_core.core_schema import general_after_validator_function, union_schema, no_info_after_validator_function
+from pydantic_core.core_schema import general_after_validator_function
 
 
 class Role(Enum):
@@ -402,136 +397,14 @@ def can_be_positional(param: Parameter) -> bool:
     return param.kind in (Parameter.POSITIONAL_ONLY, Parameter.POSITIONAL_OR_KEYWORD)
 
 
-class TimeFloat:
-    """A float specifying a number of seconds.
-
-    Can be parsed from pydantic either as a number of seconds or a timedelta specifier.
-    """
-
-    @classmethod
-    def __get_pydantic_core_schema__(cls, source: type, handler: GetCoreSchemaHandler) -> CoreSchema:
-        def convert(val: float | timedelta) -> float:
-            return val.total_seconds() if isinstance(val, timedelta) else val
-
-        return no_info_after_validator_function(convert, union_schema([handler(float), handler(timedelta)]))
+def problem_entrypoints() -> dict[str, EntryPoint]:
+    """Returns all currently registered problem entrypoints."""
+    return {e.name: e for e in entry_points(group="algobattle.problem")}
 
 
-def parse_none(value: Any) -> Any | None:
-    """Used as a validator to parse false-y values into Python None objects."""
-    return None if not value else value
-
-
-TimeDeltaFloat = Annotated[float, TimeFloat]
-ByteSizeInt = Annotated[int, ByteSize]
-WithNone = Annotated[T | None, AfterValidator(parse_none)]
-
-
-def _relativize_path(path: Path, info: ValidationInfo) -> Path:
-    """If the passed path is relative to the current directory it gets relativized to the `base_path` instead."""
-    if info.context and isinstance(info.context["base_path"], Path) and not path.is_absolute():
-        return info.context["base_path"] / path
-    return path
-
-
-RelativePath = Annotated[Path, AfterValidator(_relativize_path), Field(validate_default=True)]
-
-
-class RunConfigOverride(TypedDict, total=False):
-    """Run parameters that were overriden by the battle type."""
-
-    timeout: float | None
-    space: int | None
-    cpus: int
-
-
-@dataclass(frozen=True, slots=True)
-class RunSpecs:
-    """Actual specification of a program run."""
-
-    timeout: float | None
-    space: int | None
-    cpus: int
-    overriden: RunConfigOverride
-
-
-class RunConfig(BaseModel):
-    """Parameters determining how a program is run."""
-
-    timeout: WithNone[TimeDeltaFloat] = 30
-    """Timeout in seconds, or `false` for no timeout."""
-    space: WithNone[ByteSizeInt] = None
-    """Maximum memory space available, or `false` for no limitation.
-
-    Can be either an plain number of bytes like `30000` or a string including
-    a unit like `30 kB`.
-    """
-    cpus: int = 1
-    """Number of cpu cores available."""
-
-    def reify(
-        self,
-        timeout: float | None | EllipsisType,
-        space: int | None | EllipsisType,
-        cpus: int | EllipsisType,
-    ) -> RunSpecs:
-        """Merges the overriden config options with the parsed ones."""
-        overriden = RunConfigOverride()
-        if timeout is ...:
-            timeout = self.timeout
-        else:
-            overriden["timeout"] = timeout
-        if space is ...:
-            space = self.space
-        else:
-            overriden["space"] = space
-        if cpus is ...:
-            cpus = self.cpus
-        else:
-            overriden["cpus"] = cpus
-        return RunSpecs(timeout=timeout, space=space, cpus=cpus, overriden=overriden)
-
-
-class MatchConfig(BaseModel):
-    """Parameters determining the match execution.
-
-    It will be parsed from the given config file and contains all settings that specify how the match is run.
-    """
-
-    problem: str
-    """The problem to be solved in this match."""
-    build_timeout: WithNone[TimeDeltaFloat] = 600
-    """Timeout for building each docker image."""
-    image_size: WithNone[ByteSizeInt] = None
-    """Maximum size a built program image is allowed to be."""
-    strict_timeouts: bool = False
-    """Whether to raise an error if a program runs into the timeout."""
-    generator: RunConfig = RunConfig()
-    solver: RunConfig = RunConfig()
-
-
-class ExecutionConfig(BaseModel):
-    """Settings that only determine how a match is run, not its result."""
-
-    parallel_battles: int = 1
-    """Number of battles exectuted in parallel."""
-    mode: MatchMode = "testing"
-    """Mode of the match."""
-    set_cpus: WithNone[str | list[str]] = None
-    """Wich cpus to run programs on, if a list is specified each battle will use a different cpu specification in it."""
-    points: int = 100
-    """Highest number of points each team can achieve."""
-    results: RelativePath = Path("./results")
-    """Path to a folder where the results will be saved."""
-
-    model_config = ConfigDict(revalidate_instances="always")
-
-    @model_validator(mode="after")
-    def val_set_cpus(self) -> Self:
-        """Validates that each battle that is being executed is assigned some cpu cores."""
-        if isinstance(self.set_cpus, list) and self.parallel_battles > len(self.set_cpus):
-            raise ValueError("Number of parallel battles exceeds the number of set_cpu specifier strings.")
-        else:
-            return self
+def battle_entrypoints() -> dict[str, EntryPoint]:
+    """Returns all currently registered battle entrypoints."""
+    return {e.name: e for e in entry_points(group="algobattle.battle")}
 
 
 class TempDir(TemporaryDirectory):

@@ -7,10 +7,8 @@ from pathlib import Path
 from pydantic import ByteSize, ValidationError
 
 from algobattle.battle import Fight, Iterated, Averaged
-from algobattle.match import AlgobattleConfig, Match, MatchConfig
-from algobattle.team import Team, Matchup, TeamHandler, TeamInfo
-from algobattle.program import ProgramRunInfo, RunConfig
-from algobattle.util import ExecutionConfig
+from algobattle.match import ExecutionConfig, Match, AlgobattleConfig, MatchConfig, RunConfig, TeamInfo
+from algobattle.program import ProgramRunInfo, Team, Matchup, TeamHandler
 from .testsproblem.problem import TestProblem
 
 
@@ -18,7 +16,7 @@ class TestTeam(Team):
     """Team that doesn't rely on actual docker images."""
 
     def __init__(self, team_name: str) -> None:
-        self.name = team_name
+        object.__setattr__(self, "name", team_name)
 
 
 def dummy_result(*score: float) -> list[Fight]:

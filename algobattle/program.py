@@ -1,29 +1,27 @@
 """Module providing an interface to interact with the teams' programs."""
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
-from functools import cached_property
+from itertools import combinations
 from os import environ
 from pathlib import Path
 from tarfile import TarFile, is_tarfile
 from tempfile import TemporaryDirectory
 from timeit import default_timer
 from types import EllipsisType
-from typing import Any, ClassVar, Iterator, Protocol, Self, TypeVar, cast, Generator as PyGenerator
+from typing import Any, ClassVar, Iterable, Iterator, Mapping, Protocol, Self, TypeVar, cast, Generator as PyGenerator
 from typing_extensions import TypedDict
 from uuid import uuid4
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from zipfile import ZipFile, is_zipfile
 
 from docker import DockerClient
 from docker.errors import APIError, BuildError as DockerBuildError, DockerException, ImageNotFound
 from docker.models.images import Image as DockerImage
 from docker.models.containers import Container as DockerContainer
-from docker.types import Mount, LogConfig, Ulimit
-from pydantic_core import CoreSchema
-from pydantic_core.core_schema import no_info_after_validator_function
+from docker.types import Mount
 from requests import Timeout, ConnectionError
-from pydantic import Field, GetCoreSchemaHandler
+from pydantic import Field
 from anyio.to_thread import run_sync
 from urllib3.exceptions import ReadTimeoutError
 
@@ -35,15 +33,13 @@ from algobattle.util import (
     ExceptionInfo,
     ExecutionError,
     ExecutionTimeout,
-    RunConfig,
-    RunConfigOverride,
-    RunSpecs,
+    MatchMode,
     TempDir,
     ValidationError,
     Role,
     BaseModel,
 )
-from algobattle.problem import AnyProblem, Instance, Problem, Solution
+from algobattle.problem import AnyProblem, Instance, Solution
 
 
 AnySolution = Solution[Instance]
@@ -53,193 +49,6 @@ _client_var: DockerClient | None = None
 
 
 T = TypeVar("T")
-
-
-class _Adapter:
-    """Turns a docker library config class into a pydantic parseable one."""
-
-    _Args: ClassVar[type[TypedDict]]
-
-    @classmethod
-    def _construct(cls, kwargs: dict[str, Any]) -> Self:
-        return cls(**kwargs)
-
-    @classmethod
-    def __get_pydantic_core_schema__(cls, source: type, handler: GetCoreSchemaHandler) -> CoreSchema:
-        return no_info_after_validator_function(cls._construct, handler(cls._Args))
-
-
-class PydanticLogConfig(LogConfig, _Adapter):  # noqa: D101
-    class _Args(TypedDict):
-        type: str
-        conifg: dict[Any, Any]
-
-
-class PydanticUlimit(Ulimit, _Adapter):  # noqa: D101
-    class _Args(TypedDict):
-        name: str
-        soft: int
-        hard: int
-
-
-class AdvancedRunArgs(BaseModel):
-    """Advanced docker run options.
-
-    Contains all options exposed on the python docker run api, except `device_requests`
-    and those set by :meth:`Image.run` itself.
-    """
-
-    class _BlockIOWeight(TypedDict):
-        Path: str
-        Weight: int
-
-    class _DeviceRate(TypedDict):
-        Path: str
-        Rate: int
-
-    class _HealthCheck(TypedDict):
-        test: list[str] | str
-        interval: int
-        timeout: int
-        retries: int
-        start_period: int
-
-    # defaults set by us
-    network_mode: str = "none"
-
-    # actual docker defaults
-    command: str | list[str] | None = None
-    auto_remove: bool | None = None
-    blkio_weight_device: list[_BlockIOWeight] | None = None
-    blkio_weight: int | None = Field(default=None, ge=10, le=1000)
-    cap_add: list[str] | None = None
-    cap_drop: list[str] | None = None
-    cgroup_parent: str | None = None
-    cgroupns: str | None = None
-    cpu_count: int | None = None
-    cpu_percent: int | None = None
-    cpu_period: int | None = None
-    cpu_quota: int | None = None
-    cpu_rt_period: int | None = None
-    cpu_rt_runtime: int | None = None
-    cpu_shares: int | None = None
-    cpuset_mems: str | None = None
-    device_cgroup_rules: list[str] | None = None
-    device_read_bps: list[_DeviceRate] | None = None
-    device_read_iops: list[_DeviceRate] | None = None
-    device_write_bps: list[_DeviceRate] | None = None
-    device_write_iops: list[_DeviceRate] | None = None
-    devices: list[str] | None = None
-    dns: list[str] | None = None
-    dns_opt: list[str] | None = None
-    dns_search: list[str] | None = None
-    domainname: str | list[str] | None = None
-    entrypoint: str | list[str] | None = None
-    environment: dict[str, str] | list[str] | None = None
-    extra_hosts: dict[str, str] | None = None
-    group_add: list[str] | None = None
-    healthcheck: _HealthCheck | None = None
-    hostname: str | None = None
-    init: bool | None = None
-    init_path: str | None = None
-    ipc_mode: str | None = None
-    isolation: str | None = None
-    kernel_memory: int | str | None = None
-    labels: dict[str, str] | list[str] | None = None
-    links: dict[str, str] | None = None
-    log_config: PydanticLogConfig | None = None
-    lxc_conf: dict[Any, Any] | None = None
-    mac_address: str | None = None
-    mem_limit: int | str | None = None
-    mem_reservation: int | str | None = None
-    mem_swappiness: int | None = None
-    memswap_limit: str | int | None = None
-    network: str | None = None
-    network_disabled: bool | None = None
-    oom_kill_disable: bool | None = None
-    oom_score_adj: int | None = None
-    pid_mode: str | None = None
-    pids_limit: int | None = None
-    platform: str | None = None
-    ports: dict[Any, Any] | None = None
-    privileged: bool | None = None
-    publish_all_ports: bool | None = None
-    read_only: bool | None = None
-    restart_policy: dict[Any, Any] | None = None
-    runtime: str | None = None
-    security_opt: list[str] | None = None
-    shm_size: str | int | None = None
-    stdin_open: bool | None = None
-    stdout: bool | None = None
-    stderr: bool | None = None
-    stop_signal: str | None = None
-    storage_opt: dict[Any, Any] | None = None
-    stream: bool | None = None
-    sysctls: dict[Any, Any] | None = None
-    tmpfs: dict[Any, Any] | None = None
-    tty: bool | None = None
-    ulimits: list[PydanticUlimit] | None = None
-    use_config_proxy: bool | None = None
-    user: str | int | None = None
-    userns_mode: str | None = None
-    uts_mode: str | None = None
-    version: str | None = None
-    volume_driver: str | None = None
-    volumes: dict[Any, Any] | list[Any] | None = None
-    volumes_from: list[Any] | None = None
-    working_dir: str | None = None
-
-    @cached_property
-    def kwargs(self) -> dict[str, Any]:
-        """Transforms the object into :meth:`client.containers.run` kwargs."""
-        return self.model_dump(exclude_none=True)
-
-
-class AdvancedBuildArgs(BaseModel):
-    """Advanced docker build options.
-
-    Contains all options exposed on the python docker build api, except those set by :meth:`Image.build` itself.
-    """
-
-    class _ContainerLimits(TypedDict):
-        memory: int
-        memswap: int
-        cpushares: int
-        cpusetcpus: str
-
-    # defaults set by us
-    rm: bool = True
-    forcerm: bool = True
-    quiet: bool = True
-    network_mode: str = "host"
-    pull: bool | None = True
-
-    # actual Docker defaults
-    nocache: bool | None = None
-    encoding: str | None = None
-    buildargs: dict[Any, Any] | None = None
-    container_limits: _ContainerLimits | None = None
-    shmsize: int | None = None
-    labels: dict[Any, Any] | None = None
-    cache_from: list[Any] | None = None
-    target: str | None = None
-    squash: bool | None = None
-    extra_hosts: dict[Any, Any] | None = None
-    platform: str | None = None
-    isolation: str | None = None
-    use_config_proxy: bool | None = None
-
-    @cached_property
-    def kwargs(self) -> dict[str, Any]:
-        """Transforms the object into :meth:`client.images.build` kwargs."""
-        return self.model_dump(exclude_none=True)
-
-
-class DockerConfig(BaseModel):
-    """Settings passed directly to the docker daemon."""
-
-    build: AdvancedBuildArgs = AdvancedBuildArgs()
-    run: AdvancedRunArgs = AdvancedRunArgs()
 
 
 def client() -> DockerClient:
@@ -253,6 +62,46 @@ def client() -> DockerClient:
     except (DockerException, APIError):
         raise SystemExit("Could not connect to the docker daemon. Is docker running?")
     return _client_var
+
+
+class RunConfigOverride(TypedDict, total=False):
+    """Run parameters that were overriden by the battle type."""
+
+    timeout: float | None
+    space: int | None
+    cpus: int
+
+
+@dataclass(frozen=True, slots=True)
+class RunSpecs:
+    """Actual specification of a program run."""
+
+    timeout: float | None
+    space: int | None
+    cpus: int
+    overriden: RunConfigOverride
+
+
+class RunConfigView(Protocol):
+    """Config view for single runs."""
+
+    timeout: float | None
+    space: int | None
+    cpus: int
+
+
+@dataclass(frozen=True, slots=True)
+class ProgramConfigView:
+    """Config settings relevant to the program module."""
+
+    build_timeout: float | None
+    max_image_size: int | None
+    strict_timeouts: bool
+    build_kwargs: dict[str, Any]
+    run_kwargs: dict[str, Any]
+    generator: RunConfigView
+    solver: RunConfigView
+    mode: MatchMode
 
 
 class ProgramUi(Protocol):
@@ -360,14 +209,10 @@ class Program(ABC):
 
     id: str
     """The id of the Docker image."""
-    problem: Problem[Instance, Solution[Instance]]
-    """The problem this program creates instances and/or solutions for."""
-    config: RunConfig
-    """Config settings this program will use."""
-    strict_timeouts: bool
-    """Wether this program will raise an exception if the container times out."""
-    docker_config: DockerConfig
-    """Advanced config settings this program will use to run."""
+    problem: AnyProblem
+    """The problem this program generates/solves."""
+    config: ProgramConfigView
+    """Config settings used for this program."""
 
     role: ClassVar[Role]
     """Role of this program."""
@@ -402,25 +247,17 @@ class Program(ABC):
         cls,
         path: Path,
         *,
-        timeout: float | None = 600,
-        max_size: int | None = None,
-        team_name: str | None = None,
         problem: AnyProblem,
-        config: RunConfig = RunConfig(),
-        strict_timeouts: bool = False,
-        docker_config: DockerConfig = DockerConfig(),
+        config: ProgramConfigView,
+        team_name: str | None = None,
     ) -> Self:
         """Creates a program by building the specified docker image.
 
         Args:
             path: Path to a Dockerfile (or folder containing one) from which to build the image.
-            timeout: Build timeout.
-            max_size: Maximum size of the built image.
+            problem: The problem this program generates/solves.
+            config: Settings for this program.
             team_name: If set the image will be given a descriptive name.
-            problem: Problem this program is solving/generating instances for.
-            config: Run config for this program.
-            strict_timeouts: Wether to raise an error if the container times out but produces valid output.
-            docker_config: Docker config that will be used to build and run this program.
 
         Returns:
             The built Program.
@@ -444,9 +281,9 @@ class Program(ABC):
                     cls._build_daemon_call,
                     str(path),
                     name,
-                    timeout,
+                    config.build_timeout,
                     dockerfile,
-                    docker_config.build.kwargs,
+                    config.build_kwargs,
                 )
                 if old_image is not None:
                     old_image.reload()
@@ -464,15 +301,15 @@ class Program(ABC):
             cast(str, image.id),
             problem=problem,
             config=config,
-            strict_timeouts=strict_timeouts,
-            docker_config=docker_config,
         )
         used_size = cast(dict[str, Any], image.attrs).get("Size", 0)
-        if max_size is not None and used_size > max_size:
+        if config.max_image_size is not None and used_size > config.max_image_size:
             try:
                 self.remove()
             finally:
-                raise BuildError("Built image is too large.", detail=f"Size: {used_size}B, limit: {max_size}B.")
+                raise BuildError(
+                    "Built image is too large.", detail=f"Size: {used_size}B, limit: {config.max_image_size}B."
+                )
         return self
 
     @classmethod
@@ -490,6 +327,33 @@ class Program(ABC):
             ),
         )
         return image
+
+    def run_specs(
+        self,
+        timeout: float | None | EllipsisType,
+        space: int | None | EllipsisType,
+        cpus: int | EllipsisType,
+    ) -> RunSpecs:
+        """Merges the overriden config options with the parsed ones."""
+        overriden = RunConfigOverride()
+        match self.role:
+            case Role.generator:
+                config = self.config.generator
+            case Role.solver:
+                config = self.config.solver
+        if timeout is ...:
+            timeout = config.timeout
+        else:
+            overriden["timeout"] = timeout
+        if space is ...:
+            space = config.space
+        else:
+            overriden["space"] = space
+        if cpus is ...:
+            cpus = config.cpus
+        else:
+            overriden["cpus"] = cpus
+        return RunSpecs(timeout=timeout, space=space, cpus=cpus, overriden=overriden)
 
     async def _run_inner(
         self,
@@ -531,7 +395,7 @@ class Program(ABC):
                     detach=True,
                     mounts=io.mounts if io else None,
                     cpuset_cpus=set_cpus,
-                    **self.docker_config.run.kwargs,
+                    **self.config.run_kwargs,
                 ),
             )
 
@@ -590,7 +454,7 @@ class Program(ABC):
             elapsed_time = round(default_timer() - start_time, 2)
             if len(e.args) != 1 or not isinstance(e.args[0], ReadTimeoutError):
                 raise
-            if self.strict_timeouts:
+            if self.config.strict_timeouts:
                 raise ExecutionTimeout("The docker container exceeded the time limit.", runtime=elapsed_time)
             return elapsed_time
 
@@ -650,7 +514,7 @@ class Generator(Program):
         Returns:
             Datastructure containing all info about the generator execution and the created problem instance.
         """
-        specs = self.config.reify(timeout, space, cpus)
+        specs = self.run_specs(timeout, space, cpus)
         runtime = 0
         battle_data = None
         instance = None
@@ -767,7 +631,7 @@ class Solver(Program):
         Returns:
             Datastructure containing all info about the solver execution and the solution it computed.
         """
-        specs = self.config.reify(timeout, space, cpus)
+        specs = self.run_specs(timeout, space, cpus)
         runtime = 0
         battle_data = None
         solution = None
@@ -807,3 +671,186 @@ class Solver(Program):
                 battle_data=battle_data,
                 solution=solution,
             )
+
+
+class BuildUi(Protocol):
+    """Provides and interface for the build process to update the ui."""
+
+    @abstractmethod
+    def start_build_step(self, teams: Iterable[str], timeout: float | None) -> None:
+        """Tells the ui that the build process has started."""
+
+    @abstractmethod
+    def start_build(self, team: str, role: Role) -> None:
+        """Informs the ui that a new program is being built."""
+
+    @abstractmethod
+    def finish_build(self, team: str, success: bool) -> None:
+        """Informs the ui that the current build has been finished."""
+
+
+class _TeamInfo(Protocol):
+    generator: Path
+    solver: Path
+
+
+@dataclass(frozen=True, slots=True)
+class Team:
+    """Class bundling together the programs of a team."""
+
+    name: str
+    generator: Generator
+    solver: Solver
+
+    @classmethod
+    async def build(
+        cls,
+        name: str,
+        info: _TeamInfo,
+        problem: AnyProblem,
+        config: ProgramConfigView,
+        ui: BuildUi,
+    ) -> "Team":
+        """Builds the specified docker files into images and return the corresponding team.
+
+        Args:
+            name: Name of the team.
+            info: Team info containing the paths to the program data.
+            problem: The problem class the current match is fought over.
+            config: Config for the programs.
+
+        Returns:
+            The built team.
+
+        Raises:
+            ValueError: If the team name is already in use.
+            DockerError: If the docker build fails for some reason
+        """
+        tag_name = name.lower().replace(" ", "_") if config.mode == "testing" else None
+        ui.start_build(name, Role.generator)
+        generator = await Generator.build(
+            path=info.generator,
+            problem=problem,
+            config=config,
+            team_name=tag_name,
+        )
+        try:
+            ui.start_build(name, Role.solver)
+            solver = await Solver.build(
+                path=info.solver,
+                problem=problem,
+                config=config,
+                team_name=tag_name,
+            )
+        except Exception:
+            generator.remove()
+            raise
+        return Team(name, generator, solver)
+
+    def __str__(self) -> str:
+        return self.name
+
+    def __eq__(self, o: object) -> bool:
+        if isinstance(o, Team):
+            return self.name == o.name
+        else:
+            return False
+
+    def __hash__(self) -> int:
+        return hash(self.name)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, _type: Any, _value: Any, _traceback: Any):
+        self.cleanup()
+
+    def cleanup(self) -> None:
+        """Removes the built docker images."""
+        self.generator.remove()
+        self.solver.remove()
+
+
+@dataclass(frozen=True)
+class Matchup:
+    """Represents an individual matchup of teams."""
+
+    generator: Team
+    solver: Team
+
+    def __iter__(self) -> Iterator[Team]:
+        yield self.generator
+        yield self.solver
+
+    def __repr__(self) -> str:
+        return f"Matchup({self.generator.name}, {self.solver.name})"
+
+    def __str__(self) -> str:
+        return f"{self.generator.name} vs {self.solver.name}"
+
+
+@dataclass
+class TeamHandler:
+    """Handles building teams and cleaning them up."""
+
+    active: list[Team] = field(default_factory=list)
+    excluded: dict[str, ExceptionInfo] = field(default_factory=dict)
+    cleanup: bool = True
+
+    @classmethod
+    async def build(
+        cls,
+        infos: Mapping[str, _TeamInfo],
+        problem: AnyProblem,
+        config: ProgramConfigView,
+        ui: BuildUi,
+    ) -> Self:
+        """Builds the programs of every team.
+
+        Attempts to build the programs of every team. If any build fails, that team will be excluded and all its
+        programs cleaned up.
+
+        Args:
+            infos: Teams that participate in the match.
+            problem: Problem class that the match will be fought with.
+            config: Config options.
+
+        Returns:
+            :class:`TeamHandler` containing the info about the participating teams.
+        """
+        handler = cls(cleanup=config.mode == "tournament")
+        ui.start_build_step(infos.keys(), config.build_timeout)
+        for name, info in infos.items():
+            try:
+                team = await Team.build(name, info, problem, config, ui)
+                handler.active.append(team)
+            except Exception as e:
+                handler.excluded[name] = ExceptionInfo.from_exception(e)
+                ui.finish_build(name, False)
+            else:
+                ui.finish_build(name, True)
+        return handler
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, _type: Any, _value: Any, _traceback: Any):
+        if self.cleanup:
+            for team in self.active:
+                team.cleanup()
+
+    @property
+    def grouped_matchups(self) -> list[tuple[Matchup, Matchup]]:
+        """All matchups, grouped by the involved teams.
+
+        Each tuple's first matchup has the first team in the group generating, the second has it solving.
+        """
+        return [(Matchup(*g), Matchup(*g[::-1])) for g in combinations(self.active, 2)]
+
+    @property
+    def matchups(self) -> list[Matchup]:
+        """All matchups that will be fought."""
+        if len(self.active) == 1:
+            return [Matchup(self.active[0], self.active[0])]
+        else:
+            return [m for pair in self.grouped_matchups for m in pair]

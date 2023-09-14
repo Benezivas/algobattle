@@ -1,10 +1,10 @@
 """Module defining the Problem and Solution base classes and related objects."""
 from abc import ABC, abstractmethod
 from functools import wraps
-from importlib.metadata import entry_points
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
+    Annotated,
     Any,
     Callable,
     ClassVar,
@@ -18,11 +18,14 @@ from typing import (
 )
 from math import inf, isnan
 
+from pydantic import AfterValidator
+
 from algobattle.util import (
     EncodableModel,
     InstanceSolutionModel,
     Role,
     Encodable,
+    problem_entrypoints,
 )
 
 
@@ -307,8 +310,8 @@ class Problem(Generic[InstanceT, SolutionT]):
         Raises:
             RuntimeError: If an entrypoint is not a Problem.
         """
-        for entrypoint in entry_points(group="algobattle.problem"):
-            if entrypoint.name not in cls._installed:
+        for name, entrypoint in problem_entrypoints().items():
+            if name not in cls._installed:
                 problem = entrypoint.load()
                 if not isinstance(problem, cls):
                     raise RuntimeError(
@@ -317,7 +320,28 @@ class Problem(Generic[InstanceT, SolutionT]):
                 cls._installed[entrypoint.name] = problem
         return cls._installed
 
+    @classmethod
+    def load(cls, problem: "ProblemName") -> "AnyProblem":
+        """Gets either an installed problem instance using its name or imports an entrypoint."""
+        if problem in cls._installed:
+            return cls._installed[problem]
+        else:
+            try:
+                loaded = problem_entrypoints()[problem].load()
+                if not isinstance(loaded, cls):
+                    raise RuntimeError(f"The entrypoint '{problem}' doesn't point to a problem but rather: {problem}.")
+                return loaded
+            except KeyError:
+                raise ValueError("Problem name is not valid.")
 
+
+def _check_problem_name(val: str) -> str:
+    if val not in Problem._installed and val not in problem_entrypoints():
+        raise ValueError("Value is not the name of an installed Problem.")
+    return val
+
+
+ProblemName = Annotated[str, AfterValidator(_check_problem_name)]
 AnyProblem = Problem[Any, Any]
 
 

@@ -41,10 +41,9 @@ from tomlkit import TOMLDocument, parse as parse_toml, dumps as dumps_toml, tabl
 from tomlkit.items import Table as TomlTable
 
 from algobattle.battle import Battle
-from algobattle.match import AlgobattleConfig, EmptyUi, Match, Ui
-from algobattle.problem import Problem
-from algobattle.team import Matchup
-from algobattle.util import ExecutionConfig, MatchConfig, Role, RunningTimer, BaseModel, TempDir
+from algobattle.match import AlgobattleConfig, EmptyUi, Match, Ui, ExecutionConfig, MatchConfig
+from algobattle.program import Matchup
+from algobattle.util import Role, RunningTimer, BaseModel, TempDir
 from algobattle.templates import Language, PartialTemplateArgs, TemplateArgs, write_templates
 
 
@@ -128,9 +127,6 @@ def run_match(
 ) -> Match:
     """Runs a match using the config found at the provided path and displays it to the cli."""
     config = AlgobattleConfig.from_file(path)
-    if config.match.problem not in Problem.all():
-        print("The problem specified in the config file ({config.match.problem}) is not installed")
-        raise Abort
     result = Match()
     try:
         with CliUi() if ui else EmptyUi() as ui_obj:
