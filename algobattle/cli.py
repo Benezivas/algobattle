@@ -19,8 +19,8 @@ from anyio.abc import TaskGroup
 from algobattle.battle import Battle, Fight
 from algobattle.match import Match, Ui, AlgobattleConfig
 from algobattle.problem import AnyProblem, Problem
-from algobattle.team import Matchup
 from algobattle.util import Role, RunningTimer, flat_intersperse
+from algobattle.program import Matchup
 
 
 @dataclass

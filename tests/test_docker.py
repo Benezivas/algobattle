@@ -2,11 +2,8 @@
 from unittest import IsolatedAsyncioTestCase, main as run_tests
 from pathlib import Path
 
-from algobattle.program import (
-    Generator,
-    RunConfig,
-    Solver,
-)
+from algobattle.program import Generator, Solver
+from algobattle.match import AlgobattleConfig, MatchConfig, RunConfig
 from . import testsproblem
 from .testsproblem.problem import TestProblem, TestInstance, TestSolution
 
@@ -18,8 +15,13 @@ class ProgramTests(IsolatedAsyncioTestCase):
     def setUpClass(cls) -> None:
         """Set up the config and problem objects."""
         cls.problem_path = Path(testsproblem.__file__).parent
-        cls.config = RunConfig()
-        cls.config_short = RunConfig(timeout=2)
+        cls.config = AlgobattleConfig().as_prog_config()
+        cls.config_short = AlgobattleConfig(
+            match=MatchConfig(generator=RunConfig(timeout=2), solver=RunConfig(timeout=2))
+        ).as_prog_config()
+        cls.config_strict = AlgobattleConfig(
+            match=MatchConfig(generator=RunConfig(timeout=2), solver=RunConfig(timeout=2), strict_timeouts=True)
+        ).as_prog_config()
         cls.instance = TestInstance(semantics=True)
 
     async def test_gen_lax_timeout(self):
@@ -35,8 +37,7 @@ class ProgramTests(IsolatedAsyncioTestCase):
         with await Generator.build(
             path=self.problem_path / "generator_timeout",
             problem=TestProblem,
-            config=self.config_short,
-            strict_timeouts=True,
+            config=self.config_strict,
         ) as gen:
             res = await gen.run(5)
             assert res.info.error is not None
@@ -83,8 +84,7 @@ class ProgramTests(IsolatedAsyncioTestCase):
         with await Solver.build(
             path=self.problem_path / "solver_timeout",
             problem=TestProblem,
-            config=self.config_short,
-            strict_timeouts=True,
+            config=self.config_strict
         ) as sol:
             res = await sol.run(self.instance, 5)
             assert res.info.error is not None

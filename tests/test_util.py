@@ -5,8 +5,7 @@ from pathlib import Path
 
 from algobattle.problem import Problem
 from algobattle.battle import Battle, Iterated, Averaged
-from algobattle.match import AlgobattleConfig
-from algobattle.config import MatchConfig
+from algobattle.match import AlgobattleConfig, MatchConfig
 from . import testsproblem
 
 

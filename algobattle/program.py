@@ -1,17 +1,18 @@
 """Module providing an interface to interact with the teams' programs."""
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
+from itertools import combinations
 from os import environ
 from pathlib import Path
 from tarfile import TarFile, is_tarfile
 from tempfile import TemporaryDirectory
 from timeit import default_timer
 from types import EllipsisType
-from typing import Any, ClassVar, Iterator, Protocol, Self, TypeVar, cast, Generator as PyGenerator
+from typing import Any, ClassVar, Iterator, Mapping, Protocol, Self, TypeVar, cast, Generator as PyGenerator
 from typing_extensions import TypedDict
 from uuid import uuid4
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from zipfile import ZipFile, is_zipfile
 
 from docker import DockerClient
@@ -32,6 +33,7 @@ from algobattle.util import (
     ExceptionInfo,
     ExecutionError,
     ExecutionTimeout,
+    MatchMode,
     ValidationError,
     Role,
     BaseModel,
@@ -79,35 +81,12 @@ class RunSpecs:
     overriden: RunConfigOverride
 
 
-@dataclass(frozen=True, slots=True)
-class RunConfigView:
+class RunConfigView(Protocol):
     """Config view for single runs."""
 
     timeout: float | None
     space: int | None
     cpus: int
-
-    def reify(
-        self,
-        timeout: float | None | EllipsisType,
-        space: int | None | EllipsisType,
-        cpus: int | EllipsisType,
-    ) -> RunSpecs:
-        """Merges the overriden config options with the parsed ones."""
-        overriden = RunConfigOverride()
-        if timeout is ...:
-            timeout = self.timeout
-        else:
-            overriden["timeout"] = timeout
-        if space is ...:
-            space = self.space
-        else:
-            overriden["space"] = space
-        if cpus is ...:
-            cpus = self.cpus
-        else:
-            overriden["cpus"] = cpus
-        return RunSpecs(timeout=timeout, space=space, cpus=cpus, overriden=overriden)
 
 
 @dataclass(frozen=True, slots=True)
@@ -121,6 +100,7 @@ class ProgramConfigView:
     run_kwargs: dict[str, Any]
     generator: RunConfigView
     solver: RunConfigView
+    mode: MatchMode
 
 
 class ProgramUi(Protocol):
@@ -691,3 +671,177 @@ class Solver(Program):
                 battle_data=battle_data,
                 solution=solution,
             )
+
+
+class BuildUi(Protocol):
+    """Provides and interface for the build process to update the ui."""
+
+    @abstractmethod
+    def start_build(self, team: str, role: Role, timeout: float | None) -> None:
+        """Informs the ui that a new program is being built."""
+
+    @abstractmethod
+    def finish_build(self) -> None:
+        """Informs the ui that the current build has been finished."""
+
+
+class _TeamInfo(Protocol):
+    generator: Path
+    solver: Path
+
+
+@dataclass(frozen=True, slots=True)
+class Team:
+    """Class bundling together the programs of a team."""
+
+    name: str
+    generator: Generator
+    solver: Solver
+
+    @classmethod
+    async def build(
+        cls,
+        name: str,
+        info: _TeamInfo,
+        problem: AnyProblem,
+        config: ProgramConfigView,
+        ui: BuildUi,
+    ) -> "Team":
+        """Builds the specified docker files into images and return the corresponding team.
+
+        Args:
+            name: Name of the team.
+            info: Team info containing the paths to the program data.
+            problem: The problem class the current match is fought over.
+            config: Config for the programs.
+
+        Returns:
+            The built team.
+
+        Raises:
+            ValueError: If the team name is already in use.
+            DockerError: If the docker build fails for some reason
+        """
+        tag_name = name.lower().replace(" ", "_") if config.mode == "testing" else None
+        ui.start_build(name, Role.generator, config.build_timeout)
+        generator = await Generator.build(
+            path=info.generator,
+            problem=problem,
+            config=config,
+            team_name=tag_name,
+        )
+        ui.finish_build()
+        try:
+            ui.start_build(name, Role.solver, config.build_timeout)
+            solver = await Solver.build(
+                path=info.solver,
+                problem=problem,
+                config=config,
+                team_name=tag_name,
+            )
+            ui.finish_build()
+        except Exception:
+            generator.remove()
+            raise
+        return Team(name, generator, solver)
+
+    def __str__(self) -> str:
+        return self.name
+
+    def __eq__(self, o: object) -> bool:
+        if isinstance(o, Team):
+            return self.name == o.name
+        else:
+            return False
+
+    def __hash__(self) -> int:
+        return hash(self.name)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, _type: Any, _value: Any, _traceback: Any):
+        self.cleanup()
+
+    def cleanup(self) -> None:
+        """Removes the built docker images."""
+        self.generator.remove()
+        self.solver.remove()
+
+
+@dataclass(frozen=True)
+class Matchup:
+    """Represents an individual matchup of teams."""
+
+    generator: Team
+    solver: Team
+
+    def __iter__(self) -> Iterator[Team]:
+        yield self.generator
+        yield self.solver
+
+    def __repr__(self) -> str:
+        return f"Matchup({self.generator.name}, {self.solver.name})"
+
+
+@dataclass
+class TeamHandler:
+    """Handles building teams and cleaning them up."""
+
+    active: list[Team] = field(default_factory=list)
+    excluded: dict[str, ExceptionInfo] = field(default_factory=dict)
+    cleanup: bool = True
+
+    @classmethod
+    async def build(
+        cls,
+        infos: Mapping[str, _TeamInfo],
+        problem: AnyProblem,
+        config: ProgramConfigView,
+        ui: BuildUi,
+    ) -> Self:
+        """Builds the programs of every team.
+
+        Attempts to build the programs of every team. If any build fails, that team will be excluded and all its
+        programs cleaned up.
+
+        Args:
+            infos: Teams that participate in the match.
+            problem: Problem class that the match will be fought with.
+            config: Config options.
+
+        Returns:
+            :class:`TeamHandler` containing the info about the participating teams.
+        """
+        handler = cls(cleanup=config.mode == "tournament")
+        for name, info in infos.items():
+            try:
+                team = await Team.build(name, info, problem, config, ui)
+                handler.active.append(team)
+            except Exception as e:
+                handler.excluded[name] = ExceptionInfo.from_exception(e)
+        return handler
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, _type: Any, _value: Any, _traceback: Any):
+        if self.cleanup:
+            for team in self.active:
+                team.cleanup()
+
+    @property
+    def grouped_matchups(self) -> list[tuple[Matchup, Matchup]]:
+        """All matchups, grouped by the involved teams.
+
+        Each tuple's first matchup has the first team in the group generating, the second has it solving.
+        """
+        return [(Matchup(*g), Matchup(*g[::-1])) for g in combinations(self.active, 2)]
+
+    @property
+    def matchups(self) -> list[Matchup]:
+        """All matchups that will be fought."""
+        if len(self.active) == 1:
+            return [Matchup(self.active[0], self.active[0])]
+        else:
+            return [m for pair in self.grouped_matchups for m in pair]

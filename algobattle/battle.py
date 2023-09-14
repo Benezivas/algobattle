@@ -250,8 +250,8 @@ class Battle(BaseModel):
                 case _:
                     return tagged_union_schema(
                         choices={
-                            subclass.model_fields["type"].default: subclass.__pydantic_core_schema__
-                            for subclass in Battle._battle_types.values()
+                            battle.Config.model_fields["type"].default: battle.Config.__pydantic_core_schema__
+                            for battle in Battle._battle_types.values()
                         },
                         discriminator="type",
                     )

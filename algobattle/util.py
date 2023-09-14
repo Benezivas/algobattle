@@ -4,31 +4,27 @@ In particular, the base classes :class:`BaseModel`, :class:`Encodable`, :class:`
 """
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
 from inspect import Parameter, Signature, signature
 from itertools import chain
 import json
 from pathlib import Path
 from traceback import format_exception
-from typing import Annotated, Any, Callable, ClassVar, Iterable, Literal, LiteralString, TypeVar, Self, cast, get_args
+from typing import Any, Callable, ClassVar, Iterable, Literal, LiteralString, TypeVar, Self, cast, get_args
 from annotated_types import GroupedMetadata
 from importlib.metadata import EntryPoint, entry_points
 
 from pydantic import (
-    AfterValidator,
-    ByteSize,
     ConfigDict,
     BaseModel as PydandticBaseModel,
     Extra,
-    Field,
     GetCoreSchemaHandler,
     ValidationError as PydanticValidationError,
     ValidationInfo,
 )
-from pydantic.types import PathType
 from pydantic_core import CoreSchema
-from pydantic_core.core_schema import general_after_validator_function, union_schema, no_info_after_validator_function
+from pydantic_core.core_schema import general_after_validator_function
 
 
 class Role(Enum):

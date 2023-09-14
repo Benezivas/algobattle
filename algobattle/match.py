@@ -6,7 +6,8 @@ from functools import cached_property
 from itertools import combinations
 from pathlib import Path
 import tomllib
-from typing import Annotated, Any, ClassVar, Self, TypeAlias, TypeVar, TypedDict, cast, overload
+from typing import Annotated, Any, ClassVar, Self, TypeAlias, TypeVar, cast, overload
+from typing_extensions import TypedDict
 
 from pydantic import AfterValidator, ByteSize, ConfigDict, Field, GetCoreSchemaHandler, ValidationInfo, model_validator
 from pydantic.types import PathType
@@ -17,8 +18,7 @@ from anyio.to_thread import current_default_thread_limiter
 from docker.types import LogConfig, Ulimit
 
 from algobattle.battle import Battle, FightHandler, FightUi, BattleUi, Iterated
-from algobattle.program import ProgramUi
-from algobattle.team import BuildUi, Matchup, Team, TeamHandler
+from algobattle.program import ProgramConfigView, ProgramUi, BuildUi, Matchup, Team, TeamHandler
 from algobattle.problem import InstanceT, Problem, ProblemName, SolutionT
 from algobattle.util import (
     ExceptionInfo,
@@ -98,9 +98,7 @@ class Match(BaseModel):
         if ui is None:
             ui = Ui()
 
-        with await TeamHandler.build(
-            config.teams, problem, config.execution.mode, config.match, config.docker, ui
-        ) as teams:
+        with await TeamHandler.build(config.teams, problem, config.as_prog_config(), ui) as teams:
             result = cls(
                 active_teams=[t.name for t in teams.active],
                 excluded_teams=teams.excluded,
@@ -631,3 +629,16 @@ class AlgobattleConfig(BaseModel):
                 except tomllib.TOMLDecodeError as e:
                     raise ValueError(f"The config file at {file} is not a properly formatted TOML file!\n{e}")
         return cls.model_validate(config_dict, context={"base_path": file.parent})
+
+    def as_prog_config(self) -> ProgramConfigView:
+        """Builds a simple object containing all program relevant settings."""
+        return ProgramConfigView(
+            build_timeout=self.match.build_timeout,
+            max_image_size=self.match.image_size,
+            strict_timeouts=self.match.strict_timeouts,
+            build_kwargs=self.docker.build.kwargs,
+            run_kwargs=self.docker.run.kwargs,
+            generator=self.match.generator,
+            solver=self.match.solver,
+            mode=self.execution.mode,
+        )
