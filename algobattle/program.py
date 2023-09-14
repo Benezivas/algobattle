@@ -22,6 +22,7 @@ from docker.models.containers import Container as DockerContainer
 from docker.types import Mount
 from requests import Timeout, ConnectionError
 from pydantic import Field
+from anyio import run as run_async
 from anyio.to_thread import run_sync
 from urllib3.exceptions import ReadTimeoutError
 
@@ -577,6 +578,15 @@ class Generator(Program):
                 solution=solution,
             )
 
+    def test(self) -> Instance | ExceptionInfo:
+        """Tests whether the generator runs without issues and creates a syntactically valid instance."""
+        res = run_async(self.run, self.problem.min_size)
+        if res.info.error:
+            return res.info.error
+        else:
+            assert res.instance is not None
+            return res.instance
+
 
 class Solver(Program):
     """A higher level interface for a team's solver."""
@@ -671,6 +681,14 @@ class Solver(Program):
                 battle_data=battle_data,
                 solution=solution,
             )
+
+    def test(self, instance: Instance) -> ExceptionInfo | None:
+        """Tests whether the solver runs without issues and creates a syntactically valid solution."""
+        res = run_async(self.run, instance, instance.size)
+        if res.info.error:
+            return res.info.error
+        else:
+            return None
 
 
 class BuildUi(Protocol):

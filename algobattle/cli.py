@@ -42,8 +42,9 @@ from tomlkit.items import Table as TomlTable
 
 from algobattle.battle import Battle
 from algobattle.match import AlgobattleConfig, EmptyUi, Match, Ui, ExecutionConfig, MatchConfig
-from algobattle.program import Matchup
-from algobattle.util import Role, RunningTimer, BaseModel, TempDir
+from algobattle.problem import Instance
+from algobattle.program import Generator, Matchup, Solver
+from algobattle.util import ExceptionInfo, Role, RunningTimer, BaseModel, TempDir
 from algobattle.templates import Language, PartialTemplateArgs, TemplateArgs, write_templates
 
 
@@ -281,6 +282,79 @@ def init(
         _init_program(target, solver, template_args, Role.solver)
 
     print(f"Initialized problem directory at {target}")
+
+
+@app.command()
+def test(
+    folder: Annotated[Path, Argument(file_okay=False, writable=True, help="The problem folder to use.")] = Path(),
+    generator: Annotated[bool, Option(help="Whether to test the generator")] = True,
+    solver: Annotated[bool, Option(help="Whether to test the solver")] = True,
+    team: Annotated[Optional[str], Option(help="Name of the team whose programs you want to test.")] = None,
+) -> None:
+    """Tests whether the programs install successfully and run on dummy instances without crashing."""
+    config = AlgobattleConfig.from_file(folder)
+    problem = config.problem
+    if problem is None:
+        print(f"The problem specified in the config file ({config.match.problem}) is not installed.")
+        raise Abort
+    if team:
+        try:
+            team_obj = config.teams[team]
+        except KeyError:
+            console.print("[red]The specified team does not exist in the config file.")
+            raise Abort
+    else:
+        match len(config.teams):
+            case 0:
+                console.print("[red]The config file contains no teams.")
+                raise Abort
+            case 1:
+                team_obj = next(iter(config.teams.values()))
+            case _:
+                console.print("[red]The config file contains more than one team and none were specified.")
+                raise Abort
+
+    gen_instance = None
+    if generator:
+        async def gen_builder() -> Generator:
+            with Status("Building generator"):
+                return await Generator.build(team_obj.generator, problem=problem, config=config.as_prog_config())
+
+        with run_async_fn(gen_builder) as gen:
+            with Status("Running generator"):
+                gen_instance = gen.test()
+            if isinstance(gen_instance, ExceptionInfo):
+                console.print("[red]The generator didn't run successfully.")
+                config.execution.results.write_text(gen_instance.model_dump_json())
+                gen_instance = None
+
+    sol_error = None
+    if solver:
+        if gen_instance is None:
+            if problem.test_instance is None:
+                console.print(
+                    "[magenta2]Cannot test the solver since the generator failed and the problem doesn't provide a test"
+                    " instance."
+                )
+                raise Exit
+            else:
+                instance = cast(Instance, problem.test_instance)
+        else:
+            instance = gen_instance
+
+        async def sol_builder() -> Solver:
+            with Status("Building solver"):
+                return await Solver.build(team_obj.generator, problem=problem, config=config.as_prog_config())
+
+        with run_async_fn(sol_builder) as sol:
+            with Status("Running solver"):
+                sol_error = sol.test(instance)
+            if isinstance(sol_error, ExceptionInfo):
+                console.print("[red]The solver didn't run successfully.")
+                config.execution.results.write_text(sol_error.model_dump_json())
+
+    if gen_instance is not None and sol_error is None:
+        console.print("[green]Both programs tested successfully.")
 
 
 @app.command()

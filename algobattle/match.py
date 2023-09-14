@@ -626,6 +626,11 @@ class AlgobattleConfig(BaseModel):
 
     model_config = ConfigDict(revalidate_instances="always")
 
+    @cached_property
+    def problem(self) -> Problem[Any, Any] | None:
+        """The problem this config uses."""
+        return Problem.load(self.match.problem)
+
     @classmethod
     def from_file(cls, file: Path) -> Self:
         """Parses a config object from a toml file.

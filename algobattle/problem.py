@@ -217,6 +217,7 @@ class Problem(Generic[InstanceT, SolutionT]):
         min_size: int = 0,
         with_solution: Literal[True] = True,
         score_function: ScoreFunctionWithSol[InstanceT, SolutionT] = default_score,
+        test_instance: InstanceT | None = None,
     ) -> None:
         ...
 
@@ -230,6 +231,7 @@ class Problem(Generic[InstanceT, SolutionT]):
         min_size: int = 0,
         with_solution: Literal[False],
         score_function: ScoreFunctionNoSol[InstanceT, SolutionT] = default_score,
+        test_instance: InstanceT | None = None,
     ) -> None:
         ...
 
@@ -242,6 +244,7 @@ class Problem(Generic[InstanceT, SolutionT]):
         min_size: int = 0,
         with_solution: bool = True,
         score_function: ScoreFunction[InstanceT, SolutionT] = default_score,
+        test_instance: InstanceT | None = None,
     ) -> None:
         """The definition of a problem.
 
@@ -259,6 +262,7 @@ class Problem(Generic[InstanceT, SolutionT]):
                 gets the generated solutions at `generator_solution` and `solver_solution`. If it is not set it receives
                 the solver's solution at `solution`. It should return the calculated score, a number in [0, 1] with a
                 value of 0 indicating that the solver failed completely and 1 that it solved the instance perfectly.
+            test_instance: A dummy instance that can be used to test whether a solver produces correct output.
         """
         self.name = name
         self.instance_cls = instance_cls
@@ -266,8 +270,9 @@ class Problem(Generic[InstanceT, SolutionT]):
         self.min_size = min_size
         self.with_solution = with_solution
         self.score_function = score_function
+        self.test_instance = test_instance
 
-    __slots__ = ("name", "instance_cls", "solution_cls", "min_size", "with_solution", "score_function")
+    __slots__ = ("name", "instance_cls", "solution_cls", "min_size", "with_solution", "score_function", "test_instance")
     _installed: "ClassVar[dict[str, AnyProblem]]" = {}
 
     @overload
@@ -299,26 +304,6 @@ class Problem(Generic[InstanceT, SolutionT]):
             if TYPE_CHECKING:
                 assert isinstance(self.score_function, ScoreFunctionNoSol)
             return self.score_function(instance, solution=solution)
-
-    @classmethod
-    def all(cls) -> "dict[str, AnyProblem]":
-        """Returns a dictionary mapping the names of all installed problems to their python objects.
-
-        It includes all Problem objects that have been created so far and ones exposed to the algobattle module via the
-        `algobattle.problem` entrypoint hook.
-
-        Raises:
-            RuntimeError: If an entrypoint is not a Problem.
-        """
-        for name, entrypoint in problem_entrypoints().items():
-            if name not in cls._installed:
-                problem = entrypoint.load()
-                if not isinstance(problem, cls):
-                    raise RuntimeError(
-                        f"The entrypoint '{entrypoint.name}' doesn't point to a problem but rather: {problem}."
-                    )
-                cls._installed[entrypoint.name] = problem
-        return cls._installed
 
     @classmethod
     def load(cls, problem: "ProblemName") -> "AnyProblem":
