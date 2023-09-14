@@ -8,7 +8,7 @@ from os import environ
 from pathlib import Path
 from random import choice
 from shutil import rmtree
-from subprocess import run as run_process
+from subprocess import PIPE, Popen, run as run_process
 import sys
 from typing import Annotated, Any, ClassVar, Iterable, Literal, Optional, Self, cast
 from typing_extensions import override
@@ -233,11 +233,16 @@ def init(
 
             if new_problem:
                 cmd = config.install_cmd(build_dir)
-                with console.status("Installing problem"):
-                    res = run_process(cmd, env=environ.copy())
-                if res.returncode:
-                    print("Couldn't install the problem")
-                    console.print(f"[red]{res.stderr}")
+                with console.status("Installing problem"), Popen(
+                    cmd, env=environ.copy(), stdout=PIPE, stderr=PIPE, text=True
+                ) as installer:
+                    assert installer.stdout is not None
+                    assert installer.stderr is not None
+                    for line in installer.stdout:
+                        console.print(line.strip("\n"))
+                    error = "".join(installer.stderr.readlines())
+                if installer.returncode:
+                    console.print(f"[red]Couldn't install the problem[/]\n{error}")
                     raise Abort
                 for path in problem_data:
                     path.rename(target / path.name)
