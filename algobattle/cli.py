@@ -41,7 +41,7 @@ from tomlkit import TOMLDocument, parse as parse_toml, dumps as dumps_toml, tabl
 from tomlkit.items import Table as TomlTable
 
 from algobattle.battle import Battle
-from algobattle.match import AlgobattleConfig, EmptyUi, Match, Ui, ExecutionConfig, MatchConfig
+from algobattle.match import AlgobattleConfig, EmptyUi, Match, Ui, ExecutionConfig
 from algobattle.problem import Instance, Problem
 from algobattle.program import Generator, Matchup, Solver
 from algobattle.util import EncodableModel, ExceptionInfo, Role, RunningTimer, BaseModel, TempDir
@@ -209,8 +209,7 @@ def init(
                     problem_zip.extractall(build_dir)
 
             problem_config = parse_toml((build_dir / "config.toml").read_text())
-            # ! paths in this config arent properly relativized
-            parsed_config = AlgobattleConfig.model_validate(problem_config)
+            parsed_config = AlgobattleConfig.from_file(build_dir / "config.toml", ignore_uninstalled=True)
             problem_name = parsed_config.match.problem
             assert isinstance(problem_name, str)
             if target is None:
@@ -256,8 +255,7 @@ def init(
             console.print("[red]You must either use a problem spec file or target a directory with an existing config.")
             raise Abort
         problem_config = parse_toml(target.joinpath("config.toml").read_text())
-        # ! paths in this config arent properly relativized
-        parsed_config = AlgobattleConfig.model_validate(problem_config)
+        parsed_config = AlgobattleConfig.from_file(target / "config.toml", ignore_uninstalled=True)
         problem_name = parsed_config.match.problem
 
     with Status("Initializing metadata"):
@@ -273,8 +271,6 @@ def init(
             problem_config["execution"] = config.default_exec
         (target / "config.toml").write_text(dumps_toml(problem_config))
         res_path = parsed_config.execution.results
-        if not res_path.is_absolute():
-            res_path = (target / res_path).resolve()
         res_path.mkdir(parents=True, exist_ok=True)
 
     problem_obj = Problem.load(problem_name)

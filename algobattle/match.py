@@ -20,7 +20,7 @@ from docker.types import LogConfig, Ulimit
 
 from algobattle.battle import Battle, FightHandler, FightUi, BattleUi, Iterated
 from algobattle.program import ProgramConfigView, ProgramUi, Matchup, TeamHandler, Team, BuildUi
-from algobattle.problem import InstanceT, Problem, ProblemName, SolutionT
+from algobattle.problem import InstanceT, Problem, SolutionT
 from algobattle.util import (
     ExceptionInfo,
     MatchMode,
@@ -559,6 +559,16 @@ class RunConfig(BaseModel):
     """Number of cpu cores available."""
 
 
+def _check_problem_name(val: str, info: ValidationInfo) -> str:
+    if (info.context is not None and info.context.get("ignore_uninstalled", False)) or val in Problem.available():
+        return val
+    else:
+        raise ValueError("Value is not the name of an installed Problem.")
+
+
+ProblemName = Annotated[str, AfterValidator(_check_problem_name)]
+
+
 class MatchConfig(BaseModel):
     """Parameters determining the match execution.
 
@@ -632,21 +642,26 @@ class AlgobattleConfig(BaseModel):
         return Problem.load(self.match.problem)
 
     @classmethod
-    def from_file(cls, file: Path) -> Self:
+    def from_file(cls, file: Path, ignore_uninstalled: bool = False) -> Self:
         """Parses a config object from a toml file.
 
-        If the file doesn't exist it returns a default instance instead of raising an error.
+        Args:
+            file: Path to the file, or a directory containing one called 'config.toml'.
+            ignore_uninstalled: Whether to raise errors if the specified problem and battle type cannot be found.
         """
         Battle.load_entrypoints()
         if not file.is_file():
-            config_dict = {}
-        else:
-            with open(file, "rb") as f:
-                try:
-                    config_dict = tomllib.load(f)
-                except tomllib.TOMLDecodeError as e:
-                    raise ValueError(f"The config file at {file} is not a properly formatted TOML file!\n{e}")
-        return cls.model_validate(config_dict, context={"base_path": file.parent})
+            if file.joinpath("config.toml").is_file():
+                file /= "config.toml"
+            else:
+                raise ValueError("The path does not point to a config file")
+        try:
+            config_dict = tomllib.loads(file.read_text())
+        except tomllib.TOMLDecodeError as e:
+            raise ValueError(f"The config file at {file} is not a properly formatted TOML file!\n{e}")
+        return cls.model_validate(
+            config_dict, context={"base_path": file.parent, "ignore_uninstalled": ignore_uninstalled}
+        )
 
     def as_prog_config(self) -> ProgramConfigView:
         """Builds a simple object containing all program relevant settings."""

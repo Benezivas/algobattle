@@ -397,16 +397,6 @@ def can_be_positional(param: Parameter) -> bool:
     return param.kind in (Parameter.POSITIONAL_ONLY, Parameter.POSITIONAL_OR_KEYWORD)
 
 
-def problem_entrypoints() -> dict[str, EntryPoint]:
-    """Returns all currently registered problem entrypoints."""
-    return {e.name: e for e in entry_points(group="algobattle.problem")}
-
-
-def battle_entrypoints() -> dict[str, EntryPoint]:
-    """Returns all currently registered battle entrypoints."""
-    return {e.name: e for e in entry_points(group="algobattle.battle")}
-
-
 class TempDir(TemporaryDirectory):
     """Python's `TemporaryDirectory` but with a contextmanager returning a Path."""
 
