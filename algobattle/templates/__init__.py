@@ -15,7 +15,10 @@ class Language(StrEnum):
 
 ENVS = {
     "python": Environment(
-        loader=PackageLoader("algobattle.templates", "python"), keep_trailing_newline=True, line_statement_prefix="# ?"
+        loader=PackageLoader("algobattle.templates", "python"),
+        keep_trailing_newline=True,
+        trim_blocks=True,
+        lstrip_blocks=True,
     )
 }
 
@@ -25,6 +28,9 @@ class PartialTemplateArgs(TypedDict):
 
     problem: str
     team: str
+    with_solution: bool
+    instance_json: bool
+    solution_json: bool
 
 
 class TemplateArgs(PartialTemplateArgs):
@@ -39,7 +45,7 @@ def normalize(s: str) -> str:
 
 
 def write_templates(target: Path, lang: Language, args: TemplateArgs) -> None:
-    """Yields all templates and where they should be placed."""
+    """Writes the formatted templates to the target directory."""
     template_args = args | {
         "project": f"{normalize(args['team'])}-{normalize(args['problem'])}-{normalize(args['program'])}",
     }
@@ -47,7 +53,10 @@ def write_templates(target: Path, lang: Language, args: TemplateArgs) -> None:
     for name in env.list_templates():
         template = env.get_template(name)
         formatted = template.render(template_args)
-        formatted_path = Template(name).render(template_args)
+        formatted_path = Path(Template(name).render(template_args))
+        if formatted_path.suffix == ".jinja":
+            formatted_path = formatted_path.with_suffix("")
+
         (target / formatted_path).parent.mkdir(parents=True, exist_ok=True)
         with open(target / formatted_path, "w+") as file:
             file.write(formatted)

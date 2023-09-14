@@ -42,9 +42,9 @@ from tomlkit.items import Table as TomlTable
 
 from algobattle.battle import Battle
 from algobattle.match import AlgobattleConfig, EmptyUi, Match, Ui, ExecutionConfig, MatchConfig
-from algobattle.problem import Instance
+from algobattle.problem import Instance, Problem
 from algobattle.program import Generator, Matchup, Solver
-from algobattle.util import ExceptionInfo, Role, RunningTimer, BaseModel, TempDir
+from algobattle.util import EncodableModel, ExceptionInfo, Role, RunningTimer, BaseModel, TempDir
 from algobattle.templates import Language, PartialTemplateArgs, TemplateArgs, write_templates
 
 
@@ -156,7 +156,8 @@ def _init_program(target: Path, lang: Language, args: PartialTemplateArgs, role:
     dir = target / role.value
     if dir.exists():
         replace = Confirm.ask(
-            f"[magenta2]The targeted directory already contains a {role}, do you want to replace it?", default=True
+            f"[magenta2]The targeted directory already contains a {role.value}, do you want to replace it?",
+            default=True,
         )
         if replace:
             rmtree(dir)
@@ -166,7 +167,7 @@ def _init_program(target: Path, lang: Language, args: PartialTemplateArgs, role:
     else:
         dir.mkdir(parents=True, exist_ok=True)
     with Status(f"Initializing {role}"):
-        write_templates(dir, lang, cast(TemplateArgs, args | {"program": role.value}))
+        write_templates(dir, lang, TemplateArgs(program=role.value, **args))
 
 
 @app.command()
@@ -249,39 +250,47 @@ def init(
                 for path in problem_data:
                     path.rename(target / path.name)
     else:
-        problem_name = "Unknown Problem"
-        problem_config = TOMLDocument()
         if target is None:
             target = Path()
+        if not target.joinpath("config.toml").is_file():
+            console.print("[red]You must either use a problem spec file or target a directory with an existing config.")
+            raise Abort
+        problem_config = parse_toml(target.joinpath("config.toml").read_text())
         # ! paths in this config arent properly relativized
-        parsed_config = AlgobattleConfig(match=MatchConfig(problem="Uknown Problem"))
+        parsed_config = AlgobattleConfig.model_validate(problem_config)
+        problem_name = parsed_config.match.problem
 
     with Status("Initializing metadata"):
-        problem_config.add(
-            "teams",
-            table().add(
-                team_name,
-                table().add("generator", "./generator").add("solver", "./solver"),
-            ),
-        )
-        if config.default_exec is not None:
-            problem_config.add(config.default_exec)
+        if "teams" not in problem_config:
+            problem_config.add(
+                "teams",
+                table().add(
+                    team_name,
+                    table().add("generator", "./generator").add("solver", "./solver"),
+                ),
+            )
+        if config.default_exec is not None and "execution" not in problem_config:
+            problem_config["execution"] = config.default_exec
         (target / "config.toml").write_text(dumps_toml(problem_config))
         res_path = parsed_config.execution.results
         if not res_path.is_absolute():
             res_path = (target / res_path).resolve()
         res_path.mkdir(parents=True, exist_ok=True)
 
+    problem_obj = Problem.load(problem_name)
     template_args: PartialTemplateArgs = {
         "problem": problem_name,
         "team": team_name,
+        "with_solution": problem_obj.with_solution,
+        "instance_json": issubclass(problem_obj.instance_cls, EncodableModel),
+        "solution_json": issubclass(problem_obj.solution_cls, EncodableModel),
     }
     if generator is not None:
         _init_program(target, generator, template_args, Role.generator)
     if solver is not None:
         _init_program(target, solver, template_args, Role.solver)
 
-    print(f"Initialized problem directory at {target}")
+    console.print(f"[green]Success![/] initialized algobattle project data in [cyan]{target}[/]")
 
 
 @app.command()
@@ -316,6 +325,7 @@ def test(
 
     gen_instance = None
     if generator:
+
         async def gen_builder() -> Generator:
             with Status("Building generator"):
                 return await Generator.build(team_obj.generator, problem=problem, config=config.as_prog_config())
