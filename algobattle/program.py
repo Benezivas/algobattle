@@ -266,8 +266,9 @@ class Program(ABC):
         Raises:
             BuildError: If the build fails for any reason.
         """
-        if team_name is not None:
-            name = f"algobattle_{team_name}_{cls.role.name}"
+        if team_name is not None and config.mode == "testing":
+            normalized = team_name.lower().replace(" ", "_")
+            name = f"algobattle_{normalized}_{cls.role.name}"
             try:
                 old_image = cast(DockerImage, client().images.get(name))
             except ImageNotFound:
@@ -745,13 +746,12 @@ class Team:
             ValueError: If the team name is already in use.
             DockerError: If the docker build fails for some reason
         """
-        tag_name = name.lower().replace(" ", "_") if config.mode == "testing" else None
         ui.start_build(name, Role.generator)
         generator = await Generator.build(
             path=info.generator,
             problem=problem,
             config=config,
-            team_name=tag_name,
+            team_name=name,
         )
         try:
             ui.start_build(name, Role.solver)
@@ -759,7 +759,7 @@ class Team:
                 path=info.solver,
                 problem=problem,
                 config=config,
-                team_name=tag_name,
+                team_name=name,
             )
         except Exception:
             generator.remove()
@@ -778,11 +778,14 @@ class Team:
     def __hash__(self) -> int:
         return hash(self.name)
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
+        self.generator.__enter__()
+        self.solver.__enter__()
         return self
 
-    def __exit__(self, _type: Any, _value: Any, _traceback: Any):
-        self.cleanup()
+    def __exit__(self, *args: Any):
+        self.generator.__exit__(*args)
+        self.solver.__exit__(*args)
 
     def cleanup(self) -> None:
         """Removes the built docker images."""
@@ -851,12 +854,13 @@ class TeamHandler:
         return handler
 
     def __enter__(self) -> Self:
+        for team in self.active:
+            team.__enter__()
         return self
 
-    def __exit__(self, _type: Any, _value: Any, _traceback: Any):
-        if self.cleanup:
-            for team in self.active:
-                team.cleanup()
+    def __exit__(self, *args: Any):
+        for team in self.active:
+            team.__exit__(*args)
 
     @property
     def grouped_matchups(self) -> list[tuple[Matchup, Matchup]]:
