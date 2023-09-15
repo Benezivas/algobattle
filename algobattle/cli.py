@@ -94,7 +94,7 @@ class CliConfig(BaseModel):
     @property
     def default_exec(self) -> TomlTable | None:
         """The default exec config for each problem."""
-        exec: Any = self._doc.get("exec", None)
+        exec: Any = self._doc.get("execution", None)
         return exec
 
     def install_cmd(self, target: Path) -> list[str]:
@@ -173,7 +173,7 @@ def _init_program(target: Path, lang: Language, args: PartialTemplateArgs, role:
 @app.command()
 def init(
     target: Annotated[
-        Optional[Path], Argument(file_okay=False, writable=True, resolve_path=True, help="The folder to initialize.")
+        Optional[Path], Argument(file_okay=False, writable=True, help="The folder to initialize.")
     ] = None,
     problem: Annotated[
         Optional[Path],
@@ -186,7 +186,6 @@ def init(
         Optional[Language], Option("--generator", "-g", help="The language to use for the generator.")
     ] = None,
     solver: Annotated[Optional[Language], Option("--solver", "-s", help="The language to use for the solver.")] = None,
-    install: Annotated[bool, Option(help="Whether to install the problem package.")] = True,
 ) -> None:
     """Initializes a project directory, setting up the problem files and program folders with docker files.
 
@@ -201,84 +200,100 @@ def init(
     config = CliConfig.load()
     team_name = config.general.team_name or choice(("Dogs", "Cats", "Otters", "Red Pandas", "Possums", "Rats"))
 
-    if problem is None and Path("problem.aprb").is_file():
-        problem = Path("problem.aprb")
     if problem is not None:
-        with TempDir() as build_dir:
+        with TempDir() as unpack_dir:
             with console.status("Extracting problem data"):
                 with ZipFile(problem) as problem_zip:
-                    problem_zip.extractall(build_dir)
+                    problem_zip.extractall(unpack_dir)
 
-            problem_config = parse_toml((build_dir / "config.toml").read_text())
             parsed_config = AlgobattleConfig.from_file(
-                build_dir / "config.toml", ignore_uninstalled=True, reltivize_paths=False
+                unpack_dir / "config.toml", ignore_uninstalled=True, reltivize_paths=False
             )
-            problem_name = parsed_config.match.problem
-            assert isinstance(problem_name, str)
             if target is None:
-                target = Path() if Path().name == problem_name else Path() / problem_name
-            target.mkdir(parents=True, exist_ok=True)
+                target = Path() / parsed_config.match.problem
 
-            new_problem = True
-            problem_data = list(build_dir.iterdir())
+            target.mkdir(parents=True, exist_ok=True)
+            problem_data = list(unpack_dir.iterdir())
             if any(((target / path.name).exists() for path in problem_data)):
-                replace = Confirm.ask(
-                    "[magenta2]The target directory already contains problem data, do you want to replace it?",
+                copy_problem_data = Confirm.ask(
+                    "[magenta2]The target directory already contains an algobattle project, do you want to replace it?",
                     default=True,
                 )
-                if replace:
-                    for path in problem_data:
-                        if (file := target / path.name).is_file():
-                            file.unlink()
-                        elif (dir := target / path.name).is_dir():
-                            rmtree(dir)
-                else:
-                    new_problem = False
-
-            if new_problem and install:
-                cmd = config.install_cmd(build_dir)
-                with console.status("Installing problem"), Popen(
-                    cmd, env=environ.copy(), stdout=PIPE, stderr=PIPE, text=True
-                ) as installer:
-                    assert installer.stdout is not None
-                    assert installer.stderr is not None
-                    for line in installer.stdout:
-                        console.print(line.strip("\n"))
-                    error = "".join(installer.stderr.readlines())
-                if installer.returncode:
-                    console.print(f"[red]Couldn't install the problem[/]\n{error}")
-                    raise Abort
+            else:
+                copy_problem_data = True
+            if copy_problem_data:
                 for path in problem_data:
+                    if (file := target / path.name).is_file():
+                        file.unlink()
+                    elif (dir := target / path.name).is_dir():
+                        rmtree(dir)
                     path.rename(target / path.name)
+                console.print("Unpacked problem data")
+            else:
+                parsed_config = AlgobattleConfig.from_file(
+                    target / "config.toml", ignore_uninstalled=True, reltivize_paths=False
+                )
+                console.print("Using existing problem data")
     else:
         if target is None:
-            target = Path().resolve()
+            target = Path()
         if not target.joinpath("config.toml").is_file():
             console.print("[red]You must either use a problem spec file or target a directory with an existing config.")
             raise Abort
-        problem_config = parse_toml(target.joinpath("config.toml").read_text())
         parsed_config = AlgobattleConfig.from_file(
             target / "config.toml", ignore_uninstalled=True, reltivize_paths=False
         )
-        problem_name = parsed_config.match.problem
+        console.print("Using existing problem data")
+
+    problem_name = parsed_config.match.problem
+    if problem_name not in Problem.available():
+        existing_data = set(p.resolve() for p in target.iterdir())
+        cmd = config.install_cmd(target)
+        try:
+            with console.status("Installing problem"), Popen(
+                cmd, env=environ.copy(), stdout=PIPE, stderr=PIPE, text=True
+            ) as installer:
+                assert installer.stdout is not None
+                assert installer.stderr is not None
+                for line in installer.stdout:
+                    console.print(line.strip("\n"))
+                error = "".join(installer.stderr.readlines())
+        # pip leaves behind some build artifacts we want to clean up
+        finally:
+            for path in target.iterdir():
+                path = path.resolve()
+                if path in existing_data:
+                    continue
+                elif path.is_file():
+                    path.unlink()
+                elif path.is_dir():
+                    rmtree(path)
+        if installer.returncode:
+            console.print(f"[red]Couldn't install the problem[/]\n{error}")
+            raise Abort
+        else:
+            console.print(f"Installed problem {problem_name}")
+    else:
+        console.print(f"{problem_name} problem already is installed")
 
     with console.status("Initializing metadata"):
-        if "teams" not in problem_config:
-            problem_config.add(
+        config_doc = parse_toml(target.joinpath("config.toml").read_text())
+        if "teams" not in config_doc:
+            config_doc.add(
                 "teams",
                 table().add(
                     team_name,
                     table().add("generator", "./generator").add("solver", "./solver"),
                 ),
             )
-        if config.default_exec is not None and "execution" not in problem_config:
-            problem_config["execution"] = config.default_exec
-        (target / "config.toml").write_text(dumps_toml(problem_config))
+        if config.default_exec is not None and "execution" not in config_doc:
+            config_doc["execution"] = config.default_exec
+        (target / "config.toml").write_text(dumps_toml(config_doc))
         res_path = parsed_config.execution.results
         if not res_path.is_absolute():
             res_path = target / res_path
         res_path.mkdir(parents=True, exist_ok=True)
-        if res_path.is_relative_to(target):
+        if res_path.resolve().is_relative_to(target.resolve()):
             target.joinpath(".gitignore").write_text(f"{res_path.relative_to(target)}/\n")
 
     problem_obj = Problem.load(problem_name)
