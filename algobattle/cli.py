@@ -2,7 +2,6 @@
 
 Provides a command line interface to start matches and observe them. See `battle --help` for further options.
 """
-from datetime import datetime
 from enum import StrEnum
 from os import environ
 from pathlib import Path
@@ -43,7 +42,7 @@ from algobattle.battle import Battle
 from algobattle.match import AlgobattleConfig, EmptyUi, Match, Ui, ExecutionConfig
 from algobattle.problem import Instance, Problem
 from algobattle.program import Generator, Matchup, Solver
-from algobattle.util import EncodableModel, ExceptionInfo, Role, RunningTimer, BaseModel, TempDir
+from algobattle.util import BuildError, EncodableModel, ExceptionInfo, Role, RunningTimer, BaseModel, TempDir, timestamp
 from algobattle.templates import Language, PartialTemplateArgs, TemplateArgs, write_templates
 
 
@@ -142,10 +141,8 @@ def run_match(
                     print(f"Team {team} gained {pts:.1f} points.")
 
             if save:
-                t = datetime.now()
-                filename = f"{t.year:04d}-{t.month:02d}-{t.day:02d}_{t.hour:02d}-{t.minute:02d}-{t.second:02d}.json"
-                with open(config.execution.results / filename, "w+") as f:
-                    f.write(result.model_dump_json(exclude_defaults=True))
+                res_string = result.model_dump_json(exclude_defaults=True)
+                config.execution.results.joinpath(f"{timestamp()}.json").write_text(res_string)
             return result
         except KeyboardInterrupt:
             raise Exit
@@ -312,9 +309,18 @@ def init(
     console.print(f"[green]Success![/] initialized algobattle project data in [cyan]{target}[/]")
 
 
+class TestErrors(BaseModel):
+    """Helper class holding test error messages."""
+
+    generator_build: ExceptionInfo | None = None
+    solver_build: ExceptionInfo | None = None
+    generator_run: ExceptionInfo | None = None
+    solver_run: ExceptionInfo | None = None
+
+
 @app.command()
 def test(
-    folder: Annotated[Path, Argument(file_okay=False, writable=True, help="The problem folder to use.")] = Path(),
+    folder: Annotated[Path, Argument(help="The project folder to use.")] = Path(),
     generator: Annotated[bool, Option(help="Whether to test the generator")] = True,
     solver: Annotated[bool, Option(help="Whether to test the solver")] = True,
     team: Annotated[Optional[str], Option(help="Name of the team whose programs you want to test.")] = None,
@@ -322,12 +328,13 @@ def test(
     """Tests whether the programs install successfully and run on dummy instances without crashing."""
     config = AlgobattleConfig.from_file(folder)
     problem = config.problem
+    errors = TestErrors()
     if problem is None:
         print(f"The problem specified in the config file ({config.match.problem}) is not installed.")
         raise Abort
     if team:
         try:
-            team_obj = config.teams[team]
+            team_info = config.teams[team]
         except KeyError:
             console.print("[red]The specified team does not exist in the config file.")
             raise Abort
@@ -337,29 +344,40 @@ def test(
                 console.print("[red]The config file contains no teams.")
                 raise Abort
             case 1:
-                team_obj = next(iter(config.teams.values()))
+                team, team_info = next(iter(config.teams.items()))
             case _:
                 console.print("[red]The config file contains more than one team and none were specified.")
                 raise Abort
 
-    gen_instance = None
+    console.print(f"Testing {team}'s programs")
+    instance = None
     if generator:
 
         async def gen_builder() -> Generator:
             with console.status("Building generator"):
-                return await Generator.build(team_obj.generator, problem=problem, config=config.as_prog_config())
+                return await Generator.build(
+                    team_info.generator, problem=problem, config=config.as_prog_config(), team_name=team
+                )
 
-        with run_async_fn(gen_builder) as gen:
-            with console.status("Running generator"):
-                gen_instance = gen.test()
-            if isinstance(gen_instance, ExceptionInfo):
-                console.print("[red]The generator didn't run successfully.")
-                config.execution.results.write_text(gen_instance.model_dump_json())
-                gen_instance = None
+        try:
+            with run_async_fn(gen_builder) as gen:
+                console.print("[green]Generator built successfully")
+                with console.status("Running generator"):
+                    instance = gen.test()
+                if isinstance(instance, ExceptionInfo):
+                    console.print("[red]Generator didn't run successfully")
+                    errors.generator_run = instance
+                    instance = None
+                else:
+                    console.print("[green]Generator ran successfully")
+        except BuildError as e:
+            console.print("[red]Generator didn't build successfully")
+            errors.generator_build = ExceptionInfo.from_exception(e)
+            instance = None
 
     sol_error = None
     if solver:
-        if gen_instance is None:
+        if instance is None:
             if problem.test_instance is None:
                 console.print(
                     "[magenta2]Cannot test the solver since the generator failed and the problem doesn't provide a test"
@@ -368,22 +386,32 @@ def test(
                 raise Exit
             else:
                 instance = cast(Instance, problem.test_instance)
-        else:
-            instance = gen_instance
 
         async def sol_builder() -> Solver:
             with console.status("Building solver"):
-                return await Solver.build(team_obj.generator, problem=problem, config=config.as_prog_config())
+                return await Solver.build(
+                    team_info.solver, problem=problem, config=config.as_prog_config(), team_name=team
+                )
 
-        with run_async_fn(sol_builder) as sol:
-            with console.status("Running solver"):
-                sol_error = sol.test(instance)
-            if isinstance(sol_error, ExceptionInfo):
-                console.print("[red]The solver didn't run successfully.")
-                config.execution.results.write_text(sol_error.model_dump_json())
+        try:
+            with run_async_fn(sol_builder) as sol:
+                console.print("[green]Solver built successfully")
+                with console.status("Running solver"):
+                    sol_error = sol.test(instance)
+                if isinstance(sol_error, ExceptionInfo):
+                    console.print("[red]Solver didn't run successfully")
+                    errors.solver_run = sol_error
+                else:
+                    console.print("[green]Solver ran successfully")
+        except BuildError as e:
+            console.print("[red]Solver didn't build successfully")
+            errors.solver_build = ExceptionInfo.from_exception(e)
+            instance = None
 
-    if gen_instance is not None and sol_error is None:
-        console.print("[green]Both programs tested successfully.")
+    if errors != TestErrors():
+        err_path = config.execution.results.joinpath(f"{timestamp()}.json")
+        err_path.write_text(errors.model_dump_json(indent=4, exclude_defaults=True))
+        console.print(f"You can find detailed error messages at {err_path}")
 
 
 @app.command()

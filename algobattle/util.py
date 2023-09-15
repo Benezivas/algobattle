@@ -401,3 +401,9 @@ class TempDir(TemporaryDirectory):
 
     def __enter__(self) -> Path:
         return Path(super().__enter__())
+
+
+def timestamp() -> str:
+    """Formats the current time into a filename-safe string."""
+    t = datetime.now()
+    return f"{t.year:04d}-{t.month:02d}-{t.day:02d}_{t.hour:02d}-{t.minute:02d}-{t.second:02d}"
