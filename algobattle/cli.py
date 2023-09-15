@@ -173,7 +173,7 @@ def _init_program(target: Path, lang: Language, args: PartialTemplateArgs, role:
 @app.command()
 def init(
     target: Annotated[
-        Optional[Path], Argument(file_okay=False, writable=True, help="The folder to initialize.")
+        Optional[Path], Argument(file_okay=False, writable=True, resolve_path=True, help="The folder to initialize.")
     ] = None,
     problem: Annotated[
         Optional[Path],
@@ -252,7 +252,7 @@ def init(
                     path.rename(target / path.name)
     else:
         if target is None:
-            target = Path()
+            target = Path().resolve()
         if not target.joinpath("config.toml").is_file():
             console.print("[red]You must either use a problem spec file or target a directory with an existing config.")
             raise Abort
@@ -275,9 +275,11 @@ def init(
             problem_config["execution"] = config.default_exec
         (target / "config.toml").write_text(dumps_toml(problem_config))
         res_path = parsed_config.execution.results
-        if not res_path.absolute():
+        if not res_path.is_absolute():
             res_path = target / res_path
         res_path.mkdir(parents=True, exist_ok=True)
+        if res_path.is_relative_to(target):
+            target.joinpath(".gitignore").write_text(f"{res_path.relative_to(target)}/\n")
 
     problem_obj = Problem.load(problem_name)
     template_args: PartialTemplateArgs = {
