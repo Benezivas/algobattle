@@ -343,7 +343,7 @@ WithNone = Annotated[T | None, AfterValidator(parse_none)]
 
 def _relativize_path(path: Path, info: ValidationInfo) -> Path:
     """If the passed path is relative to the current directory it gets relativized to the `base_path` instead."""
-    if info.context and isinstance(info.context["base_path"], Path) and not path.is_absolute():
+    if info.context and isinstance(info.context.get("base_path", None), Path) and not path.is_absolute():
         return info.context["base_path"] / path
     return path
 
