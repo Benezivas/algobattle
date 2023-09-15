@@ -186,6 +186,7 @@ def init(
         Optional[Language], Option("--generator", "-g", help="The language to use for the generator.")
     ] = None,
     solver: Annotated[Optional[Language], Option("--solver", "-s", help="The language to use for the solver.")] = None,
+    install: Annotated[bool, Option(help="Whether to install the problem package.")] = True,
 ) -> None:
     """Initializes a project directory, setting up the problem files and program folders with docker files.
 
@@ -232,7 +233,7 @@ def init(
                 else:
                     new_problem = False
 
-            if new_problem:
+            if new_problem and install:
                 cmd = config.install_cmd(build_dir)
                 with console.status("Installing problem"), Popen(
                     cmd, env=environ.copy(), stdout=PIPE, stderr=PIPE, text=True
