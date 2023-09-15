@@ -480,7 +480,8 @@ class Program(ABC):
         return self
 
     def __exit__(self, _type: Any, _value: Any, _traceback: Any):
-        self.remove()
+        if self.config.mode == "tournament":
+            self.remove()
 
 
 class Generator(Program):
