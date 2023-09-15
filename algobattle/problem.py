@@ -2,6 +2,7 @@
 from abc import ABC, abstractmethod
 from functools import wraps
 from importlib.metadata import entry_points
+from itertools import chain
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -327,7 +328,7 @@ class Problem(Generic[InstanceT, SolutionT]):
     @classmethod
     def available(cls) -> set[str]:
         """Returns the names of all available Problems."""
-        return set(*cls._installed.keys(), *(e.name for e in entry_points(group="algobattle.problem")))
+        return set(chain(cls._installed.keys(), (e.name for e in entry_points(group="algobattle.problem"))))
 
 
 AnyProblem = Problem[Any, Any]
