@@ -167,6 +167,7 @@ def _init_program(target: Path, lang: Language, args: PartialTemplateArgs, role:
         dir.mkdir(parents=True, exist_ok=True)
     with console.status(f"Initializing {role}"):
         write_templates(dir, lang, TemplateArgs(program=role.value, **args))
+    console.print(f"Created a {lang.value} {role.value} in [cyan]{dir}")
 
 
 @app.command()
