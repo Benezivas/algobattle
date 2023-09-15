@@ -32,7 +32,7 @@ from pydantic import (
     ValidatorFunctionWrapHandler,
 )
 from pydantic_core import CoreSchema
-from pydantic_core.core_schema import tagged_union_schema, union_schema, general_wrap_validator_function
+from pydantic_core.core_schema import tagged_union_schema, general_wrap_validator_function
 
 from algobattle.program import (
     Generator,

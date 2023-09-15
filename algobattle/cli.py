@@ -8,7 +8,7 @@ from os import environ
 from pathlib import Path
 from random import choice
 from shutil import rmtree
-from subprocess import PIPE, Popen, run as run_process
+from subprocess import PIPE, Popen
 import sys
 from typing import Annotated, Any, ClassVar, Iterable, Literal, Optional, Self, cast
 from typing_extensions import override
@@ -210,7 +210,9 @@ def init(
                     problem_zip.extractall(build_dir)
 
             problem_config = parse_toml((build_dir / "config.toml").read_text())
-            parsed_config = AlgobattleConfig.from_file(build_dir / "config.toml", ignore_uninstalled=True)
+            parsed_config = AlgobattleConfig.from_file(
+                build_dir / "config.toml", ignore_uninstalled=True, reltivize_paths=False
+            )
             problem_name = parsed_config.match.problem
             assert isinstance(problem_name, str)
             if target is None:
@@ -255,7 +257,9 @@ def init(
             console.print("[red]You must either use a problem spec file or target a directory with an existing config.")
             raise Abort
         problem_config = parse_toml(target.joinpath("config.toml").read_text())
-        parsed_config = AlgobattleConfig.from_file(target / "config.toml", ignore_uninstalled=True)
+        parsed_config = AlgobattleConfig.from_file(
+            target / "config.toml", ignore_uninstalled=True, reltivize_paths=False
+        )
         problem_name = parsed_config.match.problem
 
     with console.status("Initializing metadata"):
@@ -271,6 +275,8 @@ def init(
             problem_config["execution"] = config.default_exec
         (target / "config.toml").write_text(dumps_toml(problem_config))
         res_path = parsed_config.execution.results
+        if not res_path.absolute():
+            res_path = target / res_path
         res_path.mkdir(parents=True, exist_ok=True)
 
     problem_obj = Problem.load(problem_name)

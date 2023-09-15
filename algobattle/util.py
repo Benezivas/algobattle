@@ -14,7 +14,6 @@ from tempfile import TemporaryDirectory
 from traceback import format_exception
 from typing import Any, Callable, ClassVar, Iterable, Literal, LiteralString, TypeVar, Self, cast, get_args
 from annotated_types import GroupedMetadata
-from importlib.metadata import EntryPoint, entry_points
 
 from pydantic import (
     ConfigDict,
