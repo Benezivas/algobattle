@@ -419,7 +419,8 @@ def import_file_as_module(path: Path, name: str) -> ModuleType:
         path: A path to a python file.
 
     Raises:
-        ValueError: If the path doesn't point to a module or the file cannot be imported properly.
+        ValueError: If the path doesn't point to a module
+        RuntimeError: If the file cannot be imported properly
     """
     if not path.is_file():
         raise ValueError(f"'{path}' does not point to a python file or a proper parent folder of one.")
@@ -433,4 +434,4 @@ def import_file_as_module(path: Path, name: str) -> ModuleType:
         spec.loader.exec_module(module)
         return module
     except Exception as e:
-        raise ValueError from e
+        raise RuntimeError from e

@@ -313,6 +313,17 @@ class Problem(Generic[InstanceT, SolutionT]):
             return self.score_function(instance, solution=solution)
 
     @classmethod
+    def load_file(cls, name: str, file: Path) -> "AnyProblem":
+        """Loads the problem from the specified file."""
+        existing_problems = cls._problems.copy()
+        import_file_as_module(file, "__algobattle_problem__")
+        new_problems = {n: p for n, p in cls._problems.items() if n not in existing_problems}
+        if name not in new_problems:
+            raise ValueError(f"The {name} problem is not defined in {file}")
+        else:
+            return cls._problems[name]
+
+    @classmethod
     def load(cls, name: str, dynamic: Mapping[str, DynamicProblemInfo]) -> "AnyProblem":
         """Loads the problem with the given name.
 
@@ -320,16 +331,13 @@ class Problem(Generic[InstanceT, SolutionT]):
             name: The name of the Problem to use.
             dynamic: Metadata used to dynamically import a problem if needed.
 
+        Raises:
+            ValueError: If the problem is not specified properly
+            RuntimeError If the problem's dynamic import fails
         """
         if name in dynamic:
             info = dynamic[name]
-            existing_problems = cls._problems.copy()
-            import_file_as_module(info.location, "__algobattle_problem__")
-            new_problems = {n: p for n, p in cls._problems.items() if n not in existing_problems}
-            if name not in new_problems:
-                raise ValueError(f"The {name} problem is not defined in {info.location}")
-            else:
-                return cls._problems[name]
+            return cls.load_file(name, info.location)
         if name in cls._problems:
             return cls._problems[name]
         match list(entry_points(group="algobattle.problem", name=name)):
@@ -338,7 +346,7 @@ class Problem(Generic[InstanceT, SolutionT]):
             case [e]:
                 loaded: object = e.load()
                 if not isinstance(loaded, cls):
-                    raise RuntimeError(
+                    raise ValueError(
                         f"The entrypoint '{name}' doesn't point to a problem but a {loaded.__class__.__qualname__}."
                     )
                 return loaded
