@@ -41,7 +41,7 @@ from tomlkit.exceptions import ParseError
 from tomlkit.items import Table as TomlTable
 
 from algobattle.battle import Battle
-from algobattle.match import AlgobattleConfig, DynamicProblemConfig, EmptyUi, Match, Ui, ExecutionConfig
+from algobattle.match import AlgobattleConfig, EmptyUi, Match, Ui, ExecutionConfig
 from algobattle.problem import Instance, Problem
 from algobattle.program import Generator, Matchup, Solver
 from algobattle.util import BuildError, EncodableModel, ExceptionInfo, Role, RunningTimer, BaseModel, TempDir, timestamp
