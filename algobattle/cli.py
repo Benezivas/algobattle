@@ -360,15 +360,6 @@ def test(
             instance = None
 
         sol_error = None
-        if instance is None:
-            if problem.test_instance is None:
-                console.print(
-                    "[magenta2]Cannot test the solver since the generator failed and the problem doesn't provide a test"
-                    " instance."
-                )
-                continue
-            else:
-                instance = cast(Instance, problem.test_instance)
 
         async def sol_builder() -> Solver:
             with console.status("Building solver"):
@@ -379,13 +370,18 @@ def test(
         try:
             with run_async_fn(sol_builder) as sol:
                 console.print("[green]Solver built successfully")
-                with console.status("Running solver"):
-                    sol_error = sol.test(instance)
-                if isinstance(sol_error, ExceptionInfo):
-                    console.print("[red]Solver didn't run successfully")
-                    errors.solver_run = sol_error
+
+                instance = instance or cast(Instance, problem.test_instance)
+                if instance:
+                    with console.status("Running solver"):
+                        sol_error = sol.test(instance)
+                    if isinstance(sol_error, ExceptionInfo):
+                        console.print("[red]Solver didn't run successfully")
+                        errors.solver_run = sol_error
+                    else:
+                        console.print("[green]Solver ran successfully")
                 else:
-                    console.print("[green]Solver ran successfully")
+                    console.print("[magenta2]Cannot test running the solver")
         except BuildError as e:
             console.print("[red]Solver didn't build successfully")
             errors.solver_build = ExceptionInfo.from_exception(e)
