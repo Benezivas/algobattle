@@ -15,7 +15,7 @@ from importlib.metadata import version as pkg_version
 from zipfile import ZipFile
 
 from anyio import run as run_async_fn
-from pydantic import Field
+from pydantic import Field, ValidationError
 from typer import Exit, Typer, Argument, Option, Abort, get_app_dir, launch
 from rich.console import Group, RenderableType, Console
 from rich.live import Live
@@ -36,10 +36,11 @@ from rich.text import Text
 from rich.columns import Columns
 from rich.prompt import Prompt, Confirm
 from tomlkit import TOMLDocument, parse as parse_toml, dumps as dumps_toml, table
+from tomlkit.exceptions import ParseError
 from tomlkit.items import Table as TomlTable
 
 from algobattle.battle import Battle
-from algobattle.match import AlgobattleConfig, EmptyUi, Match, Ui, ExecutionConfig
+from algobattle.match import AlgobattleConfig, DynamicProblemConfig, EmptyUi, Match, Ui, ExecutionConfig
 from algobattle.problem import Instance, Problem
 from algobattle.program import Generator, Matchup, Solver
 from algobattle.util import BuildError, EncodableModel, ExceptionInfo, Role, RunningTimer, BaseModel, TempDir, timestamp
@@ -412,6 +413,90 @@ def config() -> None:
     CliConfig.init_file()
     print(f"Opening the algobattle cli config file at {CliConfig.path}.")
     launch(str(CliConfig.path))
+
+
+@app.command()
+def package(
+    problem_path: Annotated[
+        Optional[Path], Argument(exists=True, help="Path to problem python file or a package containing it.")
+    ] = None,
+    config: Annotated[Optional[Path], Option(exists=True, dir_okay=False, help="Path to the config file.")] = None,
+    description: Annotated[
+        Optional[Path], Option(exists=True, dir_okay=False, help="Path to a problem description file.")
+    ] = None,
+    out: Annotated[
+        Optional[Path], Option("--out", "-o", dir_okay=False, file_okay=False, help="Location of the output.")
+    ] = None,
+) -> None:
+    """Packages problem data into an `.algo` file."""
+    if problem_path is None:
+        if Path("problem.py").is_file():
+            problem_path = Path("problem.py")
+        elif Path("problem").is_dir():
+            problem_path = Path("problem")
+        else:
+            console.print("[red]Couldn't find a problem package")
+            raise Abort
+    if config is None:
+        if problem_path.parent.joinpath("algobattle.toml").is_file():
+            config = problem_path.parent / "algobattle.toml"
+        else:
+            console.log("[red]Couldn't find a config file")
+            raise Abort
+    if description is None:
+        match list(problem_path.parent.resolve().glob("description.*")):
+            case []:
+                pass
+            case [desc]:
+                description = desc
+            case _:
+                console.print(
+                    "[red]Found multiple potential description files[/], explicitly specify which you want to include"
+                )
+                raise Abort
+
+    try:
+        config_doc = parse_toml(config.read_text())
+        parsed_config = AlgobattleConfig.from_file(config)
+    except (ValidationError, ParseError) as e:
+        console.print(f"[red]Improperly formatted config file\nError: {e}")
+        raise Abort
+    problem_name = parsed_config.match.problem
+    try:
+        with console.status("Loading problem"):
+            Problem.load_file(problem_name, problem_path)
+    except (ValueError, RuntimeError) as e:
+        console.print(f"[red]Couldn't load the problem file[/]\nError: {e}")
+        raise Abort
+    problem_info = parsed_config.problems[problem_name]
+
+    if "execution" in config_doc:
+        config_doc.remove("execution")
+    if "teams" in config_doc:
+        config_doc.remove("teams")
+    info_doc = table().append(
+        "location",
+        "problem.py"
+        if problem_path.is_file()
+        else Path("problem") / problem_info.location.resolve().relative_to(problem_path.resolve()),
+    )
+    if problem_info.dependencies:
+        info_doc.append("dependencies", problem_info.dependencies)
+    config_doc["problems"] = table().append(problem_name, info_doc)
+
+    if out is None:
+        out = problem_path.parent / f"{problem_name.lower().replace(' ', '_')}.algo"
+    with console.status("Packaging data"), ZipFile(out, "w") as file:
+        if problem_path.is_file():
+            file.write(problem_path, "problem.py")
+        else:
+            for path in problem_path.glob("**"):
+                if path.is_file():
+                    file.write(path, Path("problem") / path.relative_to(problem_path))
+        file.writestr("algobattle.toml", dumps_toml(config_doc))
+        if description is not None:
+            file.write(description, description.name)
+    console.print("[green]Packaged Algobattle project into[/]", out)
 
 
 class TimerTotalColumn(ProgressColumn):
