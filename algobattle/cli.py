@@ -43,7 +43,7 @@ from tomlkit.items import Table as TomlTable
 
 from algobattle.battle import Battle
 from algobattle.match import AlgobattleConfig, EmptyUi, Match, Ui, ExecutionConfig
-from algobattle.problem import Instance, Problem
+from algobattle.problem import Instance, Problem, Solution
 from algobattle.program import Generator, Matchup, Solver
 from algobattle.util import BuildError, EncodableModel, ExceptionInfo, Role, RunningTimer, BaseModel, TempDir, timestamp
 from algobattle.templates import Language, PartialTemplateArgs, TemplateArgs, write_templates
@@ -187,6 +187,7 @@ def init(
         Optional[Language], Option("--generator", "-g", help="The language to use for the generator.")
     ] = None,
     solver: Annotated[Optional[Language], Option("--solver", "-s", help="The language to use for the solver.")] = None,
+    schemas: Annotated[bool, Option(help="Whether to also save the problem's IO schemas.")] = False,
 ) -> None:
     """Initializes a project directory, setting up the problem files and program folders.
 
@@ -285,6 +286,16 @@ def init(
             target.joinpath(".gitignore").write_text(f"{res_path.relative_to(target)}/\n")
 
     problem_obj = parsed_config.problem
+    if schemas:
+        instance: type[Instance] = problem_obj.instance_cls
+        solution: type[Solution[Instance]] = problem_obj.solution_cls
+        schema_folder = target / "schemas"
+        schema_folder.mkdir(exist_ok=True)
+        if s := instance.io_schema():
+            schema_folder.joinpath("instance.json").write_text(s)
+        if s := solution.io_schema():
+            schema_folder.joinpath("solution.json").write_text(s)
+
     template_args: PartialTemplateArgs = {
         "problem": problem_name,
         "team": team_name,
