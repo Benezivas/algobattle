@@ -381,7 +381,7 @@ def test(
                     else:
                         console.print("[green]Solver ran successfully")
                 else:
-                    console.print("[magenta2]Cannot test running the solver")
+                    console.print("[orange3]Cannot test running the solver")
         except BuildError as e:
             console.print("[red]Solver didn't build successfully")
             errors.solver_build = ExceptionInfo.from_exception(e)
