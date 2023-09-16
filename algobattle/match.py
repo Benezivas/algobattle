@@ -582,7 +582,7 @@ class MatchConfig(BaseModel):
 class DynamicProblemConfig(BaseModel):
     """Defines metadata used to dynamically import problems."""
 
-    location: RelativeFilePath = Field(default=Path("problem.py"), validate_default=True)
+    location: RelativePath = Field(default=Path("problem.py"), validate_default=True)
     """Path to the file defining the problem"""
     dependencies: list[str] = Field(default_factory=list)
     """List of dependencies needed to run the problem"""

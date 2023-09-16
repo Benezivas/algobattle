@@ -244,7 +244,10 @@ def init(
         console.print("Using existing project data")
 
     problem_name = parsed_config.match.problem
-    if (info := parsed_config.problems.get(problem_name, None)) and info.dependencies:
+    info = parsed_config.problems.get(problem_name, None)
+    if info is not None and not info.location.is_absolute():
+        info.location = target / info.location
+    if info is not None and info.dependencies:
         cmd = config.install_cmd
         with console.status(f"Installing {problem_name}'s dependencies"), Popen(
             cmd + info.dependencies, env=environ.copy(), stdout=PIPE, stderr=PIPE, text=True
