@@ -3,6 +3,7 @@
 Provides a command line interface to start matches and observe them. See `battle --help` for further options.
 """
 from enum import StrEnum
+from functools import cached_property
 from os import environ
 from pathlib import Path
 from random import choice
@@ -97,7 +98,8 @@ class CliConfig(BaseModel):
         exec: Any = self._doc.get("execution", None)
         return exec
 
-    def install_cmd(self, target: Path) -> list[str]:
+    @cached_property
+    def install_cmd(self) -> list[str]:
         cmd = [sys.executable, "-m", "pip", "install"]
         if self.general.install_mode is None:
             command_str: str = Prompt.ask(
@@ -116,7 +118,7 @@ class CliConfig(BaseModel):
                 self._doc.add("general", table())
             cast(TomlTable, self._doc["general"])["install_mode"] = command_str
             self.save()
-        return cmd + [str(target.resolve())]
+        return cmd
 
 
 @app.command("run")
@@ -239,35 +241,21 @@ def init(
         console.print("Using existing project data")
 
     problem_name = parsed_config.match.problem
-    if problem_name not in Problem.available():
-        existing_data = set(p.resolve() for p in target.iterdir())
-        cmd = config.install_cmd(target)
-        try:
-            with console.status("Installing problem"), Popen(
-                cmd, env=environ.copy(), stdout=PIPE, stderr=PIPE, text=True
-            ) as installer:
-                assert installer.stdout is not None
-                assert installer.stderr is not None
-                for line in installer.stdout:
-                    console.print(line.strip("\n"))
-                error = "".join(installer.stderr.readlines())
-        # pip leaves behind some build artifacts we want to clean up
-        finally:
-            for path in target.iterdir():
-                path = path.resolve()
-                if path in existing_data:
-                    continue
-                elif path.is_file():
-                    path.unlink()
-                elif path.is_dir():
-                    rmtree(path)
+    if (info := parsed_config.problems.get(problem_name, None)) and info.dependencies:
+        cmd = config.install_cmd
+        with console.status(f"Installing {problem_name}'s dependencies"), Popen(
+            cmd + info.dependencies, env=environ.copy(), stdout=PIPE, stderr=PIPE, text=True
+        ) as installer:
+            assert installer.stdout is not None
+            assert installer.stderr is not None
+            for line in installer.stdout:
+                console.print(line.strip("\n"))
+            error = "".join(installer.stderr.readlines())
         if installer.returncode:
-            console.print(f"[red]Couldn't install the problem[/]\n{error}")
+            console.print(f"[red]Couldn't install the dependencies[/]\n{error}")
             raise Abort
         else:
-            console.print(f"Installed problem {problem_name}")
-    else:
-        console.print(f"{problem_name} problem already is installed")
+            console.print(f"[green]Installed dependencies of {problem_name}")
 
     with console.status("Initializing metadata"):
         config_doc = parse_toml(target.joinpath("algobattle.toml").read_text())
