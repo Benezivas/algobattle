@@ -177,7 +177,7 @@ def init(
     ] = None,
     problem: Annotated[
         Optional[Path],
-        Option("--problem", "-p", exists=True, dir_okay=False, help="A problem spec file to use for this."),
+        Option("--problem", "-p", exists=True, dir_okay=False, help="The .algo file to use for this."),
     ] = None,
     language: Annotated[
         Optional[Language], Option("--language", "-l", help="The language to use for the programs.")
@@ -187,7 +187,7 @@ def init(
     ] = None,
     solver: Annotated[Optional[Language], Option("--solver", "-s", help="The language to use for the solver.")] = None,
 ) -> None:
-    """Initializes a project directory, setting up the problem files and program folders with docker files.
+    """Initializes a project directory, setting up the problem files and program folders.
 
     Generates dockerfiles and an initial project structure for the language(s) you choose. Either use `--language` to
     use the same language for both, or specify each individually with `--generator` and `--solver`.
