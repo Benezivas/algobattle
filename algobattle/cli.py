@@ -316,6 +316,9 @@ def test(
     team: Annotated[Optional[str], Option(help="Name of the team whose programs you want to test.")] = None,
 ) -> None:
     """Tests whether the programs install successfully and run on dummy instances without crashing."""
+    if not (folder.is_file() or folder.joinpath("algobattle.toml").is_file()):
+        console.print("[red]The folder does not contain an Algobattle project")
+        raise Abort
     config = AlgobattleConfig.from_file(folder)
     problem = config.problem
     errors = TestErrors()
