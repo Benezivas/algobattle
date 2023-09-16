@@ -625,9 +625,7 @@ class AlgobattleConfig(BaseModel):
     """Base that contains all config options and can be parsed from config files."""
 
     # funky defaults to force their validation with context info present
-    teams: TeamInfos = Field(
-        default={"team_0": {"generator": Path("generator"), "solver": Path("solver")}}, validate_default=True
-    )
+    teams: TeamInfos = Field(default_factory=dict)
     execution: ExecutionConfig = Field(default_factory=dict, validate_default=True)
     match: MatchConfig
     battle: Battle.Config = Iterated.Config()
