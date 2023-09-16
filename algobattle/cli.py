@@ -4,6 +4,7 @@ Provides a command line interface to start matches and observe them. See `battle
 """
 from enum import StrEnum
 from functools import cached_property
+import json
 from os import environ
 from pathlib import Path
 from random import choice
@@ -311,9 +312,6 @@ class TestErrors(BaseModel):
 @app.command()
 def test(
     folder: Annotated[Path, Argument(help="The project folder to use.")] = Path(),
-    generator: Annotated[bool, Option(help="Whether to test the generator")] = True,
-    solver: Annotated[bool, Option(help="Whether to test the solver")] = True,
-    team: Annotated[Optional[str], Option(help="Name of the team whose programs you want to test.")] = None,
 ) -> None:
     """Tests whether the programs install successfully and run on dummy instances without crashing."""
     if not (folder.is_file() or folder.joinpath("algobattle.toml").is_file()):
@@ -321,27 +319,12 @@ def test(
         raise Abort
     config = AlgobattleConfig.from_file(folder)
     problem = config.problem
-    errors = TestErrors()
-    if team:
-        try:
-            team_info = config.teams[team]
-        except KeyError:
-            console.print("[red]The specified team does not exist in the config file.")
-            raise Abort
-    else:
-        match len(config.teams):
-            case 0:
-                console.print("[red]The config file contains no teams.")
-                raise Abort
-            case 1:
-                team, team_info = next(iter(config.teams.items()))
-            case _:
-                console.print("[red]The config file contains more than one team and none were specified.")
-                raise Abort
+    all_errors: dict[str, Any] = {}
 
-    console.print(f"Testing {team}'s programs")
-    instance = None
-    if generator:
+    for team, team_info in config.teams.items():
+        console.print(f"Testing programs of team {team}")
+        errors = TestErrors()
+        instance = None
 
         async def gen_builder() -> Generator:
             with console.status("Building generator"):
@@ -365,15 +348,14 @@ def test(
             errors.generator_build = ExceptionInfo.from_exception(e)
             instance = None
 
-    sol_error = None
-    if solver:
+        sol_error = None
         if instance is None:
             if problem.test_instance is None:
                 console.print(
                     "[magenta2]Cannot test the solver since the generator failed and the problem doesn't provide a test"
                     " instance."
                 )
-                raise Exit
+                continue
             else:
                 instance = cast(Instance, problem.test_instance)
 
@@ -398,9 +380,12 @@ def test(
             errors.solver_build = ExceptionInfo.from_exception(e)
             instance = None
 
-    if errors != TestErrors():
+        if errors != TestErrors():
+            all_errors[team] = errors.model_dump(exclude_defaults=True)
+
+    if all_errors:
         err_path = config.execution.results.joinpath(f"{timestamp()}.json")
-        err_path.write_text(errors.model_dump_json(indent=4, exclude_defaults=True))
+        err_path.write_text(json.dumps(all_errors, indent=4))
         console.print(f"You can find detailed error messages at {err_path}")
 
 
