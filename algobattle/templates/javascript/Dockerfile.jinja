@@ -1,0 +1,8 @@
+FROM node
+
+WORKDIR /algobattle_src
+COPY . .
+RUN npm install .
+
+WORKDIR /
+CMD [ "node", "/algobattle_src/{{ program }}.js" ]
