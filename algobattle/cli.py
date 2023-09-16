@@ -198,7 +198,10 @@ def init(
     if language:
         generator = solver = language
     config = CliConfig.load()
-    team_name = config.general.team_name or choice(("Dogs", "Cats", "Otters", "Red Pandas", "Possums", "Rats"))
+    team_name = config.general.team_name or choice(
+        ("Dogs", "Cats", "Otters", "Red Pandas", "Crows", "Rats", "Cockatoos", "Dingos", "Penguins", "Kiwis", "Orcas")
+        + ("Bearded Dragons", "Macaws", "Wombats", "Wallabies", "Owls", "Seals", "Octopuses", "Frogs", "Jellyfish")
+    )
 
     if problem is not None:
         with TempDir() as unpack_dir:
