@@ -12,6 +12,7 @@ class Language(StrEnum):
     """Langues supported by `algobattle init`."""
 
     python = "python"
+    javascript = "javascript"
 
     @cached_property
     def env(self) -> Environment:

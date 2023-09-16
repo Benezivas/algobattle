@@ -153,10 +153,10 @@ def run_match(
 
 
 def _init_program(target: Path, lang: Language, args: PartialTemplateArgs, role: Role) -> None:
-    dir = target / role.value
+    dir = target / role
     if dir.exists():
         replace = Confirm.ask(
-            f"[magenta2]The targeted directory already contains a {role.value}, do you want to replace it?",
+            f"[magenta2]The targeted directory already contains a {role}, do you want to replace it?",
             default=True,
         )
         if replace:
@@ -168,7 +168,7 @@ def _init_program(target: Path, lang: Language, args: PartialTemplateArgs, role:
         dir.mkdir(parents=True, exist_ok=True)
     with console.status(f"Initializing {role}"):
         write_templates(dir, lang, TemplateArgs(program=role.value, **args))
-    console.print(f"Created a {lang.value} {role.value} in [cyan]{dir}")
+    console.print(f"Created a {lang} {role} in [cyan]{dir}")
 
 
 @app.command()

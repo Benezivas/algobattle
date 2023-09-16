@@ -5,7 +5,7 @@ In particular, the base classes :class:`BaseModel`, :class:`Encodable`, :class:`
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from importlib.util import module_from_spec, spec_from_file_location
 from inspect import Parameter, Signature, signature
 from itertools import chain
@@ -30,7 +30,7 @@ from pydantic_core import CoreSchema
 from pydantic_core.core_schema import general_after_validator_function
 
 
-class Role(Enum):
+class Role(StrEnum):
     """Indicates whether the role of a program is to generate or to solve instances."""
 
     generator = "generator"
