@@ -1,6 +1,7 @@
 """Package containing templates used for the algobattle init command."""
 
 from enum import StrEnum
+from functools import cached_property
 from pathlib import Path
 from typing import Literal
 from typing_extensions import TypedDict
@@ -12,15 +13,15 @@ class Language(StrEnum):
 
     python = "python"
 
-
-ENVS = {
-    "python": Environment(
-        loader=PackageLoader("algobattle.templates", "python"),
-        keep_trailing_newline=True,
-        trim_blocks=True,
-        lstrip_blocks=True,
-    )
-}
+    @cached_property
+    def env(self) -> Environment:
+        """The jinja environment for this language."""
+        return Environment(
+            loader=PackageLoader("algobattle.templates", self.value),
+            keep_trailing_newline=True,
+            trim_blocks=True,
+            lstrip_blocks=True,
+        )
 
 
 class PartialTemplateArgs(TypedDict):
@@ -49,9 +50,8 @@ def write_templates(target: Path, lang: Language, args: TemplateArgs) -> None:
     template_args = args | {
         "project": f"{normalize(args['team'])}-{normalize(args['problem'])}-{normalize(args['program'])}",
     }
-    env = ENVS[lang]
-    for name in env.list_templates():
-        template = env.get_template(name)
+    for name in lang.env.list_templates():
+        template = lang.env.get_template(name)
         formatted = template.render(template_args)
         formatted_path = Path(Template(name).render(template_args))
         if formatted_path.suffix == ".jinja":
