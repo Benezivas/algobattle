@@ -204,7 +204,7 @@ def init(
                     problem_zip.extractall(unpack_dir)
 
             parsed_config = AlgobattleConfig.from_file(
-                unpack_dir / "config.toml", ignore_uninstalled=True, reltivize_paths=False
+                unpack_dir / "config.toml", reltivize_paths=False
             )
             if target is None:
                 target = Path() / parsed_config.match.problem
@@ -228,7 +228,7 @@ def init(
                 console.print("Unpacked problem data")
             else:
                 parsed_config = AlgobattleConfig.from_file(
-                    target / "config.toml", ignore_uninstalled=True, reltivize_paths=False
+                    target / "config.toml", reltivize_paths=False
                 )
                 console.print("Using existing problem data")
     else:
@@ -238,7 +238,7 @@ def init(
             console.print("[red]You must either use a problem spec file or target a directory with an existing config.")
             raise Abort
         parsed_config = AlgobattleConfig.from_file(
-            target / "config.toml", ignore_uninstalled=True, reltivize_paths=False
+            target / "config.toml", reltivize_paths=False
         )
         console.print("Using existing problem data")
 
@@ -293,7 +293,7 @@ def init(
         if res_path.resolve().is_relative_to(target.resolve()):
             target.joinpath(".gitignore").write_text(f"{res_path.relative_to(target)}/\n")
 
-    problem_obj = Problem.load(problem_name)
+    problem_obj = parsed_config.problem
     template_args: PartialTemplateArgs = {
         "problem": problem_name,
         "team": team_name,
@@ -329,9 +329,6 @@ def test(
     config = AlgobattleConfig.from_file(folder)
     problem = config.problem
     errors = TestErrors()
-    if problem is None:
-        print(f"The problem specified in the config file ({config.match.problem}) is not installed.")
-        raise Abort
     if team:
         try:
             team_info = config.teams[team]

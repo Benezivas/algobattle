@@ -91,7 +91,7 @@ class Match(BaseModel):
         if ui is None:
             ui = EmptyUi()
         ui.match = self
-        problem = Problem.load(config.match.problem)
+        problem = Problem.load(config.match.problem, config.problems)
 
         with await TeamHandler.build(config.teams, problem, config.as_prog_config(), ui) as teams:
             self.active_teams = [t.name for t in teams.active]
@@ -559,23 +559,13 @@ class RunConfig(BaseModel):
     """Number of cpu cores available."""
 
 
-def _check_problem_name(val: str, info: ValidationInfo) -> str:
-    if (info.context is not None and info.context.get("ignore_uninstalled", False)) or val in Problem.available():
-        return val
-    else:
-        raise ValueError("Value is not the name of an installed Problem.")
-
-
-ProblemName = Annotated[str, AfterValidator(_check_problem_name)]
-
-
 class MatchConfig(BaseModel):
     """Parameters determining the match execution.
 
     It will be parsed from the given config file and contains all settings that specify how the match is run.
     """
 
-    problem: ProblemName
+    problem: str
     """The problem this match is over."""
     build_timeout: WithNone[TimeDeltaFloat] = 600
     """Timeout for building each docker image."""
@@ -587,6 +577,15 @@ class MatchConfig(BaseModel):
     solver: RunConfig = RunConfig()
 
     model_config = ConfigDict(revalidate_instances="always")
+
+
+class DynamicProblemConfig(BaseModel):
+    """Defines metadata used to dynamically import problems."""
+
+    location: RelativeFilePath = Field(default=Path("problem.py"), validate_default=True)
+    """Path to the file defining the problem"""
+    dependencies: list[str] = Field(default_factory=list)
+    """List of dependencies needed to run the problem"""
 
 
 class ExecutionConfig(BaseModel):
@@ -633,21 +632,31 @@ class AlgobattleConfig(BaseModel):
     match: MatchConfig
     battle: Battle.Config = Iterated.Config()
     docker: DockerConfig = DockerConfig()
+    problems: dict[str, DynamicProblemConfig] = Field(default_factory=dict)
 
     model_config = ConfigDict(revalidate_instances="always")
 
+    @model_validator(mode="after")
+    def check_problem_defined(self) -> Self:
+        """Validates that the specified problem is either installed or dynamically specified."""
+        prob = self.match.problem
+        if prob not in self.problems and prob not in Problem.available():
+            raise ValueError(f"The specified problem {prob} cannot be found")
+        else:
+            return self
+
     @cached_property
-    def problem(self) -> Problem[Any, Any] | None:
+    def problem(self) -> Problem[Any, Any]:
         """The problem this config uses."""
-        return Problem.load(self.match.problem)
+        return Problem.load(self.match.problem, self.problems)
 
     @classmethod
-    def from_file(cls, file: Path, ignore_uninstalled: bool = False, reltivize_paths: bool = True) -> Self:
+    def from_file(cls, file: Path, *, ignore_uninstalled: bool = False, reltivize_paths: bool = True) -> Self:
         """Parses a config object from a toml file.
 
         Args:
             file: Path to the file, or a directory containing one called 'config.toml'.
-            ignore_uninstalled: Whether to raise errors if the specified problem and battle type cannot be found.
+            ignore_uninstalled: Whether to raise errors if the specified battle type is not installed.
             reltivize_paths: Wether to relativize paths to the config's location rather than the cwd.
         """
         Battle.load_entrypoints()

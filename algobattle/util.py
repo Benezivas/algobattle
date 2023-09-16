@@ -6,12 +6,15 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
+from importlib.util import module_from_spec, spec_from_file_location
 from inspect import Parameter, Signature, signature
 from itertools import chain
 import json
 from pathlib import Path
+import sys
 from tempfile import TemporaryDirectory
 from traceback import format_exception
+from types import ModuleType
 from typing import Any, Callable, ClassVar, Iterable, Literal, LiteralString, TypeVar, Self, cast, get_args
 from annotated_types import GroupedMetadata
 
@@ -407,3 +410,27 @@ def timestamp() -> str:
     """Formats the current time into a filename-safe string."""
     t = datetime.now()
     return f"{t.year:04d}-{t.month:02d}-{t.day:02d}_{t.hour:02d}-{t.minute:02d}-{t.second:02d}"
+
+
+def import_file_as_module(path: Path, name: str) -> ModuleType:
+    """Imports a file as a module.
+
+    Args:
+        path: A path to a python file.
+
+    Raises:
+        ValueError: If the path doesn't point to a module or the file cannot be imported properly.
+    """
+    if not path.is_file():
+        raise ValueError(f"'{path}' does not point to a python file or a proper parent folder of one.")
+
+    try:
+        spec = spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        return module
+    except Exception as e:
+        raise ValueError from e

@@ -10,6 +10,7 @@ from typing import (
     Callable,
     ClassVar,
     Literal,
+    Mapping,
     ParamSpec,
     Protocol,
     Self,
@@ -24,6 +25,7 @@ from algobattle.util import (
     InstanceSolutionModel,
     Role,
     Encodable,
+    import_file_as_module,
 )
 
 
@@ -202,6 +204,12 @@ def default_score(
         return max(0, min(1, solution.score(instance, Role.solver)))
 
 
+class DynamicProblemInfo(Protocol):
+    """Defines the metadadata needed to dynamically import a problem."""
+
+    location: Path
+
+
 class Problem(Generic[InstanceT, SolutionT]):
     """The definition of a problem."""
 
@@ -269,10 +277,10 @@ class Problem(Generic[InstanceT, SolutionT]):
         self.with_solution = with_solution
         self.score_function = score_function
         self.test_instance = test_instance
-        self._installed[name] = self
+        self._problems[name] = self
 
     __slots__ = ("name", "instance_cls", "solution_cls", "min_size", "with_solution", "score_function", "test_instance")
-    _installed: "ClassVar[dict[str, AnyProblem]]" = {}
+    _problems: "ClassVar[dict[str, AnyProblem]]" = {}
 
     @overload
     def score(self, instance: InstanceT, *, solution: SolutionT) -> float:
@@ -305,10 +313,25 @@ class Problem(Generic[InstanceT, SolutionT]):
             return self.score_function(instance, solution=solution)
 
     @classmethod
-    def load(cls, name: str) -> "AnyProblem":
-        """Gets either an installed problem instance using its name or imports an entrypoint."""
-        if name in cls._installed:
-            return cls._installed[name]
+    def load(cls, name: str, dynamic: Mapping[str, DynamicProblemInfo]) -> "AnyProblem":
+        """Loads the problem with the given name.
+
+        Args:
+            name: The name of the Problem to use.
+            dynamic: Metadata used to dynamically import a problem if needed.
+
+        """
+        if name in dynamic:
+            info = dynamic[name]
+            existing_problems = cls._problems.copy()
+            import_file_as_module(info.location, "__algobattle_problem__")
+            new_problems = {n: p for n, p in cls._problems.items() if n not in existing_problems}
+            if name not in new_problems:
+                raise ValueError(f"The {name} problem is not defined in {info.location}")
+            else:
+                return cls._problems[name]
+        if name in cls._problems:
+            return cls._problems[name]
         match list(entry_points(group="algobattle.problem", name=name)):
             case []:
                 raise ValueError("Problem name is not valid.")
@@ -328,7 +351,7 @@ class Problem(Generic[InstanceT, SolutionT]):
     @classmethod
     def available(cls) -> set[str]:
         """Returns the names of all available Problems."""
-        return set(chain(cls._installed.keys(), (e.name for e in entry_points(group="algobattle.problem"))))
+        return set(chain(cls._problems.keys(), (e.name for e in entry_points(group="algobattle.problem"))))
 
 
 AnyProblem = Problem[Any, Any]
