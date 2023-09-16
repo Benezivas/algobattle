@@ -2,7 +2,7 @@ FROM node
 
 WORKDIR /algobattle_src
 COPY . .
-RUN npm install .
+RUN npm ci
 
 WORKDIR /
 CMD [ "node", "/algobattle_src" ]
