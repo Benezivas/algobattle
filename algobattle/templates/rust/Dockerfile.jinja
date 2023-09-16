@@ -1,0 +1,8 @@
+FROM rust
+
+WORKDIR /algobattle_src
+COPY . .
+RUN cargo install --path .
+
+WORKDIR /
+CMD [ "{{ program }}" ]

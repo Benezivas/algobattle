@@ -13,6 +13,7 @@ class Language(StrEnum):
 
     python = "python"
     javascript = "javascript"
+    rust = "rust"
 
     @cached_property
     def env(self) -> Environment:
