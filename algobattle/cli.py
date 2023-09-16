@@ -305,8 +305,12 @@ def init(
     }
     if generator is not None:
         _init_program(target, generator, template_args, Role.generator)
+    elif not target.joinpath("generator").exists():
+        _init_program(target, Language.plain, template_args, Role.generator)
     if solver is not None:
         _init_program(target, solver, template_args, Role.solver)
+    elif not target.joinpath("solver").exists():
+        _init_program(target, Language.plain, template_args, Role.solver)
 
     console.print(f"[green]Success![/] initialized algobattle project data in [cyan]{target}[/]")
 

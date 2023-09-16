@@ -11,6 +11,7 @@ from jinja2 import Environment, PackageLoader, Template
 class Language(StrEnum):
     """Langues supported by `algobattle init`."""
 
+    plain = "plain"
     python = "python"
     javascript = "javascript"
     rust = "rust"
