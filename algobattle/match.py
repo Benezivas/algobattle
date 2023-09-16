@@ -653,14 +653,14 @@ class AlgobattleConfig(BaseModel):
         """Parses a config object from a toml file.
 
         Args:
-            file: Path to the file, or a directory containing one called 'config.toml'.
+            file: Path to the file, or a directory containing one called 'algobattle.toml'.
             ignore_uninstalled: Whether to raise errors if the specified battle type is not installed.
             reltivize_paths: Wether to relativize paths to the config's location rather than the cwd.
         """
         Battle.load_entrypoints()
         if not file.is_file():
-            if file.joinpath("config.toml").is_file():
-                file /= "config.toml"
+            if file.joinpath("algobattle.toml").is_file():
+                file /= "algobattle.toml"
             else:
                 raise ValueError("The path does not point to an Algobattle project")
         try:

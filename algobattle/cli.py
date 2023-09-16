@@ -203,9 +203,7 @@ def init(
                 with ZipFile(problem) as problem_zip:
                     problem_zip.extractall(unpack_dir)
 
-            parsed_config = AlgobattleConfig.from_file(
-                unpack_dir / "config.toml", reltivize_paths=False
-            )
+            parsed_config = AlgobattleConfig.from_file(unpack_dir, reltivize_paths=False)
             if target is None:
                 target = Path() / parsed_config.match.problem
 
@@ -227,20 +225,17 @@ def init(
                     path.rename(target / path.name)
                 console.print("Unpacked problem data")
             else:
-                parsed_config = AlgobattleConfig.from_file(
-                    target / "config.toml", reltivize_paths=False
-                )
+                parsed_config = AlgobattleConfig.from_file(target, reltivize_paths=False)
                 console.print("Using existing problem data")
     else:
         if target is None:
             target = Path()
-        if not target.joinpath("config.toml").is_file():
+        try:
+            parsed_config = AlgobattleConfig.from_file(target, reltivize_paths=False)
+        except ValueError:
             console.print("[red]You must either use a problem spec file or target a directory with an existing config.")
             raise Abort
-        parsed_config = AlgobattleConfig.from_file(
-            target / "config.toml", reltivize_paths=False
-        )
-        console.print("Using existing problem data")
+        console.print("Using existing project data")
 
     problem_name = parsed_config.match.problem
     if problem_name not in Problem.available():
@@ -274,7 +269,7 @@ def init(
         console.print(f"{problem_name} problem already is installed")
 
     with console.status("Initializing metadata"):
-        config_doc = parse_toml(target.joinpath("config.toml").read_text())
+        config_doc = parse_toml(target.joinpath("algobattle.toml").read_text())
         if "teams" not in config_doc:
             config_doc.add(
                 "teams",
@@ -285,7 +280,7 @@ def init(
             )
         if config.default_exec is not None and "execution" not in config_doc:
             config_doc["execution"] = config.default_exec
-        (target / "config.toml").write_text(dumps_toml(config_doc))
+        target.joinpath("algobattle.toml").write_text(dumps_toml(config_doc))
         res_path = parsed_config.execution.results
         if not res_path.is_absolute():
             res_path = target / res_path

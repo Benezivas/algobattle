@@ -15,7 +15,7 @@ Running `algobattle --help` will bring up a short description of each of these i
 `path`
 
 : This is the only positional argument. It should either be the path to a config file or one to a directory containing
-one that is called `config.toml`.
+one that is called `algobattle.toml`.
 
 `--silent` / `-s`
 
@@ -43,7 +43,7 @@ An example config file filled with default values looks like this:
 /// example
 
 ```toml
-{!> config.toml !}
+{!> algobattle.toml !}
 ```
 
 ///
