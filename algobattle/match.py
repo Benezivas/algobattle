@@ -97,13 +97,13 @@ class Match(BaseModel):
             self.active_teams = [t.name for t in teams.active]
             self.excluded_teams = teams.excluded
             battle_cls = Battle.all()[config.match.battle.type]
-            limiter = CapacityLimiter(config.execution.parallel_battles)
-            current_default_thread_limiter().total_tokens = config.execution.parallel_battles
-            set_cpus = config.execution.set_cpus
+            limiter = CapacityLimiter(config.project.parallel_battles)
+            current_default_thread_limiter().total_tokens = config.project.parallel_battles
+            set_cpus = config.project.set_cpus
             if isinstance(set_cpus, list):
-                match_cpus = cast(list[str | None], set_cpus[: config.execution.parallel_battles])
+                match_cpus = cast(list[str | None], set_cpus[: config.project.parallel_battles])
             else:
-                match_cpus = [set_cpus] * config.execution.parallel_battles
+                match_cpus = [set_cpus] * config.project.parallel_battles
             ui.start_battles()
             async with create_task_group() as tg:
                 for matchup in teams.matchups:
@@ -592,8 +592,8 @@ class DynamicProblemConfig(BaseModel):
     """List of dependencies needed to run the problem"""
 
 
-class ExecutionConfig(BaseModel):
-    """Settings that only determine how a match is run, not its result."""
+class ProjectConfig(BaseModel):
+    """Various project settings."""
 
     parallel_battles: int = 1
     """Number of battles exectuted in parallel."""
@@ -630,7 +630,7 @@ class AlgobattleConfig(BaseModel):
 
     # funky defaults to force their validation with context info present
     teams: TeamInfos = Field(default_factory=dict)
-    execution: ExecutionConfig = Field(default_factory=dict, validate_default=True)
+    project: ProjectConfig = Field(default_factory=dict, validate_default=True)
     match: MatchConfig
     docker: DockerConfig = DockerConfig()
     problems: dict[str, DynamicProblemConfig] = Field(default_factory=dict)
@@ -685,5 +685,5 @@ class AlgobattleConfig(BaseModel):
             run_kwargs=self.docker.run.kwargs,
             generator=self.match.generator,
             solver=self.match.solver,
-            mode=self.execution.mode,
+            mode=self.project.mode,
         )

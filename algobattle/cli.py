@@ -17,7 +17,7 @@ from importlib.metadata import version as pkg_version
 from zipfile import ZipFile
 
 from anyio import run as run_async_fn
-from pydantic import Field, ValidationError
+from pydantic import ConfigDict, Field, ValidationError
 from typer import Exit, Typer, Argument, Option, Abort, get_app_dir, launch
 from rich.console import Group, RenderableType, Console
 from rich.live import Live
@@ -42,7 +42,7 @@ from tomlkit.exceptions import ParseError
 from tomlkit.items import Table as TomlTable
 
 from algobattle.battle import Battle
-from algobattle.match import AlgobattleConfig, EmptyUi, Match, Ui, ExecutionConfig
+from algobattle.match import AlgobattleConfig, EmptyUi, Match, Ui, ProjectConfig
 from algobattle.problem import Instance, Problem, Solution
 from algobattle.program import Generator, Matchup, Solver
 from algobattle.util import BuildError, EncodableModel, ExceptionInfo, Role, RunningTimer, BaseModel, TempDir, timestamp
@@ -68,7 +68,7 @@ class _General(BaseModel):
 
 class CliConfig(BaseModel):
     general: _General = Field(default_factory=dict, validate_default=True)
-    execution: ExecutionConfig = Field(default_factory=dict, validate_default=True)
+    default_project_config: ProjectConfig | None = Field(default=None)
 
     _doc: TOMLDocument
     path: ClassVar[Path] = Path(get_app_dir("algobattle")) / "config.toml"
@@ -94,9 +94,11 @@ class CliConfig(BaseModel):
         self.path.write_text(dumps_toml(self._doc))
 
     @property
-    def default_exec(self) -> TomlTable | None:
+    def default_project_doc(self) -> TomlTable | None:
         """The default exec config for each problem."""
-        exec: Any = self._doc.get("execution", None)
+        exec: Any = self._doc.get(
+            "default_project_config", table().append("results", "./results").append("mode", "testing")
+        )
         return exec
 
     @cached_property
@@ -139,14 +141,14 @@ def run_match(
     finally:
         try:
             console.print(CliUi.display_match(result))
-            if config.execution.points > 0:
-                points = result.calculate_points(config.execution.points)
+            if config.project.points > 0:
+                points = result.calculate_points(config.project.points)
                 for team, pts in points.items():
                     print(f"Team {team} gained {pts:.1f} points.")
 
             if save:
                 res_string = result.model_dump_json(exclude_defaults=True)
-                config.execution.results.joinpath(f"{timestamp()}.json").write_text(res_string)
+                config.project.results.joinpath(f"{timestamp()}.json").write_text(res_string)
             return result
         except KeyboardInterrupt:
             raise Exit
@@ -277,10 +279,10 @@ def init(
                     table().add("generator", "./generator").add("solver", "./solver"),
                 ),
             )
-        if config.default_exec is not None and "execution" not in config_doc:
-            config_doc["execution"] = config.default_exec
+        if config.default_project_doc is not None and "project" not in config_doc:
+            config_doc["project"] = config.default_project_doc
         target.joinpath("algobattle.toml").write_text(dumps_toml(config_doc))
-        res_path = parsed_config.execution.results
+        res_path = parsed_config.project.results
         if not res_path.is_absolute():
             res_path = target / res_path
         res_path.mkdir(parents=True, exist_ok=True)
@@ -397,7 +399,7 @@ def test(
             all_errors[team] = errors.model_dump(exclude_defaults=True)
 
     if all_errors:
-        err_path = config.execution.results.joinpath(f"{timestamp()}.json")
+        err_path = config.project.results.joinpath(f"{timestamp()}.json")
         err_path.write_text(json.dumps(all_errors, indent=4))
         console.print(f"You can find detailed error messages at {err_path}")
 
@@ -465,8 +467,8 @@ def package(
         raise Abort
     problem_info = parsed_config.problems[problem_name]
 
-    if "execution" in config_doc:
-        config_doc.remove("execution")
+    if "project" in config_doc:
+        config_doc.remove("project")
     if "teams" in config_doc:
         config_doc.remove("teams")
     info_doc = table().append(

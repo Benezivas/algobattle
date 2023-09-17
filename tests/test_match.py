@@ -7,7 +7,7 @@ from pathlib import Path
 from pydantic import ByteSize, ValidationError
 
 from algobattle.battle import Fight, Iterated, Averaged
-from algobattle.match import ExecutionConfig, Match, AlgobattleConfig, MatchConfig, RunConfig, TeamInfo
+from algobattle.match import ProjectConfig, Match, AlgobattleConfig, MatchConfig, RunConfig, TeamInfo
 from algobattle.program import ProgramRunInfo, Team, Matchup, TeamHandler
 from .testsproblem.problem import TestProblem
 
@@ -236,7 +236,7 @@ class Parsing(TestCase):
                     problem="Test Problem",
                     battle=Averaged.Config(num_fights=1),
                 ),
-                execution=ExecutionConfig(points=10, results=self.configs_path / "results"),
+                project=ProjectConfig(points=10, results=self.configs_path / "results"),
             ),
         )
 
@@ -252,7 +252,7 @@ class Parsing(TestCase):
                 match=MatchConfig(
                     problem="Test Problem",
                 ),
-                execution=ExecutionConfig(results=self.configs_path / "results"),
+                project=ProjectConfig(results=self.configs_path / "results"),
             ),
         )
 

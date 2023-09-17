@@ -8,5 +8,5 @@ space = 10
 type = "Averaged"
 num_fights = 1
 
-[execution]
+[project]
 points = 10
