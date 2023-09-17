@@ -1,10 +1,11 @@
 # the from line specifies a base image to use, most languages publish their own ones with their runtime preinstalled
 FROM alpine
 
-# change the cwd to some new for all following commands
-WORKDIR /algobattle_src
+# change the cwd to some new directory for all following commands
+WORKDIR /algobattle
 # copy our source code into this directory
-COPY . .
+# note the trailing slash, docker needs it to know that we're trying to copy to a directory and not a file
+COPY . ./
 # compile our program during the build step so we're ready to go when the container runs and won't lose any time
 RUN echo "building the {{ program }}"
 

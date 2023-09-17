@@ -1,7 +1,7 @@
 FROM maven:3.9.4-eclipse-temurin-20
 
-WORKDIR /algobattle_src
-COPY . .
+WORKDIR /algobattle
+COPY . ./
 RUN mvn package
 
 WORKDIR /

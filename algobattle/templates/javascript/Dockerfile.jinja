@@ -1,8 +1,8 @@
 FROM node
 
-WORKDIR /algobattle_src
-COPY . .
+WORKDIR /algobattle
+COPY . ./
 RUN npm ci
 
 WORKDIR /
-CMD [ "node", "/algobattle_src" ]
+CMD [ "node", "/algobattle" ]
