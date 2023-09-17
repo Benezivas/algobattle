@@ -23,7 +23,6 @@ from algobattle.program import ProgramConfigView, ProgramUi, Matchup, TeamHandle
 from algobattle.problem import InstanceT, Problem, SolutionT
 from algobattle.util import (
     ExceptionInfo,
-    MatchMode,
     Role,
     RunningTimer,
     BaseModel,
@@ -597,8 +596,10 @@ class ProjectConfig(BaseModel):
 
     parallel_battles: int = 1
     """Number of battles exectuted in parallel."""
-    mode: MatchMode = "testing"
-    """Mode of the match."""
+    name_images: bool = True
+    """Whether to give the docker images names."""
+    cleanup_images: bool = False
+    """Whether to clean up the images after we use them."""
     set_cpus: str | list[str] | None = None
     """Wich cpus to run programs on, if it is a list each battle will use a different cpu specification for it."""
     points: int = 100
@@ -685,5 +686,6 @@ class AlgobattleConfig(BaseModel):
             run_kwargs=self.docker.run.kwargs,
             generator=self.match.generator,
             solver=self.match.solver,
-            mode=self.project.mode,
+            name_images=self.project.name_images,
+            cleanup_images=self.project.cleanup_images,
         )

@@ -37,8 +37,6 @@ class Role(StrEnum):
     solver = "solver"
 
 
-MatchMode = Literal["tournament", "testing"]
-"""Indicates what type of match is being fought."""
 T = TypeVar("T")
 
 

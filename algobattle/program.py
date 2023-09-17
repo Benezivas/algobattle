@@ -34,7 +34,6 @@ from algobattle.util import (
     ExceptionInfo,
     ExecutionError,
     ExecutionTimeout,
-    MatchMode,
     TempDir,
     ValidationError,
     Role,
@@ -102,7 +101,8 @@ class ProgramConfigView:
     run_kwargs: dict[str, Any]
     generator: RunConfigView
     solver: RunConfigView
-    mode: MatchMode
+    name_images: bool
+    cleanup_images: bool
 
 
 class ProgramUi(Protocol):
@@ -266,7 +266,7 @@ class Program(ABC):
         Raises:
             BuildError: If the build fails for any reason.
         """
-        if team_name is not None and config.mode == "testing":
+        if team_name is not None and config.name_images:
             normalized = team_name.lower().replace(" ", "_")
             name = f"algobattle_{normalized}_{cls.role.name}"
             try:
@@ -481,7 +481,7 @@ class Program(ABC):
         return self
 
     def __exit__(self, _type: Any, _value: Any, _traceback: Any):
-        if self.config.mode == "tournament":
+        if self.config.cleanup_images:
             self.remove()
 
 
@@ -817,7 +817,6 @@ class TeamHandler:
 
     active: list[Team] = field(default_factory=list)
     excluded: dict[str, ExceptionInfo] = field(default_factory=dict)
-    cleanup: bool = True
 
     @classmethod
     async def build(
@@ -840,7 +839,7 @@ class TeamHandler:
         Returns:
             :class:`TeamHandler` containing the info about the participating teams.
         """
-        handler = cls(cleanup=config.mode == "tournament")
+        handler = cls()
         ui.start_build_step(infos.keys(), config.build_timeout)
         for name, info in infos.items():
             try:
