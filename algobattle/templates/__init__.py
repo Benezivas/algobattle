@@ -15,6 +15,7 @@ class Language(StrEnum):
     python = "python"
     javascript = "javascript"
     rust = "rust"
+    java = "java"
 
     @cached_property
     def env(self) -> Environment:
@@ -52,6 +53,7 @@ def write_templates(target: Path, lang: Language, args: TemplateArgs) -> None:
     """Writes the formatted templates to the target directory."""
     template_args = args | {
         "project": f"{normalize(args['team'])}-{normalize(args['problem'])}-{normalize(args['program'])}",
+        "team_normalized": args["team"].lower().replace(" ", "")
     }
     for name in lang.env.list_templates():
         template = lang.env.get_template(name)
