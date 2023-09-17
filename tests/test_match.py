@@ -154,12 +154,20 @@ class Execution(IsolatedAsyncioTestCase):
         cls.problem = TestProblem
         run_params = RunConfig(timeout=2)
         cls.config_iter = AlgobattleConfig(
-            match=MatchConfig(generator=run_params, solver=run_params, problem="Test Problem"),
-            battle=Iterated.Config(maximum_size=10, rounds=2),
+            match=MatchConfig(
+                generator=run_params,
+                solver=run_params,
+                problem="Test Problem",
+                battle=Iterated.Config(maximum_size=10, rounds=2),
+            ),
         )
         cls.config_avg = AlgobattleConfig(
-            match=MatchConfig(generator=run_params, solver=run_params, problem="Test Problem"),
-            battle=Averaged.Config(instance_size=5, num_fights=3),
+            match=MatchConfig(
+                generator=run_params,
+                solver=run_params,
+                problem="Test Problem",
+                battle=Averaged.Config(instance_size=5, num_fights=3),
+            ),
         )
         cls.generator = problem_path / "generator"
         cls.solver = problem_path / "solver"
@@ -226,8 +234,8 @@ class Parsing(TestCase):
                 match=MatchConfig(
                     generator=RunConfig(space=ByteSize(10)),
                     problem="Test Problem",
+                    battle=Averaged.Config(num_fights=1),
                 ),
-                battle=Averaged.Config(num_fights=1),
                 execution=ExecutionConfig(points=10, results=self.configs_path / "results"),
             ),
         )

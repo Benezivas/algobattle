@@ -65,7 +65,7 @@ class Match(BaseModel):
             try:
                 await battle.run_battle(
                     handler,
-                    config.battle,
+                    config.match.battle,
                     problem.min_size,
                     battle_ui,
                 )
@@ -96,7 +96,7 @@ class Match(BaseModel):
         with await TeamHandler.build(config.teams, problem, config.as_prog_config(), ui) as teams:
             self.active_teams = [t.name for t in teams.active]
             self.excluded_teams = teams.excluded
-            battle_cls = Battle.all()[config.battle.type]
+            battle_cls = Battle.all()[config.match.battle.type]
             limiter = CapacityLimiter(config.execution.parallel_battles)
             current_default_thread_limiter().total_tokens = config.execution.parallel_battles
             set_cpus = config.execution.set_cpus
@@ -574,7 +574,11 @@ class MatchConfig(BaseModel):
     strict_timeouts: bool = False
     """Whether to raise an error if a program runs into the timeout."""
     generator: RunConfig = RunConfig()
+    """Settings determining generator execution."""
     solver: RunConfig = RunConfig()
+    """Settings determining solver execution."""
+    battle: Battle.Config = Iterated.Config()
+    """Config for the battle type."""
 
     model_config = ConfigDict(revalidate_instances="always")
 
@@ -628,7 +632,6 @@ class AlgobattleConfig(BaseModel):
     teams: TeamInfos = Field(default_factory=dict)
     execution: ExecutionConfig = Field(default_factory=dict, validate_default=True)
     match: MatchConfig
-    battle: Battle.Config = Iterated.Config()
     docker: DockerConfig = DockerConfig()
     problems: dict[str, DynamicProblemConfig] = Field(default_factory=dict)
 

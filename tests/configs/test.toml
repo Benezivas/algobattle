@@ -4,7 +4,7 @@ problem = "Test Problem"
 [match.generator]
 space = 10
 
-[battle]
+[match.battle]
 type = "Averaged"
 num_fights = 1
 
