@@ -569,7 +569,7 @@ class MatchConfig(BaseModel):
     """The problem this match is over."""
     build_timeout: WithNone[TimeDeltaFloat] = 600
     """Timeout for building each docker image."""
-    image_size: WithNone[ByteSizeInt] = None
+    max_program_size: WithNone[ByteSizeInt] = 4_000_000_000
     """Maximum size a built program image is allowed to be."""
     strict_timeouts: bool = False
     """Whether to raise an error if a program runs into the timeout."""
@@ -586,7 +586,7 @@ class MatchConfig(BaseModel):
 class DynamicProblemConfig(BaseModel):
     """Defines metadata used to dynamically import problems."""
 
-    location: RelativePath = Field(default=Path("problem.py"), validate_default=True)
+    location: RelativePath
     """Path to the file defining the problem"""
     dependencies: list[str] = Field(default_factory=list)
     """List of dependencies needed to run the problem"""
@@ -600,7 +600,7 @@ class ExecutionConfig(BaseModel):
     mode: MatchMode = "testing"
     """Mode of the match."""
     set_cpus: str | list[str] | None = None
-    """Wich cpus to run programs on, if a list is specified each battle will use a different cpu specification in it."""
+    """Wich cpus to run programs on, if it is a list each battle will use a different cpu specification for it."""
     points: int = 100
     """Highest number of points each team can achieve."""
     results: RelativePath = Field(default=Path("./results"), validate_default=True)
@@ -679,7 +679,7 @@ class AlgobattleConfig(BaseModel):
         """Builds a simple object containing all program relevant settings."""
         return ProgramConfigView(
             build_timeout=self.match.build_timeout,
-            max_image_size=self.match.image_size,
+            max_program_size=self.match.max_program_size,
             strict_timeouts=self.match.strict_timeouts,
             build_kwargs=self.docker.build.kwargs,
             run_kwargs=self.docker.run.kwargs,

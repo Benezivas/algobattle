@@ -96,7 +96,7 @@ class ProgramConfigView:
     """Config settings relevant to the program module."""
 
     build_timeout: float | None
-    max_image_size: int | None
+    max_program_size: int | None
     strict_timeouts: bool
     build_kwargs: dict[str, Any]
     run_kwargs: dict[str, Any]
@@ -305,12 +305,12 @@ class Program(ABC):
             config=config,
         )
         used_size = cast(dict[str, Any], image.attrs).get("Size", 0)
-        if config.max_image_size is not None and used_size > config.max_image_size:
+        if config.max_program_size is not None and used_size > config.max_program_size:
             try:
                 self.remove()
             finally:
                 raise BuildError(
-                    "Built image is too large.", detail=f"Size: {used_size}B, limit: {config.max_image_size}B."
+                    "Built image is too large.", detail=f"Size: {used_size}B, limit: {config.max_program_size}B."
                 )
         return self
 
