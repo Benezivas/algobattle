@@ -14,6 +14,7 @@ class Language(StrEnum):
     plain = "plain"
     python = "python"
     javascript = "javascript"
+    typescript = "typescript"
     rust = "rust"
     java = "java"
     cpp = "cpp"
