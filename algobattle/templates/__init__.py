@@ -19,6 +19,7 @@ class Language(StrEnum):
     cpp = "cpp"
     c = "c"
     csharp = "csharp"
+    go = "go"
 
     @cached_property
     def env(self) -> Environment:
