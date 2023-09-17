@@ -17,6 +17,7 @@ class Language(StrEnum):
     rust = "rust"
     java = "java"
     cpp = "cpp"
+    c = "c"
 
     @cached_property
     def env(self) -> Environment:
