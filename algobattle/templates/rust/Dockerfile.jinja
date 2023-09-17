@@ -1,7 +1,8 @@
 FROM rust
 
-WORKDIR /algobattle_src
-COPY . .
+WORKDIR /algobattle
+COPY Cargo.toml ./
+COPY src src/
 RUN cargo install --path .
 
 WORKDIR /
