@@ -244,6 +244,8 @@ def init(
             console.print("[red]You must either use a problem spec file or target a directory with an existing config.")
             raise Abort
         console.print("Using existing project data")
+        if len(parsed_config.teams) == 1:
+            team_name = next(iter(parsed_config.teams.keys()))
 
     problem_name = parsed_config.match.problem
     info = parsed_config.problems.get(problem_name, None)
