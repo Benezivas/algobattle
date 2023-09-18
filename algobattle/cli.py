@@ -732,7 +732,8 @@ class CliUi(Live, Ui):
             elif fight.solver and fight.solver.error:
                 info = f"[red]Solver failed[/]: {fight.solver.error.message}"
             else:
-                info = ""
+                assert fight.solver is not None
+                info = f"Runtimes: gen {fight.generator.runtime:.1f}s, sol {fight.solver.runtime:.1f}s"
             table.add_row(str(i), str(fight.max_size), f"{fight.score:.1%}", info)
         panel.past_fights = table
 
