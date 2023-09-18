@@ -42,7 +42,7 @@ from tomlkit.exceptions import ParseError
 from tomlkit.items import Table as TomlTable
 
 from algobattle.battle import Battle
-from algobattle.match import AlgobattleConfig, EmptyUi, Match, Ui, ProjectConfig
+from algobattle.match import AlgobattleConfig, EmptyUi, Match, MatchConfig, Ui, ProjectConfig
 from algobattle.problem import Instance, Problem, Solution
 from algobattle.program import Generator, Matchup, Solver
 from algobattle.util import BuildError, EncodableModel, ExceptionInfo, Role, RunningTimer, BaseModel, TempDir, timestamp
@@ -96,9 +96,7 @@ class CliConfig(BaseModel):
     @property
     def default_project_doc(self) -> TomlTable | None:
         """The default exec config for each problem."""
-        exec: Any = self._doc.get(
-            "default_project_config", table().append("results", "results")
-        )
+        exec: Any = self._doc.get("default_project_config", table().append("results", "results"))
         return exec
 
     @cached_property
@@ -178,9 +176,13 @@ def init(
     target: Annotated[
         Optional[Path], Argument(file_okay=False, writable=True, help="The folder to initialize.")
     ] = None,
-    problem: Annotated[
-        Optional[Path],
-        Option("--problem", "-p", exists=True, dir_okay=False, help="The .algo file to use for this."),
+    problem_: Annotated[
+        Optional[str],
+        Option(
+            "--problem",
+            "-p",
+            help="Path to the .algo file to use, or the name of an installed problem.",
+        ),
     ] = None,
     language: Annotated[
         Optional[Language], Option("--language", "-l", help="The language to use for the programs.")
@@ -207,7 +209,26 @@ def init(
         + ("Bearded Dragons", "Macaws", "Wombats", "Wallabies", "Owls", "Seals", "Octopuses", "Frogs", "Jellyfish")
     )
 
-    if problem is not None:
+    if problem_ is None:  # use the preexisting config file in the target folder
+        if target is None:
+            target = Path()
+        try:
+            parsed_config = AlgobattleConfig.from_file(target, reltivize_paths=False)
+        except ValueError:
+            console.print("[red]You must either use a problem spec file or target a directory with an existing config.")
+            raise Abort
+        console.print("Using existing project data")
+        if len(parsed_config.teams) == 1:
+            team_name = next(iter(parsed_config.teams.keys()))
+
+    elif problem_ in Problem.available():  # use a preinstalled problem
+        if target is None:
+            target = Path() / problem_
+        target.mkdir(parents=True, exist_ok=True)
+        target.joinpath("algobattle.toml").write_text(f"""[match]\nproblem = "{problem_}""")
+        parsed_config = AlgobattleConfig(match=MatchConfig(problem=problem_))
+
+    elif (problem := Path(problem_)).is_file():  # use a problem spec file
         with TempDir() as unpack_dir:
             with console.status("Extracting problem data"):
                 with ZipFile(problem) as problem_zip:
@@ -237,17 +258,12 @@ def init(
             else:
                 parsed_config = AlgobattleConfig.from_file(target, reltivize_paths=False)
                 console.print("Using existing problem data")
+
     else:
-        if target is None:
-            target = Path()
-        try:
-            parsed_config = AlgobattleConfig.from_file(target, reltivize_paths=False)
-        except ValueError:
-            console.print("[red]You must either use a problem spec file or target a directory with an existing config.")
-            raise Abort
-        console.print("Using existing project data")
-        if len(parsed_config.teams) == 1:
-            team_name = next(iter(parsed_config.teams.keys()))
+        console.print(
+            "[red]The problem argument is neither the name of an installed problem, nor the path to a problem spec"
+        )
+        raise Abort
 
     problem_name = parsed_config.match.problem
     info = parsed_config.problems.get(problem_name, None)
