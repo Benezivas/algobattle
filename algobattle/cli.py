@@ -51,8 +51,12 @@ from algobattle.templates import Language, PartialTemplateArgs, TemplateArgs, wr
 
 __all__ = ("app",)
 
+help_message = """The Algobattle command line program.
 
-app = Typer(pretty_exceptions_show_locals=True)
+You can use this to setup your workspace, develop programs, run matches, and more!
+For more detailed documentation, visit our website at http://algobattle.org/docs/tutorial
+"""
+app = Typer(pretty_exceptions_show_locals=True, help=help_message)
 console = Console()
 
 
