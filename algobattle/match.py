@@ -666,7 +666,7 @@ class AlgobattleConfig(BaseModel):
             if file.joinpath("algobattle.toml").is_file():
                 file /= "algobattle.toml"
             else:
-                raise ValueError("The path does not point to an Algobattle project")
+                raise FileNotFoundError("The path does not point to an Algobattle project")
         try:
             config_dict = tomllib.loads(file.read_text())
         except tomllib.TOMLDecodeError as e:

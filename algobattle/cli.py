@@ -17,7 +17,7 @@ from importlib.metadata import version as pkg_version
 from zipfile import ZipFile
 
 from anyio import run as run_async_fn
-from pydantic import ConfigDict, Field, ValidationError
+from pydantic import Field, ValidationError
 from typer import Exit, Typer, Argument, Option, Abort, get_app_dir, launch
 from rich.console import Group, RenderableType, Console
 from rich.live import Live
@@ -214,8 +214,11 @@ def init(
             target = Path()
         try:
             parsed_config = AlgobattleConfig.from_file(target, relativize_paths=False)
-        except ValueError:
+        except FileNotFoundError:
             console.print("[red]You must either use a problem spec file or target a directory with an existing config.")
+            raise Abort
+        except ValueError as e:
+            console.print("[red]The Algobattle config file is not formatted properly\n", e)
             raise Abort
         console.print("Using existing project data")
         if len(parsed_config.teams) == 1:
