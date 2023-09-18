@@ -225,7 +225,7 @@ def init(
         if target is None:
             target = Path() / problem_
         target.mkdir(parents=True, exist_ok=True)
-        target.joinpath("algobattle.toml").write_text(f"""[match]\nproblem = "{problem_}""")
+        target.joinpath("algobattle.toml").write_text(f"""[match]\nproblem = "{problem_}"\n""")
         parsed_config = AlgobattleConfig(match=MatchConfig(problem=problem_))
 
     elif (problem := Path(problem_)).is_file():  # use a problem spec file
