@@ -582,7 +582,7 @@ class FightPanel(Panel):
         )
         self.generator = self.progress.add_task("Generator", start=False, total=1, message="")
         self.solver = self.progress.add_task("Solver", start=False, total=1, message="")
-        super().__init__(self.progress, title="Current Fight", width=30)
+        super().__init__(self.progress, title="[green]Current Fight", width=30)
 
 
 class BattlePanel(Panel):
@@ -597,7 +597,7 @@ class BattlePanel(Panel):
 
     def _make_renderable(self) -> RenderableType:
         return Group(
-            Columns((self._battle_data, self._curr_fight), expand=True, equal=True, align="center"),
+            Columns((self._curr_fight, self._battle_data), align="left"),
             self._past_fights,
         )
 
@@ -607,7 +607,7 @@ class BattlePanel(Panel):
 
     @battle_data.setter
     def battle_data(self, value: RenderableType) -> None:
-        self._battle_data = value
+        self._battle_data = Panel(value, title="[green]Battle Data")
         self.renderable = self._make_renderable()
 
     @property
@@ -761,7 +761,7 @@ class CliUi(Live, Ui):
     @override
     def update_battle_data(self, matchup: Matchup, data: Battle.UiData) -> None:
         self.battle_panels[matchup].battle_data = Group(
-            "[green]Battle Data:", *(f"[orchid]{key}[/]: [cyan]{value}" for key, value in data.model_dump().items())
+            *(f"[orchid]{key}[/]: [cyan]{value}" for key, value in data.model_dump().items())
         )
 
 
