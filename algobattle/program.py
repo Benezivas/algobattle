@@ -286,6 +286,7 @@ class Program(ABC):
                     config.build_timeout,
                     dockerfile,
                     config.build_kwargs,
+                    cancellable=True,
                 )
                 if old_image is not None:
                     old_image.reload()
@@ -404,7 +405,7 @@ class Program(ABC):
             if ui is not None:
                 ui.start_program(self.role, specs.timeout)
             try:
-                runtime = await run_sync(self._run_daemon_call, container, specs.timeout)
+                runtime = await run_sync(self._run_daemon_call, container, specs.timeout, cancellable=True)
             except ExecutionError as e:
                 raise _WrappedException(e, e.runtime)
             finally:
