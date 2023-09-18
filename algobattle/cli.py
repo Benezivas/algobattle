@@ -29,7 +29,6 @@ from rich.progress import (
     BarColumn,
     MofNCompleteColumn,
     TimeElapsedColumn,
-    TaskID,
     ProgressColumn,
     Task,
 )
@@ -128,7 +127,9 @@ class CliConfig(BaseModel):
 
 @app.command("run")
 def run_match(
-    path: Annotated[Path, Argument(exists=True, help="Path to either a config file or a directory containing one.")],
+    path: Annotated[
+        Path, Argument(exists=True, help="Path to either a config file or a directory containing one.")
+    ] = Path(),
     ui: Annotated[bool, Option(help="Whether to show the CLI UI during match execution.")] = True,
     save: Annotated[bool, Option(help="Whether to save the match result.")] = True,
 ) -> Match:
@@ -558,12 +559,12 @@ class BuildView(Group):
             LazySpinnerColumn(),
             BarColumn(bar_width=10),
             TimeElapsedColumn(),
+            TextColumn("[cyan]{task.fields[status]}"),
         )
         self.overall_task = self.overall_progress.add_task("[blue]Building programs", total=2 * len(teams))
-        team_dict: dict[str, TaskID] = {}
-        for team in teams:
-            team_dict[team] = self.team_progress.add_task(team, start=False, total=2, failed="", name=team)
-        self.teams = team_dict
+        self.teams = {
+            team: self.team_progress.add_task(team, start=False, total=2, status="", name=team) for team in teams
+        }
         super().__init__(self.overall_progress, self.team_progress)
 
 
@@ -682,8 +683,12 @@ class CliUi(Live, Ui):
         view = self.renderable.renderable
         assert isinstance(view, BuildView)
         task = view.teams[team]
-        view.team_progress.start_task(task)
-        view.team_progress.advance(task)
+        match role:
+            case Role.generator:
+                view.team_progress.start_task(task)
+            case Role.solver:
+                view.team_progress.advance(task)
+                view.overall_progress.advance(view.overall_task, 1)
 
     @override
     def finish_build(self, team: str, success: bool) -> None:
@@ -692,7 +697,7 @@ class CliUi(Live, Ui):
         assert isinstance(view, BuildView)
         task = view.teams[team]
         current = view.team_progress._tasks[task].completed
-        view.team_progress.update(task, completed=2, failed="" if success else ":warning:")
+        view.team_progress.update(task, completed=2, status="" if success else "[red]failed!")
         view.overall_progress.advance(view.overall_task, 2 - current)
 
     @override
@@ -723,9 +728,9 @@ class CliUi(Live, Ui):
         table = panel._fights_table()
         for i, fight in zip(range(len(battle.fights), len(battle.fights) - len(fights), -1), fights):
             if fight.generator.error:
-                info = f"Generator failed: {fight.generator.error.message}"
+                info = f"[red]Generator failed[/]: {fight.generator.error.message}"
             elif fight.solver and fight.solver.error:
-                info = f"Solver failed: {fight.solver.error.message}"
+                info = f"[red]Solver failed[/]: {fight.solver.error.message}"
             else:
                 info = ""
             table.add_row(str(i), str(fight.max_size), f"{fight.score:.1%}", info)
