@@ -97,7 +97,7 @@ class CliConfig(BaseModel):
     def default_project_doc(self) -> TomlTable | None:
         """The default exec config for each problem."""
         exec: Any = self._doc.get(
-            "default_project_config", table().append("results", "./results").append("mode", "testing")
+            "default_project_config", table().append("results", "results")
         )
         return exec
 
@@ -276,7 +276,7 @@ def init(
                 "teams",
                 table().add(
                     team_name,
-                    table().add("generator", "./generator").add("solver", "./solver"),
+                    table().add("generator", "generator").add("solver", "solver"),
                 ),
             )
         if config.default_project_doc is not None and "project" not in config_doc:
