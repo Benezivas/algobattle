@@ -333,7 +333,7 @@ class Problem(Generic[InstanceT, SolutionT]):
 
         Raises:
             ValueError: If the problem is not specified properly
-            RuntimeError If the problem's dynamic import fails
+            RuntimeError: If the problem's dynamic import fails
         """
         if name in dynamic:
             info = dynamic[name]
