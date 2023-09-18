@@ -546,7 +546,7 @@ class DockerConfig(BaseModel):
 class RunConfig(BaseModel):
     """Parameters determining how a program is run."""
 
-    timeout: WithNone[TimeDeltaFloat] = 30
+    timeout: WithNone[TimeDeltaFloat] = 20
     """Timeout in seconds, or `false` for no timeout."""
     space: WithNone[ByteSizeInt] = None
     """Maximum memory space available, or `false` for no limitation.
