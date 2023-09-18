@@ -653,13 +653,13 @@ class AlgobattleConfig(BaseModel):
         return Problem.load(self.match.problem, self.problems)
 
     @classmethod
-    def from_file(cls, file: Path, *, ignore_uninstalled: bool = False, reltivize_paths: bool = True) -> Self:
+    def from_file(cls, file: Path, *, ignore_uninstalled: bool = False, relativize_paths: bool = True) -> Self:
         """Parses a config object from a toml file.
 
         Args:
             file: Path to the file, or a directory containing one called 'algobattle.toml'.
             ignore_uninstalled: Whether to raise errors if the specified battle type is not installed.
-            reltivize_paths: Wether to relativize paths to the config's location rather than the cwd.
+            relativize_paths: Wether to relativize paths to the config's location rather than the cwd.
         """
         Battle.load_entrypoints()
         if not file.is_file():
@@ -672,7 +672,7 @@ class AlgobattleConfig(BaseModel):
         except tomllib.TOMLDecodeError as e:
             raise ValueError(f"The config file at {file} is not a properly formatted TOML file!\n{e}")
         context: dict[str, Any] = {"ignore_uninstalled": ignore_uninstalled}
-        if reltivize_paths:
+        if relativize_paths:
             context["base_path"] = file.parent
         return cls.model_validate(config_dict, context=context)
 

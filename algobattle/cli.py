@@ -213,7 +213,7 @@ def init(
         if target is None:
             target = Path()
         try:
-            parsed_config = AlgobattleConfig.from_file(target, reltivize_paths=False)
+            parsed_config = AlgobattleConfig.from_file(target, relativize_paths=False)
         except ValueError:
             console.print("[red]You must either use a problem spec file or target a directory with an existing config.")
             raise Abort
@@ -234,7 +234,7 @@ def init(
                 with ZipFile(problem) as problem_zip:
                     problem_zip.extractall(unpack_dir)
 
-            parsed_config = AlgobattleConfig.from_file(unpack_dir, reltivize_paths=False)
+            parsed_config = AlgobattleConfig.from_file(unpack_dir, relativize_paths=False)
             if target is None:
                 target = Path() / parsed_config.match.problem
 
@@ -256,7 +256,7 @@ def init(
                     path.rename(target / path.name)
                 console.print("Unpacked problem data")
             else:
-                parsed_config = AlgobattleConfig.from_file(target, reltivize_paths=False)
+                parsed_config = AlgobattleConfig.from_file(target, relativize_paths=False)
                 console.print("Using existing problem data")
 
     else:
