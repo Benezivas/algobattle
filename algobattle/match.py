@@ -10,7 +10,7 @@ from typing import Annotated, Any, Iterable, Protocol, ClassVar, Self, TypeAlias
 from typing_extensions import override
 from typing_extensions import TypedDict
 
-from pydantic import AfterValidator, ByteSize, ConfigDict, Field, GetCoreSchemaHandler, ValidationInfo, model_validator
+from pydantic import AfterValidator, ByteSize, ConfigDict, Field, GetCoreSchemaHandler, ValidationInfo, field_validator, model_validator
 from pydantic.types import PathType
 from pydantic_core import CoreSchema
 from pydantic_core.core_schema import no_info_after_validator_function, union_schema
@@ -548,7 +548,7 @@ class RunConfig(BaseModel):
 
     timeout: WithNone[TimeDeltaFloat] = 20
     """Timeout in seconds, or `false` for no timeout."""
-    space: WithNone[ByteSizeInt] = None
+    space: WithNone[ByteSizeInt] = 4_000_000_000
     """Maximum memory space available, or `false` for no limitation.
 
     Can be either an plain number of bytes like `30000` or a string including
@@ -556,6 +556,15 @@ class RunConfig(BaseModel):
     """
     cpus: int = 1
     """Number of cpu cores available."""
+
+    @field_validator("cpus")
+    @classmethod
+    def check_nonzero(cls, val: int) -> int:
+        """Checks that the number of available cpus is non-zero."""
+        if not val:
+            raise ValueError("Number must be non-zero")
+        else:
+            return val
 
 
 class MatchConfig(BaseModel):
