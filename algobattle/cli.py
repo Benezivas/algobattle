@@ -612,7 +612,6 @@ class BuildView(Group):
         ]
 
 
-
 class FightPanel(Panel):
     """Panel displaying a currently running fight."""
 
