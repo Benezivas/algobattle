@@ -778,6 +778,7 @@ class CliUi(Live, Ui):
         self.battle_panels[matchup].battle_data = Group(
             *(f"[orchid]{key}[/]: [info]{value}" for key, value in data.model_dump().items())
         )
+        self._update_renderable()
 
 
 if __name__ == "__main__":
