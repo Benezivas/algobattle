@@ -19,7 +19,7 @@ from zipfile import ZipFile
 
 from anyio import run as run_async_fn
 from pydantic import Field, ValidationError
-from typer import Exit, Typer, Argument, Option, Abort, get_app_dir, launch
+from typer import Typer, Argument, Option, Abort, get_app_dir, launch
 from rich.console import Group, RenderableType, Console
 from rich.live import Live
 from rich.table import Table, Column
@@ -40,7 +40,7 @@ from rich.prompt import Prompt, Confirm
 from rich.theme import Theme
 from rich.rule import Rule
 from rich.padding import Padding
-from tomlkit import TOMLDocument, parse as parse_toml, dumps as dumps_toml, table
+from tomlkit import TOMLDocument, comment, parse as parse_toml, dumps as dumps_toml, table, nl as toml_newline
 from tomlkit.exceptions import ParseError
 from tomlkit.items import Table as TomlTable
 
@@ -60,14 +60,16 @@ You can use this to setup your workspace, develop programs, run matches, and mor
 For more detailed documentation, visit our website at http://algobattle.org/docs/tutorial
 """
 app = Typer(pretty_exceptions_show_locals=True, help=help_message)
-theme = Theme({
-    "success": "green",
-    "warning": "orange3",
-    "error": "red",
-    "attention": "magenta2",
-    "heading": "blue",
-    "info": "dim cyan",
-})
+theme = Theme(
+    {
+        "success": "green",
+        "warning": "orange3",
+        "error": "red",
+        "attention": "magenta2",
+        "heading": "blue",
+        "info": "dim cyan",
+    }
+)
 console = Console(theme=theme)
 
 
@@ -79,6 +81,8 @@ class _InstallMode(StrEnum):
 class _General(BaseModel):
     team_name: str | None = None
     install_mode: _InstallMode | None = None
+    generator_language: Language = Language.plain
+    solver_language: Language = Language.plain
 
 
 class CliConfig(BaseModel):
@@ -93,7 +97,15 @@ class CliConfig(BaseModel):
         """Initializes the config file if it does not exist."""
         if not cls.path.is_file():
             cls.path.parent.mkdir(parents=True, exist_ok=True)
-            cls.path.write_text("# The Algobattle cli configuration\n")
+            general = table().append("generator_language", "plain").append("solver_language", "plain")
+            doc = (
+                table()
+                .add(comment("# The Algobattle cli configuration"))
+                .add(toml_newline())
+                .append("general", general)
+                .add(toml_newline())
+            )
+            cls.path.write_text(dumps_toml(doc))
 
     @classmethod
     def load(cls) -> Self:
@@ -354,11 +366,11 @@ def init(
     if generator is not None:
         _init_program(target, generator, template_args, Role.generator)
     elif not target.joinpath("generator").exists():
-        _init_program(target, Language.plain, template_args, Role.generator)
+        _init_program(target, config.general.generator_language, template_args, Role.generator)
     if solver is not None:
         _init_program(target, solver, template_args, Role.solver)
     elif not target.joinpath("solver").exists():
-        _init_program(target, Language.plain, template_args, Role.solver)
+        _init_program(target, config.general.solver_language, template_args, Role.solver)
 
     console.print(f"[success]Initialized algobattle project[/] in {target}")
 
