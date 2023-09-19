@@ -163,7 +163,9 @@ def run_match(
 
             if save:
                 res_string = result.model_dump_json(exclude_defaults=True)
-                config.project.results.joinpath(f"{timestamp()}.json").write_text(res_string)
+                out_path = config.project.results.joinpath(f"{timestamp()}.json")
+                out_path.write_text(res_string)
+                console.print("Saved match result to ", out_path)
             return result
         except KeyboardInterrupt:
             raise Abort
