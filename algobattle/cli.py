@@ -388,13 +388,13 @@ class TestErrors(BaseModel):
 
 @app.command()
 def test(
-    folder: Annotated[Path, Argument(help="The project folder to use.")] = Path(),
+    project: Annotated[Path, Argument(help="The project folder to use.")] = Path(),
 ) -> None:
     """Tests whether the programs install successfully and run on dummy instances without crashing."""
-    if not (folder.is_file() or folder.joinpath("algobattle.toml").is_file()):
+    if not (project.is_file() or project.joinpath("algobattle.toml").is_file()):
         console.print("[error]The folder does not contain an Algobattle project")
         raise Abort
-    config = AlgobattleConfig.from_file(folder)
+    config = AlgobattleConfig.from_file(project)
     problem = config.problem
     all_errors: dict[str, Any] = {}
 
