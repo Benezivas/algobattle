@@ -36,6 +36,7 @@ from rich.panel import Panel
 from rich.text import Text
 from rich.columns import Columns
 from rich.prompt import Prompt, Confirm
+from rich.theme import Theme
 from tomlkit import TOMLDocument, parse as parse_toml, dumps as dumps_toml, table
 from tomlkit.exceptions import ParseError
 from tomlkit.items import Table as TomlTable
@@ -56,7 +57,15 @@ You can use this to setup your workspace, develop programs, run matches, and mor
 For more detailed documentation, visit our website at http://algobattle.org/docs/tutorial
 """
 app = Typer(pretty_exceptions_show_locals=True, help=help_message)
-console = Console()
+theme = Theme({
+    "success": "green",
+    "warning": "orange3",
+    "error": "red",
+    "attention": "magenta2",
+    "heading": "blue",
+    "info": "dim cyan",
+})
+console = Console(theme=theme)
 
 
 class _InstallMode(StrEnum):
@@ -107,8 +116,8 @@ class CliConfig(BaseModel):
         cmd = [sys.executable, "-m", "pip", "install"]
         if self.general.install_mode is None:
             command_str: str = Prompt.ask(
-                "[cyan]Do you want to install problems normally, or into the user directory?[/] If you're using an "
-                "environment manager like venv or conda you should install them normally, otherwise user installs "
+                "[attention]Do you want to install problems normally, or into the user directory?[/] If you're using "
+                "an environment manager like venv or conda you should install them normally, otherwise user installs "
                 "might be better.",
                 default="normal",
                 choices=["normal", "user"],
@@ -161,7 +170,7 @@ def _init_program(target: Path, lang: Language, args: PartialTemplateArgs, role:
     dir = target / role
     if dir.exists():
         replace = Confirm.ask(
-            f"[magenta2]The targeted directory already contains a {role}, do you want to replace it?",
+            f"[attention]The targeted directory already contains a {role}, do you want to replace it?",
             default=True,
         )
         if replace:
@@ -173,7 +182,7 @@ def _init_program(target: Path, lang: Language, args: PartialTemplateArgs, role:
         dir.mkdir(parents=True, exist_ok=True)
     with console.status(f"Initializing {role}"):
         write_templates(dir, lang, TemplateArgs(program=role.value, **args))
-    console.print(f"Created a {lang} {role} in [cyan]{dir}")
+    console.print(f"Created a {lang} {role} in {dir}")
 
 
 @app.command()
@@ -220,10 +229,10 @@ def init(
         try:
             parsed_config = AlgobattleConfig.from_file(target, relativize_paths=False)
         except FileNotFoundError:
-            console.print("[red]You must either use a problem spec file or target a directory with an existing config.")
+            console.print("[error]You must use a problem spec file or target a directory with an existing config.")
             raise Abort
         except ValueError as e:
-            console.print("[red]The Algobattle config file is not formatted properly\n", e)
+            console.print("[error]The Algobattle config file is not formatted properly\n", e)
             raise Abort
         console.print("Using existing project data")
         if len(parsed_config.teams) == 1:
@@ -250,7 +259,8 @@ def init(
             problem_data = list(unpack_dir.iterdir())
             if any(((target / path.name).exists() for path in problem_data)):
                 copy_problem_data = Confirm.ask(
-                    "[magenta2]The target directory already contains an algobattle project, do you want to replace it?",
+                    "[attention]The target directory already contains an algobattle project, "
+                    "do you want to replace it?",
                     default=True,
                 )
             else:
@@ -269,7 +279,7 @@ def init(
 
     else:
         console.print(
-            "[red]The problem argument is neither the name of an installed problem, nor the path to a problem spec"
+            "[error]The problem argument is neither the name of an installed problem, nor the path to a problem spec"
         )
         raise Abort
 
@@ -288,10 +298,10 @@ def init(
                 console.print(line.strip("\n"))
             error = "".join(installer.stderr.readlines())
         if installer.returncode:
-            console.print(f"[red]Couldn't install the dependencies[/]\n{error}")
+            console.print(f"[error]Couldn't install the dependencies[/]\n{error}")
             raise Abort
         else:
-            console.print(f"[green]Installed dependencies of {problem_name}")
+            console.print(f"[success]Installed dependencies of {problem_name}")
 
     with console.status("Initializing metadata"):
         config_doc = parse_toml(target.joinpath("algobattle.toml").read_text())
@@ -340,7 +350,7 @@ def init(
     elif not target.joinpath("solver").exists():
         _init_program(target, Language.plain, template_args, Role.solver)
 
-    console.print(f"[green]Success![/] initialized algobattle project data in [cyan]{target}[/]")
+    console.print(f"[success]Initialized algobattle project[/] in {target}")
 
 
 class TestErrors(BaseModel):
@@ -358,7 +368,7 @@ def test(
 ) -> None:
     """Tests whether the programs install successfully and run on dummy instances without crashing."""
     if not (folder.is_file() or folder.joinpath("algobattle.toml").is_file()):
-        console.print("[red]The folder does not contain an Algobattle project")
+        console.print("[error]The folder does not contain an Algobattle project")
         raise Abort
     config = AlgobattleConfig.from_file(folder)
     problem = config.problem
@@ -377,17 +387,17 @@ def test(
 
         try:
             with run_async_fn(gen_builder) as gen:
-                console.print("[green]Generator built successfully")
+                console.print("[success]Generator built successfully")
                 with console.status("Running generator"):
                     instance = gen.test()
                 if isinstance(instance, ExceptionInfo):
-                    console.print("[red]Generator didn't run successfully")
+                    console.print("[error]Generator didn't run successfully")
                     errors.generator_run = instance
                     instance = None
                 else:
-                    console.print("[green]Generator ran successfully")
+                    console.print("[success]Generator ran successfully")
         except BuildError as e:
-            console.print("[red]Generator didn't build successfully")
+            console.print("[error]Generator didn't build successfully")
             errors.generator_build = ExceptionInfo.from_exception(e)
             instance = None
 
@@ -401,21 +411,21 @@ def test(
 
         try:
             with run_async_fn(sol_builder) as sol:
-                console.print("[green]Solver built successfully")
+                console.print("[success]Solver built successfully")
 
                 instance = instance or cast(Instance, problem.test_instance)
                 if instance:
                     with console.status("Running solver"):
                         sol_error = sol.test(instance)
                     if isinstance(sol_error, ExceptionInfo):
-                        console.print("[red]Solver didn't run successfully")
+                        console.print("[error]Solver didn't run successfully")
                         errors.solver_run = sol_error
                     else:
-                        console.print("[green]Solver ran successfully")
+                        console.print("[success]Solver ran successfully")
                 else:
-                    console.print("[orange3]Cannot test running the solver")
+                    console.print("[warning]Cannot test running the solver")
         except BuildError as e:
-            console.print("[red]Solver didn't build successfully")
+            console.print("[error]Solver didn't build successfully")
             errors.solver_build = ExceptionInfo.from_exception(e)
             instance = None
 
@@ -456,13 +466,13 @@ def package(
         elif Path("problem").is_dir():
             problem_path = Path("problem")
         else:
-            console.print("[red]Couldn't find a problem package")
+            console.print("[error]Couldn't find a problem package")
             raise Abort
     if config is None:
         if problem_path.parent.joinpath("algobattle.toml").is_file():
             config = problem_path.parent / "algobattle.toml"
         else:
-            console.log("[red]Couldn't find a config file")
+            console.log("[error]Couldn't find a config file")
             raise Abort
     if description is None:
         match list(problem_path.parent.resolve().glob("description.*")):
@@ -472,7 +482,7 @@ def package(
                 description = desc
             case _:
                 console.print(
-                    "[red]Found multiple potential description files[/], explicitly specify which you want to include"
+                    "[error]Found multiple potential description files[/], explicitly specify which you want to include"
                 )
                 raise Abort
 
@@ -480,14 +490,14 @@ def package(
         config_doc = parse_toml(config.read_text())
         parsed_config = AlgobattleConfig.from_file(config)
     except (ValidationError, ParseError) as e:
-        console.print(f"[red]Improperly formatted config file\nError: {e}")
+        console.print(f"[error]Improperly formatted config file\nError: {e}")
         raise Abort
     problem_name = parsed_config.match.problem
     try:
         with console.status("Loading problem"):
             Problem.load_file(problem_name, problem_path)
     except (ValueError, RuntimeError) as e:
-        console.print(f"[red]Couldn't load the problem file[/]\nError: {e}")
+        console.print(f"[error]Couldn't load the problem file[/]\nError: {e}")
         raise Abort
     problem_info = parsed_config.problems[problem_name]
 
@@ -517,7 +527,7 @@ def package(
         file.writestr("algobattle.toml", dumps_toml(config_doc))
         if description is not None:
             file.write(description, description.name)
-    console.print("[green]Packaged Algobattle project into[/]", out)
+    console.print("[success]Packaged Algobattle project[/] into", out)
 
 
 class TimerTotalColumn(ProgressColumn):
@@ -555,13 +565,13 @@ class BuildView(Group):
             transient=True,
         )
         self.team_progress = Progress(
-            TextColumn("[cyan]{task.fields[name]}"),
+            TextColumn("{task.fields[name]}"),
             LazySpinnerColumn(),
             BarColumn(bar_width=10),
             TimeElapsedColumn(),
-            TextColumn("[cyan]{task.fields[status]}"),
+            TextColumn("{task.fields[status]}"),
         )
-        self.overall_task = self.overall_progress.add_task("[blue]Building programs", total=2 * len(teams))
+        self.overall_task = self.overall_progress.add_task("[heading]Building programs", total=2 * len(teams))
         self.teams = {
             team: self.team_progress.add_task(team, start=False, total=2, status="", name=team) for team in teams
         }
@@ -582,7 +592,7 @@ class FightPanel(Panel):
         )
         self.generator = self.progress.add_task("Generator", start=False, total=1, message="")
         self.solver = self.progress.add_task("Solver", start=False, total=1, message="")
-        super().__init__(Group(f"Max size: {self.max_size}", self.progress), title="[green]Current Fight", width=30)
+        super().__init__(Group(f"Max size: {self.max_size}", self.progress), title="[heading]Current Fight", width=30)
 
 
 class BattlePanel(Panel):
@@ -593,7 +603,7 @@ class BattlePanel(Panel):
         self._battle_data: RenderableType = ""
         self._curr_fight: FightPanel | Literal[""] = ""
         self._past_fights = self._fights_table()
-        super().__init__(self._make_renderable(), title=f"Battle {self.matchup}")
+        super().__init__(self._make_renderable(), title=f"[heading]Battle {self.matchup}")
 
     def _make_renderable(self) -> RenderableType:
         return Group(
@@ -607,7 +617,7 @@ class BattlePanel(Panel):
 
     @battle_data.setter
     def battle_data(self, value: RenderableType) -> None:
-        self._battle_data = Panel(value, title="[green]Battle Data")
+        self._battle_data = Panel(value, title="[heading]Battle Data")
         self.renderable = self._make_renderable()
 
     @property
@@ -634,7 +644,7 @@ class BattlePanel(Panel):
             Column("Max size", justify="right"),
             Column("Score", justify="right"),
             "Detail",
-            title="Most recent fights",
+            title="[heading]Most recent fights",
         )
 
 
@@ -645,7 +655,7 @@ class CliUi(Live, Ui):
 
     def __init__(self) -> None:
         self.battle_panels: dict[Matchup, BattlePanel] = {}
-        super().__init__(None, refresh_per_second=10, transient=True)
+        super().__init__(None, refresh_per_second=10, transient=True, console=console)
 
     def __enter__(self) -> Self:
         return cast(Self, super().__enter__())
@@ -662,7 +672,7 @@ class CliUi(Live, Ui):
             Column("Generating", justify="center"),
             Column("Solving", justify="center"),
             Column("Result", justify="right"),
-            title="[green]Match overview",
+            title="[heading]Match overview",
         )
         for generating, battles in match.results.items():
             for solving, result in battles.items():
@@ -697,7 +707,7 @@ class CliUi(Live, Ui):
         assert isinstance(view, BuildView)
         task = view.teams[team]
         current = view.team_progress._tasks[task].completed
-        view.team_progress.update(task, completed=2, status="" if success else "[red]failed!")
+        view.team_progress.update(task, completed=2, status="" if success else "[error]failed!")
         view.overall_progress.advance(view.overall_task, 2 - current)
 
     @override
@@ -728,9 +738,9 @@ class CliUi(Live, Ui):
         table = panel._fights_table()
         for i, fight in zip(range(len(battle.fights), len(battle.fights) - len(fights), -1), fights):
             if fight.generator.error:
-                info = f"[red]Generator failed[/]: {fight.generator.error.message}"
+                info = f"[error]Generator failed[/]: {fight.generator.error.message}"
             elif fight.solver and fight.solver.error:
-                info = f"[red]Solver failed[/]: {fight.solver.error.message}"
+                info = f"[error]Solver failed[/]: {fight.solver.error.message}"
             else:
                 assert fight.solver is not None
                 info = f"Runtimes: gen {fight.generator.runtime:.1f}s, sol {fight.solver.runtime:.1f}s"
@@ -762,7 +772,7 @@ class CliUi(Live, Ui):
     @override
     def update_battle_data(self, matchup: Matchup, data: Battle.UiData) -> None:
         self.battle_panels[matchup].battle_data = Group(
-            *(f"[orchid]{key}[/]: [cyan]{value}" for key, value in data.model_dump().items())
+            *(f"[orchid]{key}[/]: [info]{value}" for key, value in data.model_dump().items())
         )
 
 
