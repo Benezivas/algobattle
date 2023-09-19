@@ -603,7 +603,14 @@ class BuildView(Group):
         self.teams = {
             team: self.team_progress.add_task(team, start=False, total=2, status="", name=team) for team in teams
         }
-        super().__init__(Padding(self.overall_progress, (0, 0, 1, 0)), self.team_progress)
+        super().__init__(*self._make_renderables())
+
+    def _make_renderables(self) -> list[RenderableType]:
+        return [
+            Padding(self.overall_progress, (0, 0, 1, 0)),
+            self.team_progress,
+        ]
+
 
 
 class FightPanel(Panel):
@@ -683,15 +690,18 @@ class CliUi(Live, Ui):
     match: Match
 
     def __init__(self) -> None:
+        self.build: BuildView | None = None
         self.battle_panels: dict[Matchup, BattlePanel] = {}
         super().__init__(None, refresh_per_second=10, transient=True, console=console)
 
     def __enter__(self) -> Self:
         return cast(Self, super().__enter__())
 
-    def _update_renderable(self, renderable: RenderableType | None = None) -> None:
-        if renderable is None:
+    def _update_renderable(self) -> None:
+        if self.build is None:
             renderable = Group(self.display_match(self.match), *self.battle_panels.values())
+        else:
+            renderable = self.build
         self.update(Panel(renderable, title=f"[orange1]Algobattle {pkg_version('algobattle_base')}"))
 
     @staticmethod
@@ -714,13 +724,13 @@ class CliUi(Live, Ui):
 
     @override
     def start_build_step(self, teams: Iterable[str], timeout: float | None) -> None:
-        self._update_renderable(BuildView(teams))
+        self.build = BuildView(teams)
+        self._update_renderable()
 
     @override
     def start_build(self, team: str, role: Role) -> None:
-        assert isinstance(self.renderable, Panel)
-        view = self.renderable.renderable
-        assert isinstance(view, BuildView)
+        view = self.build
+        assert view is not None
         task = view.teams[team]
         match role:
             case Role.generator:
@@ -731,9 +741,8 @@ class CliUi(Live, Ui):
 
     @override
     def finish_build(self, team: str, success: bool) -> None:
-        assert isinstance(self.renderable, Panel)
-        view = self.renderable.renderable
-        assert isinstance(view, BuildView)
+        view = self.build
+        assert view is not None
         task = view.teams[team]
         current = view.team_progress._tasks[task].completed
         view.team_progress.update(task, completed=2, status="" if success else "[error]failed!")
