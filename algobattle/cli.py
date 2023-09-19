@@ -159,7 +159,7 @@ def run_match(
             if config.project.points > 0:
                 points = result.calculate_points(config.project.points)
                 for team, pts in points.items():
-                    print(f"Team {team} gained {pts:.1f} points.")
+                    print(f"Team {team} scored {pts:.1f} points.")
 
             if save:
                 res_string = result.model_dump_json(exclude_defaults=True)
