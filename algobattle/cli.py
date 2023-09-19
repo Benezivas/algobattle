@@ -610,7 +610,7 @@ class BattlePanel(Group):
 
     def _make_renderable(self) -> list[RenderableType]:
         return [
-            Padding(Rule(title=f"[heading]Battle {self.matchup}"), pad=(1, 0)),
+            Padding(Rule(title=f"[heading]{self.matchup}"), pad=(1, 0)),
             Columns((self._curr_fight, self._battle_data), align="left"),
             self._past_fights,
         ]
