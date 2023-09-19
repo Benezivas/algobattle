@@ -1,167 +1,129 @@
 
 # Running a match
 
-With a ready to use install of everything we need, we can jump right into actually running some matches and see how that
-works.
+## Overview
 
-/// tip
-You can follow along by downloading the [Algobattle Problem](https://github.com/Benezivas/algobattle-problems)
-repository. You can also choose different problems than the ones we'll be discussing here, they all are interchangeable.
-///
+Now that we've got everything we need and have even written some working code we can try running an actual match.
+A _match_ is basically Algobattle's way of determining whose code generates the hardest instances and solves them the
+best. It does this by running everyone's generator against everyone else's solver in what is called a _battle_.
 
-## Selecting a problem
+??? Example
+    Let's say there are three teams Crows, Cats, and Otters. The battles will then look like this
 
-The first step is that we need to tell Algobattle what problem to use. Recall that by _a problem_ we really mean a
-certain type of python class. There's two ways of specifying which one Algobattle should use:
+    | Generating | Solving |
+    |------------|---------|
+    |   crows    |   cats  |
+    |   crows    | otters  |
+    |    cats    |  crows  |
+    |    cats    | otters  |
+    |  otters    |  crows  |
+    |  otters    |   cats  |
 
-1. The path to a file containing it. The path can either be to the file directly, or to the parent folder
-as long as the file is called `problem.py`. The file must uniquely identify a problem class, most commonly this is
-achieved by it only containing a single one, but more complex use cases are possible too.
+!!! tip
+    If there's only one team Algobattle will run a single battle with that team performing both roles. You can use this
+    to easily try out how well your code performs.
 
-2. The name of a problem. For this to work the problem needs to be part of an installed problem package.
+Algobattle also lets course instructors customize what each battle looks like. This is usually done much more rarely
+than changing up the problem, so you won't have to learn much more stuff! Throughout this page we will be using the
+Iterated battle type since it's the default and explains things the best. The idea behind Iterated battles is that we
+want to figure out what the biggest size is where the solving team can still correctly solve the generating team's
+instances. We do this by first having the generator create an instance up to some particular size. Then the solving team
+must solve this instance. If it manages to do so, we repeat this cycle (called a _Fight_) with a bigger maximum instance
+size. At some point the instances will be so big that the solver can't keep up any more and produces a wrong solution.
+The last size where the solving team still was correct becomes that team's score.
 
-/// tab | Path
-<div class="termy">
+!!! info "More details"
+    The process described above is the best way to explain this battle type, but it's not actually precisely how it
+    works. You can find the actual process description in our [battle types](/advanced/battle_types.md) page.
+
+
+## Let's get started
+
+To run a match we just execute
 
 ```console
-algobattle .\algobattle_problems\pairsum
+algobattle run
 ```
 
-</div>
+This will display a lot of info to the command line. We will now go through it all step by step and explain what
+Algobattle is doing and what the interface is trying to tell us.
 
-///
+## Building programs
 
-/// tab | Name
-<div class="termy">
+The First part of a match is building every team's programs. Depending on how complicated they are this may take a
+little while. During this step Algobattle gets all the programs ready for execution, compiles and installs them, etc.
 
-```console
-algobattle Pairsum
+??? question "You can't just skip over what's actually happening!"
+    Yes I can :wink:. The actual details of this are somewhat complicated if you're not familiar with Docker (and if
+    you are, you'll have already figured our what's going on) so we recommend skipping over this for now. We recommend
+    skipping over the details here for now and if you still want to learn more later you can check out the
+    [advanced guide on Docker](/advanced/docker.md#building-images).
+
+During this the interface will look something like this
+
+```{.sh .no-copy}
+{!> interface_build.txt !}
 ```
 
-</div>
-///
+!!! bug "This looks much better with colours"
+    Don't worry if you find this hard to read here, it should be a lot more readable in your terminal with proper
+    alignment and colour rendering.
 
-/// info
-Depending on your exact setup this command may throw an error right now, we'll see why and what to do to fix it in a
-bit.
-///
+This should be fairly straightforward, the top progress bar tracks how many programs need to be built in total and
+below we have a full listing of every participating team. There are two programs here since there is only one team with
+a generator and a solver.
 
-## Building program images
-
-Algobattle needs to not only know what problem to use, but also what teams are participating in the match and where it
-can find their programs. For now, we'll use the default of a single team that fights against itself. This setup is often
-used during development when teams want to test their own code.
-
-When the problem is specified via a path, Algobattle defaults to searching for the programs at the `/generator` and
-`/solver` subfolders of the directory the problem is in. If you provide the name of a program, it will look for those
-folders in the current instead.
-
-/// note
-The problems in the Algobattle Problems repository all have dummy programs at the required paths. If you are using
-different problems you will need to write your own programs before you can run a match.
-
-Since these dummy programs are located in the package folders, you will need to specify the program with a path to it to
-use them.
-///
-
-These folders should contain Dockerfiles that build into the team's programs. The first thing that happens during a
-match is that Algobattle builds the containers. During this the terminal will tell you whose programs are being build,
-how long this is taking, and what the timeout is set to.
-
-## Match execution
+## The match itself
 
 With the programs built, the actual match can start. While this is happening a lot of different things will be
 displayed, so let's go through each of them on its own:
 
-### Battle overview
+### Match overview
 
-```console hl_lines="2-11"
-{!> match_cli.txt!}
+```console hl_lines="3-8"
+{!> interface_match.txt!}
 ```
 
-Right at the top you will see an overview over all battles in this match. Normally this includes every combination of
-one team generating and another team solving, but there are some exceptions. The first is that if there is a single
-participating team (as is the default), then it will instead be paired up against itself. The other is that teams are
-excluded if their Docker containers don't successfully build.
+Right at the top you will see an overview over the whole match. This table lists every battle in the match, its
+participants, and what the result of that match was. For the Iterated battle type the result just is the highest size
+the solving team was able to solve.
 
-The First two rows contain the names of the teams participating in that match, and the third is the score of that
-battle. Note that this is not the same as the points each team gets awarded at the end. Rather, it just represents a
-battle specific measure of how well the solving team performed in it. The final points calculation is explained
-[here](#points-calculation).
-
-### Battle data
-
-```console hl_lines="14-15"
-{!> match_cli.txt!}
-```
-
-Each battle also has its own specific data it will display. In our example, we are using the Iterated battle type which
-runs fights at increasing instance sizes until the solver can no longer solve the generated instances within the time
-limit. This is repeated a few times to be fair to teams that implemented programs with random elements. The `reached`
-field indicates what the maximum size reached in each iteration was, here the first repetition got to 12 and the second
-has currently not executed any fights. The `cap` field is a bit more intricate and explained in detail in the
-[Battle types](battle_types.md) section.
+Everything below this is specific to each battle. It starts off by just showing you who the generating and solving team
+is.
 
 ### Current fight
 
-```console hl_lines="17-19"
-{!> match_cli.txt!}
+```console hl_lines="12-16"
+{!> interface_match.txt!}
 ```
 
-The fight that is currently being executed displays what size it is being fought at and timing data about each program
-execution.
+On the left we have info on the current fight. What maximum size it is using, and basic data on the programs. Here we
+can see that the generator has already run successfully using only half a second of the 20 it has, and the solver is
+still running at the moment.
+
+### Battle data
+
+On the right we see some data specific to the battle type. If you want to learn what the Iterated type displays here,
+check out its documentation in the [battle types page](/advanced/battle_types.md#iterated).
 
 ### Most recent fights
 
-```console hl_lines="21-29"
-{!> match_cli.txt!}
+```console hl_lines="17-26"
+{!> interface_match.txt!}
 ```
 
-Lastly, the three most recent fights have their score displayed.
+At the bottom we can see some more info on the last five fights. The score of a fight indicates how well the solver did,
+with the Pairsum problem it can really only pass or fail, but some other problems judge the solution by e.g. how well it
+approximates an optimal solution. The detail column will display the runtimes of the programs if everything went well,
+or a short error message if some error occurred. Here we can see that all but the second to last fight happened without
+issue, but in that one the solver didn't actually output a solution, and thus failed.
 
-## Points calculation
+## Finishing the match
 
-Once all battles have finished running each team will get some number of points based on how well it performed. By
-default, each team can get up to 100 points in a match. In the case of a three team matchup like we have here this means
-that there are 50 points divided out between each pairing here. How they are divided is determined is based on how well
-a team was able to solve another team's instances compared to how well that other team was able to solve the ones it
-generated. For example, if the battle scores look like this:
+To get the full results you need to wait until the match is done running everything it needs to. But this can take quite
+a while, if you want you can safely cancel it early by pressing ++ctrl+c++.
+Algobattle will handle stopping any running programs and log the (partially) completed match to the file path it prints.
+This file will also contain more detailed error messages that didn't fit on the command line interface for every error
+that happened during the match.
 
-| Generator |  Solver | Result |
-|-----------|---------|--------|
-|    dogs   |   cats  |     24 |
-|    dogs   | otters  |     50 |
-|    cats   |   dogs  |     12 |
-|    cats   | otters  |    700 |
-|  otters   |   dogs  |     50 |
-|  otters   |   cats  |      0 |
-
-Then there are three pairings that are considered:
-
-1. Dogs vs Cats. Here the battle scores are 12 to 24, team cats was able to solve the presented instances twice as well
-as team dogs. So cats receives 33.3 points and dogs 16.6.
-
-2. Cats vs Otters. This matchup is much more decisive at 700 to 0, obviously the otters will get all 50 points and cats
-none. Note that the fact that the total score here was much higher than the ones in the previous matchup is irrelevant,
-battle scores are only compared between two particular teams, not over the whole match.
-
-3. Otters vs Dogs. This matchup again is very simple as both teams performed equally well, so both will receive 25
-points.
-
-In total, dogs win this match with 41.6 points, cats are second with 33.3, and the otters are third with 25.
-
-## Save match results
-
-Algobattle keeps a detailed log of everything that happens during a match, including many things that are not displayed
-to the terminal during execution. This is especially useful during development since it includes error messages of
-programs that failed to run. All you need to do to enable this is passing a path to a folder where you want them to be
-saved when running the match
-
-<div class="termy">
-
-```console
-algobattle .\algobattle_problems\pairsum --result_output=.\algobattle_logs
-```
-
-</div>
-
+Finally, the leaderboard is displayed. Points are allocated by comparing how well each team did against each other team.

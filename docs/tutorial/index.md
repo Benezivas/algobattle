@@ -1,29 +1,27 @@
 # Tutorial
 
 The Algobattle tutorial goes over everything needed to understand how the package works and the most common ways to
-use it. It's aimed at students participating in a course and course instructor that want to learn how to work with the
-package.
+use it. It's aimed at students participating in a course and course instructors that want to learn how to work with the
+framework.
 
 The tutorial pages build on each other and are best read in sequence. It assumes almost no prerequisite knowledge of
 specific topics, but an understanding of basic theoretical computer science ideas like algorithmic problems and of
 the Python language will make things a lot easier.
 
 
-# Student quick start
+## Quick overview
 
-If all you want is the fastest way to get started writing code and running things, this is for you. Every step here
-links to its more detailed explanation in the full tutorial. If you are already familiar with Docker and Python this is
-all you need to do:
+If you're dying to get started coding then the full tutorial might be a bit long for you. Here's all the steps you need
+to get going, each also linking to corresponding part of the in depth tutorial.
 
-1. [Install Python](installation.md#installing-python)
+1. [Install everything we need](installation.md#installing-python)
 
-2. [Install Docker](installation.md#installing-docker)
+2. Download the [problem spec file](getting_started.md#problem-spec-files) your course instructors gave you
 
-3. [Install the Algobattle package](installation.md#installing-algobattle)
+3. [Run `algobattle init --problem path/to/spec.algo --language someLanguage`](getting_started.md#setting-up-the-workspace)
+    with the first parameter being the file you just downloaded and the second being the programming language you
+    want to use
 
-4. Download the Problem your course instructors gave you.
+4. [Write your programs](programs.md#what-it-needs-to-do)
 
-5. Put your code into the `generator` and `solver` subfolders of the problem folder. Each folder needs to contain a
-    Dockerfile that builds into an image which can be executed to either generate problem instances or solve them. We
-    have an example [generator](programs.md#generator) and [solver](programs.md#solver) setup.
-
+5. [Run `algobattle run` and watch your programs battle against each other](match.md)

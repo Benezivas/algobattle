@@ -1,27 +1,29 @@
+"""Main module, will be run as the generator."""
 import json
+from pathlib import Path
 from random import randrange, sample
 
-with open("input/max_size.txt") as file:  # (1)!
-    size = int(file.read())
 
-numbers = [randrange(2**63 - 1) for _ in range(size - 4)]  # (2)!
+max_size = int(Path("/input/max_size.txt").read_text())
 
-a, b = randrange(2**63 - 1), randrange(2**63 - 1)  # (4)!
+
+numbers = [randrange(2**63 - 1) for _ in range(max_size - 4)]  # (1)!
+instance = {
+    "numbers": numbers,
+}
+
+a, b = randrange(2**63 - 1), randrange(2**63 - 1)  # (2)!
 c = randrange(min(a + b, 2**63 - 1))
 d = a + b - c
-solution = [a, b, c, d]
-solution_indices = sorted(sample(range(size), 4))
-for index, number in zip(solution_indices, solution):
+
+indices = sorted(sample(range(max_size), 4))    # (3)!
+for index, number in zip(indices, [a, b, c, d]):
     numbers.insert(index, number)
 
-with open("output/instance.json", "x") as file:  # (3)!
-    instance = {
-        "numbers": numbers,
-    }
-    json.dump(instance, file)
+solution = {
+    "indices": indices,
+}
 
-with open("output/solution.json", "x") as file:  # (5)!
-    solution = {
-        "indices": solution_indices,
-    }
-    json.dump(solution, file)
+
+Path("/output/instance.json").write_text(json.dumps(instance))
+Path("/output/solution.json").write_text(json.dumps(solution))
