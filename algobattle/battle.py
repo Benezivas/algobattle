@@ -469,7 +469,7 @@ class Averaged(Battle):
 
         type: Literal["Averaged"] = "Averaged"
 
-        instance_size: int = 10
+        instance_size: int = 25
         """Instance size that will be fought at."""
         num_fights: int = 10
         """Number of iterations in each round."""
