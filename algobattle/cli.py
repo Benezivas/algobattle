@@ -138,6 +138,7 @@ class CliConfig(BaseModel):
                 "might be better.",
                 default="normal",
                 choices=["normal", "user"],
+                console=console,
             )
             if command_str == "user":
                 cmd.append("--user")
@@ -196,6 +197,7 @@ def _init_program(target: Path, lang: Language, args: PartialTemplateArgs, role:
         replace = Confirm.ask(
             f"[attention]The targeted directory already contains a {role}, do you want to replace it?",
             default=True,
+            console=console,
         )
         if replace:
             rmtree(dir)
@@ -286,6 +288,7 @@ def init(
                     "[attention]The target directory already contains an algobattle project, "
                     "do you want to replace it?",
                     default=True,
+                    console=console,
                 )
             else:
                 copy_problem_data = True
