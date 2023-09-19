@@ -37,6 +37,8 @@ from rich.text import Text
 from rich.columns import Columns
 from rich.prompt import Prompt, Confirm
 from rich.theme import Theme
+from rich.rule import Rule
+from rich.padding import Padding
 from tomlkit import TOMLDocument, parse as parse_toml, dumps as dumps_toml, table
 from tomlkit.exceptions import ParseError
 from tomlkit.items import Table as TomlTable
@@ -595,7 +597,7 @@ class FightPanel(Panel):
         super().__init__(Group(f"Max size: {self.max_size}", self.progress), title="[heading]Current Fight", width=30)
 
 
-class BattlePanel(Panel):
+class BattlePanel(Group):
     """Panel that displays the state of a battle."""
 
     def __init__(self, matchup: Matchup) -> None:
@@ -603,13 +605,14 @@ class BattlePanel(Panel):
         self._battle_data: RenderableType = ""
         self._curr_fight: FightPanel | Literal[""] = ""
         self._past_fights = self._fights_table()
-        super().__init__(self._make_renderable(), title=f"[heading]Battle {self.matchup}")
+        super().__init__(*self._make_renderable())
 
-    def _make_renderable(self) -> RenderableType:
-        return Group(
+    def _make_renderable(self) -> list[RenderableType]:
+        return [
+            Padding(Rule(title=f"[heading]Battle {self.matchup}"), pad=(1, 0)),
             Columns((self._curr_fight, self._battle_data), align="left"),
             self._past_fights,
-        )
+        ]
 
     @property
     def battle_data(self) -> RenderableType:
@@ -618,7 +621,7 @@ class BattlePanel(Panel):
     @battle_data.setter
     def battle_data(self, value: RenderableType) -> None:
         self._battle_data = Panel(value, title="[heading]Battle Data")
-        self.renderable = self._make_renderable()
+        self._render = list(self._make_renderable())
 
     @property
     def curr_fight(self) -> FightPanel | Literal[""]:
@@ -627,7 +630,7 @@ class BattlePanel(Panel):
     @curr_fight.setter
     def curr_fight(self, value: FightPanel | Literal[""]) -> None:
         self._curr_fight = value
-        self.renderable = self._make_renderable()
+        self._render = self._make_renderable()
 
     @property
     def past_fights(self) -> Table:
@@ -636,7 +639,7 @@ class BattlePanel(Panel):
     @past_fights.setter
     def past_fights(self, value: Table) -> None:
         self._past_fights = value
-        self.renderable = self._make_renderable()
+        self._render = self._make_renderable()
 
     def _fights_table(self) -> Table:
         return Table(
