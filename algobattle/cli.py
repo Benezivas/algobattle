@@ -582,7 +582,7 @@ class FightPanel(Panel):
         )
         self.generator = self.progress.add_task("Generator", start=False, total=1, message="")
         self.solver = self.progress.add_task("Solver", start=False, total=1, message="")
-        super().__init__(self.progress, title="[green]Current Fight", width=30)
+        super().__init__(Group(f"Max size: {self.max_size}", self.progress), title="[green]Current Fight", width=30)
 
 
 class BattlePanel(Panel):
@@ -662,7 +662,7 @@ class CliUi(Live, Ui):
             Column("Generating", justify="center"),
             Column("Solving", justify="center"),
             Column("Result", justify="right"),
-            title="[blue]Match overview",
+            title="[green]Match overview",
         )
         for generating, battles in match.results.items():
             for solving, result in battles.items():
