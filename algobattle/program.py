@@ -581,9 +581,9 @@ class Generator(Program):
                 solution=solution,
             )
 
-    def test(self) -> Instance | ExceptionInfo:
+    def test(self, max_size: int | None = None) -> Instance | ExceptionInfo:
         """Tests whether the generator runs without issues and creates a syntactically valid instance."""
-        res = run_async(self.run, self.problem.min_size)
+        res = run_async(self.run, max_size or self.problem.min_size)
         if res.info.error:
             return res.info.error
         else:

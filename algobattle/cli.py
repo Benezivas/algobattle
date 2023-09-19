@@ -389,6 +389,7 @@ class TestErrors(BaseModel):
 @app.command()
 def test(
     project: Annotated[Path, Argument(help="The project folder to use.")] = Path(),
+    size: Annotated[Optional[int], Option(help="The size of instance the generator will be asked to create.")] = None,
 ) -> None:
     """Tests whether the programs install successfully and run on dummy instances without crashing."""
     if not (project.is_file() or project.joinpath("algobattle.toml").is_file()):
@@ -413,7 +414,7 @@ def test(
             with run_async_fn(gen_builder) as gen:
                 console.print("[success]Generator built successfully")
                 with console.status("Running generator"):
-                    instance = gen.test()
+                    instance = gen.test(size)
                 if isinstance(instance, ExceptionInfo):
                     console.print("[error]Generator didn't run successfully")
                     errors.generator_run = instance

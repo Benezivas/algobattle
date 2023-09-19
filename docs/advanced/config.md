@@ -255,6 +255,9 @@ This runs a basic test checking whether the programs in a project build and run 
 : Path to the Algobattle project to test. Can either point directly to a project config file, or to a folder containing
 one called `algobattle.toml`. Defaults to the current working directory.
 
+`--size`
+: Will be passed to the generator as it's `max_size`. Defaults to the problem's minimum size.
+
 ### config
 
 Opens the CLI config file. Accepts no arguments.1
