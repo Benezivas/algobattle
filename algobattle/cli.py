@@ -182,7 +182,7 @@ def run_match(
 
             if save:
                 res_string = result.model_dump_json(exclude_defaults=True)
-                out_path = config.project.results.joinpath(f"{timestamp()}.json")
+                out_path = config.project.results.joinpath(f"match-{timestamp()}.json")
                 out_path.write_text(res_string)
                 console.print("Saved match result to ", out_path)
             return result
@@ -457,7 +457,7 @@ def test(
             all_errors[team] = errors.model_dump(exclude_defaults=True)
 
     if all_errors:
-        err_path = config.project.results.joinpath(f"{timestamp()}.json")
+        err_path = config.project.results.joinpath(f"test-{timestamp()}.json")
         err_path.write_text(json.dumps(all_errors, indent=4))
         console.print(f"You can find detailed error messages at {err_path}")
 
