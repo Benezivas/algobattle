@@ -419,10 +419,11 @@ class Iterated(Battle):
             base_increment = 0
             alive = True
             reached = 0
+            self.results.append(0)
             cap = config.maximum_size
             current = min_size
             while alive:
-                ui.update_battle_data(self.UiData(reached=self.results + [reached], cap=cap))
+                ui.update_battle_data(self.UiData(reached=self.results, cap=cap))
                 result = await fight.run(current)
                 score = result.score
                 if score < config.minimum_score:
@@ -436,7 +437,7 @@ class Iterated(Battle):
                     alive = True
                 elif current > reached and alive:
                     # We solved an instance of bigger size than before
-                    reached = current
+                    self.results[-1] = reached = current
 
                 if current + 1 > cap:
                     alive = False
@@ -448,7 +449,7 @@ class Iterated(Battle):
                         # We have failed at this value of n already, reset the step size!
                         current -= base_increment**config.exponent - 1
                         base_increment = 1
-            self.results.append(reached)
+            self.results[-1] = reached
 
     def score(self) -> float:
         """Averages the highest instance size reached in each round."""
