@@ -16,7 +16,7 @@ a, b = randrange(2**63 - 1), randrange(2**63 - 1)  # (2)!
 c = randrange(min(a + b, 2**63 - 1))
 d = a + b - c
 
-indices = sorted(sample(range(max_size), 4))    # (3)!
+indices = sorted(sample(range(max_size), 4))  # (3)!
 for index, number in zip(indices, [a, b, c, d]):
     numbers.insert(index, number)
 

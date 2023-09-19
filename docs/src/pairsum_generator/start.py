@@ -8,7 +8,7 @@ max_size = int(Path("/input/max_size.txt").read_text())
 
 numbers = [randrange(2**63 - 1) for _ in range(max_size)]  # (1)!
 instance = {
-    "numbers": numbers, # (2)!
+    "numbers": numbers,  # (2)!
 }
 solution = ...
 
