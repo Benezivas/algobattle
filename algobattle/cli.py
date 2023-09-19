@@ -87,7 +87,7 @@ class _General(BaseModel):
 
 class CliConfig(BaseModel):
     general: _General = Field(default_factory=dict, validate_default=True)
-    default_project_config: ProjectConfig | None = Field(default=None)
+    default_project_table: ProjectConfig | None = Field(default=None)
 
     _doc: TOMLDocument
     path: ClassVar[Path] = Path(get_app_dir("algobattle")) / "config.toml"
@@ -103,6 +103,8 @@ class CliConfig(BaseModel):
                 .add(comment("# The Algobattle cli configuration"))
                 .add(toml_newline())
                 .append("general", general)
+                .add(toml_newline())
+                .append("default_project_table", table().append("results", "results"))
                 .add(toml_newline())
             )
             cls.path.write_text(dumps_toml(doc))
@@ -123,7 +125,7 @@ class CliConfig(BaseModel):
     @property
     def default_project_doc(self) -> TomlTable | None:
         """The default exec config for each problem."""
-        exec: Any = self._doc.get("default_project_config", table().append("results", "results"))
+        exec: Any = self._doc.get("default_project_table", None)
         return exec
 
     @cached_property
