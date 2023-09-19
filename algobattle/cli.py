@@ -5,6 +5,7 @@ Provides a command line interface to start matches and observe them. See `battle
 from enum import StrEnum
 from functools import cached_property
 import json
+import operator
 from os import environ
 from pathlib import Path
 from random import choice
@@ -154,12 +155,16 @@ def run_match(
         console.print("[error]Stopping match execution")
     finally:
         try:
-            if any(r for r in result.results.values()):
-                console.print(CliUi.display_match(result))
             if config.project.points > 0:
                 points = result.calculate_points(config.project.points)
-                for team, pts in points.items():
-                    print(f"Team {team} scored {pts:.1f} points.")
+                leaderboard = Table(
+                    Column("Team", justify="center"),
+                    Column("Points", justify="right"),
+                    title="[heading]Leaderboard",
+                )
+                for team, pts in sorted(points.items(), key=operator.itemgetter(1)):
+                    leaderboard.add_row(team, f"{pts:.1f}")
+                console.print(Padding(leaderboard, (1, 0, 0, 0)))
 
             if save:
                 res_string = result.model_dump_json(exclude_defaults=True)
