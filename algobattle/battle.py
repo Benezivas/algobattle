@@ -14,7 +14,6 @@ from typing import (
     Callable,
     ClassVar,
     Concatenate,
-    Hashable,
     Literal,
     ParamSpec,
     Protocol,
@@ -24,11 +23,10 @@ from typing import (
 )
 
 from pydantic import Field, GetCoreSchemaHandler
-from pydantic.main import BaseModel as PydanticBase
 from pydantic_core import CoreSchema
 from pydantic_core.core_schema import tagged_union_schema
 
-from algobattle.docker_util import (
+from algobattle.program import (
     Generator,
     ProgramRunInfo,
     ProgramUi,
@@ -229,13 +227,13 @@ class Battle(BaseModel):
         :meth:`Battle.run` method with its fields set accordingly.
         """
 
-        type: str = "Iterated"
+        type: str
         """Type of battle that will be used."""
 
         @classmethod
-        def __get_pydantic_core_schema__(cls, source: Type[PydanticBase], handler: GetCoreSchemaHandler) -> CoreSchema:
+        def __get_pydantic_core_schema__(cls, source: Type, handler: GetCoreSchemaHandler) -> CoreSchema:
             # there's two bugs we need to catch:
-            # 1. this function is called during the pydantic BaseModel metaclass's __new__, so the Battle class
+            # 1. this function is called during the pydantic BaseModel metaclass's __new__, so the BattleConfig class
             # won't be ready at that point and be missing in the namespace
             # 2. pydantic uses the core schema to build child classes core schema. for them we want to behave like a
             # normal model, only our own schema gets modified
@@ -244,17 +242,19 @@ class Battle(BaseModel):
                     return handler(source)
             except NameError:
                 return handler(source)
-            battle_classes = Battle.all()
-            match len(battle_classes):
+            match len(Battle._battle_types):
                 case 0:
                     return handler(source)
                 case 1:
-                    return handler(next(iter(battle_classes.values())).Config)
+                    return handler(next(iter(Battle._battle_types.values())))
                 case _:
-                    choices: dict[Hashable, CoreSchema] = {
-                        name: handler(sublass.Config) for name, sublass in battle_classes.items()
-                    }
-                    return tagged_union_schema(choices=choices, discriminator="type")
+                    return tagged_union_schema(
+                        choices={
+                            battle.Config.model_fields["type"].default: battle.Config.__pydantic_core_schema__
+                            for battle in Battle._battle_types.values()
+                        },
+                        discriminator="type",
+                    )
 
     class UiData(BaseModel):
         """Object containing custom diplay data.

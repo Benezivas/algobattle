@@ -17,10 +17,10 @@ from anyio import create_task_group, run, sleep
 from anyio.abc import TaskGroup
 
 from algobattle.battle import Battle, Fight
-from algobattle.match import BaseConfig, Match, Ui
+from algobattle.match import Match, Ui, AlgobattleConfig
 from algobattle.problem import AnyProblem, Problem
-from algobattle.team import Matchup
 from algobattle.util import Role, RunningTimer, flat_intersperse
+from algobattle.program import Matchup
 
 
 @dataclass
@@ -32,7 +32,7 @@ class CliOptions:
     result: Path | None = None
 
 
-def parse_cli_args(args: list[str]) -> tuple[CliOptions, BaseConfig]:
+def parse_cli_args(args: list[str]) -> tuple[CliOptions, AlgobattleConfig]:
     """Parse a given CLI arg list into config objects."""
     parser = ArgumentParser()
     parser.add_argument(
@@ -52,8 +52,8 @@ def parse_cli_args(args: list[str]) -> tuple[CliOptions, BaseConfig]:
     if path.is_dir():
         path /= "config.toml"
 
-    config = BaseConfig.from_file(path)
-    problem = Problem.get(config.match.problem)
+    config = AlgobattleConfig.from_file(path)
+    problem = Problem.load(config.match.problem)
 
     exec_config = CliOptions(
         problem=problem,
@@ -65,7 +65,7 @@ def parse_cli_args(args: list[str]) -> tuple[CliOptions, BaseConfig]:
 
 
 async def _run_with_ui(
-    match_config: BaseConfig,
+    match_config: AlgobattleConfig,
     problem: AnyProblem,
 ) -> Match:
     async with CliUi() as ui:

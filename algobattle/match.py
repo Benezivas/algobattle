@@ -1,23 +1,28 @@
 """Module defining how a match is run."""
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
+from functools import cached_property
 from itertools import combinations
 from pathlib import Path
 import tomllib
-from typing import Annotated, Self, cast, overload
+from typing import Annotated, Any, ClassVar, Self, TypeAlias, TypeVar, cast, overload
+from typing_extensions import TypedDict
 
-from pydantic import Field
+from pydantic import AfterValidator, ByteSize, ConfigDict, Field, GetCoreSchemaHandler, ValidationInfo, model_validator
+from pydantic.types import PathType
+from pydantic_core import CoreSchema
+from pydantic_core.core_schema import no_info_after_validator_function, union_schema
 from anyio import create_task_group, CapacityLimiter
 from anyio.to_thread import current_default_thread_limiter
+from docker.types import LogConfig, Ulimit
 
-from algobattle.battle import Battle, FightHandler, FightUi, BattleUi
-from algobattle.docker_util import DockerConfig, ProgramUi
-from algobattle.team import BuildUi, Matchup, Team, TeamHandler, TeamInfos
-from algobattle.problem import InstanceT, MatchConfig, Problem, SolutionT
+from algobattle.battle import Battle, FightHandler, FightUi, BattleUi, Iterated
+from algobattle.program import ProgramConfigView, ProgramUi, BuildUi, Matchup, Team, TeamHandler
+from algobattle.problem import InstanceT, Problem, ProblemName, SolutionT
 from algobattle.util import (
     ExceptionInfo,
-    ExecutionConfig,
+    MatchMode,
     Role,
     RunningTimer,
     BaseModel,
@@ -25,32 +30,7 @@ from algobattle.util import (
 )
 
 
-class BaseConfig(BaseModel):
-    """Base that contains all config options and can be parsed from config files."""
-
-    # funky defaults to force their validation with context info present
-    teams: TeamInfos = Field(default={"team_0": {"generator": Path("generator"), "solver": Path("solver")}})
-    execution: ExecutionConfig = Field(default_factory=dict, validate_default=True)
-    match: MatchConfig = Field(default_factory=dict, validate_default=True)
-    battle: Battle.Config = Field(default={"type": "Iterated"}, validate_default=True)
-    docker: DockerConfig = Field(default_factory=dict, validate_default=True)
-
-    @classmethod
-    def from_file(cls, file: Path) -> Self:
-        """Parses a config object from a toml file.
-
-        If the file doesn't exist it returns a default instance instead of raising an error.
-        """
-        if not file.is_file():
-            config_dict = {}
-        else:
-            with open(file, "rb") as f:
-                try:
-                    config_dict = tomllib.load(f)
-                except tomllib.TOMLDecodeError as e:
-                    raise ValueError(f"The config file at {file} is not a properly formatted TOML file!\n{e}")
-        Battle.load_entrypoints()
-        return cls.model_validate(config_dict, context={"base_path": file.parent})
+Type = type
 
 
 class Match(BaseModel):
@@ -66,7 +46,7 @@ class Match(BaseModel):
         self,
         battle: Battle,
         matchup: Matchup,
-        config: BaseConfig,
+        config: "AlgobattleConfig",
         problem: Problem[InstanceT, SolutionT],
         cpus: list[str | None],
         ui: "Ui",
@@ -99,7 +79,7 @@ class Match(BaseModel):
     @classmethod
     async def run(
         cls,
-        config: BaseConfig,
+        config: "AlgobattleConfig",
         problem: Problem[InstanceT, SolutionT],
         ui: "Ui | None" = None,
     ) -> Self:
@@ -118,9 +98,7 @@ class Match(BaseModel):
         if ui is None:
             ui = Ui()
 
-        with await TeamHandler.build(
-            config.teams, problem, config.execution.mode, config.match, config.docker, ui
-        ) as teams:
+        with await TeamHandler.build(config.teams, problem, config.as_prog_config(), ui) as teams:
             result = cls(
                 active_teams=[t.name for t in teams.active],
                 excluded_teams=teams.excluded,
@@ -317,3 +295,350 @@ class BattleObserver(BattleUi, FightUi, ProgramUi):
 
     def stop_program(self, role: Role, runtime: float) -> None:  # noqa: D102
         self.ui.end_program(self.matchup, role, runtime)
+
+
+################################################################################
+#   Config stuff
+################################################################################
+
+
+class TimeFloat:
+    """A float specifying a number of seconds.
+
+    Can be parsed from pydantic either as a number of seconds or a timedelta specifier.
+    """
+
+    @classmethod
+    def __get_pydantic_core_schema__(cls, source: type, handler: GetCoreSchemaHandler) -> CoreSchema:
+        def convert(val: float | timedelta) -> float:
+            return val.total_seconds() if isinstance(val, timedelta) else val
+
+        return no_info_after_validator_function(convert, union_schema([handler(float), handler(timedelta)]))
+
+
+def parse_none(value: Any) -> Any | None:
+    """Used as a validator to parse false-y values into Python None objects."""
+    return None if not value else value
+
+
+T = TypeVar("T")
+TimeDeltaFloat = Annotated[float, TimeFloat]
+ByteSizeInt = Annotated[int, ByteSize]
+WithNone = Annotated[T | None, AfterValidator(parse_none)]
+
+
+def _relativize_path(path: Path, info: ValidationInfo) -> Path:
+    """If the passed path is relative to the current directory it gets relativized to the `base_path` instead."""
+    if info.context and isinstance(info.context["base_path"], Path) and not path.is_absolute():
+        return info.context["base_path"] / path
+    return path
+
+
+def _relativize_file(path: Path, info: ValidationInfo) -> Path:
+    path = _relativize_path(path, info)
+    return PathType.validate_file(path, info)
+
+
+RelativePath = Annotated[Path, AfterValidator(_relativize_path), Field(validate_default=True)]
+RelativeFilePath = Annotated[Path, AfterValidator(_relativize_file), Field(validate_default=True)]
+
+
+class _Adapter:
+    """Turns a docker library config class into a pydantic parseable one."""
+
+    _Args: ClassVar[type[TypedDict]]
+
+    @classmethod
+    def _construct(cls, kwargs: dict[str, Any]) -> Self:
+        return cls(**kwargs)
+
+    @classmethod
+    def __get_pydantic_core_schema__(cls, source: type, handler: GetCoreSchemaHandler) -> CoreSchema:
+        return no_info_after_validator_function(cls._construct, handler(cls._Args))
+
+
+class PydanticLogConfig(LogConfig, _Adapter):  # noqa: D101
+    class _Args(TypedDict):
+        type: str
+        conifg: dict[Any, Any]
+
+
+class PydanticUlimit(Ulimit, _Adapter):  # noqa: D101
+    class _Args(TypedDict):
+        name: str
+        soft: int
+        hard: int
+
+
+class AdvancedRunArgs(BaseModel):
+    """Advanced docker run options.
+
+    Contains all options exposed on the python docker run api, except `device_requests`
+    and those set by :meth:`Image.run` itself.
+    """
+
+    class _BlockIOWeight(TypedDict):
+        Path: str
+        Weight: int
+
+    class _DeviceRate(TypedDict):
+        Path: str
+        Rate: int
+
+    class _HealthCheck(TypedDict):
+        test: list[str] | str
+        interval: int
+        timeout: int
+        retries: int
+        start_period: int
+
+    # defaults set by us
+    network_mode: str = "none"
+
+    # actual docker defaults
+    command: str | list[str] | None = None
+    auto_remove: bool | None = None
+    blkio_weight_device: list[_BlockIOWeight] | None = None
+    blkio_weight: int | None = Field(default=None, ge=10, le=1000)
+    cap_add: list[str] | None = None
+    cap_drop: list[str] | None = None
+    cgroup_parent: str | None = None
+    cgroupns: str | None = None
+    cpu_count: int | None = None
+    cpu_percent: int | None = None
+    cpu_period: int | None = None
+    cpu_quota: int | None = None
+    cpu_rt_period: int | None = None
+    cpu_rt_runtime: int | None = None
+    cpu_shares: int | None = None
+    cpuset_mems: str | None = None
+    device_cgroup_rules: list[str] | None = None
+    device_read_bps: list[_DeviceRate] | None = None
+    device_read_iops: list[_DeviceRate] | None = None
+    device_write_bps: list[_DeviceRate] | None = None
+    device_write_iops: list[_DeviceRate] | None = None
+    devices: list[str] | None = None
+    dns: list[str] | None = None
+    dns_opt: list[str] | None = None
+    dns_search: list[str] | None = None
+    domainname: str | list[str] | None = None
+    entrypoint: str | list[str] | None = None
+    environment: dict[str, str] | list[str] | None = None
+    extra_hosts: dict[str, str] | None = None
+    group_add: list[str] | None = None
+    healthcheck: _HealthCheck | None = None
+    hostname: str | None = None
+    init: bool | None = None
+    init_path: str | None = None
+    ipc_mode: str | None = None
+    isolation: str | None = None
+    kernel_memory: int | str | None = None
+    labels: dict[str, str] | list[str] | None = None
+    links: dict[str, str] | None = None
+    log_config: PydanticLogConfig | None = None
+    lxc_conf: dict[Any, Any] | None = None
+    mac_address: str | None = None
+    mem_limit: int | str | None = None
+    mem_reservation: int | str | None = None
+    mem_swappiness: int | None = None
+    memswap_limit: str | int | None = None
+    network: str | None = None
+    network_disabled: bool | None = None
+    oom_kill_disable: bool | None = None
+    oom_score_adj: int | None = None
+    pid_mode: str | None = None
+    pids_limit: int | None = None
+    platform: str | None = None
+    ports: dict[Any, Any] | None = None
+    privileged: bool | None = None
+    publish_all_ports: bool | None = None
+    read_only: bool | None = None
+    restart_policy: dict[Any, Any] | None = None
+    runtime: str | None = None
+    security_opt: list[str] | None = None
+    shm_size: str | int | None = None
+    stdin_open: bool | None = None
+    stdout: bool | None = None
+    stderr: bool | None = None
+    stop_signal: str | None = None
+    storage_opt: dict[Any, Any] | None = None
+    stream: bool | None = None
+    sysctls: dict[Any, Any] | None = None
+    tmpfs: dict[Any, Any] | None = None
+    tty: bool | None = None
+    ulimits: list[PydanticUlimit] | None = None
+    use_config_proxy: bool | None = None
+    user: str | int | None = None
+    userns_mode: str | None = None
+    uts_mode: str | None = None
+    version: str | None = None
+    volume_driver: str | None = None
+    volumes: dict[Any, Any] | list[Any] | None = None
+    volumes_from: list[Any] | None = None
+    working_dir: str | None = None
+
+    @cached_property
+    def kwargs(self) -> dict[str, Any]:
+        """Transforms the object into :meth:`client.containers.run` kwargs."""
+        return self.model_dump(exclude_none=True)
+
+
+class AdvancedBuildArgs(BaseModel):
+    """Advanced docker build options.
+
+    Contains all options exposed on the python docker build api, except those set by :meth:`Image.build` itself.
+    """
+
+    class _ContainerLimits(TypedDict):
+        memory: int
+        memswap: int
+        cpushares: int
+        cpusetcpus: str
+
+    # defaults set by us
+    rm: bool = True
+    forcerm: bool = True
+    quiet: bool = True
+    network_mode: str = "host"
+    pull: bool | None = True
+
+    # actual Docker defaults
+    nocache: bool | None = None
+    encoding: str | None = None
+    buildargs: dict[Any, Any] | None = None
+    container_limits: _ContainerLimits | None = None
+    shmsize: int | None = None
+    labels: dict[Any, Any] | None = None
+    cache_from: list[Any] | None = None
+    target: str | None = None
+    squash: bool | None = None
+    extra_hosts: dict[Any, Any] | None = None
+    platform: str | None = None
+    isolation: str | None = None
+    use_config_proxy: bool | None = None
+
+    @cached_property
+    def kwargs(self) -> dict[str, Any]:
+        """Transforms the object into :meth:`client.images.build` kwargs."""
+        return self.model_dump(exclude_none=True)
+
+
+class DockerConfig(BaseModel):
+    """Settings passed directly to the docker daemon."""
+
+    build: AdvancedBuildArgs = AdvancedBuildArgs()
+    run: AdvancedRunArgs = AdvancedRunArgs()
+
+
+class RunConfig(BaseModel):
+    """Parameters determining how a program is run."""
+
+    timeout: WithNone[TimeDeltaFloat] = 30
+    """Timeout in seconds, or `false` for no timeout."""
+    space: WithNone[ByteSizeInt] = None
+    """Maximum memory space available, or `false` for no limitation.
+
+    Can be either an plain number of bytes like `30000` or a string including
+    a unit like `30 kB`.
+    """
+    cpus: int = 1
+    """Number of cpu cores available."""
+
+
+class MatchConfig(BaseModel):
+    """Parameters determining the match execution.
+
+    It will be parsed from the given config file and contains all settings that specify how the match is run.
+    """
+
+    problem: ProblemName | RelativeFilePath = Field(default=Path("problem.py"), validate_default=True)
+    """The problem this match is over.
+
+    Either the name of an installed problem, or the path to a problem file
+    """
+    build_timeout: WithNone[TimeDeltaFloat] = 600
+    """Timeout for building each docker image."""
+    image_size: WithNone[ByteSizeInt] = None
+    """Maximum size a built program image is allowed to be."""
+    strict_timeouts: bool = False
+    """Whether to raise an error if a program runs into the timeout."""
+    generator: RunConfig = RunConfig()
+    solver: RunConfig = RunConfig()
+
+    model_config = ConfigDict(revalidate_instances="always")
+
+
+class ExecutionConfig(BaseModel):
+    """Settings that only determine how a match is run, not its result."""
+
+    parallel_battles: int = 1
+    """Number of battles exectuted in parallel."""
+    mode: MatchMode = "testing"
+    """Mode of the match."""
+    set_cpus: str | list[str] | None = None
+    """Wich cpus to run programs on, if a list is specified each battle will use a different cpu specification in it."""
+    points: int = 100
+    """Highest number of points each team can achieve."""
+
+    @model_validator(mode="after")
+    def val_set_cpus(self) -> Self:
+        """Validates that each battle that is being executed is assigned some cpu cores."""
+        if isinstance(self.set_cpus, list) and self.parallel_battles > len(self.set_cpus):
+            raise ValueError("Number of parallel battles exceeds the number of set_cpu specifier strings.")
+        else:
+            return self
+
+
+class TeamInfo(BaseModel):
+    """The config parameters defining a team."""
+
+    generator: RelativePath
+    solver: RelativePath
+
+
+TeamInfos: TypeAlias = dict[str, TeamInfo]
+
+
+class AlgobattleConfig(BaseModel):
+    """Base that contains all config options and can be parsed from config files."""
+
+    # funky defaults to force their validation with context info present
+    teams: TeamInfos = Field(
+        default={"team_0": {"generator": Path("generator"), "solver": Path("solver")}}, validate_default=True
+    )
+    execution: ExecutionConfig = Field(default_factory=dict, validate_default=True)
+    match: MatchConfig = Field(default_factory=dict, validate_default=True)
+    battle: Battle.Config = Iterated.Config()
+    docker: DockerConfig = DockerConfig()
+
+    model_config = ConfigDict(revalidate_instances="always")
+
+    @classmethod
+    def from_file(cls, file: Path) -> Self:
+        """Parses a config object from a toml file.
+
+        If the file doesn't exist it returns a default instance instead of raising an error.
+        """
+        Battle.load_entrypoints()
+        if not file.is_file():
+            config_dict = {}
+        else:
+            with open(file, "rb") as f:
+                try:
+                    config_dict = tomllib.load(f)
+                except tomllib.TOMLDecodeError as e:
+                    raise ValueError(f"The config file at {file} is not a properly formatted TOML file!\n{e}")
+        return cls.model_validate(config_dict, context={"base_path": file.parent})
+
+    def as_prog_config(self) -> ProgramConfigView:
+        """Builds a simple object containing all program relevant settings."""
+        return ProgramConfigView(
+            build_timeout=self.match.build_timeout,
+            max_image_size=self.match.image_size,
+            strict_timeouts=self.match.strict_timeouts,
+            build_kwargs=self.docker.build.kwargs,
+            run_kwargs=self.docker.run.kwargs,
+            generator=self.match.generator,
+            solver=self.match.solver,
+            mode=self.execution.mode,
+        )
