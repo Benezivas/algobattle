@@ -219,7 +219,7 @@ class Parsing(TestCase):
         cls.teams = {"team_0": TeamInfo(generator=cls.problem_path / "generator", solver=cls.problem_path / "solver")}
 
     def test_no_cfg_default(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(FileNotFoundError):
             AlgobattleConfig.from_file(self.problem_path)
 
     def test_empty_cfg(self):
