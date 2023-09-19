@@ -603,7 +603,7 @@ class BuildView(Group):
         self.teams = {
             team: self.team_progress.add_task(team, start=False, total=2, status="", name=team) for team in teams
         }
-        super().__init__(self.overall_progress, self.team_progress)
+        super().__init__(Padding(self.overall_progress, (0, 0, 1, 0)), self.team_progress)
 
 
 class FightPanel(Panel):
