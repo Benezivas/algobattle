@@ -151,10 +151,11 @@ def run_match(
         with CliUi() if ui else EmptyUi() as ui_obj:
             run_async_fn(result.run, config, ui_obj)
     except KeyboardInterrupt:
-        console.print("Received keyboard interrupt, terminating execution.")
+        console.print("[error]Stopping match execution")
     finally:
         try:
-            console.print(CliUi.display_match(result))
+            if any(r for r in result.results.values()):
+                console.print(CliUi.display_match(result))
             if config.project.points > 0:
                 points = result.calculate_points(config.project.points)
                 for team, pts in points.items():
@@ -165,7 +166,7 @@ def run_match(
                 config.project.results.joinpath(f"{timestamp()}.json").write_text(res_string)
             return result
         except KeyboardInterrupt:
-            raise Exit
+            raise Abort
 
 
 def _init_program(target: Path, lang: Language, args: PartialTemplateArgs, role: Role) -> None:
@@ -684,7 +685,7 @@ class CliUi(Live, Ui):
                 else:
                     res = ":warning:"
                 table.add_row(generating, solving, res)
-        return table
+        return Padding(table, pad=(1, 0, 0, 0))
 
     @override
     def start_build_step(self, teams: Iterable[str], timeout: float | None) -> None:
