@@ -15,12 +15,17 @@ class ProgramTests(IsolatedAsyncioTestCase):
     def setUpClass(cls) -> None:
         """Set up the config and problem objects."""
         cls.problem_path = Path(testsproblem.__file__).parent
-        cls.config = AlgobattleConfig().as_prog_config()
+        cls.config = AlgobattleConfig(match=MatchConfig(problem="Test Problem")).as_prog_config()
         cls.config_short = AlgobattleConfig(
-            match=MatchConfig(generator=RunConfig(timeout=2), solver=RunConfig(timeout=2))
+            match=MatchConfig(problem="Test Problem", generator=RunConfig(timeout=2), solver=RunConfig(timeout=2))
         ).as_prog_config()
         cls.config_strict = AlgobattleConfig(
-            match=MatchConfig(generator=RunConfig(timeout=2), solver=RunConfig(timeout=2), strict_timeouts=True)
+            match=MatchConfig(
+                problem="Test Problem",
+                generator=RunConfig(timeout=2),
+                solver=RunConfig(timeout=2),
+                strict_timeouts=True,
+            )
         ).as_prog_config()
         cls.instance = TestInstance(semantics=True)
 
@@ -82,9 +87,7 @@ class ProgramTests(IsolatedAsyncioTestCase):
     async def test_sol_strict_timeout(self):
         """The solver times out."""
         with await Solver.build(
-            path=self.problem_path / "solver_timeout",
-            problem=TestProblem,
-            config=self.config_strict
+            path=self.problem_path / "solver_timeout", problem=TestProblem, config=self.config_strict
         ) as sol:
             res = await sol.run(self.instance, 5)
             assert res.info.error is not None
