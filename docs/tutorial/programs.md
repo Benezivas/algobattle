@@ -89,6 +89,10 @@ algobattle init --generator python
     the initially auto-generated file we made when we set up the project folder, so we can safely replace it with the
     python template.
 
+!!! tip "No need to repeat yourself"
+    You can directly specify the languages you want to use when unpacking the problem spec file. We're only doing it in
+    several steps here to explain every part on its own.
+
 Our project folder should now look something like this
 
 ``` { .sh .no-copy }
