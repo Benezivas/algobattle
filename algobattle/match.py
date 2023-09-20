@@ -6,10 +6,20 @@ from functools import cached_property
 from itertools import combinations
 from pathlib import Path
 import tomllib
-from typing import Annotated, Any, ClassVar, Self, TypeAlias, TypeVar, cast, overload
+from typing import Annotated, Any, Iterable, Protocol, ClassVar, Self, TypeAlias, TypeVar, cast, overload
+from typing_extensions import override
 from typing_extensions import TypedDict
 
-from pydantic import AfterValidator, ByteSize, ConfigDict, Field, GetCoreSchemaHandler, ValidationInfo, model_validator
+from pydantic import (
+    AfterValidator,
+    ByteSize,
+    ConfigDict,
+    Field,
+    GetCoreSchemaHandler,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
 from pydantic.types import PathType
 from pydantic_core import CoreSchema
 from pydantic_core.core_schema import no_info_after_validator_function, union_schema
@@ -18,11 +28,10 @@ from anyio.to_thread import current_default_thread_limiter
 from docker.types import LogConfig, Ulimit
 
 from algobattle.battle import Battle, FightHandler, FightUi, BattleUi, Iterated
-from algobattle.program import ProgramConfigView, ProgramUi, BuildUi, Matchup, Team, TeamHandler
-from algobattle.problem import InstanceT, Problem, ProblemName, SolutionT
+from algobattle.program import ProgramConfigView, ProgramUi, Matchup, TeamHandler, Team, BuildUi
+from algobattle.problem import InstanceT, Problem, SolutionT
 from algobattle.util import (
     ExceptionInfo,
-    MatchMode,
     Role,
     RunningTimer,
     BaseModel,
@@ -30,14 +39,11 @@ from algobattle.util import (
 )
 
 
-Type = type
-
-
 class Match(BaseModel):
     """The Result of a whole Match."""
 
-    active_teams: list[str]
-    excluded_teams: dict[str, ExceptionInfo]
+    active_teams: list[str] = field(default_factory=list)
+    excluded_teams: dict[str, ExceptionInfo] = field(default_factory=dict)
     results: defaultdict[str, Annotated[dict[str, Battle], Field(default_factory=dict)]] = Field(
         default_factory=lambda: defaultdict(dict)
     )
@@ -67,7 +73,7 @@ class Match(BaseModel):
             try:
                 await battle.run_battle(
                     handler,
-                    config.battle,
+                    config.match.battle,
                     problem.min_size,
                     battle_ui,
                 )
@@ -76,11 +82,9 @@ class Match(BaseModel):
             cpus.append(set_cpus)
             ui.battle_completed(matchup)
 
-    @classmethod
     async def run(
-        cls,
+        self,
         config: "AlgobattleConfig",
-        problem: Problem[InstanceT, SolutionT],
         ui: "Ui | None" = None,
     ) -> Self:
         """Runs a match with the given config settings and problem type.
@@ -91,33 +95,30 @@ class Match(BaseModel):
         Since all of these battles are completely independent, you can set `config.parallel_battles` to have some number
         of them run in parallel. This will speed up the exection of the match, but can also make the match unfair if the
         hardware running it does not have the resources to adequately execute that many containers in parallel.
-
-        Returns:
-            A :class:`Match` object with its fields populated to reflect the result of the match.
         """
         if ui is None:
-            ui = Ui()
+            ui = EmptyUi()
+        ui.match = self
+        problem = Problem.load(config.match.problem, config.problems)
 
         with await TeamHandler.build(config.teams, problem, config.as_prog_config(), ui) as teams:
-            result = cls(
-                active_teams=[t.name for t in teams.active],
-                excluded_teams=teams.excluded,
-            )
-            ui.match = result
-            battle_cls = Battle.all()[config.battle.type]
-            limiter = CapacityLimiter(config.execution.parallel_battles)
-            current_default_thread_limiter().total_tokens = config.execution.parallel_battles
-            set_cpus = config.execution.set_cpus
+            self.active_teams = [t.name for t in teams.active]
+            self.excluded_teams = teams.excluded
+            battle_cls = Battle.all()[config.match.battle.type]
+            limiter = CapacityLimiter(config.project.parallel_battles)
+            current_default_thread_limiter().total_tokens = config.project.parallel_battles
+            set_cpus = config.project.set_cpus
             if isinstance(set_cpus, list):
-                match_cpus = cast(list[str | None], set_cpus[: config.execution.parallel_battles])
+                match_cpus = cast(list[str | None], set_cpus[: config.project.parallel_battles])
             else:
-                match_cpus = [set_cpus] * config.execution.parallel_battles
+                match_cpus = [set_cpus] * config.project.parallel_battles
+            ui.start_battles()
             async with create_task_group() as tg:
                 for matchup in teams.matchups:
                     battle = battle_cls()
-                    result.results[matchup.generator.name][matchup.solver.name] = battle
-                    tg.start_soon(result._run_battle, battle, matchup, config, problem, match_cpus, ui, limiter)
-                return result
+                    self.results[matchup.generator.name][matchup.solver.name] = battle
+                    tg.start_soon(self._run_battle, battle, matchup, config, problem, match_cpus, ui, limiter)
+        return self
 
     @overload
     def battle(self, matchup: Matchup) -> Battle | None:
@@ -215,8 +216,7 @@ class Match(BaseModel):
         return points
 
 
-@dataclass
-class Ui(BuildUi):
+class Ui(BuildUi, Protocol):
     """Base class for a UI that observes a Match and displays its data.
 
     The Ui object both observes the match object as it's being built and receives additional updates through
@@ -225,27 +225,30 @@ class Ui(BuildUi):
     by just subclassing :class:`Ui` and implementing its methods.
     """
 
-    match: Match | None = field(default=None, init=False)
-    active_battles: list[Matchup] = field(default_factory=list, init=False)
+    match: Match
 
-    def start_build(self, team: str, role: Role, timeout: float | None) -> None:
+    def start_build_step(self, teams: Iterable[str], timeout: float | None) -> None:
+        """Tells the ui that the build process has started."""
+        return
+
+    def start_build(self, team: str, role: Role) -> None:
         """Informs the ui that a new program is being built."""
         return
 
-    def finish_build(self) -> None:
+    def finish_build(self, team: str, success: bool) -> None:
         """Informs the ui that the current build has been finished."""
+        return
+
+    def start_battles(self) -> None:
+        """Tells the UI that building the programs has finished and battles will start now."""
         return
 
     def start_battle(self, matchup: Matchup) -> None:
         """Notifies the Ui that a battle has been started."""
-        self.active_battles.append(matchup)
+        return
 
     def battle_completed(self, matchup: Matchup) -> None:
         """Notifies the Ui that a specific battle has been completed."""
-        self.active_battles.remove(matchup)
-
-    def update_fights(self, matchup: Matchup) -> None:
-        """Notifies the Ui to update the display of fight results for a specific battle."""
         return
 
     def update_battle_data(self, matchup: Matchup, data: Battle.UiData) -> None:
@@ -274,6 +277,20 @@ class Ui(BuildUi):
         return
 
 
+class EmptyUi(Ui):
+    """A dummy Ui."""
+
+    match: Match
+
+    def __enter__(self) -> Self:
+        """Starts displaying the Ui."""
+        return self
+
+    def __exit__(self, *args: Any) -> None:
+        """Stops the Ui."""
+        return
+
+
 @dataclass
 class BattleObserver(BattleUi, FightUi, ProgramUi):
     """Tracks updates for a specific battle."""
@@ -281,18 +298,23 @@ class BattleObserver(BattleUi, FightUi, ProgramUi):
     ui: Ui
     matchup: Matchup
 
+    @override
     def update_battle_data(self, data: Battle.UiData) -> None:  # noqa: D102
         self.ui.update_battle_data(self.matchup, data)
 
+    @override
     def start_fight(self, max_size: int) -> None:  # noqa: D102
         self.ui.start_fight(self.matchup, max_size)
 
+    @override
     def end_fight(self) -> None:  # noqa: D102
-        self.ui.update_fights(self.matchup)
+        self.ui.end_fight(self.matchup)
 
+    @override
     def start_program(self, role: Role, timeout: float | None) -> None:  # noqa: D102
         self.ui.start_program(self.matchup, role, RunningTimer(datetime.now(), timeout))
 
+    @override
     def stop_program(self, role: Role, runtime: float) -> None:  # noqa: D102
         self.ui.end_program(self.matchup, role, runtime)
 
@@ -329,7 +351,7 @@ WithNone = Annotated[T | None, AfterValidator(parse_none)]
 
 def _relativize_path(path: Path, info: ValidationInfo) -> Path:
     """If the passed path is relative to the current directory it gets relativized to the `base_path` instead."""
-    if info.context and isinstance(info.context["base_path"], Path) and not path.is_absolute():
+    if info.context and isinstance(info.context.get("base_path", None), Path) and not path.is_absolute():
         return info.context["base_path"] / path
     return path
 
@@ -533,9 +555,9 @@ class DockerConfig(BaseModel):
 class RunConfig(BaseModel):
     """Parameters determining how a program is run."""
 
-    timeout: WithNone[TimeDeltaFloat] = 30
+    timeout: WithNone[TimeDeltaFloat] = 20
     """Timeout in seconds, or `false` for no timeout."""
-    space: WithNone[ByteSizeInt] = None
+    space: WithNone[ByteSizeInt] = 4_000_000_000
     """Maximum memory space available, or `false` for no limitation.
 
     Can be either an plain number of bytes like `30000` or a string including
@@ -544,6 +566,15 @@ class RunConfig(BaseModel):
     cpus: int = 1
     """Number of cpu cores available."""
 
+    @field_validator("cpus")
+    @classmethod
+    def check_nonzero(cls, val: int) -> int:
+        """Checks that the number of available cpus is non-zero."""
+        if not val:
+            raise ValueError("Number must be non-zero")
+        else:
+            return val
+
 
 class MatchConfig(BaseModel):
     """Parameters determining the match execution.
@@ -551,34 +582,48 @@ class MatchConfig(BaseModel):
     It will be parsed from the given config file and contains all settings that specify how the match is run.
     """
 
-    problem: ProblemName | RelativeFilePath = Field(default=Path("problem.py"), validate_default=True)
-    """The problem this match is over.
-
-    Either the name of an installed problem, or the path to a problem file
-    """
+    problem: str
+    """The problem this match is over."""
     build_timeout: WithNone[TimeDeltaFloat] = 600
     """Timeout for building each docker image."""
-    image_size: WithNone[ByteSizeInt] = None
+    max_program_size: WithNone[ByteSizeInt] = 4_000_000_000
     """Maximum size a built program image is allowed to be."""
     strict_timeouts: bool = False
     """Whether to raise an error if a program runs into the timeout."""
     generator: RunConfig = RunConfig()
+    """Settings determining generator execution."""
     solver: RunConfig = RunConfig()
+    """Settings determining solver execution."""
+    battle: Battle.Config = Iterated.Config()
+    """Config for the battle type."""
 
     model_config = ConfigDict(revalidate_instances="always")
 
 
-class ExecutionConfig(BaseModel):
-    """Settings that only determine how a match is run, not its result."""
+class DynamicProblemConfig(BaseModel):
+    """Defines metadata used to dynamically import problems."""
+
+    location: RelativePath
+    """Path to the file defining the problem"""
+    dependencies: list[str] = Field(default_factory=list)
+    """List of dependencies needed to run the problem"""
+
+
+class ProjectConfig(BaseModel):
+    """Various project settings."""
 
     parallel_battles: int = 1
     """Number of battles exectuted in parallel."""
-    mode: MatchMode = "testing"
-    """Mode of the match."""
+    name_images: bool = True
+    """Whether to give the docker images names."""
+    cleanup_images: bool = False
+    """Whether to clean up the images after we use them."""
     set_cpus: str | list[str] | None = None
-    """Wich cpus to run programs on, if a list is specified each battle will use a different cpu specification in it."""
+    """Wich cpus to run programs on, if it is a list each battle will use a different cpu specification for it."""
     points: int = 100
     """Highest number of points each team can achieve."""
+    results: RelativePath = Field(default=Path("./results"), validate_default=True)
+    """Path to a folder where the results will be saved."""
 
     @model_validator(mode="after")
     def val_set_cpus(self) -> Self:
@@ -603,42 +648,62 @@ class AlgobattleConfig(BaseModel):
     """Base that contains all config options and can be parsed from config files."""
 
     # funky defaults to force their validation with context info present
-    teams: TeamInfos = Field(
-        default={"team_0": {"generator": Path("generator"), "solver": Path("solver")}}, validate_default=True
-    )
-    execution: ExecutionConfig = Field(default_factory=dict, validate_default=True)
-    match: MatchConfig = Field(default_factory=dict, validate_default=True)
-    battle: Battle.Config = Iterated.Config()
+    teams: TeamInfos = Field(default_factory=dict)
+    project: ProjectConfig = Field(default_factory=dict, validate_default=True)
+    match: MatchConfig
     docker: DockerConfig = DockerConfig()
+    problems: dict[str, DynamicProblemConfig] = Field(default_factory=dict)
 
     model_config = ConfigDict(revalidate_instances="always")
 
+    @model_validator(mode="after")
+    def check_problem_defined(self) -> Self:
+        """Validates that the specified problem is either installed or dynamically specified."""
+        prob = self.match.problem
+        if prob not in self.problems and prob not in Problem.available():
+            raise ValueError(f"The specified problem {prob} cannot be found")
+        else:
+            return self
+
+    @cached_property
+    def problem(self) -> Problem[Any, Any]:
+        """The problem this config uses."""
+        return Problem.load(self.match.problem, self.problems)
+
     @classmethod
-    def from_file(cls, file: Path) -> Self:
+    def from_file(cls, file: Path, *, ignore_uninstalled: bool = False, relativize_paths: bool = True) -> Self:
         """Parses a config object from a toml file.
 
-        If the file doesn't exist it returns a default instance instead of raising an error.
+        Args:
+            file: Path to the file, or a directory containing one called 'algobattle.toml'.
+            ignore_uninstalled: Whether to raise errors if the specified battle type is not installed.
+            relativize_paths: Wether to relativize paths to the config's location rather than the cwd.
         """
         Battle.load_entrypoints()
         if not file.is_file():
-            config_dict = {}
-        else:
-            with open(file, "rb") as f:
-                try:
-                    config_dict = tomllib.load(f)
-                except tomllib.TOMLDecodeError as e:
-                    raise ValueError(f"The config file at {file} is not a properly formatted TOML file!\n{e}")
-        return cls.model_validate(config_dict, context={"base_path": file.parent})
+            if file.joinpath("algobattle.toml").is_file():
+                file /= "algobattle.toml"
+            else:
+                raise FileNotFoundError("The path does not point to an Algobattle project")
+        try:
+            config_dict = tomllib.loads(file.read_text())
+        except tomllib.TOMLDecodeError as e:
+            raise ValueError(f"The config file at {file} is not a properly formatted TOML file!\n{e}")
+        context: dict[str, Any] = {"ignore_uninstalled": ignore_uninstalled}
+        if relativize_paths:
+            context["base_path"] = file.parent
+        return cls.model_validate(config_dict, context=context)
 
     def as_prog_config(self) -> ProgramConfigView:
         """Builds a simple object containing all program relevant settings."""
         return ProgramConfigView(
             build_timeout=self.match.build_timeout,
-            max_image_size=self.match.image_size,
+            max_program_size=self.match.max_program_size,
             strict_timeouts=self.match.strict_timeouts,
             build_kwargs=self.docker.build.kwargs,
             run_kwargs=self.docker.run.kwargs,
             generator=self.match.generator,
             solver=self.match.solver,
-            mode=self.execution.mode,
+            name_images=self.project.name_images,
+            cleanup_images=self.project.cleanup_images,
         )

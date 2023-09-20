@@ -1,16 +1,16 @@
 """Module defining the Problem and Solution base classes and related objects."""
 from abc import ABC, abstractmethod
 from functools import wraps
-import importlib.util
-import sys
+from importlib.metadata import entry_points
+from itertools import chain
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
-    Annotated,
     Any,
     Callable,
     ClassVar,
     Literal,
+    Mapping,
     ParamSpec,
     Protocol,
     Self,
@@ -20,14 +20,12 @@ from typing import (
 )
 from math import inf, isnan
 
-from pydantic import AfterValidator
-
 from algobattle.util import (
     EncodableModel,
     InstanceSolutionModel,
     Role,
     Encodable,
-    problem_entrypoints,
+    import_file_as_module,
 )
 
 
@@ -206,6 +204,12 @@ def default_score(
         return max(0, min(1, solution.score(instance, Role.solver)))
 
 
+class DynamicProblemInfo(Protocol):
+    """Defines the metadadata needed to dynamically import a problem."""
+
+    location: Path
+
+
 class Problem(Generic[InstanceT, SolutionT]):
     """The definition of a problem."""
 
@@ -218,8 +222,8 @@ class Problem(Generic[InstanceT, SolutionT]):
         solution_cls: type[SolutionT],
         min_size: int = 0,
         with_solution: Literal[True] = True,
-        export: bool = True,
         score_function: ScoreFunctionWithSol[InstanceT, SolutionT] = default_score,
+        test_instance: InstanceT | None = None,
     ) -> None:
         ...
 
@@ -232,8 +236,8 @@ class Problem(Generic[InstanceT, SolutionT]):
         solution_cls: type[SolutionT],
         min_size: int = 0,
         with_solution: Literal[False],
-        export: bool = True,
         score_function: ScoreFunctionNoSol[InstanceT, SolutionT] = default_score,
+        test_instance: InstanceT | None = None,
     ) -> None:
         ...
 
@@ -245,8 +249,8 @@ class Problem(Generic[InstanceT, SolutionT]):
         solution_cls: type[SolutionT],
         min_size: int = 0,
         with_solution: bool = True,
-        export: bool = True,
         score_function: ScoreFunction[InstanceT, SolutionT] = default_score,
+        test_instance: InstanceT | None = None,
     ) -> None:
         """The definition of a problem.
 
@@ -256,9 +260,6 @@ class Problem(Generic[InstanceT, SolutionT]):
             solution_cls: Class definitng what solutions of this problem look like.
             min_size: Minimum size of valid instances of this problem.
             with_solution: Whether the generator should also create a solution.
-            export: Wether the class should be exported.
-                If a battle is run by specifying a module, exactly one Problem in it must have `export=True`. It will
-                then be used to run the battle.
             score_function: Function used to score how well a solution solves a problem instance.
 
                 The default scoring function returns the quotient of the solver's to the generator's solution score.
@@ -267,19 +268,19 @@ class Problem(Generic[InstanceT, SolutionT]):
                 gets the generated solutions at `generator_solution` and `solver_solution`. If it is not set it receives
                 the solver's solution at `solution`. It should return the calculated score, a number in [0, 1] with a
                 value of 0 indicating that the solver failed completely and 1 that it solved the instance perfectly.
+            test_instance: A dummy instance that can be used to test whether a solver produces correct output.
         """
         self.name = name
         self.instance_cls = instance_cls
         self.solution_cls = solution_cls
         self.min_size = min_size
         self.with_solution = with_solution
-        self.export = export
         self.score_function = score_function
-        if self.export and self.name not in self._installed:
-            self._installed[self.name] = self
+        self.test_instance = test_instance
+        self._problems[name] = self
 
-    __slots__ = ("name", "instance_cls", "solution_cls", "min_size", "with_solution", "export", "score_function")
-    _installed: "ClassVar[dict[str, AnyProblem]]" = {}
+    __slots__ = ("name", "instance_cls", "solution_cls", "min_size", "with_solution", "score_function", "test_instance")
+    _problems: "ClassVar[dict[str, AnyProblem]]" = {}
 
     @overload
     def score(self, instance: InstanceT, *, solution: SolutionT) -> float:
@@ -312,76 +313,55 @@ class Problem(Generic[InstanceT, SolutionT]):
             return self.score_function(instance, solution=solution)
 
     @classmethod
-    def import_from_path(cls, path: Path) -> "AnyProblem":
-        """Try to import a Problem from a given path.
-
-        The specified file will be imported using the standard python loaders. If the created module contains exactly
-        one Problem with the `export` flag set, it will be imported.
-
-        Args:
-            path: A path to a module, or a folder containing an `__init__.py` or `problem.py` file.
-
-        Raises:
-            ValueError: If the path doesn't point to a module or the file cannot be imported properly.
-        """
-        if path.is_file():
-            pass
-        elif (path / "problem.py").is_file():
-            path /= "problem.py"
+    def load_file(cls, name: str, file: Path) -> "AnyProblem":
+        """Loads the problem from the specified file."""
+        existing_problems = cls._problems.copy()
+        import_file_as_module(file, "__algobattle_problem__")
+        new_problems = {n: p for n, p in cls._problems.items() if n not in existing_problems}
+        if name not in new_problems:
+            raise ValueError(f"The {name} problem is not defined in {file}")
         else:
-            raise ValueError(f"'{path}' does not point to a python file or a proper parent folder of one.")
-
-        try:
-            spec = importlib.util.spec_from_file_location("_problem", path)
-            assert spec is not None
-            assert spec.loader is not None
-            problem_module = importlib.util.module_from_spec(spec)
-            sys.modules[spec.name] = problem_module
-            spec.loader.exec_module(problem_module)
-        except Exception as e:
-            raise ValueError from e
-
-        try:
-            problems = [obj for obj in vars(problem_module).values() if isinstance(obj, cls) and obj.export]
-            match len(problems):
-                case 0:
-                    raise ValueError(f"'{path}' contains no Problems.")
-                case 1:
-                    problem = problems[0]
-                case _:
-                    raise ValueError(
-                        f"'{path}' contains {len(problems)} different problems: {', '.join(p.name for p in problems)}."
-                    )
-
-            return problem
-
-        finally:
-            sys.modules.pop("_problem")
+            return cls._problems[name]
 
     @classmethod
-    def load(cls, problem: "ProblemName | Path") -> "AnyProblem":
-        """Gets either an installed problem instance using its name or imports a problem file."""
-        if isinstance(problem, Path):
-            return cls.import_from_path(problem)
-        elif problem in cls._installed:
-            return cls._installed[problem]
-        else:
-            try:
-                loaded = problem_entrypoints()[problem].load()
-                if not isinstance(loaded, cls):
-                    raise RuntimeError(f"The entrypoint '{problem}' doesn't point to a problem but rather: {problem}.")
-                return loaded
-            except KeyError:
+    def load(cls, name: str, dynamic: Mapping[str, DynamicProblemInfo]) -> "AnyProblem":
+        """Loads the problem with the given name.
+
+        Args:
+            name: The name of the Problem to use.
+            dynamic: Metadata used to dynamically import a problem if needed.
+
+        Raises:
+            ValueError: If the problem is not specified properly
+            RuntimeError: If the problem's dynamic import fails
+        """
+        if name in dynamic:
+            info = dynamic[name]
+            return cls.load_file(name, info.location)
+        if name in cls._problems:
+            return cls._problems[name]
+        match list(entry_points(group="algobattle.problem", name=name)):
+            case []:
                 raise ValueError("Problem name is not valid.")
+            case [e]:
+                loaded: object = e.load()
+                if not isinstance(loaded, cls):
+                    raise ValueError(
+                        f"The entrypoint '{name}' doesn't point to a problem but a {loaded.__class__.__qualname__}."
+                    )
+                return loaded
+            case entypoints:
+                raise ValueError(
+                    f"Multiple problem entrypoints with the name {name} exist!"
+                    f" The modules providing them are: {', '.join(e.module for e in entypoints)}."
+                )
+
+    @classmethod
+    def available(cls) -> set[str]:
+        """Returns the names of all available Problems."""
+        return set(chain(cls._problems.keys(), (e.name for e in entry_points(group="algobattle.problem"))))
 
 
-def _check_problem_name(val: str) -> str:
-    if val not in Problem._installed and val not in problem_entrypoints():
-        raise ValueError("Value is not the name of an installed Problem.")
-    return val
-
-
-ProblemName = Annotated[str, AfterValidator(_check_problem_name)]
 AnyProblem = Problem[Any, Any]
 
 

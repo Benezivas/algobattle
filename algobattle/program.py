@@ -8,7 +8,7 @@ from tarfile import TarFile, is_tarfile
 from tempfile import TemporaryDirectory
 from timeit import default_timer
 from types import EllipsisType
-from typing import Any, ClassVar, Iterator, Mapping, Protocol, Self, TypeVar, cast, Generator as PyGenerator
+from typing import Any, ClassVar, Iterable, Iterator, Mapping, Protocol, Self, TypeVar, cast, Generator as PyGenerator
 from typing_extensions import TypedDict
 from uuid import uuid4
 import json
@@ -22,6 +22,7 @@ from docker.models.containers import Container as DockerContainer
 from docker.types import Mount
 from requests import Timeout, ConnectionError
 from pydantic import Field
+from anyio import run as run_async
 from anyio.to_thread import run_sync
 from urllib3.exceptions import ReadTimeoutError
 
@@ -33,7 +34,7 @@ from algobattle.util import (
     ExceptionInfo,
     ExecutionError,
     ExecutionTimeout,
-    MatchMode,
+    TempDir,
     ValidationError,
     Role,
     BaseModel,
@@ -94,13 +95,14 @@ class ProgramConfigView:
     """Config settings relevant to the program module."""
 
     build_timeout: float | None
-    max_image_size: int | None
+    max_program_size: int | None
     strict_timeouts: bool
     build_kwargs: dict[str, Any]
     run_kwargs: dict[str, Any]
     generator: RunConfigView
     solver: RunConfigView
-    mode: MatchMode
+    name_images: bool
+    cleanup_images: bool
 
 
 class ProgramUi(Protocol):
@@ -229,8 +231,7 @@ class Program(ABC):
             yield source.parent, source.name
             return
 
-        with TemporaryDirectory() as build_folder:
-            build_folder = Path(build_folder)
+        with TempDir() as build_folder:
             if is_zipfile(source):
                 with ZipFile(source, "r") as f:
                     f.extractall(build_folder)
@@ -265,8 +266,9 @@ class Program(ABC):
         Raises:
             BuildError: If the build fails for any reason.
         """
-        if team_name is not None:
-            name = f"algobattle_{team_name}_{cls.role.name}"
+        if team_name is not None and config.name_images:
+            normalized = team_name.lower().replace(" ", "_")
+            name = f"algobattle_{normalized}_{cls.role.name}"
             try:
                 old_image = cast(DockerImage, client().images.get(name))
             except ImageNotFound:
@@ -284,6 +286,7 @@ class Program(ABC):
                     config.build_timeout,
                     dockerfile,
                     config.build_kwargs,
+                    cancellable=True,
                 )
                 if old_image is not None:
                     old_image.reload()
@@ -303,12 +306,12 @@ class Program(ABC):
             config=config,
         )
         used_size = cast(dict[str, Any], image.attrs).get("Size", 0)
-        if config.max_image_size is not None and used_size > config.max_image_size:
+        if config.max_program_size is not None and used_size > config.max_program_size:
             try:
                 self.remove()
             finally:
                 raise BuildError(
-                    "Built image is too large.", detail=f"Size: {used_size}B, limit: {config.max_image_size}B."
+                    "Built image is too large.", detail=f"Size: {used_size}B, limit: {config.max_program_size}B."
                 )
         return self
 
@@ -402,7 +405,7 @@ class Program(ABC):
             if ui is not None:
                 ui.start_program(self.role, specs.timeout)
             try:
-                runtime = await run_sync(self._run_daemon_call, container, specs.timeout)
+                runtime = await run_sync(self._run_daemon_call, container, specs.timeout, cancellable=True)
             except ExecutionError as e:
                 raise _WrappedException(e, e.runtime)
             finally:
@@ -479,7 +482,8 @@ class Program(ABC):
         return self
 
     def __exit__(self, _type: Any, _value: Any, _traceback: Any):
-        self.remove()
+        if self.config.cleanup_images:
+            self.remove()
 
 
 class Generator(Program):
@@ -577,6 +581,15 @@ class Generator(Program):
                 solution=solution,
             )
 
+    def test(self, max_size: int | None = None) -> Instance | ExceptionInfo:
+        """Tests whether the generator runs without issues and creates a syntactically valid instance."""
+        res = run_async(self.run, max_size or self.problem.min_size)
+        if res.info.error:
+            return res.info.error
+        else:
+            assert res.instance is not None
+            return res.instance
+
 
 class Solver(Program):
     """A higher level interface for a team's solver."""
@@ -672,16 +685,28 @@ class Solver(Program):
                 solution=solution,
             )
 
+    def test(self, instance: Instance) -> ExceptionInfo | None:
+        """Tests whether the solver runs without issues and creates a syntactically valid solution."""
+        res = run_async(self.run, instance, instance.size)
+        if res.info.error:
+            return res.info.error
+        else:
+            return None
+
 
 class BuildUi(Protocol):
     """Provides and interface for the build process to update the ui."""
 
     @abstractmethod
-    def start_build(self, team: str, role: Role, timeout: float | None) -> None:
+    def start_build_step(self, teams: Iterable[str], timeout: float | None) -> None:
+        """Tells the ui that the build process has started."""
+
+    @abstractmethod
+    def start_build(self, team: str, role: Role) -> None:
         """Informs the ui that a new program is being built."""
 
     @abstractmethod
-    def finish_build(self) -> None:
+    def finish_build(self, team: str, success: bool) -> None:
         """Informs the ui that the current build has been finished."""
 
 
@@ -722,24 +747,21 @@ class Team:
             ValueError: If the team name is already in use.
             DockerError: If the docker build fails for some reason
         """
-        tag_name = name.lower().replace(" ", "_") if config.mode == "testing" else None
-        ui.start_build(name, Role.generator, config.build_timeout)
+        ui.start_build(name, Role.generator)
         generator = await Generator.build(
             path=info.generator,
             problem=problem,
             config=config,
-            team_name=tag_name,
+            team_name=name,
         )
-        ui.finish_build()
         try:
-            ui.start_build(name, Role.solver, config.build_timeout)
+            ui.start_build(name, Role.solver)
             solver = await Solver.build(
                 path=info.solver,
                 problem=problem,
                 config=config,
-                team_name=tag_name,
+                team_name=name,
             )
-            ui.finish_build()
         except Exception:
             generator.remove()
             raise
@@ -757,11 +779,14 @@ class Team:
     def __hash__(self) -> int:
         return hash(self.name)
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
+        self.generator.__enter__()
+        self.solver.__enter__()
         return self
 
-    def __exit__(self, _type: Any, _value: Any, _traceback: Any):
-        self.cleanup()
+    def __exit__(self, *args: Any):
+        self.generator.__exit__(*args)
+        self.solver.__exit__(*args)
 
     def cleanup(self) -> None:
         """Removes the built docker images."""
@@ -783,6 +808,9 @@ class Matchup:
     def __repr__(self) -> str:
         return f"Matchup({self.generator.name}, {self.solver.name})"
 
+    def __str__(self) -> str:
+        return f"{self.generator.name} vs {self.solver.name}"
+
 
 @dataclass
 class TeamHandler:
@@ -790,7 +818,6 @@ class TeamHandler:
 
     active: list[Team] = field(default_factory=list)
     excluded: dict[str, ExceptionInfo] = field(default_factory=dict)
-    cleanup: bool = True
 
     @classmethod
     async def build(
@@ -813,22 +840,27 @@ class TeamHandler:
         Returns:
             :class:`TeamHandler` containing the info about the participating teams.
         """
-        handler = cls(cleanup=config.mode == "tournament")
+        handler = cls()
+        ui.start_build_step(infos.keys(), config.build_timeout)
         for name, info in infos.items():
             try:
                 team = await Team.build(name, info, problem, config, ui)
                 handler.active.append(team)
             except Exception as e:
                 handler.excluded[name] = ExceptionInfo.from_exception(e)
+                ui.finish_build(name, False)
+            else:
+                ui.finish_build(name, True)
         return handler
 
     def __enter__(self) -> Self:
+        for team in self.active:
+            team.__enter__()
         return self
 
-    def __exit__(self, _type: Any, _value: Any, _traceback: Any):
-        if self.cleanup:
-            for team in self.active:
-                team.cleanup()
+    def __exit__(self, *args: Any):
+        for team in self.active:
+            team.__exit__(*args)
 
     @property
     def grouped_matchups(self) -> list[tuple[Matchup, Matchup]]:

@@ -64,6 +64,8 @@ markdown_extensions:
   - pymdownx.extra
   - pymdownx.highlight
   - pymdownx.inlinehilite
+  - pymdownx.details
+  - pymdownx.superfences
   - pymdownx.blocks.tab:
       alternate_style: true
   - pymdownx.blocks.admonition:
@@ -82,8 +84,13 @@ markdown_extensions:
       - quote
       - new
       - settings
+  - pymdownx.keys
   - mdx_include:
       base_path: docs/src
+  - attr_list
+  - pymdownx.emoji:
+      emoji_index: !!python/name:materialx.emoji.twemoji
+      emoji_generator: !!python/name:materialx.emoji.to_svg
 
 
 extra_css:
@@ -98,12 +105,16 @@ nav:
   - Home: index.md
   - Tutorial:
     - tutorial/index.md
-    - tutorial/overview.md
     - tutorial/installation.md
-    - tutorial/match.md
+    - tutorial/getting_started.md
     - tutorial/programs.md
-    - tutorial/battle_types.md
-    - tutorial/config.md
+    - tutorial/match.md
+    - tutorial/summary.md
+  - Advanced Topics:
+    - advanced/index.md
+    - advanced/config.md
+    - advanced/battle_types.md
+    - advanced/docker.md
   - API Reference:
     - api/index.md
     - api/battle.md

@@ -6,9 +6,8 @@ from pathlib import Path
 
 from pydantic import ByteSize, ValidationError
 
-from algobattle.cli import parse_cli_args
 from algobattle.battle import Fight, Iterated, Averaged
-from algobattle.match import ExecutionConfig, Match, AlgobattleConfig, MatchConfig, RunConfig, TeamInfo
+from algobattle.match import ProjectConfig, Match, AlgobattleConfig, MatchConfig, RunConfig, TeamInfo
 from algobattle.program import ProgramRunInfo, Team, Matchup, TeamHandler
 from .testsproblem.problem import TestProblem
 
@@ -155,19 +154,27 @@ class Execution(IsolatedAsyncioTestCase):
         cls.problem = TestProblem
         run_params = RunConfig(timeout=2)
         cls.config_iter = AlgobattleConfig(
-            match=MatchConfig(generator=run_params, solver=run_params, problem="Test Problem"),
-            battle=Iterated.Config(maximum_size=10, rounds=2),
+            match=MatchConfig(
+                generator=run_params,
+                solver=run_params,
+                problem="Test Problem",
+                battle=Iterated.Config(maximum_size=10, rounds=2),
+            ),
         )
         cls.config_avg = AlgobattleConfig(
-            match=MatchConfig(generator=run_params, solver=run_params, problem="Test Problem"),
-            battle=Averaged.Config(instance_size=5, num_fights=3),
+            match=MatchConfig(
+                generator=run_params,
+                solver=run_params,
+                problem="Test Problem",
+                battle=Averaged.Config(instance_size=5, num_fights=3),
+            ),
         )
         cls.generator = problem_path / "generator"
         cls.solver = problem_path / "solver"
 
     async def test_basic(self):
         self.config_iter.teams = {"team_0": TeamInfo(generator=self.generator, solver=self.solver)}
-        res = await Match.run(self.config_iter, TestProblem)
+        res = await Match().run(self.config_iter)
         for res_dict in res.results.values():
             for result in res_dict.values():
                 self.assertIsNone(result.run_exception)
@@ -180,7 +187,7 @@ class Execution(IsolatedAsyncioTestCase):
         team0 = TeamInfo(generator=self.generator, solver=self.solver)
         team1 = TeamInfo(generator=self.generator, solver=self.solver)
         self.config_iter.teams = {"team_0": team0, "team_1": team1}
-        res = await Match.run(self.config_iter, TestProblem)
+        res = await Match().run(self.config_iter)
         for res_dict in res.results.values():
             for result in res_dict.values():
                 self.assertIsNone(result.run_exception)
@@ -191,7 +198,7 @@ class Execution(IsolatedAsyncioTestCase):
 
     async def test_averaged(self):
         self.config_avg.teams = {"team_0": TeamInfo(generator=self.generator, solver=self.solver)}
-        res = await Match.run(self.config_avg, TestProblem)
+        res = await Match().run(self.config_avg)
         for res_dict in res.results.values():
             for result in res_dict.values():
                 self.assertIsNone(result.run_exception)
@@ -212,42 +219,29 @@ class Parsing(TestCase):
         cls.teams = {"team_0": TeamInfo(generator=cls.problem_path / "generator", solver=cls.problem_path / "solver")}
 
     def test_no_cfg_default(self):
-        _, cfg = parse_cli_args([str(self.problem_path)])
-        self.assertEqual(
-            cfg, AlgobattleConfig(teams=self.teams, match=MatchConfig(problem=self.problem_path / "problem.py"))
-        )
+        with self.assertRaises(FileNotFoundError):
+            AlgobattleConfig.from_file(self.problem_path)
 
     def test_empty_cfg(self):
         with self.assertRaises(ValidationError):
-            parse_cli_args([str(self.configs_path / "empty.toml")])
+            AlgobattleConfig.from_file(self.configs_path / "empty.toml")
 
     def test_cfg(self):
-        _, cfg = parse_cli_args([str(self.configs_path / "test.toml")])
+        cfg = AlgobattleConfig.from_file(self.configs_path / "test.toml")
         self.assertEqual(
             cfg,
             AlgobattleConfig(
-                teams={
-                    "team_0": TeamInfo(generator=self.configs_path / "generator", solver=self.configs_path / "solver")
-                },
                 match=MatchConfig(
                     generator=RunConfig(space=ByteSize(10)),
                     problem="Test Problem",
+                    battle=Averaged.Config(num_fights=1),
                 ),
-                battle=Averaged.Config(num_fights=1),
-                execution=ExecutionConfig(points=10),
+                project=ProjectConfig(points=10, results=self.configs_path / "results"),
             ),
         )
 
-    def test_cli(self):
-        exec_config, _ = parse_cli_args([str(self.problem_path), "-s"])
-        self.assertTrue(exec_config.silent)
-
-    def test_cli_no_problem_path(self):
-        with self.assertRaises(SystemExit):
-            parse_cli_args([])
-
     def test_cfg_team(self):
-        _, cfg = parse_cli_args([str(self.configs_path / "teams.toml")])
+        cfg = AlgobattleConfig.from_file(self.configs_path / "teams.toml")
         self.assertEqual(
             cfg,
             AlgobattleConfig(
@@ -258,12 +252,13 @@ class Parsing(TestCase):
                 match=MatchConfig(
                     problem="Test Problem",
                 ),
+                project=ProjectConfig(results=self.configs_path / "results"),
             ),
         )
 
     def test_cfg_team_no_name(self):
         with self.assertRaises(ValueError):
-            parse_cli_args([str(self.configs_path / "teams_incorrect.toml")])
+            AlgobattleConfig.from_file(self.configs_path / "teams_incorrect.toml")
 
 
 if __name__ == "__main__":

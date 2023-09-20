@@ -5,15 +5,18 @@ In particular, the base classes :class:`BaseModel`, :class:`Encodable`, :class:`
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
+from importlib.util import module_from_spec, spec_from_file_location
 from inspect import Parameter, Signature, signature
 from itertools import chain
 import json
 from pathlib import Path
+import sys
+from tempfile import TemporaryDirectory
 from traceback import format_exception
+from types import ModuleType
 from typing import Any, Callable, ClassVar, Iterable, Literal, LiteralString, TypeVar, Self, cast, get_args
 from annotated_types import GroupedMetadata
-from importlib.metadata import EntryPoint, entry_points
 
 from pydantic import (
     ConfigDict,
@@ -27,15 +30,13 @@ from pydantic_core import CoreSchema
 from pydantic_core.core_schema import general_after_validator_function
 
 
-class Role(Enum):
+class Role(StrEnum):
     """Indicates whether the role of a program is to generate or to solve instances."""
 
     generator = "generator"
     solver = "solver"
 
 
-MatchMode = Literal["tournament", "testing"]
-"""Indicates what type of match is being fought."""
 T = TypeVar("T")
 
 
@@ -396,11 +397,39 @@ def can_be_positional(param: Parameter) -> bool:
     return param.kind in (Parameter.POSITIONAL_ONLY, Parameter.POSITIONAL_OR_KEYWORD)
 
 
-def problem_entrypoints() -> dict[str, EntryPoint]:
-    """Returns all currently registered problem entrypoints."""
-    return {e.name: e for e in entry_points(group="algobattle.problem")}
+class TempDir(TemporaryDirectory):
+    """Python's `TemporaryDirectory` but with a contextmanager returning a Path."""
+
+    def __enter__(self) -> Path:
+        return Path(super().__enter__())
 
 
-def battle_entrypoints() -> dict[str, EntryPoint]:
-    """Returns all currently registered battle entrypoints."""
-    return {e.name: e for e in entry_points(group="algobattle.battle")}
+def timestamp() -> str:
+    """Formats the current time into a filename-safe string."""
+    t = datetime.now()
+    return f"{t.year:04d}-{t.month:02d}-{t.day:02d}_{t.hour:02d}-{t.minute:02d}-{t.second:02d}"
+
+
+def import_file_as_module(path: Path, name: str) -> ModuleType:
+    """Imports a file as a module.
+
+    Args:
+        path: A path to a python file.
+
+    Raises:
+        ValueError: If the path doesn't point to a module
+        RuntimeError: If the file cannot be imported properly
+    """
+    if not path.is_file():
+        raise ValueError(f"'{path}' does not point to a python file or a proper parent folder of one.")
+
+    try:
+        spec = spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        return module
+    except Exception as e:
+        raise RuntimeError from e
