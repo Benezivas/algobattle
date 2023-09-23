@@ -16,6 +16,7 @@ from typing import Annotated, Any, ClassVar, Iterable, Literal, Optional, Self, 
 from typing_extensions import override
 from importlib.metadata import version as pkg_version
 from zipfile import ZipFile
+import shutil
 
 from anyio import run as run_async_fn
 from pydantic import Field, ValidationError
@@ -298,7 +299,7 @@ def init(
                         file.unlink()
                     elif (dir := target / path.name).is_dir():
                         rmtree(dir)
-                    path.rename(target / path.name)
+                    shutil.move(path, target / path.name)
                 console.print("Unpacked problem data")
             else:
                 parsed_config = AlgobattleConfig.from_file(target, relativize_paths=False)
