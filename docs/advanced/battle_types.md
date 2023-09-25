@@ -55,7 +55,7 @@ an instance. Defaults to 1.
 : If a generator fails to produce a valid instance, the solver wins the fight by default. This may create very lengthy
 battles where the generator keeps failing at higher and higher `max_size`s. You can use this setting to early exit and
 award the solver the full score if this happens. Set to an integer to exit after that many consecutive failures, or
-`"unlimited"` to never exit early.
+`#!toml "unlimited"` to never exit early.
 
 ### UI Data
 
