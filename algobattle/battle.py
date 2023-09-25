@@ -399,6 +399,13 @@ class Iterated(Battle):
         """Determines how quickly the instance size grows."""
         minimum_score: float = 1
         """Minimum score that a solver needs to achieve in order to pass."""
+        max_generator_errors: int | Literal["unlimited"] = 5
+        """If a generator fails to produce a valid instance, the solver wins the fight by default.
+
+        This may create very lengthy battles where the generator keeps failing at higher and higher `max_size`s. You
+        can use this setting to early exit and award the solver the full score if this happens. Set to an integer to
+        exit after that many failures, or `"unlimited"` to never exit early.
+        """
 
     @inherit_docs
     class UiData(Battle.UiData):
@@ -418,26 +425,33 @@ class Iterated(Battle):
         This process is repeated `rounds` many times, with each round being completely independent of each other.
         """
 
-        def sizes(size: int, max: int) -> Iterable[int]:
+        def sizes(size: int, max_size: int) -> Iterable[int]:
             counter = count(1)
-            while size <= max:
+            size = max(size, min_size)
+            while size <= max_size:
                 yield size
                 size += next(counter) ** config.exponent
 
         for _ in range(config.rounds):
-            min = min_size
-            max = config.maximum_size
+            max_size = config.maximum_size
             self.results.append(0)
-            while max > min:
-                for size in sizes(min, max):
-                    ui.update_battle_data(self.UiData(reached=self.results, cap=max))
+            while max_size > self.results[-1] + 1:
+                gen_errors = 0
+                for size in sizes(self.results[-1] + 1, max_size):
+                    ui.update_battle_data(self.UiData(reached=self.results, cap=max_size))
                     result = await fight.run(size)
+                    if result.generator.error and config.max_generator_errors != "unlimited":
+                        gen_errors += 1
+                        if gen_errors >= config.max_generator_errors:
+                            self.results[-1] = max_size
+                            break
+                    else:
+                        gen_errors = 0
                     if result.score < config.minimum_score:
-                        max = size
+                        max_size = size
                         break
                     else:
                         self.results[-1] = size
-                        min = size + 1
 
     def score(self) -> float:
         """Averages the highest instance size reached in each round."""
