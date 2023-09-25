@@ -8,6 +8,7 @@ from functools import wraps
 from importlib.metadata import entry_points
 from abc import abstractmethod
 from inspect import isclass
+from itertools import count
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -15,6 +16,7 @@ from typing import (
     Callable,
     ClassVar,
     Concatenate,
+    Iterable,
     Literal,
     ParamSpec,
     Protocol,
@@ -415,41 +417,27 @@ class Iterated(Battle):
 
         This process is repeated `rounds` many times, with each round being completely independent of each other.
         """
+
+        def sizes(size: int, max: int) -> Iterable[int]:
+            counter = count(1)
+            while size <= max:
+                yield size
+                size += next(counter) ** config.exponent
+
         for _ in range(config.rounds):
-            base_increment = 0
-            alive = True
-            reached = 0
+            min = min_size
+            max = config.maximum_size
             self.results.append(0)
-            cap = config.maximum_size
-            current = min_size
-            while alive:
-                ui.update_battle_data(self.UiData(reached=self.results, cap=cap))
-                result = await fight.run(current)
-                score = result.score
-                if score < config.minimum_score:
-                    alive = False
-
-                if not alive and base_increment > 1:
-                    # The step size increase was too aggressive, take it back and reset the base_increment
-                    cap = current
-                    current -= base_increment**config.exponent
-                    base_increment = 0
-                    alive = True
-                elif current > reached and alive:
-                    # We solved an instance of bigger size than before
-                    self.results[-1] = reached = current
-
-                if current + 1 > cap:
-                    alive = False
-                else:
-                    base_increment += 1
-                    current += base_increment**config.exponent
-
-                    if current >= cap:
-                        # We have failed at this value of n already, reset the step size!
-                        current -= base_increment**config.exponent - 1
-                        base_increment = 1
-            self.results[-1] = reached
+            while max > min:
+                for size in sizes(min, max):
+                    ui.update_battle_data(self.UiData(reached=self.results, cap=max))
+                    result = await fight.run(size)
+                    if result.score < config.minimum_score:
+                        max = size
+                        break
+                    else:
+                        self.results[-1] = size
+                        min = size + 1
 
     def score(self) -> float:
         """Averages the highest instance size reached in each round."""
