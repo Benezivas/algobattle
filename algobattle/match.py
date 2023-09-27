@@ -68,7 +68,7 @@ class Match(BaseModel):
 
     active_teams: list[str] = field(default_factory=list)
     excluded_teams: dict[str, ExceptionInfo] = field(default_factory=dict)
-    results: dict[MatchupStr, Battle] = Field(default_factory=dict)
+    battles: dict[MatchupStr, Battle] = Field(default_factory=dict)
 
     async def _run_battle(
         self,
@@ -138,7 +138,7 @@ class Match(BaseModel):
             async with create_task_group() as tg:
                 for matchup in teams.matchups:
                     battle = battle_cls()
-                    self.results[MatchupStr.make(matchup)] = battle
+                    self.battles[MatchupStr.make(matchup)] = battle
                     tg.start_soon(self._run_battle, battle, matchup, config, problem, match_cpus, ui, limiter)
         return self
 
@@ -161,8 +161,8 @@ class Match(BaseModel):
 
         for first, second in combinations(self.active_teams, 2):
             try:
-                first_res = self.results[MatchupStr(second, first)]
-                second_res = self.results[MatchupStr(first, second)]
+                first_res = self.battles[MatchupStr(second, first)]
+                second_res = self.battles[MatchupStr(first, second)]
             except KeyError:
                 continue
             total_score = max(0, first_res.score()) + max(0, second_res.score())

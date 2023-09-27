@@ -713,7 +713,7 @@ class CliUi(Live, Ui):
             Column("Result", justify="right"),
             title="[heading]Match overview",
         )
-        for matchup, battle in match.results.items():
+        for matchup, battle in match.battles.items():
             if battle.run_exception is None:
                 res = battle.format_score(battle.score())
             else:
@@ -768,7 +768,7 @@ class CliUi(Live, Ui):
 
     @override
     def end_fight(self, matchup: Matchup) -> None:
-        battle = self.match.results[MatchupStr.make(matchup)]
+        battle = self.match.battles[MatchupStr.make(matchup)]
         assert battle is not None
         fights = battle.fights[-1:-6:-1]
         panel = self.battle_panels[matchup]
