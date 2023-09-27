@@ -178,7 +178,7 @@ class Execution(IsolatedAsyncioTestCase):
         self.config_iter.teams = {"team_0": TeamInfo(generator=self.generator, solver=self.solver)}
         res = await Match().run(self.config_iter)
         for result in res.battles.values():
-            self.assertIsNone(result.run_exception)
+            self.assertIsNone(result.runtime_error)
             for fight in result.fights:
                 self.assertIsNone(fight.generator.error)
                 assert fight.solver is not None
@@ -190,7 +190,7 @@ class Execution(IsolatedAsyncioTestCase):
         self.config_iter.teams = {"team_0": team0, "team_1": team1}
         res = await Match().run(self.config_iter)
         for result in res.battles.values():
-            self.assertIsNone(result.run_exception)
+            self.assertIsNone(result.runtime_error)
             for fight in result.fights:
                 self.assertIsNone(fight.generator.error)
                 assert fight.solver is not None
@@ -200,7 +200,7 @@ class Execution(IsolatedAsyncioTestCase):
         self.config_avg.teams = {"team_0": TeamInfo(generator=self.generator, solver=self.solver)}
         res = await Match().run(self.config_avg)
         for result in res.battles.values():
-            self.assertIsNone(result.run_exception)
+            self.assertIsNone(result.runtime_error)
             for fight in result.fights:
                 self.assertIsNone(fight.generator.error)
                 assert fight.solver is not None

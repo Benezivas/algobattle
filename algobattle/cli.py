@@ -714,7 +714,7 @@ class CliUi(Live, Ui):
             title="[heading]Match overview",
         )
         for matchup, battle in match.battles.items():
-            if battle.run_exception is None:
+            if battle.runtime_error is None:
                 res = battle.format_score(battle.score())
             else:
                 res = ":warning:"

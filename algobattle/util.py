@@ -40,11 +40,6 @@ class Role(StrEnum):
 T = TypeVar("T")
 
 
-def str_with_traceback(exception: Exception) -> str:
-    """Returns the full exception info with a stacktrace."""
-    return "\n".join(format_exception(exception))
-
-
 def inherit_docs(obj: T) -> T:
     """Decorator to mark a method as inheriting its docstring.
 
@@ -368,7 +363,7 @@ class ExceptionInfo(BaseModel):
 
     type: str
     message: str
-    detail: str | None = None
+    detail: str | list[str] | None = None
 
     @classmethod
     def from_exception(cls, error: Exception) -> Self:
@@ -383,7 +378,7 @@ class ExceptionInfo(BaseModel):
             return cls(
                 type=error.__class__.__name__,
                 message=str(error),
-                detail=str_with_traceback(error),
+                detail=format_exception(error),
             )
 
 

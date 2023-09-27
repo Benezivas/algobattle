@@ -41,7 +41,7 @@ from algobattle.program import (
     Solver,
 )
 from algobattle.problem import AnyProblem
-from algobattle.util import Encodable, inherit_docs, BaseModel
+from algobattle.util import Encodable, ExceptionInfo, inherit_docs, BaseModel
 
 
 _BattleConfig: TypeAlias = Any
@@ -221,7 +221,7 @@ class Battle(BaseModel):
 
     fights: list[Fight] = Field(default_factory=list)
     """The list of fights that have been fought in this battle."""
-    run_exception: str | None = None
+    runtime_error: ExceptionInfo | None = None
     """The description of an otherwise unhandeled exception that occured during the execution of :meth:`Battle.run`."""
 
     _battle_types: ClassVar[dict[str, type[Self]]] = {}

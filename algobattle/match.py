@@ -35,7 +35,6 @@ from algobattle.util import (
     Role,
     RunningTimer,
     BaseModel,
-    str_with_traceback,
 )
 
 
@@ -100,7 +99,7 @@ class Match(BaseModel):
                     battle_ui,
                 )
             except Exception as e:
-                battle.run_exception = str_with_traceback(e)
+                battle.runtime_error = ExceptionInfo.from_exception(e)
             cpus.append(set_cpus)
             ui.battle_completed(matchup)
 
