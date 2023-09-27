@@ -435,8 +435,8 @@ class Iterated(Battle):
         for _ in range(config.rounds):
             max_size = config.maximum_size
             self.results.append(0)
-            while max_size > self.results[-1] + 1:
-                gen_errors = 0
+            gen_errors = 0
+            while self.results[-1] < max_size:
                 for size in sizes(self.results[-1] + 1, max_size):
                     ui.update_battle_data(self.UiData(reached=self.results, cap=max_size))
                     result = await fight.run(size)
@@ -448,7 +448,7 @@ class Iterated(Battle):
                     else:
                         gen_errors = 0
                     if result.score < config.minimum_score:
-                        max_size = size
+                        max_size = size - 1
                         break
                     else:
                         self.results[-1] = size
