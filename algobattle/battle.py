@@ -41,7 +41,7 @@ from algobattle.program import (
     Solver,
 )
 from algobattle.problem import AnyProblem
-from algobattle.util import Encodable, ExceptionInfo, inherit_docs, BaseModel
+from algobattle.util import Encodable, ExceptionInfo, BaseModel
 
 
 _BattleConfig: TypeAlias = Any
@@ -398,8 +398,7 @@ class Iterated(Battle):
         minimum_score: float = 1
         """Minimum score that a solver needs to achieve in order to pass."""
 
-    @inherit_docs
-    class UiData(Battle.UiData):
+    class UiData(Battle.UiData):  # noqa: D106
         reached: list[int]
         cap: int
 
@@ -455,9 +454,8 @@ class Iterated(Battle):
         """Averages the highest instance size reached in each round."""
         return 0 if len(self.results) == 0 else sum(self.results) / len(self.results)
 
-    @inherit_docs
     @staticmethod
-    def format_score(score: float) -> str:
+    def format_score(score: float) -> str:  # noqa: D102
         return str(int(score))
 
 
@@ -474,8 +472,7 @@ class Averaged(Battle):
         num_fights: int = 10
         """Number of iterations in each round."""
 
-    @inherit_docs
-    class UiData(Battle.UiData):
+    class UiData(Battle.UiData):  # noqa: D106
         round: int
 
     async def run_battle(self, fight: FightHandler, config: Config, min_size: int, ui: BattleUi) -> None:
@@ -496,7 +493,6 @@ class Averaged(Battle):
         else:
             return sum(f.score for f in self.fights) / len(self.fights)
 
-    @inherit_docs
     @staticmethod
-    def format_score(score: float) -> str:
+    def format_score(score: float) -> str:  # noqa: D102
         return format(score, ".0%")

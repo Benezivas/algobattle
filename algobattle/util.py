@@ -40,14 +40,6 @@ class Role(StrEnum):
 T = TypeVar("T")
 
 
-def inherit_docs(obj: T) -> T:
-    """Decorator to mark a method as inheriting its docstring.
-
-    Python 3.5+ already does this, but pydocstyle needs a static hint.
-    """
-    return obj
-
-
 ModelType = Literal["instance", "solution", "other"]
 ModelReference = ModelType | Literal["self"]
 
