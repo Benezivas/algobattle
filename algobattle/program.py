@@ -296,7 +296,8 @@ class Program(ABC):
             except Timeout as e:
                 raise BuildError("Build ran into a timeout.") from e
             except DockerBuildError as e:
-                raise BuildError("Build did not complete successfully.", detail=e.build_log) from e
+                logs = cast(list[dict[str, Any]], list(e.build_log))
+                raise BuildError("Build did not complete successfully.", detail=logs) from e
             except APIError as e:
                 raise BuildError("Docker APIError thrown while building.", detail=str(e)) from e
 
@@ -763,7 +764,8 @@ class Team:
                 team_name=name,
             )
         except Exception:
-            generator.remove()
+            if config.cleanup_images:
+                generator.remove()
             raise
         return Team(name, generator, solver)
 
@@ -849,6 +851,8 @@ class TeamHandler:
             except Exception as e:
                 handler.excluded[name] = ExceptionInfo.from_exception(e)
                 ui.finish_build(name, False)
+            except BaseException:
+                raise
             else:
                 ui.finish_build(name, True)
         return handler
