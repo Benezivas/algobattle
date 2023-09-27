@@ -296,7 +296,7 @@ class Program(ABC):
             except Timeout as e:
                 raise BuildError("Build ran into a timeout.") from e
             except DockerBuildError as e:
-                raise BuildError("Build did not complete successfully.", detail=e.msg) from e
+                raise BuildError("Build did not complete successfully.", detail=e.build_log) from e
             except APIError as e:
                 raise BuildError("Docker APIError thrown while building.", detail=str(e)) from e
 
