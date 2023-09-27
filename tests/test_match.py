@@ -7,7 +7,7 @@ from pathlib import Path
 from pydantic import ByteSize, ValidationError
 
 from algobattle.battle import Fight, Iterated, Averaged
-from algobattle.match import ProjectConfig, Match, AlgobattleConfig, MatchConfig, RunConfig, TeamInfo
+from algobattle.match import MatchupStr, ProjectConfig, Match, AlgobattleConfig, MatchConfig, RunConfig, TeamInfo
 from algobattle.program import ProgramRunInfo, Team, Matchup, TeamHandler
 from .testsproblem.problem import TestProblem
 
@@ -41,7 +41,9 @@ class Matchtests(TestCase):
         cls.team0 = TestTeam("0")
         cls.team1 = TestTeam("1")
         cls.matchup0 = Matchup(cls.team0, cls.team1)
+        cls.matchup0_str = MatchupStr.make(cls.matchup0)
         cls.matchup1 = Matchup(cls.team1, cls.team0)
+        cls.matchup1_str = MatchupStr.make(cls.matchup1)
         cls.team_dict: dict[str, Any] = {
             "active_teams": [cls.team0.name, cls.team1.name],
             "excluded_teams": {},
@@ -67,8 +69,8 @@ class Matchtests(TestCase):
         match = Match(**self.team_dict)
         battle = Iterated()
         battle.results = [0]
-        match.insert_battle(battle, self.matchup0)
-        match.insert_battle(battle, self.matchup1)
+        match.results[self.matchup0_str] = battle
+        match.results[self.matchup1_str] = battle
         self.assertEqual(match.calculate_points(100), {self.team0.name: 50, self.team1.name: 50})
 
     def test_calculate_points_iterated_draw(self):
@@ -76,8 +78,8 @@ class Matchtests(TestCase):
         match = Match(**self.team_dict)
         battle = Iterated()
         battle.results = [20]
-        match.insert_battle(battle, self.matchup0)
-        match.insert_battle(battle, self.matchup1)
+        match.results[self.matchup0_str] = battle
+        match.results[self.matchup1_str] = battle
         self.assertEqual(match.calculate_points(100), {self.team0.name: 50, self.team1.name: 50})
 
     def test_calculate_points_iterated_domination(self):
@@ -87,8 +89,8 @@ class Matchtests(TestCase):
         battle.results = [10]
         battle2 = Iterated()
         battle2.results = [0]
-        match.insert_battle(battle, self.matchup0)
-        match.insert_battle(battle2, self.matchup1)
+        match.results[self.matchup0_str] = battle
+        match.results[self.matchup1_str] = battle2
         self.assertEqual(match.calculate_points(100), {self.team0.name: 0, self.team1.name: 100})
 
     def test_calculate_points_iterated_one_team_better(self):
@@ -98,8 +100,8 @@ class Matchtests(TestCase):
         battle.results = [10]
         battle2 = Iterated()
         battle2.results = [20]
-        match.insert_battle(battle, self.matchup0)
-        match.insert_battle(battle2, self.matchup1)
+        match.results[self.matchup0_str] = battle
+        match.results[self.matchup1_str] = battle2
         self.assertEqual(match.calculate_points(100), {self.team0.name: 66.7, self.team1.name: 33.3})
 
     def test_calculate_points_averaged_no_successful_round(self):
@@ -107,8 +109,8 @@ class Matchtests(TestCase):
         match = Match(**self.team_dict)
         battle = Averaged()
         battle.fights = dummy_result(0, 0, 0)
-        match.insert_battle(battle, self.matchup0)
-        match.insert_battle(battle, self.matchup1)
+        match.results[self.matchup0_str] = battle
+        match.results[self.matchup1_str] = battle
         self.assertEqual(match.calculate_points(100), {self.team0.name: 50, self.team1.name: 50})
 
     def test_calculate_points_averaged_draw(self):
@@ -116,8 +118,8 @@ class Matchtests(TestCase):
         match = Match(**self.team_dict)
         battle = Averaged()
         battle.fights = dummy_result(0.5, 0.5, 0.5)
-        match.insert_battle(battle, self.matchup0)
-        match.insert_battle(battle, self.matchup1)
+        match.results[self.matchup0_str] = battle
+        match.results[self.matchup1_str] = battle
         self.assertEqual(match.calculate_points(100), {self.team0.name: 50, self.team1.name: 50})
 
     def test_calculate_points_averaged_domination(self):
@@ -127,8 +129,8 @@ class Matchtests(TestCase):
         battle.fights = dummy_result(0, 0, 0)
         battle2 = Averaged()
         battle2.fights = dummy_result(1, 1, 1)
-        match.insert_battle(battle, self.matchup0)
-        match.insert_battle(battle2, self.matchup1)
+        match.results[self.matchup0_str] = battle
+        match.results[self.matchup1_str] = battle2
         self.assertEqual(match.calculate_points(100), {self.team0.name: 100, self.team1.name: 0})
 
     def test_calculate_points_averaged_one_team_better(self):
@@ -138,8 +140,8 @@ class Matchtests(TestCase):
         battle.fights = dummy_result(0.6, 0.6, 0.6)
         battle2 = Averaged()
         battle2.fights = dummy_result(0.4, 0.4, 0.4)
-        match.insert_battle(battle, self.matchup0)
-        match.insert_battle(battle2, self.matchup1)
+        match.results[self.matchup0_str] = battle
+        match.results[self.matchup1_str] = battle2
         self.assertEqual(match.calculate_points(100), {self.team0.name: 40, self.team1.name: 60})
 
     # TODO: Add tests for remaining functions
@@ -175,37 +177,34 @@ class Execution(IsolatedAsyncioTestCase):
     async def test_basic(self):
         self.config_iter.teams = {"team_0": TeamInfo(generator=self.generator, solver=self.solver)}
         res = await Match().run(self.config_iter)
-        for res_dict in res.results.values():
-            for result in res_dict.values():
-                self.assertIsNone(result.run_exception)
-                for fight in result.fights:
-                    self.assertIsNone(fight.generator.error)
-                    assert fight.solver is not None
-                    self.assertIsNone(fight.solver.error)
+        for result in res.results.values():
+            self.assertIsNone(result.run_exception)
+            for fight in result.fights:
+                self.assertIsNone(fight.generator.error)
+                assert fight.solver is not None
+                self.assertIsNone(fight.solver.error)
 
     async def test_multi_team(self):
         team0 = TeamInfo(generator=self.generator, solver=self.solver)
         team1 = TeamInfo(generator=self.generator, solver=self.solver)
         self.config_iter.teams = {"team_0": team0, "team_1": team1}
         res = await Match().run(self.config_iter)
-        for res_dict in res.results.values():
-            for result in res_dict.values():
-                self.assertIsNone(result.run_exception)
-                for fight in result.fights:
-                    self.assertIsNone(fight.generator.error)
-                    assert fight.solver is not None
-                    self.assertIsNone(fight.solver.error)
+        for result in res.results.values():
+            self.assertIsNone(result.run_exception)
+            for fight in result.fights:
+                self.assertIsNone(fight.generator.error)
+                assert fight.solver is not None
+                self.assertIsNone(fight.solver.error)
 
     async def test_averaged(self):
         self.config_avg.teams = {"team_0": TeamInfo(generator=self.generator, solver=self.solver)}
         res = await Match().run(self.config_avg)
-        for res_dict in res.results.values():
-            for result in res_dict.values():
-                self.assertIsNone(result.run_exception)
-                for fight in result.fights:
-                    self.assertIsNone(fight.generator.error)
-                    assert fight.solver is not None
-                    self.assertIsNone(fight.solver.error)
+        for result in res.results.values():
+            self.assertIsNone(result.run_exception)
+            for fight in result.fights:
+                self.assertIsNone(fight.generator.error)
+                assert fight.solver is not None
+                self.assertIsNone(fight.solver.error)
 
 
 class Parsing(TestCase):

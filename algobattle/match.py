@@ -1,12 +1,11 @@
 """Module defining how a match is run."""
-from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from functools import cached_property
 from itertools import combinations
 from pathlib import Path
 import tomllib
-from typing import Annotated, Any, Iterable, Protocol, ClassVar, Self, TypeAlias, TypeVar, cast, overload
+from typing import Annotated, Any, Iterable, Protocol, ClassVar, Self, TypeAlias, TypeVar, cast
 from typing_extensions import override
 from typing_extensions import TypedDict
 
@@ -18,6 +17,7 @@ from pydantic import (
     GetCoreSchemaHandler,
     ValidationInfo,
     field_validator,
+    model_serializer,
     model_validator,
 )
 from pydantic.types import PathType
@@ -28,7 +28,7 @@ from anyio.to_thread import current_default_thread_limiter
 from docker.types import LogConfig, Ulimit
 
 from algobattle.battle import Battle, FightHandler, FightUi, BattleUi, Iterated
-from algobattle.program import ProgramConfigView, ProgramUi, Matchup, TeamHandler, Team, BuildUi
+from algobattle.program import ProgramConfigView, ProgramUi, Matchup, TeamHandler, BuildUi
 from algobattle.problem import InstanceT, Problem, SolutionT
 from algobattle.util import (
     ExceptionInfo,
@@ -39,14 +39,36 @@ from algobattle.util import (
 )
 
 
+@dataclass(frozen=True)
+class MatchupStr:
+    """Holds the names of teams in a matchup."""
+
+    generator: str
+    solver: str
+
+    @classmethod
+    def make(cls, matchup: Matchup) -> Self:
+        """Creates an instance from a matchup object."""
+        return cls(matchup.generator.name, matchup.solver.name)
+
+    @classmethod
+    def __pydantic_get_core_schema__(cls, source: type[Self], handler: GetCoreSchemaHandler) -> CoreSchema:
+        def parse(val: str) -> Self:
+            return cls(*val.split(" vs "))
+
+        return no_info_after_validator_function(parse, handler(str))
+
+    @model_serializer
+    def __str__(self) -> str:
+        return f"{self.generator} vs {self.solver}"
+
+
 class Match(BaseModel):
     """The Result of a whole Match."""
 
     active_teams: list[str] = field(default_factory=list)
     excluded_teams: dict[str, ExceptionInfo] = field(default_factory=dict)
-    results: defaultdict[str, Annotated[dict[str, Battle], Field(default_factory=dict)]] = Field(
-        default_factory=lambda: defaultdict(dict)
-    )
+    results: dict[MatchupStr, Battle] = Field(default_factory=dict)
 
     async def _run_battle(
         self,
@@ -116,62 +138,9 @@ class Match(BaseModel):
             async with create_task_group() as tg:
                 for matchup in teams.matchups:
                     battle = battle_cls()
-                    self.results[matchup.generator.name][matchup.solver.name] = battle
+                    self.results[MatchupStr.make(matchup)] = battle
                     tg.start_soon(self._run_battle, battle, matchup, config, problem, match_cpus, ui, limiter)
         return self
-
-    @overload
-    def battle(self, matchup: Matchup) -> Battle | None:
-        ...
-
-    @overload
-    def battle(self, *, generating: Team, solving: Team) -> Battle | None:
-        ...
-
-    def battle(
-        self,
-        matchup: Matchup | None = None,
-        *,
-        generating: Team | None = None,
-        solving: Team | None = None,
-    ) -> Battle | None:
-        """Helper method to look up the battle between a specific matchup.
-
-        Returns:
-            The battle if it has started already, otherwise `None`.
-        """
-        try:
-            if matchup is not None:
-                return self.results[matchup.generator.name][matchup.solver.name]
-            if generating is not None and solving is not None:
-                return self.results[generating.name][solving.name]
-            raise TypeError
-        except KeyError:
-            return None
-
-    @overload
-    def insert_battle(self, battle: Battle, matchup: Matchup) -> None:
-        ...
-
-    @overload
-    def insert_battle(self, battle: Battle, *, generating: Team, solving: Team) -> None:
-        ...
-
-    def insert_battle(
-        self,
-        battle: Battle,
-        matchup: Matchup | None = None,
-        *,
-        generating: Team | None = None,
-        solving: Team | None = None,
-    ) -> None:
-        """Helper method to insert a new battle for a specific matchup."""
-        if matchup is not None:
-            self.results[matchup.generator.name][matchup.solver.name] = battle
-        elif generating is not None and solving is not None:
-            self.results[generating.name][solving.name] = battle
-        else:
-            raise TypeError
 
     def calculate_points(self, total_points_per_team: int) -> dict[str, float]:
         """Calculate the number of points each team scored.
@@ -192,8 +161,8 @@ class Match(BaseModel):
 
         for first, second in combinations(self.active_teams, 2):
             try:
-                first_res = self.results[second][first]
-                second_res = self.results[first][second]
+                first_res = self.results[MatchupStr(second, first)]
+                second_res = self.results[MatchupStr(first, second)]
             except KeyError:
                 continue
             total_score = max(0, first_res.score()) + max(0, second_res.score())
