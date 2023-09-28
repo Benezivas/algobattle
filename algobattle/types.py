@@ -7,6 +7,7 @@ from typing import (
     ClassVar,
     Collection,
     Iterator,
+    Literal,
     TypeVar,
     Generic,
     TypedDict,
@@ -70,6 +71,7 @@ __all__ = (
     "VertexWeights",
     "AlgobattleContext",
     "LaxComp",
+    "lax_comp",
 )
 
 
@@ -527,3 +529,25 @@ class LaxComp:
 
     def __ge__(self, other: float, /) -> bool:
         return self.value >= other or self == other
+
+
+def lax_comp(value: float, cmp: Literal["<=", "==", ">="], other: float, role: Role) -> bool:
+    """Helper function to explicitly use the `LaxComp` comparison mechanism.
+
+    Args:
+        value: First value to compare.
+        cmp: Comparison to perform, one of "<=", "==", or ">=".
+        other: Other value to compare.
+        role: Role of the program the values are being validated for.
+
+    Returns:
+        Result of the comparison.
+    """
+    val = LaxComp(value, role)
+    match cmp:
+        case "<=":
+            return val <= other
+        case "==":
+            return val == other
+        case ">=":
+            return val >= other
