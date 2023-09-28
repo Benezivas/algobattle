@@ -500,7 +500,7 @@ class LaxComp:
 
     !!! example "Usage"
         ```py
-            LaxComp(some_val ** 2) <= comparison_val
+            LaxComp(some_val ** 2, role) <= comparison_val
         ```
     """
 
@@ -522,14 +522,8 @@ class LaxComp:
         else:
             return NotImplemented
 
-    def __lt__(self, other: float, /) -> bool:
-        return self.value < other
-
     def __le__(self, other: float, /) -> bool:
         return self.value <= other or self == other
-
-    def __gt__(self, other: float, /) -> bool:
-        return self.value > other
 
     def __ge__(self, other: float, /) -> bool:
         return self.value >= other or self == other
