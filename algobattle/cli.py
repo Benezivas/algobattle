@@ -46,7 +46,7 @@ from tomlkit.exceptions import ParseError
 from tomlkit.items import Table as TomlTable
 
 from algobattle.battle import Battle
-from algobattle.match import AlgobattleConfig, EmptyUi, Match, MatchConfig, Ui, ProjectConfig
+from algobattle.match import AlgobattleConfig, EmptyUi, Match, MatchConfig, MatchupStr, Ui, ProjectConfig
 from algobattle.problem import Instance, Problem, Solution
 from algobattle.program import Generator, Matchup, Solver
 from algobattle.util import BuildError, EncodableModel, ExceptionInfo, Role, RunningTimer, BaseModel, TempDir, timestamp
@@ -713,13 +713,12 @@ class CliUi(Live, Ui):
             Column("Result", justify="right"),
             title="[heading]Match overview",
         )
-        for generating, battles in match.results.items():
-            for solving, result in battles.items():
-                if result.run_exception is None:
-                    res = result.format_score(result.score())
-                else:
-                    res = ":warning:"
-                table.add_row(generating, solving, res)
+        for matchup, battle in match.battles.items():
+            if battle.runtime_error is None:
+                res = battle.format_score(battle.score())
+            else:
+                res = ":warning:"
+            table.add_row(matchup.generator, matchup.solver, res)
         return Padding(table, pad=(1, 0, 0, 0))
 
     @override
@@ -769,7 +768,7 @@ class CliUi(Live, Ui):
 
     @override
     def end_fight(self, matchup: Matchup) -> None:
-        battle = self.match.battle(matchup)
+        battle = self.match.battles[MatchupStr.make(matchup)]
         assert battle is not None
         fights = battle.fights[-1:-6:-1]
         panel = self.battle_panels[matchup]

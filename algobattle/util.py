@@ -40,19 +40,6 @@ class Role(StrEnum):
 T = TypeVar("T")
 
 
-def str_with_traceback(exception: Exception) -> str:
-    """Returns the full exception info with a stacktrace."""
-    return "\n".join(format_exception(exception))
-
-
-def inherit_docs(obj: T) -> T:
-    """Decorator to mark a method as inheriting its docstring.
-
-    Python 3.5+ already does this, but pydocstyle needs a static hint.
-    """
-    return obj
-
-
 ModelType = Literal["instance", "solution", "other"]
 ModelReference = ModelType | Literal["self"]
 
@@ -316,7 +303,7 @@ def flat_intersperse(iterable: Iterable[Iterable[T]], element: T) -> Iterable[T]
 class AlgobattleBaseException(Exception):
     """Base exception class for errors used by the algobattle package."""
 
-    def __init__(self, message: LiteralString, *, detail: str | None = None) -> None:
+    def __init__(self, message: LiteralString, *, detail: str | list[str] | list[dict[str, Any]] | None = None) -> None:
         """Base exception class for errors used by the algobattle package.
 
         Args:
@@ -368,7 +355,7 @@ class ExceptionInfo(BaseModel):
 
     type: str
     message: str
-    detail: str | None = None
+    detail: str | list[str] | list[dict[str, Any]] | None = None
 
     @classmethod
     def from_exception(cls, error: Exception) -> Self:
@@ -383,7 +370,7 @@ class ExceptionInfo(BaseModel):
             return cls(
                 type=error.__class__.__name__,
                 message=str(error),
-                detail=str_with_traceback(error),
+                detail=format_exception(error),
             )
 
 

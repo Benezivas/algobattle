@@ -43,7 +43,7 @@ from algobattle.program import (
     Solver,
 )
 from algobattle.problem import AnyProblem
-from algobattle.util import Encodable, inherit_docs, BaseModel
+from algobattle.util import Encodable, ExceptionInfo, BaseModel
 
 
 _BattleConfig: TypeAlias = Any
@@ -223,7 +223,7 @@ class Battle(BaseModel):
 
     fights: list[Fight] = Field(default_factory=list)
     """The list of fights that have been fought in this battle."""
-    run_exception: str | None = None
+    runtime_error: ExceptionInfo | None = None
     """The description of an otherwise unhandeled exception that occured during the execution of :meth:`Battle.run`."""
 
     _battle_types: ClassVar[dict[str, type[Self]]] = {}
@@ -407,8 +407,7 @@ class Iterated(Battle):
         exit after that many failures, or `"unlimited"` to never exit early.
         """
 
-    @inherit_docs
-    class UiData(Battle.UiData):
+    class UiData(Battle.UiData):  # noqa: D106
         reached: list[int]
         cap: int
         note: str
@@ -464,9 +463,8 @@ class Iterated(Battle):
         """Averages the highest instance size reached in each round."""
         return 0 if len(self.results) == 0 else sum(self.results) / len(self.results)
 
-    @inherit_docs
     @staticmethod
-    def format_score(score: float) -> str:
+    def format_score(score: float) -> str:  # noqa: D102
         return str(int(score))
 
 
@@ -483,8 +481,7 @@ class Averaged(Battle):
         num_fights: int = 10
         """Number of iterations in each round."""
 
-    @inherit_docs
-    class UiData(Battle.UiData):
+    class UiData(Battle.UiData):  # noqa: D106
         round: int
 
     async def run_battle(self, fight: FightHandler, config: Config, min_size: int, ui: BattleUi) -> None:
@@ -505,7 +502,6 @@ class Averaged(Battle):
         else:
             return sum(f.score for f in self.fights) / len(self.fights)
 
-    @inherit_docs
     @staticmethod
-    def format_score(score: float) -> str:
+    def format_score(score: float) -> str:  # noqa: D102
         return format(score, ".0%")
