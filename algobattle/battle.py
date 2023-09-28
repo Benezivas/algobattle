@@ -34,7 +34,7 @@ from pydantic import (
     ValidatorFunctionWrapHandler,
 )
 from pydantic_core import CoreSchema
-from pydantic_core.core_schema import tagged_union_schema, general_wrap_validator_function
+from pydantic_core.core_schema import tagged_union_schema, with_info_wrap_validator_function
 
 from algobattle.program import (
     Generator,
@@ -295,7 +295,7 @@ class Battle(BaseModel):
                             f"The specified battle type '{passed}' is not installed. Installed types are: {installed}"
                         )
 
-            return general_wrap_validator_function(check_installed, subclass_schema)
+            return with_info_wrap_validator_function(check_installed, subclass_schema)
 
     class FallbackConfig(Config):
         """Fallback config object to parse into if the proper battle typ isn't installed and we're ignoring installs."""
