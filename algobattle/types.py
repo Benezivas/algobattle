@@ -1,6 +1,19 @@
 """Utility types used to easily define Problems."""
 from dataclasses import dataclass
-from typing import Annotated, Any, Collection, Iterator, TypeVar, Generic, TypedDict, overload
+from sys import float_info
+from typing import (
+    Annotated,
+    Any,
+    ClassVar,
+    Collection,
+    Iterator,
+    Self,
+    SupportsIndex,
+    TypeVar,
+    Generic,
+    TypedDict,
+    overload,
+)
 import annotated_types as at
 from annotated_types import (
     BaseMetadata,
@@ -58,6 +71,7 @@ __all__ = (
     "EdgeWeights",
     "VertexWeights",
     "AlgobattleContext",
+    "LaxFloat",
 )
 
 
@@ -472,3 +486,111 @@ class VertexWeights(DirectedGraph, BaseModel, Generic[Weight]):
     """Mixin for graphs with weighted vertices."""
 
     vertex_weights: Annotated[list[Weight], SizeLen]
+
+
+class LaxFloat(float):
+    """Helper class to make forgiving float comparisons easy.
+
+    When comparing floats for equality there often are frustrating edge cases introduced by its imprecisions. This can
+    lead to matches not being decided by which team generates better instances, but by who can craft the most finnicky
+    floating point values. This class lets you easily sidestep these problems.
+
+    It implements comparison operations by adding a small epsilon that covers an allowable range of imprecision. The
+    solving team will receive twice the epsilon that the generating team was given. This means that the generator cannot
+    try to exploit imprecision issues since the solver has a bigger tolerance to play with.
+    Arithmetically these behave the same as regular floats, but any operations involving at least one LaxFloat return
+    another LaxFloat. Because of this, you can construct other bounds based on these and still benefit from the lax
+    comparisons.
+    """
+
+    factor: ClassVar[int | None] = None
+    relative_epsilon: ClassVar[float] = 128 * float_info.epsilon
+    absolute_epsilon: ClassVar[float] = float_info.min
+
+    def __eq__(self, value: object, /) -> bool:
+        if not self.factor:
+            return super().__eq__(value)
+        elif isinstance(value, (float, int, bool)):
+            first, second = float(self), float(value)
+            diff = abs(first - second)
+            norm = min(abs(first) + abs(second), float_info.max)
+            return diff <= self.factor * max(self.absolute_epsilon, norm * self.relative_epsilon)
+        else:
+            return False
+
+    def __ne__(self, value: object, /) -> bool:
+        return not (self == value)
+
+    def __le__(self, value: float, /) -> bool:
+        return self < value or self == value
+
+    def __ge__(self, value: float, /) -> bool:
+        return self > value or self == value
+
+    def __add__(self, value: float, /) -> Self:
+        return LaxFloat(super().__add__(value))
+
+    def __radd__(self, value: float, /) -> Self:
+        return LaxFloat(super().__radd__(value))
+
+    def __sub__(self, value: float, /) -> Self:
+        return LaxFloat(super().__sub__(value))
+
+    def __rsub__(self, value: float, /) -> Self:
+        return LaxFloat(super().__rsub__(value))
+
+    def __mul__(self, value: float, /) -> Self:
+        return LaxFloat(super().__mul__(value))
+
+    def __rmul__(self, value: float, /) -> Self:
+        return LaxFloat(super().__rmul__(value))
+
+    def __truediv__(self, value: float, /) -> Self:
+        return LaxFloat(super().__truediv__(value))
+
+    def __rtruediv__(self, value: float, /) -> Self:
+        return LaxFloat(super().__rtruediv__(value))
+
+    def __floordiv__(self, value: float, /) -> Self:
+        return LaxFloat(super().__floordiv__(value))
+
+    def __rfloordiv__(self, value: float, /) -> Self:
+        return LaxFloat(super().__rfloordiv__(value))
+
+    def __divmod__(self, value: float, /) -> tuple[Self, Self]:
+        a, b = super().__divmod__(value)
+        return LaxFloat(a), LaxFloat(b)
+
+    def __rdivmod__(self, value: float, /) -> tuple[Self, Self]:
+        a, b = super().__rdivmod__(value)
+        return LaxFloat(a), LaxFloat(b)
+
+    def __pow__(self, value: float, __mod: None = None, /) -> Self:
+        return LaxFloat(super().__pow__(value, __mod))
+
+    def __neg__(self, /) -> Self:
+        return LaxFloat(super().__neg__())
+
+    def __pos__(self, /) -> Self:
+        return LaxFloat(super().__pos__())
+
+    def __abs__(self, /) -> Self:
+        return LaxFloat(super().__abs__())
+
+    @overload
+    def __round__(self, ndigits: None = None, /) -> int:
+        ...
+
+    @overload
+    def __round__(self, ndigits: SupportsIndex, /) -> Self:
+        ...
+
+    def __round__(self, ndigits: SupportsIndex | None = None, /) -> Self | int:
+        if ndigits is None:
+            return super().__round__(ndigits)
+        else:
+            return LaxFloat(super().__round__(ndigits))
+
+    @classmethod
+    def __get_pydantic_core_schema__(cls, source: type, handler: GetCoreSchemaHandler) -> CoreSchema:
+        return handler(no_info_after_validator_function(cls, handler.generate_schema(float)))
