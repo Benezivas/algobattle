@@ -51,6 +51,12 @@ of 1, 2, 6, 15, 31, etc. while an exponent of 3 leads to 1, 2, 9, 36, 100, 255, 
 : A float between 0 and 1 (inclusive) that is the minimum score a solver needs to achieve to "successfully" solve
 an instance. Defaults to 1.
 
+`max_generator_errors`
+: If a generator fails to produce a valid instance, the solver wins the fight by default. This may create very lengthy
+battles where the generator keeps failing at higher and higher `max_size`s. You can use this setting to early exit and
+award the solver the full score if this happens. Set to an integer to exit after that many consecutive failures, or
+`#!toml "unlimited"` to never exit early.
+
 ### UI Data
 
 Iterated battles display two values to the UI:

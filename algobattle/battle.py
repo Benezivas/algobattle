@@ -8,6 +8,7 @@ from functools import wraps
 from importlib.metadata import entry_points
 from abc import abstractmethod
 from inspect import isclass
+from itertools import count
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -15,6 +16,7 @@ from typing import (
     Callable,
     ClassVar,
     Concatenate,
+    Iterable,
     Literal,
     ParamSpec,
     Protocol,
@@ -397,11 +399,19 @@ class Iterated(Battle):
         """Determines how quickly the instance size grows."""
         minimum_score: float = 1
         """Minimum score that a solver needs to achieve in order to pass."""
+        max_generator_errors: int | Literal["unlimited"] = 5
+        """If a generator fails to produce a valid instance, the solver wins the fight by default.
+
+        This may create very lengthy battles where the generator keeps failing at higher and higher `max_size`s. You
+        can use this setting to early exit and award the solver the full score if this happens. Set to an integer to
+        exit after that many failures, or `"unlimited"` to never exit early.
+        """
 
     @inherit_docs
     class UiData(Battle.UiData):
         reached: list[int]
         cap: int
+        note: str
 
     async def run_battle(self, fight: FightHandler, config: Config, min_size: int, ui: BattleUi) -> None:
         """Execute an iterated battle.
@@ -415,41 +425,40 @@ class Iterated(Battle):
 
         This process is repeated `rounds` many times, with each round being completely independent of each other.
         """
+
+        def sizes(size: int, max_size: int) -> Iterable[int]:
+            counter = count(1)
+            size = max(size, min_size)
+            while size <= max_size:
+                yield size
+                size += next(counter) ** config.exponent
+
+        note = "Starting battle..."
         for _ in range(config.rounds):
-            base_increment = 0
-            alive = True
-            reached = 0
+            max_size = config.maximum_size
             self.results.append(0)
-            cap = config.maximum_size
-            current = min_size
-            while alive:
-                ui.update_battle_data(self.UiData(reached=self.results, cap=cap))
-                result = await fight.run(current)
-                score = result.score
-                if score < config.minimum_score:
-                    alive = False
-
-                if not alive and base_increment > 1:
-                    # The step size increase was too aggressive, take it back and reset the base_increment
-                    cap = current
-                    current -= base_increment**config.exponent
-                    base_increment = 0
-                    alive = True
-                elif current > reached and alive:
-                    # We solved an instance of bigger size than before
-                    self.results[-1] = reached = current
-
-                if current + 1 > cap:
-                    alive = False
+            gen_errors = 0
+            while self.results[-1] < max_size:
+                for size in sizes(self.results[-1] + 1, max_size):
+                    ui.update_battle_data(self.UiData(reached=self.results, cap=max_size, note=note))
+                    result = await fight.run(size)
+                    if result.generator.error and config.max_generator_errors != "unlimited":
+                        gen_errors += 1
+                        if gen_errors >= config.max_generator_errors:
+                            self.results[-1] = max_size
+                            note = f"Generator failed {gen_errors} times in a row, solver wins round by default!"
+                            break
+                    else:
+                        gen_errors = 0
+                    if result.score < config.minimum_score:
+                        max_size = size - 1
+                        note = "Solver didn't achieve the needed score, resetting the cap"
+                        break
+                    else:
+                        note = "Solver was successful, increasing the cap"
+                        self.results[-1] = size
                 else:
-                    base_increment += 1
-                    current += base_increment**config.exponent
-
-                    if current >= cap:
-                        # We have failed at this value of n already, reset the step size!
-                        current -= base_increment**config.exponent - 1
-                        base_increment = 1
-            self.results[-1] = reached
+                    note = "Cap reached, resetting instance size"
 
     def score(self) -> float:
         """Averages the highest instance size reached in each round."""
