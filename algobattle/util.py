@@ -21,13 +21,12 @@ from annotated_types import GroupedMetadata
 from pydantic import (
     ConfigDict,
     BaseModel as PydandticBaseModel,
-    Extra,
     GetCoreSchemaHandler,
     ValidationError as PydanticValidationError,
     ValidationInfo,
 )
 from pydantic_core import CoreSchema
-from pydantic_core.core_schema import general_after_validator_function
+from pydantic_core.core_schema import with_info_after_validator_function
 
 
 class Role(StrEnum):
@@ -47,7 +46,7 @@ ModelReference = ModelType | Literal["self"]
 class BaseModel(PydandticBaseModel):
     """Base class for all pydantic models."""
 
-    model_config = ConfigDict(extra=Extra.forbid, from_attributes=True)
+    model_config = ConfigDict(extra="forbid", from_attributes=True)
 
 
 class InstanceSolutionModel(BaseModel):
@@ -168,7 +167,7 @@ class AttributeReferenceValidator:
                     return value
                 return func(value, attribute_val)
 
-        return general_after_validator_function(wrapper, schema=schema)
+        return with_info_after_validator_function(wrapper, schema=schema)
 
     def needs_self(self, model_type: ModelType) -> bool:
         """Checks if the validator needs a reference to the current model in order to work fully."""

@@ -1,12 +1,13 @@
 """Tests for pydantic parsing types."""
-from typing import Annotated
+from typing import Annotated, Any
 from unittest import TestCase, main
+from unittest.util import safe_repr
 
 from pydantic import ValidationError
 
 from algobattle.problem import InstanceModel
-from algobattle.util import AttributeReference, SelfRef
-from algobattle.types import Ge, Interval, SizeIndex, UniqueItems
+from algobattle.util import AttributeReference, Role, SelfRef
+from algobattle.types import Ge, Interval, LaxComp, SizeIndex, UniqueItems
 
 
 class ModelCreationTests(TestCase):
@@ -165,6 +166,165 @@ class UniqueItemsTest(TestCase):
     def test_schema(self):
         schema = self.TestModel.model_json_schema()
         self.assertIn("uniqueItems", schema["properties"]["array"])
+
+
+class LaxCompTests(TestCase):
+    """Tests for the LaxComp helper."""
+
+    def assertNotGreaterEqual(self, a: Any, b: Any, msg: str | None = None) -> None:
+        if msg is None:
+            msg = f"{safe_repr(a)} greater than or equal to {safe_repr(b)}"
+        self.assertFalse(a >= b, msg)
+
+    def assertNotLessEqual(self, a: Any, b: Any, msg: str | None = None) -> None:
+        if msg is None:
+            msg = f"{safe_repr(a)} less than or equal to {safe_repr(b)}"
+        self.assertFalse(a <= b, msg)
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        LaxComp.absolute_epsilon = 1
+        LaxComp.relative_epsilon = 0.1
+
+    def test_equal_strict(self) -> None:
+        self.assertEqual(LaxComp(0, Role.generator), 0)
+        self.assertEqual(LaxComp(0, Role.solver), 0)
+
+    def test_equal_small(self) -> None:
+        self.assertEqual(LaxComp(0, Role.generator), 0.5)
+        self.assertEqual(LaxComp(0, Role.solver), 0.5)
+
+    def test_equal_medium(self) -> None:
+        self.assertNotEqual(LaxComp(0, Role.generator), 1.5)
+        self.assertEqual(LaxComp(0, Role.solver), 1.5)
+
+    def test_equal_big(self) -> None:
+        self.assertNotEqual(LaxComp(0, Role.generator), 2.5)
+        self.assertNotEqual(LaxComp(0, Role.solver), 2.5)
+
+    def test_equal_rel_strict(self) -> None:
+        self.assertEqual(LaxComp(100, Role.generator), 100)
+        self.assertEqual(LaxComp(100, Role.solver), 100)
+
+    def test_equal_rel_small(self) -> None:
+        self.assertEqual(LaxComp(100, Role.generator), 110)
+        self.assertEqual(LaxComp(100, Role.solver), 110)
+
+    def test_equal_rel_medium(self) -> None:
+        self.assertNotEqual(LaxComp(100, Role.generator), 130)
+        self.assertEqual(LaxComp(100, Role.solver), 130)
+
+    def test_equal_rel_big(self) -> None:
+        self.assertNotEqual(LaxComp(100, Role.generator), 160)
+        self.assertNotEqual(LaxComp(100, Role.solver), 160)
+
+    def test_greater_equal_greater(self) -> None:
+        self.assertGreaterEqual(LaxComp(1, Role.generator), 0)
+        self.assertGreaterEqual(LaxComp(1, Role.solver), 0)
+        self.assertGreaterEqual(1, LaxComp(0, Role.generator))
+        self.assertGreaterEqual(1, LaxComp(0, Role.solver))
+
+    def test_greater_equal_strict(self) -> None:
+        self.assertGreaterEqual(LaxComp(0, Role.generator), 0)
+        self.assertGreaterEqual(LaxComp(0, Role.solver), 0)
+        self.assertGreaterEqual(0, LaxComp(0, Role.generator))
+        self.assertGreaterEqual(0, LaxComp(0, Role.solver))
+
+    def test_greater_equal_small(self) -> None:
+        self.assertGreaterEqual(LaxComp(0, Role.generator), 0.5)
+        self.assertGreaterEqual(LaxComp(0, Role.solver), 0.5)
+        self.assertGreaterEqual(0, LaxComp(0.5, Role.generator))
+        self.assertGreaterEqual(0, LaxComp(0.5, Role.solver))
+
+    def test_greater_equal_medium(self) -> None:
+        self.assertNotGreaterEqual(LaxComp(0, Role.generator), 1.5)
+        self.assertGreaterEqual(LaxComp(0, Role.solver), 1.5)
+        self.assertNotGreaterEqual(0, LaxComp(1.5, Role.generator))
+        self.assertGreaterEqual(0, LaxComp(1.5, Role.solver))
+
+    def test_greater_equal_big(self) -> None:
+        self.assertNotGreaterEqual(LaxComp(0, Role.generator), 2.5)
+        self.assertNotGreaterEqual(LaxComp(0, Role.solver), 2.5)
+        self.assertNotGreaterEqual(0, LaxComp(2.5, Role.generator))
+        self.assertNotGreaterEqual(0, LaxComp(2.5, Role.solver))
+
+    def test_greater_equal_rel_strict(self) -> None:
+        self.assertGreaterEqual(LaxComp(100, Role.generator), 100)
+        self.assertGreaterEqual(LaxComp(100, Role.solver), 100)
+        self.assertGreaterEqual(100, LaxComp(100, Role.generator))
+        self.assertGreaterEqual(100, LaxComp(100, Role.solver))
+
+    def test_greater_equal_rel_small(self) -> None:
+        self.assertGreaterEqual(LaxComp(100, Role.generator), 110)
+        self.assertGreaterEqual(LaxComp(100, Role.solver), 110)
+        self.assertGreaterEqual(100, LaxComp(110, Role.generator))
+        self.assertGreaterEqual(100, LaxComp(110, Role.solver))
+
+    def test_greater_equal_rel_medium(self) -> None:
+        self.assertNotGreaterEqual(LaxComp(100, Role.generator), 130)
+        self.assertGreaterEqual(LaxComp(100, Role.solver), 130)
+        self.assertNotGreaterEqual(100, LaxComp(130, Role.generator))
+        self.assertGreaterEqual(100, LaxComp(130, Role.solver))
+
+    def test_greater_equal_rel_big(self) -> None:
+        self.assertNotGreaterEqual(LaxComp(100, Role.generator), 160)
+        self.assertNotGreaterEqual(LaxComp(100, Role.solver), 160)
+        self.assertNotGreaterEqual(100, LaxComp(160, Role.generator))
+        self.assertNotGreaterEqual(100, LaxComp(160, Role.solver))
+
+    def test_less_equal_less(self) -> None:
+        self.assertLessEqual(LaxComp(0, Role.generator), 1)
+        self.assertLessEqual(LaxComp(0, Role.solver), 1)
+        self.assertLessEqual(0, LaxComp(1, Role.generator))
+        self.assertLessEqual(0, LaxComp(1, Role.solver))
+
+    def test_less_equal_strict(self) -> None:
+        self.assertLessEqual(LaxComp(0, Role.generator), 0)
+        self.assertLessEqual(LaxComp(0, Role.solver), 0)
+        self.assertLessEqual(0, LaxComp(0, Role.generator))
+        self.assertLessEqual(0, LaxComp(0, Role.solver))
+
+    def test_less_equal_small(self) -> None:
+        self.assertLessEqual(LaxComp(0.5, Role.generator), 0)
+        self.assertLessEqual(LaxComp(0.5, Role.solver), 0)
+        self.assertLessEqual(0.5, LaxComp(0, Role.generator))
+        self.assertLessEqual(0.5, LaxComp(0, Role.solver))
+
+    def test_less_equal_medium(self) -> None:
+        self.assertNotLessEqual(LaxComp(1.5, Role.generator), 0)
+        self.assertLessEqual(LaxComp(1.5, Role.solver), 0)
+        self.assertNotLessEqual(1.5, LaxComp(0, Role.generator))
+        self.assertLessEqual(1.5, LaxComp(0, Role.solver))
+
+    def test_less_equal_big(self) -> None:
+        self.assertNotLessEqual(LaxComp(2.5, Role.generator), 0)
+        self.assertNotLessEqual(LaxComp(2.5, Role.solver), 0)
+        self.assertNotLessEqual(2.5, LaxComp(0, Role.generator))
+        self.assertNotLessEqual(2.5, LaxComp(0, Role.solver))
+
+    def test_less_equal_rel_strict(self) -> None:
+        self.assertLessEqual(LaxComp(100, Role.generator), 100)
+        self.assertLessEqual(LaxComp(100, Role.solver), 100)
+        self.assertLessEqual(100, LaxComp(100, Role.generator))
+        self.assertLessEqual(100, LaxComp(100, Role.solver))
+
+    def test_less_equal_rel_small(self) -> None:
+        self.assertLessEqual(LaxComp(110, Role.generator), 100)
+        self.assertLessEqual(LaxComp(110, Role.solver), 100)
+        self.assertLessEqual(110, LaxComp(100, Role.generator))
+        self.assertLessEqual(110, LaxComp(100, Role.solver))
+
+    def test_less_equal_rel_medium(self) -> None:
+        self.assertNotLessEqual(LaxComp(130, Role.generator), 100)
+        self.assertLessEqual(LaxComp(130, Role.solver), 100)
+        self.assertNotLessEqual(130, LaxComp(100, Role.generator))
+        self.assertLessEqual(130, LaxComp(100, Role.solver))
+
+    def test_less_equal_rel_big(self) -> None:
+        self.assertNotLessEqual(LaxComp(160, Role.generator), 100)
+        self.assertNotLessEqual(LaxComp(160, Role.solver), 100)
+        self.assertNotLessEqual(160, LaxComp(100, Role.generator))
+        self.assertNotLessEqual(160, LaxComp(100, Role.solver))
 
 
 if __name__ == "__main__":

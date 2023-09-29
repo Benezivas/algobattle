@@ -1,6 +1,18 @@
 """Utility types used to easily define Problems."""
 from dataclasses import dataclass
-from typing import Annotated, Any, Collection, Iterator, TypeVar, Generic, TypedDict, overload
+from sys import float_info
+from typing import (
+    Annotated,
+    Any,
+    ClassVar,
+    Collection,
+    Iterator,
+    Literal,
+    TypeVar,
+    Generic,
+    TypedDict,
+    overload,
+)
 import annotated_types as at
 from annotated_types import (
     BaseMetadata,
@@ -58,6 +70,8 @@ __all__ = (
     "EdgeWeights",
     "VertexWeights",
     "AlgobattleContext",
+    "LaxComp",
+    "lax_comp",
 )
 
 
@@ -472,3 +486,68 @@ class VertexWeights(DirectedGraph, BaseModel, Generic[Weight]):
     """Mixin for graphs with weighted vertices."""
 
     vertex_weights: Annotated[list[Weight], SizeLen]
+
+
+@dataclass(frozen=True, slots=True)
+class LaxComp:
+    """Helper class to make forgiving float comparisons easy.
+
+    When comparing floats for equality there often are frustrating edge cases introduced by its imprecisions. This can
+    lead to matches not being decided by which team generates better instances, but by who can craft the most finnicky
+    floating point values. This class lets you easily sidestep these problems.
+
+    It implements comparison operations by adding a small epsilon that covers an allowable range of imprecision. The
+    solving team will receive twice the epsilon that the generating team was given. This means that the generator cannot
+    try to exploit imprecision issues since the solver has a bigger tolerance to play with.
+
+    !!! example "Usage"
+        ```py
+            LaxComp(some_val ** 2, role) <= comparison_val
+        ```
+    """
+
+    value: float
+    """The value that can be relaxed in the comparison."""
+    role: Role
+    """Role of the program whose output is currently being validated."""
+
+    relative_epsilon: ClassVar[float] = 128 * float_info.epsilon
+    absolute_epsilon: ClassVar[float] = float_info.min
+
+    def __eq__(self, other: object, /) -> bool:
+        if isinstance(other, (float, int, bool)):
+            other = float(other)
+            diff = abs(self.value - other)
+            norm = min(abs(self.value) + abs(other), float_info.max)
+            factor = 1 if self.role == Role.generator else 2
+            return diff <= factor * max(self.absolute_epsilon, norm * self.relative_epsilon)
+        else:
+            return NotImplemented
+
+    def __le__(self, other: float, /) -> bool:
+        return self.value <= other or self == other
+
+    def __ge__(self, other: float, /) -> bool:
+        return self.value >= other or self == other
+
+
+def lax_comp(value: float, cmp: Literal["<=", "==", ">="], other: float, role: Role) -> bool:
+    """Helper function to explicitly use the `LaxComp` comparison mechanism.
+
+    Args:
+        value: First value to compare.
+        cmp: Comparison to perform, one of "<=", "==", or ">=".
+        other: Other value to compare.
+        role: Role of the program the values are being validated for.
+
+    Returns:
+        Result of the comparison.
+    """
+    val = LaxComp(value, role)
+    match cmp:
+        case "<=":
+            return val <= other
+        case "==":
+            return val == other
+        case ">=":
+            return val >= other
