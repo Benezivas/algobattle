@@ -19,11 +19,11 @@ choice (by default, in the form of `json`-files.)
 
 If you are interested in how to use the framework for a
 lab course of your own, please consult our
-[teaching concept](www.algobattle.org/docs/teaching_concept/english).
+[teaching concept](https://www.algobattle.org/docs/teaching_concept/english).
 # Installation and Usage
 This project is developed and tested on all major operating systems.
 
-Please consult the official [documentation](www.algobattle.org/docs/)
+Please consult the official [documentation](https://www.algobattle.org/docs/)
 for detailed instructions on installation and usage.
 
 # Related projects
