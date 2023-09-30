@@ -13,7 +13,7 @@ import sys
 from tempfile import TemporaryDirectory
 from traceback import format_exception
 from types import ModuleType
-from typing import Any, Iterable, LiteralString, TypeVar, Self
+from typing import Any, LiteralString, TypeVar, Self
 
 from pydantic import (
     ConfigDict,
@@ -130,15 +130,6 @@ class RunningTimer:
 
     start: datetime
     timeout: float | None
-
-
-def flat_intersperse(iterable: Iterable[Iterable[T]], element: T) -> Iterable[T]:
-    """Inserts `element` between each iterator in `iterable`."""
-    iterator = iter(iterable)
-    yield from next(iterator)
-    for item in iterator:
-        yield element
-        yield from item
 
 
 class AlgobattleBaseException(Exception):

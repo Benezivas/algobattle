@@ -46,8 +46,6 @@ _client_var: DockerClient | None = None
 
 
 T = TypeVar("T")
-_I = TypeVar("_I")
-_S = TypeVar("_S")
 
 
 def client() -> DockerClient:
@@ -595,26 +593,6 @@ class Solver(Program):
     """A higher level interface for a team's solver."""
 
     role: ClassVar[Role] = Role.solver
-
-    def _encode_input(self, input: Path, max_size: int, instance: Instance | None) -> None:
-        assert instance is not None
-        instance.encode(input / "instance", self.role)
-
-    def _parse_output(self, output: Path, max_size: int, instance: Instance | None) -> Solution[Instance]:
-        assert instance is not None
-        try:
-            solution = self.problem.solution_cls.decode(output / "solution", max_size, self.role, instance)
-        except EncodingError:
-            raise
-        except Exception as e:
-            raise EncodingError("Error thrown while decoding the solution.", detail=str(e)) from e
-        try:
-            solution.validate_solution(instance, Role.solver)
-        except ValidationError:
-            raise
-        except Exception as e:
-            raise ValidationError("Unknown error during solution validation.", detail=str(e)) from e
-        return solution
 
     async def run(
         self,
