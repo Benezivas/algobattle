@@ -39,16 +39,15 @@ from algobattle.util import (
     Role,
     BaseModel,
 )
-from algobattle.problem import AnyProblem, Instance, Solution
-
-
-AnySolution = Solution[Instance]
+from algobattle.problem import Problem, Instance, Solution
 
 
 _client_var: DockerClient | None = None
 
 
 T = TypeVar("T")
+_I = TypeVar("_I")
+_S = TypeVar("_S")
 
 
 def client() -> DockerClient:
@@ -186,14 +185,14 @@ class GeneratorResult(ProgramResult):
     """Result of a single generator execution."""
 
     instance: Instance | None = None
-    solution: AnySolution | None = None
+    solution: Solution[Instance] | None = None
 
 
 @dataclass
 class SolverResult(ProgramResult):
     """Result of a single solver execution."""
 
-    solution: AnySolution | None = None
+    solution: Solution[Instance] | None = None
 
 
 @dataclass
@@ -210,7 +209,7 @@ class Program(ABC):
 
     id: str
     """The id of the Docker image."""
-    problem: AnyProblem
+    problem: Problem
     """The problem this program generates/solves."""
     config: ProgramConfigView
     """Config settings used for this program."""
@@ -248,7 +247,7 @@ class Program(ABC):
         cls,
         path: Path,
         *,
-        problem: AnyProblem,
+        problem: Problem,
         config: ProgramConfigView,
         team_name: str | None = None,
     ) -> Self:
@@ -601,7 +600,7 @@ class Solver(Program):
         assert instance is not None
         instance.encode(input / "instance", self.role)
 
-    def _parse_output(self, output: Path, max_size: int, instance: Instance | None) -> AnySolution:
+    def _parse_output(self, output: Path, max_size: int, instance: Instance | None) -> Solution[Instance]:
         assert instance is not None
         try:
             solution = self.problem.solution_cls.decode(output / "solution", max_size, self.role, instance)
@@ -729,7 +728,7 @@ class Team:
         cls,
         name: str,
         info: _TeamInfo,
-        problem: AnyProblem,
+        problem: Problem,
         config: ProgramConfigView,
         ui: BuildUi,
     ) -> "Team":
@@ -825,7 +824,7 @@ class TeamHandler:
     async def build(
         cls,
         infos: Mapping[str, _TeamInfo],
-        problem: AnyProblem,
+        problem: Problem,
         config: ProgramConfigView,
         ui: BuildUi,
     ) -> Self:

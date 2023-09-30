@@ -42,7 +42,7 @@ from algobattle.program import (
     ProgramUi,
     Solver,
 )
-from algobattle.problem import AnyProblem
+from algobattle.problem import Problem
 from algobattle.util import Encodable, ExceptionInfo, BaseModel
 
 
@@ -106,7 +106,7 @@ def _save_result(func: "RunFight[P]") -> "RunFight[P]":
 class FightHandler:
     """Helper class to run fights of a given battle."""
 
-    problem: AnyProblem
+    problem: Problem
     generator: Generator
     solver: Solver
     battle: "Battle"

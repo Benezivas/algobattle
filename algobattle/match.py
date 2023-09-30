@@ -29,7 +29,7 @@ from docker.types import LogConfig, Ulimit
 
 from algobattle.battle import Battle, FightHandler, FightUi, BattleUi, Iterated
 from algobattle.program import ProgramConfigView, ProgramUi, Matchup, TeamHandler, BuildUi
-from algobattle.problem import InstanceT, Problem, SolutionT
+from algobattle.problem import Problem
 from algobattle.util import (
     ExceptionInfo,
     Role,
@@ -74,7 +74,7 @@ class Match(BaseModel):
         battle: Battle,
         matchup: Matchup,
         config: "AlgobattleConfig",
-        problem: Problem[InstanceT, SolutionT],
+        problem: Problem,
         cpus: list[str | None],
         ui: "Ui",
         limiter: CapacityLimiter,
@@ -634,7 +634,7 @@ class AlgobattleConfig(BaseModel):
             return self
 
     @cached_property
-    def problem(self) -> Problem[Any, Any]:
+    def problem(self) -> Problem:
         """The problem this config uses."""
         return Problem.load(self.match.problem, self.problems)
 

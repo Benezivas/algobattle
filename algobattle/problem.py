@@ -221,7 +221,7 @@ class DynamicProblemInfo(Protocol):
     location: Path
 
 
-class Problem(Generic[InstanceT, SolutionT]):
+class Problem:
     """The definition of a problem."""
 
     @overload
@@ -291,19 +291,21 @@ class Problem(Generic[InstanceT, SolutionT]):
         self._problems[name] = self
 
     __slots__ = ("name", "instance_cls", "solution_cls", "min_size", "with_solution", "score_function", "test_instance")
-    _problems: "ClassVar[dict[str, AnyProblem]]" = {}
+    _problems: ClassVar[dict[str, Self]] = {}
 
     @overload
-    def score(self, instance: InstanceT, *, solution: SolutionT) -> float:
+    def score(self, instance: InstanceT, *, solution: Solution[InstanceT]) -> float:
         ...
 
     @overload
-    def score(self, instance: InstanceT, *, generator_solution: SolutionT, solver_solution: SolutionT) -> float:
+    def score(
+        self, instance: InstanceT, *, generator_solution: Solution[InstanceT], solver_solution: Solution[InstanceT]
+    ) -> float:
         ...
 
     def score(
         self,
-        instance: InstanceT,
+        instance: Instance,
         *,
         solution: SolutionT | None = None,
         generator_solution: SolutionT | None = None,
@@ -311,20 +313,30 @@ class Problem(Generic[InstanceT, SolutionT]):
     ) -> float:
         """Helper function to call self.score_function with easier to use overloads."""
         if self.with_solution:
-            if solution is not None or generator_solution is None or solver_solution is None:
+            if not (
+                isinstance(instance, self.instance_cls)
+                and isinstance(generator_solution, self.solution_cls)
+                and isinstance(solver_solution, self.solution_cls)
+                and solution is None
+            ):
                 raise TypeError
             if TYPE_CHECKING:
                 assert isinstance(self.score_function, ScoreFunctionWithSol)
             return self.score_function(instance, generator_solution=generator_solution, solver_solution=solver_solution)
         else:
-            if solution is None or generator_solution is not None or solver_solution is not None:
+            if not (
+                isinstance(instance, self.instance_cls)
+                and isinstance(solution, self.solution_cls)
+                and generator_solution is None
+                and solver_solution is None
+            ):
                 raise TypeError
             if TYPE_CHECKING:
                 assert isinstance(self.score_function, ScoreFunctionNoSol)
             return self.score_function(instance, solution=solution)
 
     @classmethod
-    def load_file(cls, name: str, file: Path) -> "AnyProblem":
+    def load_file(cls, name: str, file: Path) -> Self:
         """Loads the problem from the specified file."""
         existing_problems = cls._problems.copy()
         import_file_as_module(file, "__algobattle_problem__")
@@ -335,7 +347,7 @@ class Problem(Generic[InstanceT, SolutionT]):
             return cls._problems[name]
 
     @classmethod
-    def load(cls, name: str, dynamic: Mapping[str, DynamicProblemInfo]) -> "AnyProblem":
+    def load(cls, name: str, dynamic: Mapping[str, DynamicProblemInfo]) -> Self:
         """Loads the problem with the given name.
 
         Args:
@@ -373,7 +385,6 @@ class Problem(Generic[InstanceT, SolutionT]):
         return set(chain(cls._problems.keys(), (e.name for e in entry_points(group="algobattle.problem"))))
 
 
-AnyProblem = Problem[Any, Any]
 ModelType = Literal["instance", "solution"]
 ModelReference = ModelType | Literal["self"]
 
