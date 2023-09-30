@@ -237,7 +237,7 @@ class Battle(BaseModel):
         :meth:`Battle.run` method with its fields set accordingly.
         """
 
-        type: str
+        type: Any
         """Type of battle that will be used."""
 
         @classmethod
