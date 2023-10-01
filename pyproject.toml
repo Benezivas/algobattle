@@ -4,13 +4,12 @@ build-backend = "pdm.backend"
 
 [project]
 name = "algobattle-base"
-version = "4.0.0rc3"
+version = "4.0.0"
 description = "The Algobattle lab course package."
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [{name = "Imogen Hergeth"}, {name = "Jan Dreier"}, {name = "Henri Lotze"}]
-urls = {github = "https://github.com/Benezivas/algobattle"}
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
@@ -28,6 +27,12 @@ dependencies = [
     "tomlkit~=0.12.1",
     "jinja2~=3.1.2",
 ]
+
+[project.urls]
+Homepage = "https://algobattle.org"
+Documentation = "https://algobattle.org/docs"
+Repository = "https://github.com/Benezivas/algobattle"
+
 [project.optional-dependencies]
 dev = [
     "black~=23.7.0",
