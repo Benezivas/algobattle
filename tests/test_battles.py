@@ -1,6 +1,7 @@
 """Tests for the Battle types."""
 from enum import Enum
 from itertools import chain, cycle
+from types import EllipsisType
 from typing import Iterable, TypeVar
 from unittest import IsolatedAsyncioTestCase, main
 
@@ -51,12 +52,12 @@ class TestHandler(FightHandler):
         self,
         max_size: int,
         *,
-        timeout_generator: float | None = ...,
-        space_generator: int | None = ...,
-        cpus_generator: int = ...,
-        timeout_solver: float | None = ...,
-        space_solver: int | None = ...,
-        cpus_solver: int = ...,
+        timeout_generator: float | None | EllipsisType = ...,
+        space_generator: int | None | EllipsisType = ...,
+        cpus_generator: int | EllipsisType = ...,
+        timeout_solver: float | None | EllipsisType = ...,
+        space_solver: int | None | EllipsisType = ...,
+        cpus_solver: int | EllipsisType = ...,
         generator_battle_input: Encodable | None = None,
         solver_battle_input: Encodable | None = None,
         generator_battle_output: type[Encodable] | None = None,
@@ -95,12 +96,12 @@ class ConstantHandler(FightHandler):
         self,
         max_size: int,
         *,
-        timeout_generator: float | None = ...,
-        space_generator: int | None = ...,
-        cpus_generator: int = ...,
-        timeout_solver: float | None = ...,
-        space_solver: int | None = ...,
-        cpus_solver: int = ...,
+        timeout_generator: float | None | EllipsisType = ...,
+        space_generator: int | None | EllipsisType = ...,
+        cpus_generator: int | EllipsisType = ...,
+        timeout_solver: float | None | EllipsisType = ...,
+        space_solver: int | None | EllipsisType = ...,
+        cpus_solver: int | EllipsisType = ...,
         generator_battle_input: Encodable | None = None,
         solver_battle_input: Encodable | None = None,
         generator_battle_output: type[Encodable] | None = None,
