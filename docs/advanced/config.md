@@ -154,10 +154,10 @@ structure with both keys being mandatory:
     the formatting is very important here, you can not mix the two styles, add any spaces, or similar. A full format
     spec can be found on the [Docker site](https://docs.docker.com/config/containers/resource_constraints/).
 
-    This option accepts either a single such string, or a list of them. If a list is provided each battle that is run
-    in parallel will use one of the provided set of cores. For example, if this option is `["0,1", "2-3", "4,5"]` and
-    there are two battles executed at the same time, the first would use the first two physical CPUs and the second the
-    next two. Defaults to no CPU limitation.
+        This option accepts either a single such string, or a list of them. If a list is provided each battle that is
+        run in parallel will use one of the provided set of cores. For example, if this option is `["0,1", "2-3", "4,5"]`
+        and there are two battles executed at the same time, the first would use the first two physical CPUs and the
+        second the next two. Defaults to no CPU limitation.
 
     `name_images`
     : Whether to give the Docker images descriptive names. This is very useful during development, but can lead to
