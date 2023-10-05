@@ -92,7 +92,7 @@ big and offer a lot of room for customization. It's made up of several tables at
         `space`
         : Limits the amount of memory space the program has available during execution. Can either be an integer which
         is interpreted as bytes, a string with a unit such as `500 MB` or `1.3gb`, or `#!toml false` to set no limit.
-        Defaults to no limit. The
+        Defaults to 4 GB. The
         [Pydantic ByteSize docs](https://docs.pydantic.dev/latest/usage/types/bytesize/#using-bytesize) contain a full
         explanation of possible formats.
 
