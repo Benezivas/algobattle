@@ -92,7 +92,7 @@ big and offer a lot of room for customization. It's made up of several tables at
         `space`
         : Limits the amount of memory space the program has available during execution. Can either be an integer which
         is interpreted as bytes, a string with a unit such as `500 MB` or `1.3gb`, or `#!toml false` to set no limit.
-        Defaults to no limit. The
+        Defaults to 4 GB. The
         [Pydantic ByteSize docs](https://docs.pydantic.dev/latest/usage/types/bytesize/#using-bytesize) contain a full
         explanation of possible formats.
 
@@ -138,8 +138,7 @@ structure with both keys being mandatory:
         best fit their development workflow regardless of which ones might be used in the server matches.
 
     `points`
-    : An integer specifying the maximum number of points a team can achieve during this match. How points are calculated
-    is explained in more detail [here](match.md#points-calculation). Defaults to 100.
+    : An integer specifying the maximum number of points a team can achieve during this match. Defaults to 100.
 
     `parallel_battles`
     : To speed up battle execution you can let Algobattle run multiple battles in parallel. Note that while programs can
@@ -154,10 +153,10 @@ structure with both keys being mandatory:
     the formatting is very important here, you can not mix the two styles, add any spaces, or similar. A full format
     spec can be found on the [Docker site](https://docs.docker.com/config/containers/resource_constraints/).
 
-    This option accepts either a single such string, or a list of them. If a list is provided each battle that is run
-    in parallel will use one of the provided set of cores. For example, if this option is `["0,1", "2-3", "4,5"]` and
-    there are two battles executed at the same time, the first would use the first two physical CPUs and the second the
-    next two. Defaults to no CPU limitation.
+        This option accepts either a single such string, or a list of them. If a list is provided each battle that is
+        run in parallel will use one of the provided set of cores. For example, if this option is `["0,1", "2-3", "4,5"]`
+        and there are two battles executed at the same time, the first would use the first two physical CPUs and the
+        second the next two. Defaults to no CPU limitation.
 
     `name_images`
     : Whether to give the Docker images descriptive names. This is very useful during development, but can lead to

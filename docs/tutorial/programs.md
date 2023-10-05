@@ -119,7 +119,7 @@ The important file here is `generator.py`, we need to put the code that we want 
 ??? question "What's `Dockerfile`?"
     This is the file that specified what Docker is supposed to do with our code. What exactly Docker does and what the
     Dockerfile says is rather complicated and not super important for us right now. It's explained in detail in the
-    [docker advanced guide](/advanced/docker.md).
+    [Docker guide](../advanced/docker.md).
 
 ### What it needs to do
 
