@@ -138,8 +138,7 @@ structure with both keys being mandatory:
         best fit their development workflow regardless of which ones might be used in the server matches.
 
     `points`
-    : An integer specifying the maximum number of points a team can achieve during this match. How points are calculated
-    is explained in more detail [here](match.md#points-calculation). Defaults to 100.
+    : An integer specifying the maximum number of points a team can achieve during this match. Defaults to 100.
 
     `parallel_battles`
     : To speed up battle execution you can let Algobattle run multiple battles in parallel. Note that while programs can
