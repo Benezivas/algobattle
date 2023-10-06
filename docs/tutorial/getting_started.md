@@ -109,15 +109,9 @@ Project level configuration is done inside the `algobattle.toml` file so let's t
 problem = "Pairsum"
 # there might be more settings here
 
-[problems."Pairsum"]
-location = "problem.py"
-
 [teams."Red Pandas"]
 generator = "generator"
 solver = "solver"
-
-[project]
-results = "results"
 ```
 ///
 
@@ -129,16 +123,13 @@ problem = "Pairsum"
 [teams."Red Pandas"]
 generator = "generator"
 solver = "solver"
-
-[project]
-results = "results"
 ```
 ///
 
 The config file is split into a few tables, `match` specifies exactly what each Algobattle match is going to look like.
 This means that you will probably never want to change things in there since you want to develop your programs for the
 same conditions they're going to see during the scored matches run on the server. Feel free to play with the `teams`,
-`problems`, and `project` tables as much as you want, nothing in them affects the structure of the match or anything
+`problem`, and `project` tables as much as you want, nothing in them affects the structure of the match or anything
 on the server. In particular, the team name used here doesn't need to match the one used on your Algobattle website.
 The filled in settings so far all just are paths to where Algobattle can find certain files or folders. There's a lot
 more things you can configure, but we're happy with the default values for now.

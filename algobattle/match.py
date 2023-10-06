@@ -120,7 +120,7 @@ class Match(BaseModel):
         if ui is None:
             ui = EmptyUi()
         ui.match = self
-        problem = Problem.load(config.match.problem, config.problems)
+        problem = config.loaded_problem
 
         with await TeamHandler.build(config.teams, problem, config.as_prog_config(), ui) as teams:
             self.active_teams = [t.name for t in teams.active]
@@ -571,7 +571,7 @@ class MatchConfig(BaseModel):
 class DynamicProblemConfig(BaseModel):
     """Defines metadata used to dynamically import problems."""
 
-    location: RelativePath
+    location: RelativePath = Field(default=Path("problem.py"), validate_default=True)
     """Path to the file defining the problem"""
     dependencies: list[str] = Field(default_factory=list)
     """List of dependencies needed to run the problem"""
@@ -620,7 +620,7 @@ class AlgobattleConfig(BaseModel):
     project: ProjectConfig = Field(default_factory=dict, validate_default=True)
     match: MatchConfig
     docker: DockerConfig = DockerConfig()
-    problems: dict[str, DynamicProblemConfig] = Field(default_factory=dict)
+    problem: DynamicProblemConfig = Field(default_factory=dict, validate_default=True)
 
     model_config = ConfigDict(revalidate_instances="always")
 
@@ -628,15 +628,15 @@ class AlgobattleConfig(BaseModel):
     def check_problem_defined(self) -> Self:
         """Validates that the specified problem is either installed or dynamically specified."""
         prob = self.match.problem
-        if prob not in self.problems and prob not in Problem.available():
+        if not self.problem.location.is_file() and prob not in Problem.available():
             raise ValueError(f"The specified problem {prob} cannot be found")
         else:
             return self
 
     @cached_property
-    def problem(self) -> Problem:
+    def loaded_problem(self) -> Problem:
         """The problem this config uses."""
-        return Problem.load(self.match.problem, self.problems)
+        return Problem.load(self.match.problem, self.problem.location if self.problem.location.is_file() else None)
 
     @classmethod
     def from_file(cls, file: Path, *, ignore_uninstalled: bool = False, relativize_paths: bool = True) -> Self:

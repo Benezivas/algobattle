@@ -12,7 +12,6 @@ from typing import (
     Callable,
     ClassVar,
     Literal,
-    Mapping,
     ParamSpec,
     Protocol,
     Self,
@@ -215,12 +214,6 @@ def default_score(
         return max(0, min(1, solution.score(instance, Role.solver)))
 
 
-class DynamicProblemInfo(Protocol):
-    """Defines the metadadata needed to dynamically import a problem."""
-
-    location: Path
-
-
 class Problem:
     """The definition of a problem."""
 
@@ -347,20 +340,19 @@ class Problem:
             return cls._problems[name]
 
     @classmethod
-    def load(cls, name: str, dynamic: Mapping[str, DynamicProblemInfo]) -> Self:
+    def load(cls, name: str, file: Path | None = None) -> Self:
         """Loads the problem with the given name.
 
         Args:
             name: The name of the Problem to use.
-            dynamic: Metadata used to dynamically import a problem if needed.
+            file: Path to a file containing this problem.
 
         Raises:
             ValueError: If the problem is not specified properly
             RuntimeError: If the problem's dynamic import fails
         """
-        if name in dynamic:
-            info = dynamic[name]
-            return cls.load_file(name, info.location)
+        if file:
+            return cls.load_file(name, file)
         if name in cls._problems:
             return cls._problems[name]
         match list(entry_points(group="algobattle.problem", name=name)):

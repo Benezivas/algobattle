@@ -105,8 +105,6 @@ class CliConfig(BaseModel):
                 .add(toml_newline())
                 .append("general", general)
                 .add(toml_newline())
-                .append("default_project_table", table().append("results", "results"))
-                .add(toml_newline())
             )
             cls.path.write_text(dumps_toml(doc))
 
@@ -312,13 +310,10 @@ def init(
         raise Abort
 
     problem_name = parsed_config.match.problem
-    info = parsed_config.problems.get(problem_name, None)
-    if info is not None and not info.location.is_absolute():
-        info.location = target / info.location
-    if info is not None and info.dependencies:
+    if deps := parsed_config.problem.dependencies:
         cmd = config.install_cmd
         with console.status(f"Installing {problem_name}'s dependencies"), Popen(
-            cmd + info.dependencies, env=environ.copy(), stdout=PIPE, stderr=PIPE, text=True
+            cmd + deps, env=environ.copy(), stdout=PIPE, stderr=PIPE, text=True
         ) as installer:
             assert installer.stdout is not None
             assert installer.stderr is not None
@@ -351,7 +346,7 @@ def init(
         if res_path.resolve().is_relative_to(target.resolve()):
             target.joinpath(".gitignore").write_text(f"{res_path.relative_to(target)}/\n")
 
-    problem_obj = parsed_config.problem
+    problem_obj = parsed_config.loaded_problem
     if schemas:
         instance: type[Instance] = problem_obj.instance_cls
         solution: type[Solution[Instance]] = problem_obj.solution_cls
@@ -400,7 +395,7 @@ def test(
         console.print("[error]The folder does not contain an Algobattle project")
         raise Abort
     config = AlgobattleConfig.from_file(project)
-    problem = config.problem
+    problem = config.loaded_problem
     all_errors: dict[str, Any] = {}
 
     for team, team_info in config.teams.items():
