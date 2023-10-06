@@ -28,10 +28,10 @@ If you're curious you can unzip them and take a look inside yourself.
 
 Another way is to install a Python package that provides one or more problems. For example, our
 [Algobattle Problem](https://github.com/Benezivas/algobattle-problems) package which contains a selection of basic
-problems. We can download it and install it with pip after navigating into its directory
+problems. We can install it with pip just like the Algobattle base package:
 
 ```console
-pip install .
+pip install algobattle-problems
 ```
 
 ## Setting up the workspace
