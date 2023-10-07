@@ -479,10 +479,7 @@ def config() -> None:
 
 @packager.command("problem")
 def package_problem(
-    problem_path: Annotated[
-        Optional[Path], Argument(exists=True, help="Path to problem python file or a package containing it.")
-    ] = None,
-    config: Annotated[Optional[Path], Option(exists=True, dir_okay=False, help="Path to the config file.")] = None,
+    project: Annotated[Path, Argument(exists=True, resolve_path=True, help="Path to the project directory.")] = Path(),
     description: Annotated[
         Optional[Path], Option(exists=True, dir_okay=False, help="Path to a problem description file.")
     ] = None,
@@ -491,22 +488,13 @@ def package_problem(
     ] = None,
 ) -> None:
     """Packages problem data into an `.algo` file."""
-    if problem_path is None:
-        if Path("problem.py").is_file():
-            problem_path = Path("problem.py")
-        elif Path("problem").is_dir():
-            problem_path = Path("problem")
-        else:
-            console.print("[error]Couldn't find a problem package")
-            raise Abort
-    if config is None:
-        if problem_path.parent.joinpath("algobattle.toml").is_file():
-            config = problem_path.parent / "algobattle.toml"
-        else:
-            console.log("[error]Couldn't find a config file")
-            raise Abort
+    if project.is_file():
+        config = project
+        project = project.parent
+    else:
+        config = project / "algobattle.toml"
     if description is None:
-        match list(problem_path.parent.resolve().glob("description.*")):
+        match list(project.glob("description.*")):
             case []:
                 pass
             case [desc]:
@@ -535,24 +523,16 @@ def package_problem(
         config_doc.remove("project")
     if "teams" in config_doc:
         config_doc.remove("teams")
-    if problem_path.is_file():
-        cast(TomlTable, config_doc.get("problem", table())).remove("location")
-    elif problem_path.is_dir():
-        config_doc.setdefault("problem", table())
-        problem_file_path = parsed_config.problem.location.resolve()
-        cast(TomlTable, config_doc["problem"])["location"] = problem_file_path.relative_to(problem_path.resolve())
-    else:
-        config_doc.remove("problem")
+    prob_table: Any = config_doc.get("problem", None)
+    if isinstance(prob_table, TomlTable) and "location" in prob_table:
+        prob_table.remove("location")
+        if len(prob_table) == 0:
+            config_doc.remove("problem")
 
     if out is None:
-        out = problem_path.parent / f"{problem_name.lower().replace(' ', '_')}.algo"
+        out = project / f"{problem_name.lower().replace(' ', '_')}.algo"
     with console.status("Packaging data"), ZipFile(out, "w") as file:
-        if problem_path.is_file():
-            file.write(problem_path, "problem.py")
-        else:
-            for path in problem_path.glob("**"):
-                if path.is_file():
-                    file.write(path, Path("problem") / path.relative_to(problem_path))
+        file.write(parsed_config.problem.location, "problem.py")
         file.writestr("algobattle.toml", dumps_toml(config_doc))
         if description is not None:
             file.write(description, description.name)
