@@ -4,6 +4,7 @@ Provides a command line interface to start matches and observe them. See `battle
 """
 from enum import StrEnum
 from functools import cached_property
+from itertools import count
 import json
 import operator
 from os import environ
@@ -391,7 +392,7 @@ class TestErrors(BaseModel):
 def test(
     project: Annotated[Path, Argument(help="The project folder to use.")] = Path(),
     size: Annotated[Optional[int], Option(help="The size of instance the generator will be asked to create.")] = None,
-) -> None:
+) -> Literal["success", "error"]:
     """Tests whether the programs install successfully and run on dummy instances without crashing."""
     if not (project.is_file() or project.joinpath("algobattle.toml").is_file()):
         console.print("[error]The folder does not contain an Algobattle project")
@@ -462,6 +463,9 @@ def test(
         err_path = config.project.results.joinpath(f"test-{timestamp()}.json")
         err_path.write_text(json.dumps(all_errors, indent=4))
         console.print(f"You can find detailed error messages at {err_path}")
+        return "error"
+    else:
+        return "success"
 
 
 @app.command()
@@ -552,6 +556,54 @@ def package_problem(
         if description is not None:
             file.write(description, description.name)
     console.print("[success]Packaged Algobattle project[/] into", out)
+
+
+@packager.command("programs")
+def package_programs(
+    project: Annotated[Path, Argument(help="The project folder to use.")] = Path(),
+    team: Annotated[Optional[str], Option(help="Name of team whose programs should be packaged.")] = None,
+    generator: Annotated[bool, Option(help="Wether to package the generator")] = True,
+    solver: Annotated[bool, Option(help="Wether to package the solver")] = True,
+    test_programs: Annotated[
+        bool, Option("--test/--no-test", help="Whether to test the programs before packaging them")
+    ] = True,
+) -> None:
+    config = AlgobattleConfig.from_file(project)
+    if team is None:
+        match list(config.teams.keys()):
+            case []:
+                console.print("[error]The config file doesn't contain a team[/]")
+                raise Abort
+            case [name]:
+                team = name
+            case _:
+                console.print(
+                    "[error]The Config file contains multiple teams[/], specify whose programs you want to package"
+                )
+                raise Abort
+    if team not in config.teams:
+        console.print("[erorr]The selected team isn't in the config file[/]")
+        raise Abort
+    if test_programs:
+        test_result = test(project)
+        if test_result == "error":
+            console.print("Stopping program packaging since they do not pass tests")
+            raise Abort
+    out = project.parent if project.is_file() else project
+
+    def _package_program(role: Role) -> None:
+        with console.status(f"Packaging {team}'s {role}"), ZipFile(out / f"{team} {role}.prog", "w") as zipfile:
+            program_root: Path = getattr(config.teams[team], role)
+            for file in program_root.rglob("*"):
+                if file.is_dir():
+                    continue
+                zipfile.write(file, file.relative_to(program_root))
+        console.print(f"[success]Packaged {team}'s {role}")
+
+    if generator:
+        _package_program(Role.generator)
+    if solver:
+        _package_program(Role.solver)
 
 
 class TimerTotalColumn(ProgressColumn):
