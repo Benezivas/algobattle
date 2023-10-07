@@ -155,11 +155,7 @@ class IteratedTests(IsolatedAsyncioTestCase):
         await self._expect_fights(always(fail), [1])
         await self._expect_fights(
             always(succ),
-            [1, 2, 6, 15, 31, 56, 92, 141, 205, 286, 386, 507, 651, 820]
-            + [821, 822, 826, 835, 851, 876, 912, 961]
-            + [962, 963, 967, 976, 992]
-            + [993, 994, 998]
-            + [999, 1000],
+            [1, 2, 6, 15, 31, 56, 92, 141, 205, 286, 386, 507, 651, 820, 1000],
             score=1000,
             total=True,
         )

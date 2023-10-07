@@ -429,9 +429,10 @@ class Iterated(Battle):
         def sizes(size: int, max_size: int) -> Iterable[int]:
             counter = count(1)
             size = max(size, min_size)
-            while size <= max_size:
+            while size < max_size:
                 yield size
                 size += next(counter) ** config.exponent
+            yield max_size
 
         note = "Starting battle..."
         for _ in range(config.rounds):
