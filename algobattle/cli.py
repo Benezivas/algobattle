@@ -346,8 +346,10 @@ def init(
         if not res_path.is_absolute():
             res_path = target / res_path
         res_path.mkdir(parents=True, exist_ok=True)
+        gitignore = "*.algo\n*.prob\n"
         if res_path.resolve().is_relative_to(target.resolve()):
-            target.joinpath(".gitignore").write_text(f"{res_path.relative_to(target)}/\n")
+            gitignore += f"{res_path.relative_to(target)}/\n"
+        target.joinpath(".gitignore").write_text(gitignore)
 
     problem_obj = parsed_config.loaded_problem
     if schemas:
