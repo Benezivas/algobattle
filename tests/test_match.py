@@ -7,7 +7,16 @@ from pathlib import Path
 from pydantic import ByteSize, ValidationError
 
 from algobattle.battle import Fight, Iterated, Averaged
-from algobattle.match import DynamicProblemConfig, MatchupStr, ProjectConfig, Match, AlgobattleConfig, MatchConfig, RunConfig, TeamInfo
+from algobattle.match import (
+    DynamicProblemConfig,
+    MatchupStr,
+    ProjectConfig,
+    Match,
+    AlgobattleConfig,
+    MatchConfig,
+    RunConfig,
+    TeamInfo,
+)
 from algobattle.program import ProgramRunInfo, Team, Matchup, TeamHandler
 from .testsproblem.problem import TestProblem
 
