@@ -61,6 +61,8 @@ You can use this to setup your workspace, develop programs, run matches, and mor
 For more detailed documentation, visit our website at http://algobattle.org/docs/tutorial
 """
 app = Typer(pretty_exceptions_show_locals=True, help=help_message)
+packager = Typer(help="Subcommands to package problems and programs into `.algo` files.")
+app.add_typer(packager, name="package")
 theme = Theme(
     {
         "success": "green",
@@ -470,8 +472,8 @@ def config() -> None:
     launch(str(CliConfig.path))
 
 
-@app.command()
-def package(
+@packager.command("problem")
+def package_problem(
     problem_path: Annotated[
         Optional[Path], Argument(exists=True, help="Path to problem python file or a package containing it.")
     ] = None,
@@ -514,30 +516,28 @@ def package(
         config_doc = parse_toml(config.read_text())
         parsed_config = AlgobattleConfig.from_file(config)
     except (ValidationError, ParseError) as e:
-        console.print(f"[error]Improperly formatted config file\nError: {e}")
+        console.print(f"[error]Improperly formatted config file[/]\nError: {e}")
         raise Abort
     problem_name = parsed_config.match.problem
     try:
         with console.status("Loading problem"):
-            Problem.load_file(problem_name, problem_path)
+            parsed_config.loaded_problem
     except (ValueError, RuntimeError) as e:
         console.print(f"[error]Couldn't load the problem file[/]\nError: {e}")
         raise Abort
-    problem_info = parsed_config.problems[problem_name]
 
     if "project" in config_doc:
         config_doc.remove("project")
     if "teams" in config_doc:
         config_doc.remove("teams")
-    info_doc = table().append(
-        "location",
-        "problem.py"
-        if problem_path.is_file()
-        else Path("problem") / problem_info.location.resolve().relative_to(problem_path.resolve()),
-    )
-    if problem_info.dependencies:
-        info_doc.append("dependencies", problem_info.dependencies)
-    config_doc["problems"] = table().append(problem_name, info_doc)
+    if problem_path.is_file():
+        cast(TomlTable, config_doc.get("problem", table())).remove("location")
+    elif problem_path.is_dir():
+        config_doc.setdefault("problem", table())
+        problem_file_path = parsed_config.problem.location.resolve()
+        cast(TomlTable, config_doc["problem"])["location"] = problem_file_path.relative_to(problem_path.resolve())
+    else:
+        config_doc.remove("problem")
 
     if out is None:
         out = problem_path.parent / f"{problem_name.lower().replace(' ', '_')}.algo"
