@@ -532,7 +532,8 @@ def package_problem(
     if out is None:
         out = project / f"{problem_name.lower().replace(' ', '_')}.algo"
     with console.status("Packaging data"), ZipFile(out, "w") as file:
-        file.write(parsed_config.problem.location, "problem.py")
+        if parsed_config.problem.location.exists():
+            file.write(parsed_config.problem.location, "problem.py")
         file.writestr("algobattle.toml", dumps_toml(config_doc))
         if description is not None:
             file.write(description, description.name)
