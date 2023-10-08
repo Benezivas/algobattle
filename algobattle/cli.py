@@ -61,6 +61,8 @@ You can use this to setup your workspace, develop programs, run matches, and mor
 For more detailed documentation, visit our website at http://algobattle.org/docs/tutorial
 """
 app = Typer(pretty_exceptions_show_locals=True, help=help_message)
+packager = Typer(help="Subcommands to package problems and programs into `.algo` files.")
+app.add_typer(packager, name="package")
 theme = Theme(
     {
         "success": "green",
@@ -104,8 +106,6 @@ class CliConfig(BaseModel):
                 .add(comment("# The Algobattle cli configuration"))
                 .add(toml_newline())
                 .append("general", general)
-                .add(toml_newline())
-                .append("default_project_table", table().append("results", "results"))
                 .add(toml_newline())
             )
             cls.path.write_text(dumps_toml(doc))
@@ -312,13 +312,10 @@ def init(
         raise Abort
 
     problem_name = parsed_config.match.problem
-    info = parsed_config.problems.get(problem_name, None)
-    if info is not None and not info.location.is_absolute():
-        info.location = target / info.location
-    if info is not None and info.dependencies:
+    if deps := parsed_config.problem.dependencies:
         cmd = config.install_cmd
         with console.status(f"Installing {problem_name}'s dependencies"), Popen(
-            cmd + info.dependencies, env=environ.copy(), stdout=PIPE, stderr=PIPE, text=True
+            cmd + deps, env=environ.copy(), stdout=PIPE, stderr=PIPE, text=True
         ) as installer:
             assert installer.stdout is not None
             assert installer.stderr is not None
@@ -348,10 +345,12 @@ def init(
         if not res_path.is_absolute():
             res_path = target / res_path
         res_path.mkdir(parents=True, exist_ok=True)
+        gitignore = "*.algo\n*.prob\n"
         if res_path.resolve().is_relative_to(target.resolve()):
-            target.joinpath(".gitignore").write_text(f"{res_path.relative_to(target)}/\n")
+            gitignore += f"{res_path.relative_to(target)}/\n"
+        target.joinpath(".gitignore").write_text(gitignore)
 
-    problem_obj = parsed_config.problem
+    problem_obj = parsed_config.loaded_problem
     if schemas:
         instance: type[Instance] = problem_obj.instance_cls
         solution: type[Solution[Instance]] = problem_obj.solution_cls
@@ -394,13 +393,13 @@ class TestErrors(BaseModel):
 def test(
     project: Annotated[Path, Argument(help="The project folder to use.")] = Path(),
     size: Annotated[Optional[int], Option(help="The size of instance the generator will be asked to create.")] = None,
-) -> None:
+) -> Literal["success", "error"]:
     """Tests whether the programs install successfully and run on dummy instances without crashing."""
     if not (project.is_file() or project.joinpath("algobattle.toml").is_file()):
         console.print("[error]The folder does not contain an Algobattle project")
         raise Abort
     config = AlgobattleConfig.from_file(project)
-    problem = config.problem
+    problem = config.loaded_problem
     all_errors: dict[str, Any] = {}
 
     for team, team_info in config.teams.items():
@@ -465,6 +464,9 @@ def test(
         err_path = config.project.results.joinpath(f"test-{timestamp()}.json")
         err_path.write_text(json.dumps(all_errors, indent=4))
         console.print(f"You can find detailed error messages at {err_path}")
+        return "error"
+    else:
+        return "success"
 
 
 @app.command()
@@ -475,12 +477,9 @@ def config() -> None:
     launch(str(CliConfig.path))
 
 
-@app.command()
-def package(
-    problem_path: Annotated[
-        Optional[Path], Argument(exists=True, help="Path to problem python file or a package containing it.")
-    ] = None,
-    config: Annotated[Optional[Path], Option(exists=True, dir_okay=False, help="Path to the config file.")] = None,
+@packager.command("problem")
+def package_problem(
+    project: Annotated[Path, Argument(exists=True, resolve_path=True, help="Path to the project directory.")] = Path(),
     description: Annotated[
         Optional[Path], Option(exists=True, dir_okay=False, help="Path to a problem description file.")
     ] = None,
@@ -489,22 +488,13 @@ def package(
     ] = None,
 ) -> None:
     """Packages problem data into an `.algo` file."""
-    if problem_path is None:
-        if Path("problem.py").is_file():
-            problem_path = Path("problem.py")
-        elif Path("problem").is_dir():
-            problem_path = Path("problem")
-        else:
-            console.print("[error]Couldn't find a problem package")
-            raise Abort
-    if config is None:
-        if problem_path.parent.joinpath("algobattle.toml").is_file():
-            config = problem_path.parent / "algobattle.toml"
-        else:
-            console.log("[error]Couldn't find a config file")
-            raise Abort
+    if project.is_file():
+        config = project
+        project = project.parent
+    else:
+        config = project / "algobattle.toml"
     if description is None:
-        match list(problem_path.parent.resolve().glob("description.*")):
+        match list(project.glob("description.*")):
             case []:
                 pass
             case [desc]:
@@ -519,44 +509,83 @@ def package(
         config_doc = parse_toml(config.read_text())
         parsed_config = AlgobattleConfig.from_file(config)
     except (ValidationError, ParseError) as e:
-        console.print(f"[error]Improperly formatted config file\nError: {e}")
+        console.print(f"[error]Improperly formatted config file[/]\nError: {e}")
         raise Abort
     problem_name = parsed_config.match.problem
     try:
         with console.status("Loading problem"):
-            Problem.load_file(problem_name, problem_path)
+            parsed_config.loaded_problem
     except (ValueError, RuntimeError) as e:
         console.print(f"[error]Couldn't load the problem file[/]\nError: {e}")
         raise Abort
-    problem_info = parsed_config.problems[problem_name]
 
     if "project" in config_doc:
         config_doc.remove("project")
     if "teams" in config_doc:
         config_doc.remove("teams")
-    info_doc = table().append(
-        "location",
-        "problem.py"
-        if problem_path.is_file()
-        else Path("problem") / problem_info.location.resolve().relative_to(problem_path.resolve()),
-    )
-    if problem_info.dependencies:
-        info_doc.append("dependencies", problem_info.dependencies)
-    config_doc["problems"] = table().append(problem_name, info_doc)
+    prob_table: Any = config_doc.get("problem", None)
+    if isinstance(prob_table, TomlTable) and "location" in prob_table:
+        prob_table.remove("location")
+        if len(prob_table) == 0:
+            config_doc.remove("problem")
 
     if out is None:
-        out = problem_path.parent / f"{problem_name.lower().replace(' ', '_')}.algo"
+        out = project / f"{problem_name.lower().replace(' ', '_')}.algo"
     with console.status("Packaging data"), ZipFile(out, "w") as file:
-        if problem_path.is_file():
-            file.write(problem_path, "problem.py")
-        else:
-            for path in problem_path.glob("**"):
-                if path.is_file():
-                    file.write(path, Path("problem") / path.relative_to(problem_path))
+        if parsed_config.problem.location.exists():
+            file.write(parsed_config.problem.location, "problem.py")
         file.writestr("algobattle.toml", dumps_toml(config_doc))
         if description is not None:
             file.write(description, description.name)
     console.print("[success]Packaged Algobattle project[/] into", out)
+
+
+@packager.command("programs")
+def package_programs(
+    project: Annotated[Path, Argument(help="The project folder to use.")] = Path(),
+    team: Annotated[Optional[str], Option(help="Name of team whose programs should be packaged.")] = None,
+    generator: Annotated[bool, Option(help="Wether to package the generator")] = True,
+    solver: Annotated[bool, Option(help="Wether to package the solver")] = True,
+    test_programs: Annotated[
+        bool, Option("--test/--no-test", help="Whether to test the programs before packaging them")
+    ] = True,
+) -> None:
+    config = AlgobattleConfig.from_file(project)
+    if team is None:
+        match list(config.teams.keys()):
+            case []:
+                console.print("[error]The config file doesn't contain a team[/]")
+                raise Abort
+            case [name]:
+                team = name
+            case _:
+                console.print(
+                    "[error]The Config file contains multiple teams[/], specify whose programs you want to package"
+                )
+                raise Abort
+    if team not in config.teams:
+        console.print("[erorr]The selected team isn't in the config file[/]")
+        raise Abort
+    if test_programs:
+        test_result = test(project)
+        if test_result == "error":
+            console.print("Stopping program packaging since they do not pass tests")
+            raise Abort
+    out = project.parent if project.is_file() else project
+
+    def _package_program(role: Role) -> None:
+        with console.status(f"Packaging {team}'s {role}"), ZipFile(out / f"{team} {role}.prog", "w") as zipfile:
+            program_root: Path = getattr(config.teams[team], role)
+            for file in program_root.rglob("*"):
+                if file.is_dir():
+                    continue
+                zipfile.write(file, file.relative_to(program_root))
+        console.print(f"[success]Packaged {team}'s {role}")
+
+    if generator:
+        _package_program(Role.generator)
+    if solver:
+        _package_program(Role.solver)
 
 
 class TimerTotalColumn(ProgressColumn):

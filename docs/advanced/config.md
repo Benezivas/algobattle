@@ -117,15 +117,15 @@ structure with both keys being mandatory:
     `solver`
     : Path to the team's solver.
 
-### `problems`
-: Contains data specifying how to dynamically import problems. Keys are problem names and values tables like this:
+### `problem`
+: Contains data specifying how to dynamically import the problem.
 
     !!! note
         This table is usually filled in by the course administrators, if you're a student you probably won't have to
         worry about it.
 
     `location`
-    : Path to the problem module. Defaults to `problem.py`, but we recommend to always specify this to make it explicit.
+    : Path to the problem module. Defaults to `problem.py`.
 
     `dependencies`
     : A list of [PEP 508](https://peps.python.org/pep-0508/) conformant dependency specification strings. These will be
