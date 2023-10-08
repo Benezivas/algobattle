@@ -392,7 +392,7 @@ class Iterated(Battle):
 
         type: Literal["Iterated"] = "Iterated"
 
-        rounds: int = 5
+        rounds: int = 3
         """Number of times the instance size will be increased until the solver fails to produce correct solutions."""
         maximum_size: int = 50_000
         """Maximum instance size that will be tried."""
@@ -429,9 +429,10 @@ class Iterated(Battle):
         def sizes(size: int, max_size: int) -> Iterable[int]:
             counter = count(1)
             size = max(size, min_size)
-            while size <= max_size:
+            while size < max_size:
                 yield size
                 size += next(counter) ** config.exponent
+            yield max_size
 
         note = "Starting battle..."
         for _ in range(config.rounds):
