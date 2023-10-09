@@ -1,140 +1,275 @@
 """Tests for the Match class."""
-import unittest
-import logging
-import importlib
-import os
+# pyright: reportMissingSuperCall=false
+from typing import Any
+from unittest import IsolatedAsyncioTestCase, TestCase, main
+from pathlib import Path
 
-import algobattle
-from algobattle.match import Match
-from algobattle.team import Team
+from pydantic import ByteSize, ValidationError
 
-logging.disable(logging.CRITICAL)
+from algobattle.battle import Fight, Iterated, Averaged
+from algobattle.match import (
+    DynamicProblemConfig,
+    MatchupStr,
+    ProjectConfig,
+    Match,
+    AlgobattleConfig,
+    MatchConfig,
+    RunConfig,
+    TeamInfo,
+)
+from algobattle.program import ProgramRunInfo, Team, Matchup, TeamHandler
+from .testsproblem.problem import TestProblem
 
 
-class Matchtests(unittest.TestCase):
+class TestTeam(Team):
+    """Team that doesn't rely on actual docker images."""
+
+    def __init__(self, team_name: str) -> None:
+        object.__setattr__(self, "name", team_name)
+
+
+def dummy_result(*score: float) -> list[Fight]:
+    """Creates a list of dummy results for testing."""
+    return [
+        Fight(
+            score=s,
+            max_size=0,
+            generator=ProgramRunInfo(),
+            solver=ProgramRunInfo(),
+        )
+        for s in score
+    ]
+
+
+class Matchtests(TestCase):
     """Tests for the match object."""
 
-    def setUp(self) -> None:
-        Problem = importlib.import_module('algobattle.problems.testsproblem')
-        self.problem = Problem.Problem()
-        self.tests_path = Problem.__file__[:-12]  # remove /__init__.py
+    @classmethod
+    def setUpClass(cls) -> None:
+        """Set up a match object."""
+        cls.team0 = TestTeam("0")
+        cls.team1 = TestTeam("1")
+        cls.matchup0 = Matchup(cls.team0, cls.team1)
+        cls.matchup0_str = MatchupStr.make(cls.matchup0)
+        cls.matchup1 = Matchup(cls.team1, cls.team0)
+        cls.matchup1_str = MatchupStr.make(cls.matchup1)
+        cls.team_dict: dict[str, Any] = {
+            "active_teams": [cls.team0.name, cls.team1.name],
+            "excluded_teams": {},
+        }
+        cls.teams = TeamHandler([cls.team0, cls.team1])
 
-        self.config_directory = os.path.join(os.path.dirname(os.path.abspath(algobattle.__file__)), 'config')
-        self.config = os.path.join(self.config_directory, 'config.ini')
-        self.config_short_build_timeout = os.path.join(self.config_directory, 'config_short_build_timeout.ini')
-        self.config_short_timeout = os.path.join(self.config_directory, 'config_short_run_timeout.ini')
+    def test_all_battle_pairs_two_teams(self):
+        """Two teams both generate and solve one time each."""
+        self.assertEqual(self.teams.matchups, [self.matchup0, self.matchup1])
 
-        self.team = Team('0', self.tests_path + '/generator', self.tests_path + '/solver')
+    def test_all_battle_pairs_single_player(self):
+        """A team playing against itself is the only battle pair in single player."""
+        teams = TeamHandler([self.team0])
+        self.assertEqual(teams.matchups, [Matchup(self.team0, self.team0)])
 
-        self.match = Match(self.problem, self.config, [self.team])
+    def test_calculate_points_zero_rounds(self):
+        """All teams get 0 points if no rounds have been fought."""
+        match = Match(**self.team_dict)
+        self.assertEqual(match.calculate_points(100), {self.team0.name: 0, self.team1.name: 0})
 
-    def test_build_normal(self):
-        # A normal build
-        self.assertTrue(self.match.build_successful)
+    def test_calculate_points_iterated_no_successful_round(self):
+        """Two teams should get an equal amount of points if nobody solved anything."""
+        match = Match(**self.team_dict)
+        battle = Iterated()
+        battle.results = [0]
+        match.battles[self.matchup0_str] = battle
+        match.battles[self.matchup1_str] = battle
+        self.assertEqual(match.calculate_points(100), {self.team0.name: 50, self.team1.name: 50})
 
-    def test_build_malformed_docker(self):
-        # Malformed docker names
-        match_malformed_docker_names = Match(self.problem, self.config, self.team, cache_docker_containers=False)
-        self.assertFalse(match_malformed_docker_names._build((1, 0)))
+    def test_calculate_points_iterated_draw(self):
+        """Two teams should get an equal amount of points if both solved a problem equally well."""
+        match = Match(**self.team_dict)
+        battle = Iterated()
+        battle.results = [20]
+        match.battles[self.matchup0_str] = battle
+        match.battles[self.matchup1_str] = battle
+        self.assertEqual(match.calculate_points(100), {self.team0.name: 50, self.team1.name: 50})
 
-    def test_build_timeout(self):
-        # Build timeout
-        team = Team('0', self.tests_path + '/generator_build_timeout', self.tests_path + '/solver')
-        match_build_timeout = Match(self.problem, self.config_short_build_timeout, [team], cache_docker_containers=False)
-        self.assertFalse(match_build_timeout.build_successful)
+    def test_calculate_points_iterated_domination(self):
+        """One team should get all points if it solved anything and the other team nothing."""
+        match = Match(**self.team_dict)
+        battle = Iterated()
+        battle.results = [10]
+        battle2 = Iterated()
+        battle2.results = [0]
+        match.battles[self.matchup0_str] = battle
+        match.battles[self.matchup1_str] = battle2
+        self.assertEqual(match.calculate_points(100), {self.team0.name: 0, self.team1.name: 100})
 
-    def test_build_error(self):
-        # Build error
-        team = Team('0', self.tests_path + '/generator_build_error', self.tests_path + '/solver')
-        match_build_fail = Match(self.problem, self.config_short_build_timeout, [team], cache_docker_containers=False)
-        self.assertFalse(match_build_fail.build_successful)
+    def test_calculate_points_iterated_one_team_better(self):
+        """One team should get more points than the other if it performed better."""
+        match = Match(**self.team_dict)
+        battle = Iterated()
+        battle.results = [10]
+        battle2 = Iterated()
+        battle2.results = [20]
+        match.battles[self.matchup0_str] = battle
+        match.battles[self.matchup1_str] = battle2
+        self.assertEqual(match.calculate_points(100), {self.team0.name: 66.7, self.team1.name: 33.3})
 
-    def test_build_foo_problem(self):
-        match = Match(self.problem, self.config, 'foo')
-        self.assertFalse(match.build_successful)
+    def test_calculate_points_averaged_no_successful_round(self):
+        """Two teams should get an equal amount of points if nobody solved anything."""
+        match = Match(**self.team_dict)
+        battle = Averaged()
+        battle.fights = dummy_result(0, 0, 0)
+        match.battles[self.matchup0_str] = battle
+        match.battles[self.matchup1_str] = battle
+        self.assertEqual(match.calculate_points(100), {self.team0.name: 50, self.team1.name: 50})
 
-    def test_all_battle_pairs(self):
-        team0 = Team('0', self.tests_path + '/generator', self.tests_path + '/solver')
-        team1 = Team('1', self.tests_path + '/generator', self.tests_path + '/solver')
-        teams = [team0, team1]
-        match = Match(self.problem, self.config, teams)
-        self.assertEqual(match.all_battle_pairs(), [('0', '1'), ('1', '0')])
+    def test_calculate_points_averaged_draw(self):
+        """Two teams should get an equal amount of points if both solved a problem equally well."""
+        match = Match(**self.team_dict)
+        battle = Averaged()
+        battle.fights = dummy_result(0.5, 0.5, 0.5)
+        match.battles[self.matchup0_str] = battle
+        match.battles[self.matchup1_str] = battle
+        self.assertEqual(match.calculate_points(100), {self.team0.name: 50, self.team1.name: 50})
 
-        match = Match(self.problem, self.config, [team0])
-        self.assertEqual(match.all_battle_pairs(), [('0', '0')])
+    def test_calculate_points_averaged_domination(self):
+        """One team should get all points if it solved anything and the other team nothing."""
+        match = Match(**self.team_dict)
+        battle = Averaged()
+        battle.fights = dummy_result(0, 0, 0)
+        battle2 = Averaged()
+        battle2.fights = dummy_result(1, 1, 1)
+        match.battles[self.matchup0_str] = battle
+        match.battles[self.matchup1_str] = battle2
+        self.assertEqual(match.calculate_points(100), {self.team0.name: 100, self.team1.name: 0})
 
-    def test_run(self):
-        self.assertEqual(self.match.run(battle_type='foo')['error'], ('Unrecognized battle_type given: "foo"'))
+    def test_calculate_points_averaged_one_team_better(self):
+        """One team should get more points than the other if it performed better."""
+        match = Match(**self.team_dict)
+        battle = Averaged()
+        battle.fights = dummy_result(0.6, 0.6, 0.6)
+        battle2 = Averaged()
+        battle2.fights = dummy_result(0.4, 0.4, 0.4)
+        match.battles[self.matchup0_str] = battle
+        match.battles[self.matchup1_str] = battle2
+        self.assertEqual(match.calculate_points(100), {self.team0.name: 40, self.team1.name: 60})
 
-    def test_one_fight_gen_timeout(self):
-        team = Team('0', self.tests_path + '/generator_timeout', self.tests_path + '/solver')
-        match_run_timeout = Match(self.problem, self.config_short_timeout, [team], cache_docker_containers=False)
-        match_run_timeout.generating_team = '0'
-        match_run_timeout.solving_team = '0'
-        self.assertEqual(match_run_timeout._one_fight(1), 1.0)
-
-    def test_one_fight_gen_exec_error(self):
-        team = Team('0', self.tests_path + '/generator_execution_error', self.tests_path + '/solver')
-        match_broken_generator = Match(self.problem, self.config, [team], cache_docker_containers=False)
-        match_broken_generator.generating_team = '0'
-        match_broken_generator.solving_team = '0'
-        self.assertEqual(match_broken_generator._one_fight(1), 1.0)
-
-    def test_one_fight_gen_wrong_instance(self):
-        team = Team('0', self.tests_path + '/generator_wrong_instance', self.tests_path + '/solver')
-        match_wrong_generator_instance = Match(self.problem, self.config, [team], cache_docker_containers=False)
-        match_wrong_generator_instance.generating_team = '0'
-        match_wrong_generator_instance.solving_team = '0'
-        self.assertEqual(match_wrong_generator_instance._one_fight(1), 1.0)
-
-    def test_one_fight_gen_malformed_sol(self):
-        team = Team('0', self.tests_path + '/generator_malformed_solution', self.tests_path + '/solver')
-        match_malformed_generator_solution = Match(self.problem, self.config, [team], cache_docker_containers=False)
-        match_malformed_generator_solution.generating_team = '0'
-        match_malformed_generator_solution.solving_team = '0'
-        self.assertEqual(match_malformed_generator_solution._one_fight(1), 1.0)
-
-    def test_one_fight_gen_wrong_cert(self):
-        team = Team('0', self.tests_path + '/generator_wrong_certificate', self.tests_path + '/solver')
-        match_wrong_generator_certificate = Match(self.problem, self.config, [team], cache_docker_containers=False)
-        match_wrong_generator_certificate.generating_team = '0'
-        match_wrong_generator_certificate.solving_team = '0'
-        self.assertEqual(match_wrong_generator_certificate._one_fight(1), 1.0)
-
-    def test_one_fight_sol_timeout(self):
-        team = Team('0', self.tests_path + '/generator', self.tests_path + '/solver_timeout')
-        match_solver_timeout = Match(self.problem, self.config_short_timeout, [team], cache_docker_containers=False)
-        match_solver_timeout.generating_team = '0'
-        match_solver_timeout.solving_team = '0'
-        self.assertEqual(match_solver_timeout._one_fight(1), 0.0)
-
-    def test_one_fight_sol_exec_error(self):
-        team = Team('0', self.tests_path + '/generator', self.tests_path + '/solver_execution_error')
-        match_broken_solver = Match(self.problem, self.config, [team], cache_docker_containers=False)
-        match_broken_solver.generating_team = '0'
-        match_broken_solver.solving_team = '0'
-        self.assertEqual(match_broken_solver._one_fight(1), 0.0)
-
-    def test_one_fight_sol_malformed(self):
-        team = Team('0', self.tests_path + '/generator', self.tests_path + '/solver_malformed_solution')
-        match_malformed_solution = Match(self.problem, self.config, [team], cache_docker_containers=False)
-        match_malformed_solution.generating_team = '0'
-        match_malformed_solution.solving_team = '0'
-        self.assertEqual(match_malformed_solution._one_fight(1), 0.0)
-
-    def test_one_fight_sol_wrong_cert(self):
-        team = Team('0', self.tests_path + '/generator', self.tests_path + '/solver_wrong_certificate')
-        match_wrong_certificate = Match(self.problem, self.config, [team], cache_docker_containers=False)
-        match_wrong_certificate.generating_team = '0'
-        match_wrong_certificate.solving_team = '0'
-        self.assertEqual(match_wrong_certificate._one_fight(1), 0.0)
-
-    def test_one_fight_successful(self):
-        successful_match = Match(self.problem, self.config, [self.team], cache_docker_containers=False)
-        successful_match.generating_team = '0'
-        successful_match.solving_team = '0'
-        self.assertEqual(successful_match._one_fight(1), 1.0)
+    # TODO: Add tests for remaining functions
 
 
-if __name__ == '__main__':
-    unittest.main()
+class Execution(IsolatedAsyncioTestCase):
+    """Some basic tests for the execution of the battles."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        problem_path = Path(__file__).parent / "testsproblem"
+        cls.problem = TestProblem
+        run_params = RunConfig(timeout=2)
+        cls.config_iter = AlgobattleConfig(
+            match=MatchConfig(
+                generator=run_params,
+                solver=run_params,
+                problem="Test Problem",
+                battle=Iterated.Config(maximum_size=10, rounds=2),
+            ),
+        )
+        cls.config_avg = AlgobattleConfig(
+            match=MatchConfig(
+                generator=run_params,
+                solver=run_params,
+                problem="Test Problem",
+                battle=Averaged.Config(instance_size=5, num_fights=3),
+            ),
+        )
+        cls.generator = problem_path / "generator"
+        cls.solver = problem_path / "solver"
+
+    async def test_basic(self):
+        self.config_iter.teams = {"team_0": TeamInfo(generator=self.generator, solver=self.solver)}
+        res = await Match().run(self.config_iter)
+        for result in res.battles.values():
+            self.assertIsNone(result.runtime_error)
+            for fight in result.fights:
+                self.assertIsNone(fight.generator.error)
+                assert fight.solver is not None
+                self.assertIsNone(fight.solver.error)
+
+    async def test_multi_team(self):
+        team0 = TeamInfo(generator=self.generator, solver=self.solver)
+        team1 = TeamInfo(generator=self.generator, solver=self.solver)
+        self.config_iter.teams = {"team_0": team0, "team_1": team1}
+        res = await Match().run(self.config_iter)
+        for result in res.battles.values():
+            self.assertIsNone(result.runtime_error)
+            for fight in result.fights:
+                self.assertIsNone(fight.generator.error)
+                assert fight.solver is not None
+                self.assertIsNone(fight.solver.error)
+
+    async def test_averaged(self):
+        self.config_avg.teams = {"team_0": TeamInfo(generator=self.generator, solver=self.solver)}
+        res = await Match().run(self.config_avg)
+        for result in res.battles.values():
+            self.assertIsNone(result.runtime_error)
+            for fight in result.fights:
+                self.assertIsNone(fight.generator.error)
+                assert fight.solver is not None
+                self.assertIsNone(fight.solver.error)
+
+
+class Parsing(TestCase):
+    """Testing the parsing of CLI and config files."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        path = Path(__file__).parent
+        cls.problem_path = path / "testsproblem"
+        cls.configs_path = path / "configs"
+        cls.teams = {"team_0": TeamInfo(generator=cls.problem_path / "generator", solver=cls.problem_path / "solver")}
+
+    def test_no_cfg_default(self):
+        with self.assertRaises(FileNotFoundError):
+            AlgobattleConfig.from_file(self.problem_path)
+
+    def test_empty_cfg(self):
+        with self.assertRaises(ValidationError):
+            AlgobattleConfig.from_file(self.configs_path / "empty.toml")
+
+    def test_cfg(self):
+        cfg = AlgobattleConfig.from_file(self.configs_path / "test.toml")
+        self.assertEqual(
+            cfg,
+            AlgobattleConfig(
+                match=MatchConfig(
+                    generator=RunConfig(space=ByteSize(10)),
+                    problem="Test Problem",
+                    battle=Averaged.Config(num_fights=1),
+                ),
+                project=ProjectConfig(points=10, results=self.configs_path / "results"),
+                problem=DynamicProblemConfig(location=self.configs_path / "problem.py"),
+            ),
+        )
+
+    def test_cfg_team(self):
+        cfg = AlgobattleConfig.from_file(self.configs_path / "teams.toml")
+        self.assertEqual(
+            cfg,
+            AlgobattleConfig(
+                teams={
+                    "team 1": TeamInfo(generator=self.configs_path, solver=self.configs_path),
+                    "team 2": TeamInfo(generator=self.configs_path, solver=self.configs_path),
+                },
+                match=MatchConfig(
+                    problem="Test Problem",
+                ),
+                project=ProjectConfig(results=self.configs_path / "results"),
+                problem=DynamicProblemConfig(location=self.configs_path / "problem.py"),
+            ),
+        )
+
+    def test_cfg_team_no_name(self):
+        with self.assertRaises(ValueError):
+            AlgobattleConfig.from_file(self.configs_path / "teams_incorrect.toml")
+
+
+if __name__ == "__main__":
+    main()

@@ -1,198 +1,244 @@
-"""Collection of utility functions."""
-import os
-import logging
+"""Module containung various utility definitions.
+
+In particular, the base classes :class:`BaseModel`, :class:`Encodable`, :class:`EncodableModel`, and exception classes.
+"""
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from datetime import datetime
+from enum import StrEnum
+from importlib.util import module_from_spec, spec_from_file_location
+import json
 from pathlib import Path
-import timeit
-import subprocess
-import importlib.util
 import sys
-import collections
+from tempfile import TemporaryDirectory
+from traceback import format_exception
+from types import ModuleType
+from typing import Any, LiteralString, TypeVar, Self
 
-import algobattle
-import algobattle.problems.delaytest as DelaytestProblem
-import algobattle.sighandler as sigh
-from algobattle.problem import Problem
-
-
-logger = logging.getLogger("algobattle.util")
-
-
-creationflags = 0
-if os.name != "posix":
-    creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
+from pydantic import (
+    ConfigDict,
+    BaseModel as PydandticBaseModel,
+    ValidationError as PydanticValidationError,
+)
 
 
-def import_problem_from_path(problem_path: str) -> Problem:
-    """Try to import and initialize a Problem object from a given path.
+class Role(StrEnum):
+    """Indicates whether the role of a program is to generate or to solve instances."""
 
-    Parameters
-    ----------
-    problem_path : str
-        Path in the file system to a problem folder.
+    generator = "generator"
+    solver = "solver"
 
-    Returns
-    -------
-    Problem
-        Returns an object of the problem if successful, None otherwise.
-    """
-    try:
-        spec = importlib.util.spec_from_file_location("problem", problem_path + "/__init__.py")
-        Problem = importlib.util.module_from_spec(spec)
-        sys.modules[spec.name] = Problem
-        spec.loader.exec_module(Problem)
 
-        return Problem.Problem()
-    except Exception as e:
-        logger.critical('Importing the given problem failed with the following exception: "{}"'.format(e))
+T = TypeVar("T")
+
+
+class BaseModel(PydandticBaseModel):
+    """Base class for all pydantic models."""
+
+    model_config = ConfigDict(extra="forbid", from_attributes=True)
+
+
+class Encodable(ABC):
+    """Represents data that docker containers can interact with."""
+
+    @classmethod
+    @abstractmethod
+    def decode(cls, source: Path, max_size: int, role: Role) -> Self:
+        """Decodes the data found at the given path into a python object.
+
+        Args:
+            source: Path to data that can be used to construct an instance of this class. May either point to a folder
+                or a single file. The expected type of path should be consistent with the result of :meth:`.encode`.
+            max_size: Maximum size the current battle allows.
+            role: Role of the program that generated this data.
+
+        Raises:
+            EncodingError: If the data cannot be decoded into an instance.
+
+        Returns:
+            The decoded object.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def encode(self, target: Path, role: Role) -> None:
+        """Encodes the object onto the file system so that it can be passed to a program.
+
+        Args:
+            target: Path to the location where the program expects the encoded data. :meth:`.encode` may either create
+                a single file at the target location, or an entire folder. If creating a single file, it may append a
+                file type ending to the path. It should not affect any other files or directories.
+            role: Role of the program that generated this data.
+
+        Raises:
+            EncodingError: If the data cannot be properly encoded.
+        """
+        raise NotImplementedError
+
+    @classmethod
+    def io_schema(cls) -> str | None:
+        """Generates a schema specifying the I/O for this data.
+
+        The schema should specify the structure of the data in the input and output files or folders.
+        In particular, the specification should match precisely what :meth`.decode` accepts, and the output of
+        :meth:`.encode` should comply with it.
+
+        Returns:
+            The schema, or `None` to indicate no information about the expected shape of the data can be provided.
+        """
         return None
 
 
-def measure_runtime_overhead() -> float:
-    """Calculate the I/O delay for starting and stopping docker on the host machine.
+class EncodableModel(BaseModel, Encodable, ABC):
+    """Problem data that can easily be encoded into and decoded from json files."""
 
-    Returns
-    -------
-    float
-        I/O overhead in seconds, rounded to two decimal places.
-    """
-    problem = DelaytestProblem.Problem()
-    config_path = os.path.join(os.path.dirname(os.path.abspath(algobattle.__file__)), "config", "config_delaytest.ini")
-    delaytest_path = DelaytestProblem.__file__[:-12]  # remove /__init__.py
-    delaytest_team = algobattle.team.Team(0, delaytest_path + "/generator", delaytest_path + "/solver")
-
-    match = algobattle.match.Match(problem, config_path, [delaytest_team])
-
-    if not match.build_successful:
-        logger.warning("Building a match for the time tolerance calculation failed!")
-        return 0
-
-    overheads = []
-    for i in range(5):
-        sigh.latest_running_docker_image = "generator0"
-        _, timeout = run_subprocess(
-            match.generator_base_run_command(match.space_generator) + ["generator0"],
-            input=str(50 * i).encode(),
-            timeout=match.timeout_generator,
-        )
-        if not timeout:
-            timeout = match.timeout_generator
-        overheads.append(float(timeout))
-
-    max_overhead = round(max(overheads), 2)
-
-    return max_overhead
-
-
-def run_subprocess(run_command: list, input: bytes, timeout: float, suppress_output=False):
-    """Run a given command as a subprocess.
-
-    Parameters
-    ----------
-    run_command : list
-        The command that is to be executed.
-    input : bytes
-        Additional input for the subprocess, supplied to it via stdin.
-    timeout : float
-        The timeout for the subprocess in seconds.
-    suppress_output : bool
-        Indicate whether to suppress output to stderr.
-
-    Returns
-    -------
-    any
-        The output that the process returns.
-    float
-        Actual running time of the process.
-    """
-    start_time = timeit.default_timer()
-    raw_output = None
-
-    stderr = subprocess.PIPE
-    if suppress_output:
-        stderr = None
-
-    creationflags = 0
-    if os.name != 'posix':
-        creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
-    with subprocess.Popen(run_command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                          stderr=stderr, creationflags=creationflags) as p:
+    @classmethod
+    def _decode(cls, source: Path, **context: Any) -> Self:
+        """Internal method used by .decode to let Solutions also accept the corresponding instance."""
+        if not source.with_suffix(".json").is_file():
+            raise EncodingError("The json file does not exist.")
         try:
-            raw_output, _ = p.communicate(input=input, timeout=timeout)
-        except subprocess.TimeoutExpired:
-            logger.warning('Time limit exceeded!')
-            return None, None
+            with open(source.with_suffix(".json"), "r") as f:
+                return cls.model_validate_json(f.read(), context=context)
+        except PydanticValidationError as e:
+            raise EncodingError("Json data does not fit the schema.", detail=str(e))
         except Exception as e:
-            logger.warning('An exception was thrown while running the subprocess:\n{}'.format(e))
-            return None, None
-        finally:
-            p.kill()
-            p.wait()
-            sigh._kill_spawned_docker_containers()
+            raise EncodingError("Unknown error while decoding the data.", detail=str(e))
 
-    elapsed_time = round(timeit.default_timer() - start_time, 2)
-    logger.debug('Approximate elapsed runtime: {}/{} seconds.'.format(elapsed_time, timeout))
+    @classmethod
+    def decode(cls, source: Path, max_size: int, role: Role) -> Self:
+        """Uses pydantic to create a python object from a `.json` file."""
+        return cls._decode(source, max_size=max_size, role=role)
 
-    return raw_output, elapsed_time
-
-
-def build_image(base_cmd: list, name: str, path: Path, timeout: float) -> bool:
-    """Builds a docker image of the given name using the base_command.
-
-    Parameters
-    ----------
-    base_cmd : list
-        A list containing a shared prefix of a command.
-    name : str
-        The intended name (tag) of the image.
-    path: Path
-        Path to the image.
-    timeout: float
-        Timeout after which the build process is terminated preemptively.
-
-    Returns
-    -------
-    bool
-        Determines whether an image with the given tag is now built and thus accessible.
-    """
-    path = Path(path)
-    build_successful = True
-    with subprocess.Popen(
-        base_cmd + [name, str(path)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=creationflags
-    ) as process:
+    def encode(self, target: Path, role: Role) -> None:
+        """Uses pydantic to create a json representation of the object at the targeted file."""
         try:
-            output, _ = process.communicate(timeout=timeout)
-            logger.debug(output.decode())
-        except subprocess.TimeoutExpired:
-            process.kill()
-            process.wait()
-            logger.error(f"Build process for {name} ran into a timeout!")
-            build_successful = False
-        if process.returncode != 0:
-            process.kill()
-            process.wait()
-            logger.error(f"Build process for {name} failed!")
-            build_successful = False
-    return build_successful
+            with open(target.with_suffix(".json"), "w") as f:
+                f.write(self.model_dump_json())
+        except Exception as e:
+            raise EncodingError("Unkown error while encoding the data.", detail=str(e))
+
+    @classmethod
+    def io_schema(cls) -> str:
+        """Uses pydantic to generate a json schema for this class."""
+        return json.dumps(cls.model_json_schema(), indent=4)
 
 
-def update_nested_dict(current_dict, updates):
-    """Update a nested dictionary with new data recursively.
+@dataclass
+class RunningTimer:
+    """Basic data holding info on a currently running timer."""
 
-    Parameters
-    ----------
-    current_dict : dict
-        The dict to be updated.
-    updates : dict
-        The dict containing the updates
+    start: datetime
+    timeout: float | None
 
-    Returns
-    -------
-    dict
-        The updated dict.
-    """
-    for key, value in updates.items():
-        if isinstance(value, collections.abc.Mapping):
-            current_dict[key] = update_nested_dict(current_dict.get(key, {}), value)
+
+class AlgobattleBaseException(Exception):
+    """Base exception class for errors used by the algobattle package."""
+
+    def __init__(self, message: LiteralString, *, detail: str | list[str] | list[dict[str, Any]] | None = None) -> None:
+        """Base exception class for errors used by the algobattle package.
+
+        Args:
+            message: Simple error message that can always be displayed.
+            detail: More detailed error message that may include sensitive information.
+        """
+        self.message = message
+        self.detail = detail
+        super().__init__()
+
+
+class EncodingError(AlgobattleBaseException):
+    """Indicates that the given data could not be encoded or decoded properly."""
+
+
+class ValidationError(AlgobattleBaseException):
+    """Indicates that the decoded problem instance or solution is invalid."""
+
+
+class BuildError(AlgobattleBaseException):
+    """Indicates that the build process could not be completed successfully."""
+
+
+class ExecutionError(AlgobattleBaseException):
+    """Indicates that the program could not be executed successfully."""
+
+    def __init__(self, message: LiteralString, *, detail: str | None = None, runtime: float) -> None:
+        """Indicates that the program could not be executed successfully.
+
+        Args:
+            message: Simple error message that can always be displayed.
+            runtime: Runtime of the program in seconds until the error occured.
+            detail: More detailed error message that may include sensitive information.
+        """
+        self.runtime = runtime
+        super().__init__(message, detail=detail)
+
+
+class ExecutionTimeout(ExecutionError):
+    """Indicates that the program ran into the timeout."""
+
+
+class DockerError(AlgobattleBaseException):
+    """Indicates that an issue with the docker daemon occured."""
+
+
+class ExceptionInfo(BaseModel):
+    """Details about an exception that was raised."""
+
+    type: str
+    message: str
+    detail: str | list[str] | list[dict[str, Any]] | None = None
+
+    @classmethod
+    def from_exception(cls, error: Exception) -> Self:
+        """Constructs an instance from a raised exception."""
+        if isinstance(error, AlgobattleBaseException):
+            return cls(
+                type=error.__class__.__name__,
+                message=error.message,
+                detail=error.detail,
+            )
         else:
-            current_dict[key] = value
-    return current_dict
+            return cls(
+                type=error.__class__.__name__,
+                message=str(error),
+                detail=format_exception(error),
+            )
+
+
+class TempDir(TemporaryDirectory):
+    """Python's `TemporaryDirectory` but with a contextmanager returning a Path."""
+
+    def __enter__(self) -> Path:
+        return Path(super().__enter__())
+
+
+def timestamp() -> str:
+    """Formats the current time into a filename-safe string."""
+    t = datetime.now()
+    return f"{t.year:04d}-{t.month:02d}-{t.day:02d}_{t.hour:02d}-{t.minute:02d}-{t.second:02d}"
+
+
+def import_file_as_module(path: Path, name: str) -> ModuleType:
+    """Imports a file as a module.
+
+    Args:
+        path: A path to a python file.
+
+    Raises:
+        ValueError: If the path doesn't point to a module
+        RuntimeError: If the file cannot be imported properly
+    """
+    if not path.is_file():
+        raise ValueError(f"'{path}' does not point to a python file or a proper parent folder of one.")
+
+    try:
+        spec = spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        return module
+    except Exception as e:
+        raise RuntimeError from e

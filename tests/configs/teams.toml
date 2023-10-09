@@ -1,0 +1,10 @@
+[teams."team 1"]
+generator = "."
+solver = "."
+
+[teams."team 2"]
+generator = "."
+solver = "."
+
+[match]
+problem = "Test Problem"

@@ -1,3 +1,12 @@
 **/__pycache__
-algobattle.egg-info/*
-.vscode/*
+algobattle.egg-info
+.vscode
+.pdm-python
+pdm.lock
+build
+dist
+site
+docs/src/pairsum_solver/target
+docs/src/pairsum_solver/Cargo.lock
+.results
+.project

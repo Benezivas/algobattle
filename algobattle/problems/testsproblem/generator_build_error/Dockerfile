@@ -1,3 +1,0 @@
-FROM python:3
-
-BUILD AN ERROR

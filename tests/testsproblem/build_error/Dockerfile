@@ -1,0 +1,3 @@
+FROM scratch
+
+BUILD AN ERROR

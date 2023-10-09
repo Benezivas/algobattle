@@ -1,0 +1,124 @@
+site_name: Algobattle
+site_description: Algobattle framework, an interactive, easy to use computer science lab course
+repo_name: benezivas/algobattle
+repo_url: https://github.com/Benezivas/algobattle
+edit_uri: ""
+
+plugins:
+  - search
+
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            members_order: "source"
+            show_root_heading: true
+            show_root_path: false
+
+theme:
+  name: material
+
+  icon:
+    repo: fontawesome/brands/github
+
+  palette:
+  - media: '(prefers-color-scheme: light)'
+    scheme: default
+    primary: indigo
+    accent: amber
+    toggle:
+      icon: material/weather-sunny
+      name: Switch to dark mode
+
+  - media: '(prefers-color-scheme: dark)'
+    scheme: slate
+    primary: indigo
+    accent: amber
+    toggle:
+      icon: material/weather-night
+      name: Switch to light mode
+
+  features:
+    - navigation.instant
+    - navigation.tabs
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - search.share
+    - content.tabs.link
+    - content.code.annotate
+    - content.code.copy
+  language: en
+  font:
+    text: Roboto
+    code: monospace
+
+markdown_extensions:
+  - toc:
+      permalink: true
+  - admonition
+  - def_list
+  - pymdownx.extra
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.blocks.tab:
+      alternate_style: true
+  - pymdownx.blocks.admonition:
+      types:
+      - note
+      - abstract
+      - info
+      - tip
+      - success
+      - question
+      - warning
+      - failure
+      - danger
+      - bug
+      - example
+      - quote
+      - new
+      - settings
+  - pymdownx.keys
+  - mdx_include:
+      base_path: docs/src
+  - attr_list
+  - pymdownx.emoji:
+      emoji_index: !!python/name:materialx.emoji.twemoji
+      emoji_generator: !!python/name:materialx.emoji.to_svg
+
+
+extra_css:
+  - css/termynal.css
+  - css/custom.css
+
+extra_javascript:
+  - js/termynal.js
+  - js/custom.js
+
+nav:
+  - Home: index.md
+  - Tutorial:
+    - tutorial/index.md
+    - tutorial/installation.md
+    - tutorial/getting_started.md
+    - tutorial/programs.md
+    - tutorial/match.md
+    - tutorial/summary.md
+  - Advanced Topics:
+    - advanced/index.md
+    - advanced/config.md
+    - advanced/battle_types.md
+    - advanced/docker.md
+  - API Reference:
+    - api/index.md
+    - api/battle.md
+    - api/problem.md
+    - api/util.md
+  - Teaching Concept: teaching_concept/english.md
+

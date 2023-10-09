@@ -1,0 +1,46 @@
+// Main module, will be run as the {{ program }}
+
+use std::fs;
+use std::error::Error;
+{% if instance_json or solution_json %}
+use serde_json::{ {%- if program == "solver" %}Value, {% endif %}to_string, from_str};
+{% endif %}
+
+
+fn main() -> Result<(), Box<dyn Error>> {
+{% if program == "generator" %}
+    let max_size: u64 = fs::read_to_string("/input/max_size.txt")?.parse()?;
+
+
+    let instance = ();
+    {% if with_solution %}
+    let solution = ();
+    {% endif %}
+
+
+    {% if instance_json %}
+    fs::write("/output/instance.json", to_string(&instance)?)?;
+    {% else %}
+    let instance_output = "/output/instance"; // this is where you need to write the instance to
+    {% endif %}
+{% else %}
+    {% if instance_json %}
+    let instance: Value = from_str(&fs::read_to_string("/input/instance.json")?)?;
+    {% else %}
+    let instance_input = "/input/instance";   // this is where you can read the instance from
+    {% endif %}
+
+
+    let solution = ();
+
+
+{% endif %}
+    {% if program == "solver" or with_solution %}
+    {% if solution_json %}
+    fs::write("/output/solution.json", to_string(&solution)?)?;
+    {% else %}
+    let solution_output = "/output/solution"; // this is where you need to write the solution to
+    {% endif %}
+    {% endif %}
+    Ok(())
+}

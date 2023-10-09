@@ -1,0 +1,12 @@
+[match]
+problem = "Test Problem"
+
+[match.generator]
+space = 10
+
+[match.battle]
+type = "Averaged"
+num_fights = 1
+
+[project]
+points = 10

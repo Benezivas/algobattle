@@ -1,0 +1,15 @@
+{
+  "name": "{{ project }}",
+  "version": "0.0.1",
+  "description": "{{program.capitalize()}} for the {{ problem }} problem.",
+  "author": "{{ team }}",
+  "license": "ISC",
+  "devDependencies": {
+    "typescript": "^5.2.2",
+    "@types/node": "^20.6.2"
+  },
+  "scripts": {
+    "start": "NODE_PATH=./build node build/main.js",
+    "build": "tsc -p ."
+  }
+}
