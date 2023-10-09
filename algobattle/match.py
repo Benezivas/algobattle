@@ -624,15 +624,6 @@ class AlgobattleConfig(BaseModel):
 
     model_config = ConfigDict(revalidate_instances="always")
 
-    @model_validator(mode="after")
-    def check_problem_defined(self) -> Self:
-        """Validates that the specified problem is either installed or dynamically specified."""
-        prob = self.match.problem
-        if not self.problem.location.is_file() and prob not in Problem.available():
-            raise ValueError(f"The specified problem {prob} cannot be found")
-        else:
-            return self
-
     @cached_property
     def loaded_problem(self) -> Problem:
         """The problem this config uses."""

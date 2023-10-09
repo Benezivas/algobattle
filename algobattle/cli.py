@@ -350,6 +350,8 @@ def init(
             gitignore += f"{res_path.relative_to(target)}/\n"
         target.joinpath(".gitignore").write_text(gitignore)
 
+    if not parsed_config.problem.location.is_absolute():
+        parsed_config.problem.location = target / parsed_config.problem.location
     problem_obj = parsed_config.loaded_problem
     if schemas:
         instance: type[Instance] = problem_obj.instance_cls
