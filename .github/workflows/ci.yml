@@ -1,10 +1,8 @@
 name: CI code checks
 
 on:
-  push:
-    branches: [ main, develop, 4.0.0-rc ]
   pull_request:
-    branches: [ main, develop, 4.0.0-rc ]
+    branches: [ main, develop ]
 
 jobs:
   lint:
