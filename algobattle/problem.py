@@ -332,12 +332,15 @@ class Problem:
     def load_file(cls, name: str, file: Path) -> Self:
         """Loads the problem from the specified file."""
         existing_problems = cls._problems.copy()
-        import_file_as_module(file, "__algobattle_problem__")
-        new_problems = {n: p for n, p in cls._problems.items() if n not in existing_problems}
-        if name not in new_problems:
-            raise ValueError(f"The {name} problem is not defined in {file}")
-        else:
-            return cls._problems[name]
+        cls._problems = {}
+        try:
+            import_file_as_module(file, "__algobattle_problem__")
+            if name not in cls._problems:
+                raise ValueError(f"The {name} problem is not defined in {file}")
+            else:
+                return cls._problems[name]
+        finally:
+            cls._problems = existing_problems
 
     @classmethod
     def load(cls, name: str, file: Path | None = None) -> Self:
