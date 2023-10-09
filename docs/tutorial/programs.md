@@ -297,3 +297,16 @@ algobattle test
 ```
 
 This time it should run without any errors. If that doesn't work for you, there's error messages in the linked json file.
+
+## Packaging the Programs
+
+You may want to share your code with e.g. your lab instructors. The best way to do that is to package them into Algobattle
+program files. These are files using the `.prob` file extension that are formatted in such a way that Algobattle recognises
+them and can use them to run matches.
+
+!!! tip "A peek behind the curtain"
+    These files again are just `zip` files containing everything in your programs' folders in a specific format.
+    It's best to remove any unnessesary files from them before packaging to keep file sizes down.
+
+!!! note "Using the web framework"
+    If your lab is using the web framework, these files are what you need to upload to have your programs run in the matches.
