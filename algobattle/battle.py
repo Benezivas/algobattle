@@ -175,8 +175,9 @@ class FightHandler:
             set_cpus=self.set_cpus,
             ui=ui,
         )
-        if gen_result.instance is None:
+        if gen_result.info.error is not None:
             return Fight(score=1, max_size=max_size, generator=gen_result.info, solver=None)
+        assert gen_result.instance is not None
 
         sol_result = await self.solver.run(
             gen_result.instance,
@@ -189,8 +190,9 @@ class FightHandler:
             set_cpus=self.set_cpus,
             ui=ui,
         )
-        if sol_result.solution is None:
+        if sol_result.info.error is not None:
             return Fight(score=0, max_size=max_size, generator=gen_result.info, solver=sol_result.info)
+        assert sol_result.solution is not None
 
         if self.problem.with_solution:
             assert gen_result.solution is not None
