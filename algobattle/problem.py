@@ -209,7 +209,9 @@ def default_score(
         try:
             return max(0, min(1, sol_score / gen_score))
         except ZeroDivisionError:
-            return float(sol_score < 0)
+            # if generator scored 0 then the solver will have achieved an equal or better score
+            # i.e. the Fight's score is simply 1 regardless of its solution score.
+            return 1
     else:
         return max(0, min(1, solution.score(instance, Role.solver)))
 
