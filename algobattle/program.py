@@ -828,8 +828,6 @@ class TeamHandler:
             except Exception as e:
                 handler.excluded[name] = ExceptionInfo.from_exception(e)
                 ui.finish_build(name, False)
-            except BaseException:
-                raise
             else:
                 ui.finish_build(name, True)
         return handler
