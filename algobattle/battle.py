@@ -39,12 +39,14 @@ from pydantic_core.core_schema import tagged_union_schema, with_info_wrap_valida
 
 from algobattle.program import (
     Generator,
+    GeneratorResult,
     ProgramRunInfo,
     ProgramUi,
     Solver,
+    SolverResult,
 )
-from algobattle.problem import Problem
-from algobattle.util import Encodable, ExceptionInfo, BaseModel
+from algobattle.problem import Instance, Problem, Solution
+from algobattle.util import Encodable, EncodableModel, ExceptionInfo, BaseModel
 
 
 _BattleConfig: TypeAlias = Any
@@ -59,6 +61,26 @@ T = TypeVar("T")
 P = ParamSpec("P")
 RunFight: TypeAlias = "Callable[Concatenate[FightHandler, P], Awaitable[Fight]]"
 Type = type
+
+
+class FullRunInfo(ProgramRunInfo):
+    """Contains the program run info, including the output objects."""
+
+    battle_data: Encodable | None = None
+    instance: Instance | None = None
+    solution: Solution[Instance] | None = None
+
+    @classmethod
+    def from_result(cls, result: GeneratorResult | SolverResult) -> Self:
+        """Converts a ProgramResult into a jsonable object."""
+        res = cls.model_validate(result.info)
+        if isinstance(result.battle_data, EncodableModel):
+            res.battle_data = result.battle_data
+        if isinstance(result.solution, EncodableModel):
+            res.solution = result.solution
+        if isinstance(result, GeneratorResult) and isinstance(result.instance, EncodableModel):
+            res.instance = result.instance
+        return res
 
 
 class Fight(BaseModel):
@@ -202,7 +224,12 @@ class FightHandler:
         else:
             score = self.problem.score(gen_result.instance, solution=sol_result.solution)
         score = max(0, min(1, float(score)))
-        return Fight(score=score, max_size=max_size, generator=gen_result.info, solver=sol_result.info)
+        return Fight(
+            score=score,
+            max_size=max_size,
+            generator=FullRunInfo.from_result(gen_result),
+            solver=FullRunInfo.from_result(sol_result),
+        )
 
 
 # We need this to be here to prevent an import cycle between match.py and battle.py
