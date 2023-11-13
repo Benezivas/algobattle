@@ -5,7 +5,7 @@ from functools import cached_property
 from itertools import combinations
 from pathlib import Path
 import tomllib
-from typing import Annotated, Any, Iterable, Protocol, ClassVar, Self, TypeAlias, TypeVar, cast
+from typing import Annotated, Any, Iterable, Literal, Protocol, ClassVar, Self, TypeAlias, TypeVar, cast
 from typing_extensions import override
 from typing_extensions import TypedDict
 
@@ -182,6 +182,30 @@ class Match(BaseModel):
             points[team] += points_per_matchup * len(self.excluded_teams)
 
         return points
+
+    def format(self, *, indent: int | None = 2, error_detail: Literal["high", "low"] = "low") -> str:
+        """Nicely formats the match result into a json string."""
+        match error_detail:
+            case "high":
+                exclude = None
+            case "low":
+                detail = {"detail"}
+                program = {"error": detail}
+                exclude = {
+                    "excluded_teams": {"__all__": detail},
+                    "battles": {
+                        "__all__": {
+                            "runtime_error": detail,
+                            "fights": {
+                                "__all__": {
+                                    "generator": program,
+                                    "solver": program,
+                                }
+                            },
+                        }
+                    },
+                }
+        return self.model_dump_json(exclude_defaults=True, indent=indent, exclude=exclude)
 
 
 class Ui(BuildUi, Protocol):
@@ -588,6 +612,10 @@ class ProjectConfig(BaseModel):
     """Whether to clean up the images after we use them."""
     set_cpus: str | list[str] | None = None
     """Wich cpus to run programs on, if it is a list each battle will use a different cpu specification for it."""
+    error_detail: Literal["low", "high"] = "high"
+    """How detailed error messages should be.
+    Higher settings help in debugging, but may leak information from other teams.
+    """
     points: int = 100
     """Highest number of points each team can achieve."""
     results: RelativePath = Field(default=Path("./results"), validate_default=True)

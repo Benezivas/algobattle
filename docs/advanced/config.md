@@ -173,6 +173,11 @@ structure with both keys being mandatory:
     : Path to the folder where result files are saved. Each result file will be a json file with a name containing the
     command that created it and the current timestamp. Defaults to `results`
 
+    `error_detail`
+    : Used to specify how detailed error messages included in the log files should be. Can be set to `high`, which
+    includes full details and stack traces for any exceptions that occur, or `low` to hide sensitive data that may leak
+    other team's strategic information.
+
 ### `docker`
 : Contains various advanced Docker settings that are passed through to the Docker daemon without influencing Algobattle
 itself. You generally should not need to use these settings. If you are running into a problem you cannot solve without
