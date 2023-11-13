@@ -207,7 +207,7 @@ class ExceptionInfo(BaseModel):
         else:
             return cls(
                 type=error.__class__.__name__,
-                message=str(error),
+                message="Unknown exception occurred.",
                 detail=format_exception(error),
             )
 
