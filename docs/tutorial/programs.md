@@ -301,12 +301,23 @@ This time it should run without any errors. If that doesn't work for you, there'
 ## Packaging the Programs
 
 You may want to share your code with e.g. your lab instructors. The best way to do that is to package them into Algobattle
-program files. These are files using the `.prob` file extension that are formatted in such a way that Algobattle recognises
-them and can use them to run matches.
+program files. We do this by running
+
+```
+algobattle package programs
+```
+
+!!! note "Using the web framework"
+    If your lab is using the web framework, these files are what you need to upload to have your programs run in the
+    matches.
+
+!!! tip "Keep program sizes down"
+    Algobattle will package everything in the program directories. This may include unnecessary build artefacts, logs,
+    program output, etc. It's best to remove any superfluous files (in particular, anything in your `.gitignore`)
+    from the directories before running this command.
 
 !!! tip "A peek behind the curtain"
     These files again are just `zip` files containing everything in your programs' folders in a specific format.
-    It's best to remove any unnessesary files from them before packaging to keep file sizes down.
 
-!!! note "Using the web framework"
-    If your lab is using the web framework, these files are what you need to upload to have your programs run in the matches.
+This will create two `.prog` files that contain all the data Algobattle needs to run our programs. We can then easily
+share our code using just these files, or upload them to the Algobattle website.
