@@ -457,12 +457,12 @@ class EdgeLen:
 
     @staticmethod
     def _func(v: Any, edges: list[tuple[int, int]]) -> Any:
-        """Validates that the collection has length `instance.size`."""
+        """Validates that the collection has the same length as `instance.edges`."""
         if len(v) != len(edges):
-            raise ValueError("Value does not have length `instance.size`")
+            raise ValueError("Value does not have the same length as `instance.edges`")
         return v
 
-    _validator = AttributeReferenceValidator(_func, InstanceRef.size)
+    _validator = AttributeReferenceValidator(_func, InstanceRef.edges)
 
     @classmethod
     def __get_pydantic_core_schema__(cls, source_type: Any, handler: GetCoreSchemaHandler) -> CoreSchema:
