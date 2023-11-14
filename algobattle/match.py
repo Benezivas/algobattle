@@ -27,7 +27,15 @@ from anyio import create_task_group, CapacityLimiter
 from anyio.to_thread import current_default_thread_limiter
 from docker.types import LogConfig, Ulimit
 
-from algobattle.battle import Battle, FightHandler, FightUi, BattleUi, Iterated
+from algobattle.battle import (
+    Battle,
+    FightHandler,
+    FightUi,
+    BattleUi,
+    Iterated,
+    ProgramLogConfigLocation,
+    ProgramLogConfigTime,
+)
 from algobattle.program import ProgramConfigView, ProgramUi, Matchup, TeamHandler, BuildUi
 from algobattle.problem import Problem
 from algobattle.util import (
@@ -90,6 +98,7 @@ class Match(BaseModel):
                 battle=battle,
                 ui=battle_ui,
                 set_cpus=set_cpus,
+                log_config=config.project.log_program_io,
             )
             try:
                 await battle.run_battle(
@@ -604,6 +613,13 @@ class DynamicProblemConfig(BaseModel):
 class ProjectConfig(BaseModel):
     """Various project settings."""
 
+    class ProgramOutputConfig(BaseModel):
+        """How to log program output."""
+
+        # a bit janky atm, allows for future expansion
+        when: ProgramLogConfigTime = ProgramLogConfigTime.error
+        output: ProgramLogConfigLocation = ProgramLogConfigLocation.inline
+
     parallel_battles: int = 1
     """Number of battles exectuted in parallel."""
     name_images: bool = True
@@ -616,6 +632,8 @@ class ProjectConfig(BaseModel):
     """How detailed error messages should be.
     Higher settings help in debugging, but may leak information from other teams.
     """
+    log_program_io: ProgramOutputConfig = ProgramOutputConfig()
+    """How to log program output."""
     points: int = 100
     """Highest number of points each team can achieve."""
     results: RelativePath = Field(default=Path("./results"), validate_default=True)

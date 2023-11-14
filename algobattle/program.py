@@ -21,7 +21,6 @@ from docker.models.images import Image as DockerImage
 from docker.models.containers import Container as DockerContainer
 from docker.types import Mount
 from requests import Timeout, ConnectionError
-from pydantic import Field
 from anyio import run as run_async
 from anyio.to_thread import run_sync
 from urllib3.exceptions import ReadTimeoutError
@@ -37,7 +36,6 @@ from algobattle.util import (
     TempDir,
     ValidationError,
     Role,
-    BaseModel,
 )
 from algobattle.problem import Problem, Instance, Solution
 
@@ -162,35 +160,25 @@ class ProgramIO:
         self._output.__exit__(exc, val, tb)
 
 
-class ProgramRunInfo(BaseModel):
-    """Data about a program's execution."""
+@dataclass(frozen=True)
+class SolverResult:
+    """The result of a solver execution."""
 
     runtime: float = 0
-    overriden: RunConfigOverride = Field(default_factory=dict)
+    overriden: RunConfigOverride = field(default_factory=RunConfigOverride)
     error: ExceptionInfo | None = None
-
-
-@dataclass
-class ProgramResult:
-    """The result of a program execution."""
-
-    info: ProgramRunInfo
     battle_data: Encodable | None = None
+    solution: Solution[Instance] | None = None
 
 
-@dataclass
-class GeneratorResult(ProgramResult):
-    """Result of a single generator execution."""
+@dataclass(frozen=True)
+class GeneratorResult(SolverResult):
+    """The result of a generator execution."""
 
     instance: Instance | None = None
-    solution: Solution[Instance] | None = None
 
 
-@dataclass
-class SolverResult(ProgramResult):
-    """Result of a single solver execution."""
-
-    solution: Solution[Instance] | None = None
+ProgramResult = GeneratorResult | SolverResult
 
 
 @dataclass
@@ -573,7 +561,9 @@ class Generator(Program):
             except Exception as e:
                 exception_info = ExceptionInfo.from_exception(e)
             return GeneratorResult(
-                info=ProgramRunInfo(runtime=runtime, overriden=specs.overriden, error=exception_info),
+                runtime=runtime,
+                overriden=specs.overriden,
+                error=exception_info,
                 battle_data=battle_data,
                 instance=instance,
                 solution=solution,
@@ -582,8 +572,8 @@ class Generator(Program):
     def test(self, max_size: int | None = None) -> Instance | ExceptionInfo:
         """Tests whether the generator runs without issues and creates a syntactically valid instance."""
         res = run_async(self.run, max_size or self.problem.min_size)
-        if res.info.error:
-            return res.info.error
+        if res.error:
+            return res.error
         else:
             assert res.instance is not None
             return res.instance
@@ -658,7 +648,9 @@ class Solver(Program):
             except Exception as e:
                 exception_info = ExceptionInfo.from_exception(e)
             return SolverResult(
-                info=ProgramRunInfo(runtime=runtime, overriden=specs.overriden, error=exception_info),
+                runtime=runtime,
+                overriden=specs.overriden,
+                error=exception_info,
                 battle_data=battle_data,
                 solution=solution,
             )
@@ -666,8 +658,8 @@ class Solver(Program):
     def test(self, instance: Instance) -> ExceptionInfo | None:
         """Tests whether the solver runs without issues and creates a syntactically valid solution."""
         res = run_async(self.run, instance, instance.size)
-        if res.info.error:
-            return res.info.error
+        if res.error:
+            return res.error
         else:
             return None
 
