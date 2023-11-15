@@ -524,39 +524,41 @@ class Iterated(Battle):
         """
 
         def sizes(size: int, max_size: int) -> Iterable[int]:
+            if size > max_size:
+                return
             counter = count(1)
-            size = max(size, min_size)
             while size < max_size:
                 yield size
                 size += next(counter) ** config.exponent
             yield max_size
 
         note = "Starting battle..."
-        for _ in range(config.rounds):
-            max_size = config.maximum_size
+        for _i in range(config.rounds):
+            lower_bound = min_size
+            upper_bound = config.maximum_size
             self.results.append(0)
             gen_errors = 0
-            while self.results[-1] < max_size:
-                for size in sizes(self.results[-1] + 1, max_size):
-                    ui.update_battle_data(self.UiData(reached=self.results, cap=max_size, note=note))
+            while lower_bound <= upper_bound:
+                lower_bound = max(lower_bound, self.results[-1] + 1)
+                for size in sizes(lower_bound, upper_bound):
+                    ui.update_battle_data(self.UiData(reached=self.results, cap=upper_bound, note=note))
                     result = await fight.run(size)
                     if result.generator.error and config.max_generator_errors != "unlimited":
                         gen_errors += 1
                         if gen_errors >= config.max_generator_errors:
-                            self.results[-1] = max_size
+                            self.results[-1] = upper_bound
                             note = f"Generator failed {gen_errors} times in a row, solver wins round by default!"
                             break
                     else:
                         gen_errors = 0
                     if result.score < config.minimum_score:
-                        max_size = size - 1
+                        upper_bound = size - 1
                         note = "Solver didn't achieve the needed score, resetting the cap"
                         break
                     else:
                         note = "Solver was successful, increasing the cap"
                         self.results[-1] = size
-                else:
-                    note = "Cap reached, resetting instance size"
+            note = "Cap reached, resetting instance size"
 
     def score(self) -> float:
         """Averages the highest instance size reached in each round."""
