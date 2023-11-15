@@ -260,3 +260,44 @@ one called `algobattle.toml`. Defaults to the current working directory.
 ### config
 
 Opens the CLI config file. Accepts no arguments.1
+
+### package problem
+
+Packages the problem in the project folder into a `.algo` file.
+
+`project`
+: Path to the Algobattle project containing the problem. Can either point directly to a project config file, or to
+a folder containing one called `algobattle.toml`. Defaults to the current working directory.
+
+`--description`
+: Path to a file containing a human-readable description of the problem. Defaults to one called `description` (with any
+extension) in the project's directory.
+
+`--out` / `-o`
+: Location where the packaged `.algo` file will be placed. Defaults to a file named after the problem in the project's
+directory.
+
+### package programs
+
+Packages the programs of a particular team into `.prog` files. These files can be used to easily share programs, or
+upload them to the Algobattle website.
+
+!!! tip "Keep program sizes down"
+    Algobattle will package everything in the program directories into a zip file. This may include unnecessary build
+    artefacts, logs, program output, etc. It's best to remove any superfluous files (in particular, anything in your
+    `.gitignore`) from the directories before running this command.
+
+`project`
+: Path to the Algobattle project containing the programs. Can either point directly to a project config file, or to
+a folder containing one called `algobattle.toml`. Defaults to the current working directory.
+
+`--team`
+: Name of the team whose programs should be packaged. If there is only one team in this project, it will be selected
+by default.
+
+`--generator` and `--solver`
+: Whether to package this particular program. Defaults to `#!py True`.
+
+`--test` / `--no-test`
+: Whether to test the programs before packaging them to make sure that they are building and running correctly.
+Defaults to `#!py True`.

@@ -15,6 +15,7 @@ from pydantic import (
     ConfigDict,
     Field,
     GetCoreSchemaHandler,
+    SerializeAsAny,
     ValidationInfo,
     field_validator,
     model_serializer,
@@ -67,7 +68,7 @@ class Match(BaseModel):
 
     active_teams: list[str] = field(default_factory=list)
     excluded_teams: dict[str, ExceptionInfo] = field(default_factory=dict)
-    battles: dict[MatchupStr, Battle] = Field(default_factory=dict)
+    battles: dict[MatchupStr, SerializeAsAny[Battle]] = Field(default_factory=dict)
 
     async def _run_battle(
         self,
