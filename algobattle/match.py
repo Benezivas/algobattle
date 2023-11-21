@@ -5,7 +5,7 @@ from functools import cached_property
 from itertools import combinations
 from pathlib import Path
 import tomllib
-from typing import Annotated, Any, Iterable, Protocol, ClassVar, Self, TypeAlias, TypeVar, cast
+from typing import Annotated, Any, Iterable, Literal, Protocol, ClassVar, Self, TypeAlias, TypeVar, cast
 from typing_extensions import override
 from typing_extensions import TypedDict
 
@@ -28,7 +28,15 @@ from anyio import create_task_group, CapacityLimiter
 from anyio.to_thread import current_default_thread_limiter
 from docker.types import LogConfig, Ulimit
 
-from algobattle.battle import Battle, FightHandler, FightUi, BattleUi, Iterated
+from algobattle.battle import (
+    Battle,
+    FightHandler,
+    FightUi,
+    BattleUi,
+    Iterated,
+    ProgramLogConfigLocation,
+    ProgramLogConfigTime,
+)
 from algobattle.program import ProgramConfigView, ProgramUi, Matchup, TeamHandler, BuildUi
 from algobattle.problem import Problem
 from algobattle.util import (
@@ -91,6 +99,7 @@ class Match(BaseModel):
                 battle=battle,
                 ui=battle_ui,
                 set_cpus=set_cpus,
+                log_config=config.project.log_program_io,
             )
             try:
                 await battle.run_battle(
@@ -183,6 +192,30 @@ class Match(BaseModel):
             points[team] += points_per_matchup * len(self.excluded_teams)
 
         return points
+
+    def format(self, *, indent: int | None = 2, error_detail: Literal["high", "low"] = "low") -> str:
+        """Nicely formats the match result into a json string."""
+        match error_detail:
+            case "high":
+                exclude = None
+            case "low":
+                detail = {"detail"}
+                program = {"error": detail}
+                exclude = {
+                    "excluded_teams": {"__all__": detail},
+                    "battles": {
+                        "__all__": {
+                            "runtime_error": detail,
+                            "fights": {
+                                "__all__": {
+                                    "generator": program,
+                                    "solver": program,
+                                }
+                            },
+                        }
+                    },
+                }
+        return self.model_dump_json(exclude_defaults=True, indent=indent, exclude=exclude)
 
 
 class Ui(BuildUi, Protocol):
@@ -581,6 +614,13 @@ class DynamicProblemConfig(BaseModel):
 class ProjectConfig(BaseModel):
     """Various project settings."""
 
+    class ProgramOutputConfig(BaseModel):
+        """How to log program output."""
+
+        # a bit janky atm, allows for future expansion
+        when: ProgramLogConfigTime = ProgramLogConfigTime.error
+        output: ProgramLogConfigLocation = ProgramLogConfigLocation.inline
+
     parallel_battles: int = 1
     """Number of battles exectuted in parallel."""
     name_images: bool = True
@@ -589,6 +629,12 @@ class ProjectConfig(BaseModel):
     """Whether to clean up the images after we use them."""
     set_cpus: str | list[str] | None = None
     """Wich cpus to run programs on, if it is a list each battle will use a different cpu specification for it."""
+    error_detail: Literal["low", "high"] = "high"
+    """How detailed error messages should be.
+    Higher settings help in debugging, but may leak information from other teams.
+    """
+    log_program_io: ProgramOutputConfig = ProgramOutputConfig()
+    """How to log program output."""
     points: int = 100
     """Highest number of points each team can achieve."""
     results: RelativePath = Field(default=Path("./results"), validate_default=True)

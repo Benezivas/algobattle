@@ -183,9 +183,8 @@ def run_match(
                 console.print(Padding(leaderboard, (1, 0, 0, 0)))
 
             if save:
-                res_string = result.model_dump_json(exclude_defaults=True)
                 out_path = config.project.results.joinpath(f"match-{timestamp()}.json")
-                out_path.write_text(res_string)
+                out_path.write_text(result.format(error_detail=config.project.error_detail))
                 console.print("Saved match result to ", out_path)
             return result
         except KeyboardInterrupt:

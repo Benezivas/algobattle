@@ -4,6 +4,7 @@ This module contains the :class:`Battle` class, which speciefies how each type o
 some basic battle types, and related classed.
 """
 from dataclasses import dataclass
+from enum import StrEnum
 from functools import wraps
 from importlib.metadata import entry_points
 from abc import abstractmethod
@@ -30,6 +31,7 @@ from pydantic import (
     ConfigDict,
     Field,
     GetCoreSchemaHandler,
+    SerializeAsAny,
     ValidationError,
     ValidationInfo,
     ValidatorFunctionWrapHandler,
@@ -39,12 +41,20 @@ from pydantic_core.core_schema import tagged_union_schema, with_info_wrap_valida
 
 from algobattle.program import (
     Generator,
-    ProgramRunInfo,
+    GeneratorResult,
+    ProgramResult,
     ProgramUi,
+    RunConfigOverride,
     Solver,
+    SolverResult,
 )
-from algobattle.problem import Problem
-from algobattle.util import Encodable, ExceptionInfo, BaseModel
+from algobattle.problem import InstanceModel, Problem, SolutionModel
+from algobattle.util import (
+    Encodable,
+    EncodableModel,
+    ExceptionInfo,
+    BaseModel,
+)
 
 
 _BattleConfig: TypeAlias = Any
@@ -59,6 +69,54 @@ T = TypeVar("T")
 P = ParamSpec("P")
 RunFight: TypeAlias = "Callable[Concatenate[FightHandler, P], Awaitable[Fight]]"
 Type = type
+
+
+class ProgramLogConfigTime(StrEnum):
+    """When to log a programs i/o."""
+
+    never = "never"
+    error = "error"
+    always = "always"
+
+
+class ProgramLogConfigLocation(StrEnum):
+    """Where to log a programs i/o."""
+
+    disabled = "disabled"
+    inline = "inline"
+
+
+class ProgramLogConfigView(Protocol):  # noqa: D101
+    when: ProgramLogConfigTime = ProgramLogConfigTime.error
+    output: ProgramLogConfigLocation = ProgramLogConfigLocation.inline
+
+
+class ProgramRunInfo(BaseModel):
+    """Data about a program's execution."""
+
+    runtime: float = 0
+    overriden: RunConfigOverride = Field(default_factory=dict)
+    error: ExceptionInfo | None = None
+    battle_data: SerializeAsAny[EncodableModel] | None = None
+    instance: SerializeAsAny[InstanceModel] | None = None
+    solution: SerializeAsAny[SolutionModel[InstanceModel]] | None = None
+
+    @classmethod
+    def from_result(cls, result: ProgramResult, *, inline_output: bool) -> Self:
+        """Converts the program run info into a jsonable model."""
+        info = cls(
+            runtime=result.runtime,
+            overriden=result.overriden,
+            error=result.error,
+        )
+        if inline_output:
+            if isinstance(result.battle_data, EncodableModel):
+                info.battle_data = result.battle_data
+            if isinstance(result.solution, SolutionModel):
+                info.solution = result.solution
+            if isinstance(result, GeneratorResult) and isinstance(result.instance, InstanceModel):
+                info.instance = result.instance
+        return info
 
 
 class Fight(BaseModel):
@@ -78,6 +136,28 @@ class Fight(BaseModel):
     """Data about the generator's execution."""
     solver: ProgramRunInfo | None
     """Data about the solver's execution."""
+
+    @classmethod
+    def from_results(
+        cls,
+        max_size: int,
+        score: float,
+        generator: GeneratorResult,
+        solver: SolverResult | None,
+        *,
+        config: ProgramLogConfigView,
+    ) -> Self:
+        """Turns the involved result objects into a jsonable model."""
+        inline_output = config.when == "always" or (
+            config.when == "error"
+            and (generator.error is not None or (solver is not None and solver.error is not None))
+        )
+        return cls(
+            max_size=max_size,
+            score=score,
+            generator=ProgramRunInfo.from_result(generator, inline_output=inline_output),
+            solver=ProgramRunInfo.from_result(solver, inline_output=inline_output) if solver is not None else None,
+        )
 
 
 class FightUi(ProgramUi, Protocol):
@@ -113,6 +193,7 @@ class FightHandler:
     battle: "Battle"
     ui: FightUi
     set_cpus: str | None
+    log_config: ProgramLogConfigView
 
     @_save_result
     async def run(
@@ -175,8 +256,14 @@ class FightHandler:
             set_cpus=self.set_cpus,
             ui=ui,
         )
-        if gen_result.info.error is not None:
-            return Fight(score=1, max_size=max_size, generator=gen_result.info, solver=None)
+        if gen_result.error is not None:
+            return Fight.from_results(
+                score=1,
+                max_size=max_size,
+                generator=gen_result,
+                solver=None,
+                config=self.log_config,
+            )
         assert gen_result.instance is not None
 
         sol_result = await self.solver.run(
@@ -190,8 +277,10 @@ class FightHandler:
             set_cpus=self.set_cpus,
             ui=ui,
         )
-        if sol_result.info.error is not None:
-            return Fight(score=0, max_size=max_size, generator=gen_result.info, solver=sol_result.info)
+        if sol_result.error is not None:
+            return Fight.from_results(
+                score=0, max_size=max_size, generator=gen_result, solver=sol_result, config=self.log_config
+            )
         assert sol_result.solution is not None
 
         if self.problem.with_solution:
@@ -202,7 +291,13 @@ class FightHandler:
         else:
             score = self.problem.score(gen_result.instance, solution=sol_result.solution)
         score = max(0, min(1, float(score)))
-        return Fight(score=score, max_size=max_size, generator=gen_result.info, solver=sol_result.info)
+        return Fight.from_results(
+            score=score,
+            max_size=max_size,
+            generator=gen_result,
+            solver=sol_result,
+            config=self.log_config,
+        )
 
 
 # We need this to be here to prevent an import cycle between match.py and battle.py

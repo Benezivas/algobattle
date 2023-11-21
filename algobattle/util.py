@@ -35,7 +35,7 @@ T = TypeVar("T")
 class BaseModel(PydandticBaseModel):
     """Base class for all pydantic models."""
 
-    model_config = ConfigDict(extra="forbid", from_attributes=True)
+    model_config = ConfigDict(extra="forbid", from_attributes=True, hide_input_in_errors=True)
 
 
 class Encodable(ABC):
@@ -198,10 +198,16 @@ class ExceptionInfo(BaseModel):
                 message=error.message,
                 detail=error.detail,
             )
-        else:
+        elif isinstance(error, PydanticValidationError):
             return cls(
                 type=error.__class__.__name__,
                 message=str(error),
+                detail=str(error.errors(include_input=True, include_url=False)),
+            )
+        else:
+            return cls(
+                type=error.__class__.__name__,
+                message="Unknown exception occurred.",
                 detail=format_exception(error),
             )
 

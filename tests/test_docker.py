@@ -35,7 +35,7 @@ class ProgramTests(IsolatedAsyncioTestCase):
             path=self.problem_path / "generator_timeout", problem=TestProblem, config=self.config_short
         ) as gen:
             res = await gen.run(5)
-            self.assertIsNone(res.info.error)
+            self.assertIsNone(res.error)
 
     async def test_gen_strict_timeout(self):
         """The generator times out."""
@@ -45,8 +45,8 @@ class ProgramTests(IsolatedAsyncioTestCase):
             config=self.config_strict,
         ) as gen:
             res = await gen.run(5)
-            assert res.info.error is not None
-            self.assertEqual(res.info.error.type, "ExecutionTimeout")
+            assert res.error is not None
+            self.assertEqual(res.error.type, "ExecutionTimeout")
 
     async def test_gen_exec_err(self):
         """The generator doesn't execute properly."""
@@ -54,8 +54,8 @@ class ProgramTests(IsolatedAsyncioTestCase):
             path=self.problem_path / "generator_execution_error", problem=TestProblem, config=self.config
         ) as gen:
             res = await gen.run(5)
-            assert res.info.error is not None
-            self.assertEqual(res.info.error.type, "ExecutionError")
+            assert res.error is not None
+            self.assertEqual(res.error.type, "ExecutionError")
 
     async def test_gen_syn_err(self):
         """The generator outputs a syntactically incorrect solution."""
@@ -63,8 +63,8 @@ class ProgramTests(IsolatedAsyncioTestCase):
             path=self.problem_path / "generator_syntax_error", problem=TestProblem, config=self.config
         ) as gen:
             res = await gen.run(5)
-            assert res.info.error is not None
-            self.assertEqual(res.info.error.type, "EncodingError")
+            assert res.error is not None
+            self.assertEqual(res.error.type, "EncodingError")
 
     async def test_gen_sem_err(self):
         """The generator outputs a semantically incorrect solution."""
@@ -72,8 +72,8 @@ class ProgramTests(IsolatedAsyncioTestCase):
             path=self.problem_path / "generator_semantics_error", problem=TestProblem, config=self.config
         ) as gen:
             res = await gen.run(5)
-            assert res.info.error is not None
-            self.assertEqual(res.info.error.type, "ValidationError")
+            assert res.error is not None
+            self.assertEqual(res.error.type, "ValidationError")
 
     async def test_gen_succ(self):
         """The generator returns the fixed instance."""
@@ -90,8 +90,8 @@ class ProgramTests(IsolatedAsyncioTestCase):
             path=self.problem_path / "solver_timeout", problem=TestProblem, config=self.config_strict
         ) as sol:
             res = await sol.run(self.instance, 5)
-            assert res.info.error is not None
-            self.assertEqual(res.info.error.type, "ExecutionTimeout")
+            assert res.error is not None
+            self.assertEqual(res.error.type, "ExecutionTimeout")
 
     async def test_sol_lax_timeout(self):
         """The solver times out but still outputs a correct solution."""
@@ -99,7 +99,7 @@ class ProgramTests(IsolatedAsyncioTestCase):
             path=self.problem_path / "solver_timeout", problem=TestProblem, config=self.config_short
         ) as sol:
             res = await sol.run(self.instance, 5)
-            self.assertIsNone(res.info.error)
+            self.assertIsNone(res.error)
 
     async def test_sol_exec_err(self):
         """The solver doesn't execute properly."""
@@ -107,8 +107,8 @@ class ProgramTests(IsolatedAsyncioTestCase):
             path=self.problem_path / "solver_execution_error", problem=TestProblem, config=self.config
         ) as sol:
             res = await sol.run(self.instance, 5)
-            assert res.info.error is not None
-            self.assertEqual(res.info.error.type, "ExecutionError")
+            assert res.error is not None
+            self.assertEqual(res.error.type, "ExecutionError")
 
     async def test_sol_syn_err(self):
         """The solver outputs a syntactically incorrect solution."""
@@ -116,8 +116,8 @@ class ProgramTests(IsolatedAsyncioTestCase):
             path=self.problem_path / "solver_syntax_error", problem=TestProblem, config=self.config
         ) as sol:
             res = await sol.run(self.instance, 5)
-            assert res.info.error is not None
-            self.assertEqual(res.info.error.type, "EncodingError")
+            assert res.error is not None
+            self.assertEqual(res.error.type, "EncodingError")
 
     async def test_sol_sem_err(self):
         """The solver outputs a semantically incorrect solution."""
@@ -125,8 +125,8 @@ class ProgramTests(IsolatedAsyncioTestCase):
             path=self.problem_path / "solver_semantics_error", problem=TestProblem, config=self.config
         ) as sol:
             res = await sol.run(self.instance, 5)
-            assert res.info.error is not None
-            self.assertEqual(res.info.error.type, "ValidationError")
+            assert res.error is not None
+            self.assertEqual(res.error.type, "ValidationError")
 
     async def test_sol_succ(self):
         """The solver outputs a solution with a low quality."""

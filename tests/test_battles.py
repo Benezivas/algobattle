@@ -5,9 +5,9 @@ from types import EllipsisType
 from typing import Iterable, TypeVar
 from unittest import IsolatedAsyncioTestCase, main
 
-from algobattle.battle import Battle, Fight, FightHandler, Iterated
+from algobattle.battle import Battle, Fight, FightHandler, Iterated, ProgramRunInfo
 from algobattle.match import BattleObserver, EmptyUi
-from algobattle.program import Matchup, ProgramRunInfo, Team
+from algobattle.program import Matchup, Team
 from algobattle.util import Encodable, ExceptionInfo
 
 
