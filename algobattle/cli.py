@@ -41,6 +41,7 @@ from rich.prompt import Prompt, Confirm
 from rich.theme import Theme
 from rich.rule import Rule
 from rich.padding import Padding
+from rich.traceback import Traceback
 from tomlkit import TOMLDocument, comment, parse as parse_toml, dumps as dumps_toml, table, nl as toml_newline
 from tomlkit.exceptions import ParseError
 from tomlkit.items import Table as TomlTable
@@ -516,8 +517,16 @@ def package_problem(
     try:
         with console.status("Loading problem"):
             parsed_config.loaded_problem
-    except (ValueError, RuntimeError) as e:
+    except ValueError as e:
         console.print(f"[error]Couldn't load the problem file[/]\nError: {e}")
+        raise Abort
+    except RuntimeError as e:
+        error = e.__cause__
+        if error is None:
+            console.print(f"[error]Couldn't load the problem file[/]\nError: {e}")
+            raise Abort
+        trace = Traceback.from_exception(error.__class__, error, error.__traceback__)
+        console.print("[error]Couldn't execute the problem file[/]\nError:", trace)
         raise Abort
 
     if "project" in config_doc:
