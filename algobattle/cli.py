@@ -187,6 +187,7 @@ def run_match(
 
             if save:
                 out_path = config.project.results.joinpath(f"match-{timestamp()}.json")
+                config.project.results.mkdir(parents=True, exist_ok=True)
                 out_path.write_text(result.format(error_detail=config.project.error_detail))
                 console.print("Saved match result to ", out_path)
             return result
@@ -500,6 +501,7 @@ def test(
 
     if all_errors:
         err_path = config.project.results.joinpath(f"test-{timestamp()}.json")
+        config.project.results.mkdir(parents=True, exist_ok=True)
         err_path.write_text(json.dumps(all_errors, indent=4))
         console.print(f"You can find detailed error messages at {err_path}")
         return "error"
