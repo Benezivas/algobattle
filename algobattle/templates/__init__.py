@@ -70,3 +70,18 @@ def write_templates(target: Path, lang: Language, args: TemplateArgs) -> None:
         (target / formatted_path).parent.mkdir(parents=True, exist_ok=True)
         with open(target / formatted_path, "w+") as file:
             file.write(formatted)
+
+
+problem_env = Environment(
+    loader=PackageLoader("algobattle"),
+    keep_trailing_newline=True,
+    trim_blocks=True,
+    lstrip_blocks=True,
+)
+
+
+def write_problem_template(target: Path, name: str) -> None:
+    """Writes the problem.py template to the targeted file."""
+    template = problem_env.get_template("problem.py.jinja")
+    formatted = template.render({"name": name})
+    target.write_text(formatted)

@@ -19,6 +19,8 @@ from zipfile import ZipFile
 import shutil
 
 from anyio import run as run_async_fn
+from click import Choice
+from click.core import Parameter
 from pydantic import Field, ValidationError
 from typer import Typer, Argument, Option, Abort, get_app_dir, launch
 from rich.console import Group, RenderableType, Console
@@ -51,7 +53,7 @@ from algobattle.match import AlgobattleConfig, EmptyUi, Match, MatchConfig, Matc
 from algobattle.problem import Instance, Problem, Solution
 from algobattle.program import Generator, Matchup, Solver
 from algobattle.util import BuildError, EncodableModel, ExceptionInfo, Role, RunningTimer, BaseModel, TempDir, timestamp
-from algobattle.templates import Language, PartialTemplateArgs, TemplateArgs, write_templates
+from algobattle.templates import Language, PartialTemplateArgs, TemplateArgs, write_problem_template, write_templates
 
 
 __all__ = ("app",)
@@ -213,7 +215,17 @@ def _init_program(target: Path, lang: Language, args: PartialTemplateArgs, role:
     console.print(f"Created a {lang} {role} in {dir}")
 
 
-@app.command()
+class ClickLanguage(Choice):
+    """Used to move the language list into the help text epilog."""
+
+    def __init__(self, case_sensitive: bool = True) -> None:
+        super().__init__([lang.value for lang in Language], case_sensitive)
+
+    def get_metavar(self, param: Parameter) -> str:
+        return "LANGUAGE"
+
+
+@app.command(epilog=f"Supported languages are: {', '.join(Language)}.")
 def init(
     target: Annotated[
         Optional[Path], Argument(file_okay=False, writable=True, help="The folder to initialize.")
@@ -227,13 +239,25 @@ def init(
         ),
     ] = None,
     language: Annotated[
-        Optional[Language], Option("--language", "-l", help="The language to use for the programs.")
+        Optional[Language],
+        Option("--language", "-l", help="The language to use for the programs.", click_type=ClickLanguage()),
     ] = None,
     generator: Annotated[
-        Optional[Language], Option("--generator", "-g", help="The language to use for the generator.")
+        Optional[Language],
+        Option("--generator", "-g", help="The language to use for the generator.", click_type=ClickLanguage()),
     ] = None,
-    solver: Annotated[Optional[Language], Option("--solver", "-s", help="The language to use for the solver.")] = None,
+    solver: Annotated[
+        Optional[Language],
+        Option("--solver", "-s", help="The language to use for the solver.", click_type=ClickLanguage()),
+    ] = None,
     schemas: Annotated[bool, Option(help="Whether to also save the problem's IO schemas.")] = False,
+    new: Annotated[
+        bool,
+        Option(
+            "--new",
+            help="Whether to create a new problem from a template. You must then also provide a name with `--problem`",
+        ),
+    ] = False,
 ) -> None:
     """Initializes a project directory, setting up the problem files and program folders.
 
@@ -251,7 +275,19 @@ def init(
         + ("Bearded Dragons", "Macaws", "Wombats", "Wallabies", "Owls", "Seals", "Octopuses", "Frogs", "Jellyfish")
     )
 
-    if problem_ is None:  # use the preexisting config file in the target folder
+    if new:  # create a new problem
+        if problem_ is None:
+            console.print("[error]In order to create a new problem you need to specify its name with `--problem`.")
+            raise Abort
+        if target is None:
+            target = Path() / problem_
+        target.mkdir(parents=True, exist_ok=True)
+        target.joinpath("algobattle.toml").write_text(f"""[match]\nproblem = "{problem_}"\n""")
+        write_problem_template(target / "problem.py", name=problem_)
+        console.print(f"Created a new problem file at {target / 'problem.py'}")
+        parsed_config = AlgobattleConfig(match=MatchConfig(problem=problem_))
+
+    elif problem_ is None:  # use the preexisting config file in the target folder
         if target is None:
             target = Path()
         try:
