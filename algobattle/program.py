@@ -55,7 +55,7 @@ def client() -> DockerClient:
         else:
             _client_var.ping()
     except (DockerException, APIError):
-        raise SystemExit("Could not connect to the docker daemon. Is docker running?")
+        raise DockerError("Could not connect to the docker daemon. Is docker running?")
     return _client_var
 
 
