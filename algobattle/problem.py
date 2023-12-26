@@ -20,6 +20,7 @@ from typing import (
     overload,
     cast,
     get_args,
+    runtime_checkable,
 )
 from math import inf, isnan
 from annotated_types import GroupedMetadata
@@ -132,6 +133,7 @@ _I = TypeVar("_I", bound=Instance, contravariant=True)
 _S = TypeVar("_S", bound=Solution[Instance], contravariant=True)
 
 
+@runtime_checkable
 class ScoreFunctionWithSol(Protocol, Generic[_I, _S]):
     """Type of `score` function passed to Problem if `with_solution` is set."""
 
@@ -150,6 +152,7 @@ class ScoreFunctionWithSol(Protocol, Generic[_I, _S]):
         ...
 
 
+@runtime_checkable
 class ScoreFunctionNoSol(Protocol, Generic[_I, _S]):
     """Type of `score` function passed to Problem if `with_solution` is not set."""
 
@@ -517,9 +520,9 @@ class InstanceSolutionModel(EncodableModel):
         if cls._validate_with_self(model_type):
 
             def validate_with_self(input: object, validate: ValidatorFunctionWrapHandler, info: ValidationInfo) -> Self:
-                self = validate(input)
+                self: Self = validate(input)
                 if info.context is None or "self" not in info.context:
-                    self = cls.model_validate(input, context=(info.context or {}) | {"self": self, model_type: self})
+                    self = cast(Self, cls.model_validate(input, context=(info.context or {}) | {"self": self, model_type: self}))
                 return self
 
             schema = with_info_wrap_validator_function(validate_with_self, schema)
