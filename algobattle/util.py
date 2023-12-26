@@ -182,6 +182,10 @@ class DockerError(AlgobattleBaseException):
     """Indicates that an issue with the docker daemon occured."""
 
 
+class DockerNotRunning(BaseException):
+    """Indicates that the Docker Daemon is not running."""
+
+
 class ExceptionInfo(BaseModel):
     """Details about an exception that was raised."""
 

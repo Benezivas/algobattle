@@ -52,7 +52,7 @@ from algobattle.battle import Battle
 from algobattle.match import AlgobattleConfig, EmptyUi, Match, MatchConfig, MatchupStr, Ui, ProjectConfig
 from algobattle.problem import Instance, Problem, Solution
 from algobattle.program import Generator, Matchup, Solver
-from algobattle.util import BuildError, EncodableModel, ExceptionInfo, Role, RunningTimer, BaseModel, TempDir, timestamp
+from algobattle.util import BuildError, DockerNotRunning, EncodableModel, ExceptionInfo, Role, RunningTimer, BaseModel, TempDir, timestamp
 from algobattle.templates import Language, PartialTemplateArgs, TemplateArgs, write_problem_template, write_templates
 
 
@@ -170,11 +170,14 @@ def run_match(
     try:
         with CliUi() if ui else EmptyUi() as ui_obj:
             run_async_fn(result.run, config, ui_obj)
+    except DockerNotRunning:
+        console.print("[error]Could not connect to the Docker Daemon.[/] Is Docker running?")
+        save = False
     except KeyboardInterrupt:
         console.print("[error]Stopping match execution")
     finally:
         try:
-            if config.project.points > 0:
+            if config.project.points > 0 and result.active_teams:
                 points = result.calculate_points(config.project.points)
                 leaderboard = Table(
                     Column("Team", justify="center"),
