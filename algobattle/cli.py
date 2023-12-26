@@ -600,7 +600,12 @@ def package_problem(
 @packager.command("programs")
 def package_programs(
     project: Annotated[Path, Argument(help="The project folder to use.")] = Path(),
-    team: Annotated[Optional[str], Option(help="Name of team whose programs should be packaged.")] = None,
+    team: Annotated[
+        Optional[str],
+        Option(
+            help="Name of team whose programs should be packaged. If None are specified, every team's are packaged."
+        ),
+    ] = None,
     generator: Annotated[bool, Option(help="Wether to package the generator")] = True,
     solver: Annotated[bool, Option(help="Wether to package the solver")] = True,
     test_programs: Annotated[
@@ -608,41 +613,33 @@ def package_programs(
     ] = True,
 ) -> None:
     config = AlgobattleConfig.from_file(project)
-    if team is None:
-        match list(config.teams.keys()):
-            case []:
-                console.print("[error]The config file doesn't contain a team[/]")
-                raise Abort
-            case [name]:
-                team = name
-            case _:
-                console.print(
-                    "[error]The Config file contains multiple teams[/], specify whose programs you want to package"
-                )
-                raise Abort
-    if team not in config.teams:
+    if not config.teams:
+        console.print("[error]The project config file doesn't contain any teams[/]")
+        raise Abort
+    if team is not None and team not in config.teams:
         console.print("[erorr]The selected team isn't in the config file[/]")
         raise Abort
-    if test_programs:
-        test_result = test(project)
-        if test_result == "error":
-            console.print("Stopping program packaging since they do not pass tests")
-            raise Abort
     out = project.parent if project.is_file() else project
 
-    def _package_program(role: Role) -> None:
-        with console.status(f"Packaging {team}'s {role}"), ZipFile(out / f"{team} {role}.prog", "w") as zipfile:
-            program_root: Path = getattr(config.teams[team], role)
+    def _package_program(name: str, info: TeamInfo, role: Role) -> None:
+        with console.status(f"Packaging {name}'s {role}"), ZipFile(out / f"{name} {role}.prog", "w") as zipfile:
+            program_root: Path = getattr(info, role)
             for file in program_root.rglob("*"):
                 if file.is_dir():
                     continue
                 zipfile.write(file, file.relative_to(program_root))
-        console.print(f"[success]Packaged {team}'s {role}")
+        console.print(f"[success]Packaged {name}'s {role}")
 
-    if generator:
-        _package_program(Role.generator)
-    if solver:
-        _package_program(Role.solver)
+    for name, info in [(team, config.teams[team])] if team else config.teams.items():
+        if test_programs:
+            test_result = test_team(config, name)
+            if not test_result.ok():
+                console.print(f"[error]Team {name} does not pass tests")
+                continue
+        if generator:
+            _package_program(name, info, Role.generator)
+        if solver:
+            _package_program(name, info, Role.solver)
 
 
 class TimerTotalColumn(ProgressColumn):
