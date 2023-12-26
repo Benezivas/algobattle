@@ -49,7 +49,7 @@ from tomlkit.exceptions import ParseError
 from tomlkit.items import Table as TomlTable
 
 from algobattle.battle import Battle
-from algobattle.match import AlgobattleConfig, EmptyUi, Match, MatchConfig, MatchupStr, Ui, ProjectConfig
+from algobattle.match import AlgobattleConfig, EmptyUi, Match, MatchConfig, MatchupStr, TeamInfo, Ui, ProjectConfig
 from algobattle.problem import Instance, Problem, Solution
 from algobattle.program import Generator, Matchup, Solver
 from algobattle.util import BuildError, EncodableModel, ExceptionInfo, Role, RunningTimer, BaseModel, TempDir, timestamp
@@ -427,6 +427,69 @@ class TestErrors(BaseModel):
     generator_run: ExceptionInfo | None = None
     solver_run: ExceptionInfo | None = None
 
+    def ok(self) -> bool:
+        """Return whether the test passed with no problems."""
+        return not (self.generator_build or self.solver_build or self.generator_run or self.solver_run)
+
+
+def test_team(config: AlgobattleConfig, team: str, size: int | None = None) -> TestErrors:
+    problem = config.loaded_problem
+    console.print(f"Testing programs of team {team}")
+    errors = TestErrors()
+    instance = None
+
+    async def gen_builder() -> Generator:
+        with console.status("Building generator"):
+            return await Generator.build(
+                config.teams[team].generator, problem=problem, config=config.as_prog_config(), team_name=team
+            )
+
+    try:
+        with run_async_fn(gen_builder) as gen:
+            console.print("[success]Generator built successfully")
+            with console.status("Running generator"):
+                instance = gen.test(size)
+            if isinstance(instance, ExceptionInfo):
+                console.print("[error]Generator didn't run successfully")
+                errors.generator_run = instance
+                instance = None
+            else:
+                console.print("[success]Generator ran successfully")
+    except BuildError as e:
+        console.print("[error]Generator didn't build successfully")
+        errors.generator_build = ExceptionInfo.from_exception(e)
+        instance = None
+
+    sol_error = None
+
+    async def sol_builder() -> Solver:
+        with console.status("Building solver"):
+            return await Solver.build(
+                config.teams[team].solver, problem=problem, config=config.as_prog_config(), team_name=team
+            )
+
+    try:
+        with run_async_fn(sol_builder) as sol:
+            console.print("[success]Solver built successfully")
+
+            instance = instance or cast(Instance, problem.test_instance)
+            if instance:
+                with console.status("Running solver"):
+                    sol_error = sol.test(instance)
+                if isinstance(sol_error, ExceptionInfo):
+                    console.print("[error]Solver didn't run successfully")
+                    errors.solver_run = sol_error
+                else:
+                    console.print("[success]Solver ran successfully")
+            else:
+                console.print("[warning]Cannot test running the solver")
+    except BuildError as e:
+        console.print("[error]Solver didn't build successfully")
+        errors.solver_build = ExceptionInfo.from_exception(e)
+        instance = None
+
+    return errors
+
 
 @app.command()
 def test(
@@ -438,66 +501,12 @@ def test(
         console.print("[error]The folder does not contain an Algobattle project")
         raise Abort
     config = AlgobattleConfig.from_file(project)
-    problem = config.loaded_problem
-    all_errors: dict[str, Any] = {}
+    all_errors: dict[str, TestErrors] = {}
 
-    for team, team_info in config.teams.items():
-        console.print(f"Testing programs of team {team}")
-        errors = TestErrors()
-        instance = None
-
-        async def gen_builder() -> Generator:
-            with console.status("Building generator"):
-                return await Generator.build(
-                    team_info.generator, problem=problem, config=config.as_prog_config(), team_name=team
-                )
-
-        try:
-            with run_async_fn(gen_builder) as gen:
-                console.print("[success]Generator built successfully")
-                with console.status("Running generator"):
-                    instance = gen.test(size)
-                if isinstance(instance, ExceptionInfo):
-                    console.print("[error]Generator didn't run successfully")
-                    errors.generator_run = instance
-                    instance = None
-                else:
-                    console.print("[success]Generator ran successfully")
-        except BuildError as e:
-            console.print("[error]Generator didn't build successfully")
-            errors.generator_build = ExceptionInfo.from_exception(e)
-            instance = None
-
-        sol_error = None
-
-        async def sol_builder() -> Solver:
-            with console.status("Building solver"):
-                return await Solver.build(
-                    team_info.solver, problem=problem, config=config.as_prog_config(), team_name=team
-                )
-
-        try:
-            with run_async_fn(sol_builder) as sol:
-                console.print("[success]Solver built successfully")
-
-                instance = instance or cast(Instance, problem.test_instance)
-                if instance:
-                    with console.status("Running solver"):
-                        sol_error = sol.test(instance)
-                    if isinstance(sol_error, ExceptionInfo):
-                        console.print("[error]Solver didn't run successfully")
-                        errors.solver_run = sol_error
-                    else:
-                        console.print("[success]Solver ran successfully")
-                else:
-                    console.print("[warning]Cannot test running the solver")
-        except BuildError as e:
-            console.print("[error]Solver didn't build successfully")
-            errors.solver_build = ExceptionInfo.from_exception(e)
-            instance = None
-
-        if errors != TestErrors():
-            all_errors[team] = errors.model_dump(exclude_defaults=True)
+    for team in config.teams.keys():
+        res = test_team(config, team, size)
+        if not res.ok():
+            all_errors[team] = res
 
     if all_errors:
         err_path = config.project.results.joinpath(f"test-{timestamp()}.json")
