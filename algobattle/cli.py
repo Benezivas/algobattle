@@ -52,7 +52,17 @@ from algobattle.battle import Battle
 from algobattle.match import AlgobattleConfig, EmptyUi, Match, MatchConfig, MatchupStr, Ui, ProjectConfig
 from algobattle.problem import Instance, Problem, Solution
 from algobattle.program import Generator, Matchup, Solver
-from algobattle.util import BuildError, DockerNotRunning, EncodableModel, ExceptionInfo, Role, RunningTimer, BaseModel, TempDir, timestamp
+from algobattle.util import (
+    BuildError,
+    DockerNotRunning,
+    EncodableModel,
+    ExceptionInfo,
+    Role,
+    RunningTimer,
+    BaseModel,
+    TempDir,
+    timestamp,
+)
 from algobattle.templates import Language, PartialTemplateArgs, TemplateArgs, write_problem_template, write_templates
 
 

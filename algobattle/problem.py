@@ -522,7 +522,9 @@ class InstanceSolutionModel(EncodableModel):
             def validate_with_self(input: object, validate: ValidatorFunctionWrapHandler, info: ValidationInfo) -> Self:
                 self: Self = validate(input)
                 if info.context is None or "self" not in info.context:
-                    self = cast(Self, cls.model_validate(input, context=(info.context or {}) | {"self": self, model_type: self}))
+                    self = cast(
+                        Self, cls.model_validate(input, context=(info.context or {}) | {"self": self, model_type: self})
+                    )
                 return self
 
             schema = with_info_wrap_validator_function(validate_with_self, schema)
