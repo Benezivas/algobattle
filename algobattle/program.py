@@ -28,6 +28,7 @@ from urllib3.exceptions import ReadTimeoutError
 from algobattle.util import (
     BuildError,
     DockerError,
+    DockerNotRunning,
     Encodable,
     EncodingError,
     ExceptionInfo,
@@ -55,7 +56,7 @@ def client() -> DockerClient:
         else:
             _client_var.ping()
     except (DockerException, APIError):
-        raise SystemExit("Could not connect to the docker daemon. Is docker running?")
+        raise DockerNotRunning
     return _client_var
 
 
