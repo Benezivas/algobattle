@@ -1,5 +1,5 @@
 """Module defining how a match is run."""
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from functools import cached_property
 from itertools import combinations
@@ -74,8 +74,8 @@ class MatchupStr:
 class Match(BaseModel):
     """The Result of a whole Match."""
 
-    active_teams: list[str] = field(default_factory=list)
-    excluded_teams: dict[str, ExceptionInfo] = field(default_factory=dict)
+    active_teams: list[str] = Field(default_factory=list)
+    excluded_teams: dict[str, ExceptionInfo] = Field(default_factory=dict)
     battles: dict[MatchupStr, SerializeAsAny[Battle]] = Field(default_factory=dict)
 
     async def _run_battle(
