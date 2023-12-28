@@ -126,7 +126,7 @@ class IteratedTests(IsolatedAsyncioTestCase):
         battle = Iterated()
         handler = ConstantHandler(battle, size)
         await battle.run_battle(handler, self.config, 1, self.ui)
-        self.assertEqual(size, battle.score())
+        self.assertEqual(size, battle.score(self.config))
         return battle
 
     async def test_sizes(self) -> None:
@@ -148,7 +148,7 @@ class IteratedTests(IsolatedAsyncioTestCase):
             fought_sizes = fought_sizes[: len(sizes)]
         self.assertEqual(sizes, fought_sizes)
         if score is not None:
-            self.assertEqual(battle.score(), score)
+            self.assertEqual(battle.score(self.config), score)
         return battle
 
     async def test_full_battle(self) -> None:

@@ -439,7 +439,7 @@ class Battle(BaseModel):
         return super().__pydantic_init_subclass__(**kwargs)
 
     @abstractmethod
-    def score(self) -> float:
+    def score(self, config: _BattleConfig) -> float:
         """Calculates the score the solver has achieved during this battle.
 
         Should always be a nonnegative float, with higher values indicating a better performance of the solver.
@@ -560,7 +560,7 @@ class Iterated(Battle):
                         self.results[-1] = size
             note = "Cap reached, resetting instance size"
 
-    def score(self) -> float:
+    def score(self, config: Config) -> float:
         """Averages the highest instance size reached in each round."""
         return 0 if len(self.results) == 0 else sum(self.results) / len(self.results)
 
@@ -596,7 +596,7 @@ class Averaged(Battle):
             ui.update_battle_data(self.UiData(round=i + 1))
             await fight.run(config.instance_size)
 
-    def score(self) -> float:
+    def score(self, config: Config) -> float:
         """Averages the score of each fight."""
         if len(self.fights) == 0:
             return 0
