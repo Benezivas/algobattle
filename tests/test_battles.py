@@ -2,7 +2,7 @@
 from enum import Enum
 from itertools import chain, cycle
 from types import EllipsisType
-from typing import Iterable, TypeVar
+from typing import Any, Iterable, TypeVar
 from unittest import IsolatedAsyncioTestCase, main
 
 from algobattle.battle import Battle, Fight, FightHandler, Iterated, ProgramRunInfo
@@ -62,7 +62,8 @@ class TestHandler(FightHandler):
         solver_battle_input: Encodable | None = None,
         generator_battle_output: type[Encodable] | None = None,
         solver_battle_output: type[Encodable] | None = None,
-    ) -> Fight:
+        with_results: bool = False,
+    ) -> Any:
         f = None
         match next(self.results):
             case Result.generator_err:
@@ -106,7 +107,8 @@ class ConstantHandler(FightHandler):
         solver_battle_input: Encodable | None = None,
         generator_battle_output: type[Encodable] | None = None,
         solver_battle_output: type[Encodable] | None = None,
-    ) -> Fight:
+        with_results: bool = False,
+    ) -> Any:
         f = Fight(
             score=float(max_size <= self.size), max_size=max_size, generator=ProgramRunInfo(), solver=ProgramRunInfo()
         )
