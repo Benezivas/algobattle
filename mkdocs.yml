@@ -103,13 +103,19 @@ extra_javascript:
 
 nav:
   - Home: index.md
-  - Tutorial:
+  - Student Tutorial:
     - tutorial/index.md
     - tutorial/installation.md
     - tutorial/getting_started.md
     - tutorial/programs.md
     - tutorial/match.md
     - tutorial/summary.md
+  - Instructor Tutorial:
+    - problems/index.md
+    - problems/characteristics.md
+    - problems/basic_flow.md
+    - problems/problem_parts.md
+    - problems/2dkp.md
   - Advanced Topics:
     - advanced/index.md
     - advanced/config.md
