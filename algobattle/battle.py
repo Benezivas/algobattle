@@ -736,9 +736,10 @@ class Improving(Battle):
         if len(self.fights) == 0:
             return 0
         else:
-            return sum(f.score * (1 + config.weighting / 100) ** i for (i, f) in enumerate(self.fights)) / len(
-                self.fights
-            )
+            weight = 1 + config.weighting / 100
+            total = sum(f.score * weight ** i for (i, f) in enumerate(self.fights))
+            quotient = (1 - weight ** len(self.fights)) / (1 - weight)
+            return total / quotient
 
     @staticmethod
     def format_score(score: float) -> str:  # noqa: D102
