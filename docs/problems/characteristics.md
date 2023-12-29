@@ -20,7 +20,7 @@ validation, the framework will not continue until this solution was found or an
 error is encountered.
 
 Similarly, if you pose a problem that is easy to solve but costly to verify
-(quadratic in the size of the instance or larger), the validation process will
+(larger than quadratic in the size of the instance), the validation process will
 slow down noticeably for higher instance sizes.
 
 There is no restriction on the I/O that problems use. We only enforce all data,

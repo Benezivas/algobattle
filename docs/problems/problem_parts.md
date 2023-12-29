@@ -200,8 +200,8 @@ class Instance(InstanceModel):
         super().validate_instance()
         if not very_important_property_holds:
             raise ValidationError(
-                "A very important property does not hold!",
-                detail=f"Given property is {very_important_property_holds}.",
+                "A very important property does not hold.",
+                detail=f"Property {very_important_property_holds} does not hold.",
             )
 
     @property
