@@ -1,5 +1,6 @@
 """Problem class built for tests."""
 
+from typing import Any
 from algobattle.problem import Problem, InstanceModel, SolutionModel
 from algobattle.util import Role, ValidationError
 
@@ -8,6 +9,7 @@ class TestInstance(InstanceModel):
     """Artificial problem used for tests."""
 
     semantics: bool
+    extra: Any = None
 
     @property
     def size(self) -> int:
@@ -23,6 +25,7 @@ class TestSolution(SolutionModel[TestInstance]):
 
     semantics: bool
     quality: bool
+    extra: Any = None
 
     def validate_solution(self, instance: TestInstance, role: Role) -> None:
         if not self.semantics:
