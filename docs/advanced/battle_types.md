@@ -92,3 +92,80 @@ Averaged battles display a single value to the UI:
 
 round
 : The current round that is being fought.
+
+
+## Improving
+
+The idea behind this battle type is that the teams don't just create the best possible instances and solutions out of
+thin air, but try to learn over time and improve their output. We run multiple rounds, similar to
+[Averaged battles](#averaged), but programs will also receive information about the previous round's result. By default,
+this includes their score, the instances, and each program's own solutions.
+
+!!! example "Example program input"
+    Using the default settings and the Pairsum problem, in the third round the solver would see an input folder
+    like this:
+
+    ``` { .sh .no-copy }
+    /input
+    ├─ instance.json
+    ├─ info.json
+    └─ battle_data/
+       ├─ 0/
+       │  ├─ score.txt
+       │  ├─ instance.json
+       │  └─ solver_solution.json
+       └─ 1/
+           ├─ score.txt
+           ├─ instance.json
+           └─ solver_solution.json
+    ```
+
+    The `instance.json` file contains the actual instance that needs to be solved this round. The folders in
+    `/input/battle_data` are named after the index of each previous fight and contain that fight's data.
+
+!!! attention "Missing files"
+    The instance and solution files may be missing in some or all of the fights. This happens if e.g. one of the
+    programs crashes or outputs invalid data. In those cases the battle will continue with the corresponding files
+    not existing in the input folder. Always check if the files are actually there and have a fallback ready!
+
+You can also configure this battle type to only include some of this information or reveal even more details about the
+previous fights to each team. This can lead to interesting challenges where e.g. every instance and generator's solution
+is fully revealed and the generating team thus needs to come up with very different instances every run.
+
+The overall score is calculated by averaging each round's score, but with later fights being weighted more. This means
+that cleverly using the given information about previous fights is more important than just having strong programs.
+
+### Config
+
+`instance_size`
+: The instance size every fight in each match will be fought at. Defaults to 25.
+
+`num_fights`
+: The number of fights that will be fought in each match. Defaults to 10.
+
+`weighting`
+: How much additional weight each successive fight receives in the overall score. Needs to be a positive integer that
+expresses percentages. E.g. a `weighting` of `2` means the second fight is twice as impactful as the first, the third
+four times, etc. Note that series exhibits exponential growth and thus `weightings` close to `1` should be used to not
+make all but the last few fights matter. Defaults to `1.1`.
+
+`scores`
+: A set of roles (a role is either `#!toml "generator"` or `#!toml "solver"`) that specifies which programs will see
+each previous rounds' scores. Defaults to `#!toml ["generator", "solver"]`.
+
+`instances`
+: Similar to `scores` but regarding the problem instances. Defaults to `#!toml ["generator", "solver"]`.
+
+`generator_solutions`
+: Similar to `scores` but regarding the generator's solutions (if the problem uses them). Defaults to
+`#!toml ["generator"]`.
+
+`solver_solutions`
+: Similar to `scores` but regarding the solver's solutions. Defaults to `#!toml ["solver"]`.
+
+### UI Data
+
+Improving battles display a single value to the UI:
+
+round
+: The current round that is being fought.
