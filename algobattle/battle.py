@@ -713,7 +713,7 @@ class Improving(Battle):
         """Instance size that will be fought at."""
         num_fights: int = 20
         """Number of fights that will be fought."""
-        weighting: Annotated[int, Ge(1)] = 10
+        weighting: Annotated[float, Ge(0)] = 1.1
         """How much each successive fight should be weighted more than the previous."""
         scores: set[Role] = {Role.generator, Role.solver}
         """Who to show each fight's scores to."""
@@ -755,9 +755,8 @@ class Improving(Battle):
         if len(self.fights) == 0:
             return 0
         else:
-            weight = 1 + config.weighting / 100
-            total = sum(f.score * weight**i for (i, f) in enumerate(self.fights))
-            quotient = (1 - weight ** len(self.fights)) / (1 - weight)
+            total = sum(f.score * config.weighting**i for (i, f) in enumerate(self.fights))
+            quotient = (1 - config.weighting ** len(self.fights)) / (1 - config.weighting)
             return total / quotient
 
     @staticmethod
