@@ -202,7 +202,9 @@ class IteratedTests(IsolatedAsyncioTestCase):
 class TrackingHandler(FightHandler):
     """Fight handler that tracks the passed battle data."""
 
-    def __init__(self, battle: Improving, gen_res: Iterable[GeneratorResult], sol_res: Iterable[SolverResult | None]) -> None:
+    def __init__(
+        self, battle: Improving, gen_res: Iterable[GeneratorResult], sol_res: Iterable[SolverResult | None]
+    ) -> None:
         self.battle = battle
         self.gen_res = iter(gen_res)
         self.sol_res = iter(sol_res)
@@ -234,7 +236,12 @@ class ImprovingTests(IsolatedAsyncioTestCase):
             FightHistory.Fight(1, cls.gen_res(), cls.sol_res()),
         ]
 
-    async def run_battle(self, gen_res: Iterable[GeneratorResult], sol_res: Iterable[SolverResult | None], config: Improving.Config | None = None) -> TrackingHandler:
+    async def run_battle(
+        self,
+        gen_res: Iterable[GeneratorResult],
+        sol_res: Iterable[SolverResult | None],
+        config: Improving.Config | None = None,
+    ) -> TrackingHandler:
         battle = Improving()
         handler = TrackingHandler(battle, gen_res, sol_res)
         await battle.run_battle(handler, config=config or self.config, min_size=5, ui=self.ui)
@@ -379,15 +386,16 @@ class ImprovingScoreTests(TestCase):
 
     def test_score_cliff(self) -> None:
         battle = Improving(fights=[self.fight(0), self.fight(0), self.fight(1)])
-        self.assertAlmostEqual(battle.score(Improving.Config()), 1.1 ** 2 / (2.1 + 1.1**2))
+        self.assertAlmostEqual(battle.score(Improving.Config()), 1.1**2 / (2.1 + 1.1**2))
 
     def test_score_increasing(self) -> None:
         battle = Improving(fights=[self.fight(0), self.fight(0.5), self.fight(1)])
-        self.assertAlmostEqual(battle.score(Improving.Config()), (0.5*1.1 + 1.1**2) / (2.1 + 1.1**2))
+        self.assertAlmostEqual(battle.score(Improving.Config()), (0.5 * 1.1 + 1.1**2) / (2.1 + 1.1**2))
 
     def test_score_dropoff(self) -> None:
         battle = Improving(fights=[self.fight(1), self.fight(0), self.fight(0)])
         self.assertAlmostEqual(battle.score(Improving.Config()), 1 / (2.1 + 1.1**2))
+
 
 if __name__ == "__main__":
     main()

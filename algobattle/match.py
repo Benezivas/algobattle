@@ -174,7 +174,9 @@ class Match(BaseModel):
                 second_res = self.battles[MatchupStr(first, second)]
             except KeyError:
                 continue
-            total_score = max(0, first_res.score(self.config.match.battle)) + max(0, second_res.score(self.config.match.battle))
+            total_score = max(0, first_res.score(self.config.match.battle)) + max(
+                0, second_res.score(self.config.match.battle)
+            )
             if total_score == 0:
                 # Default values for proportions, assuming no team manages to solve anything
                 first_ratio = 0.5

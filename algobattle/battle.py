@@ -178,6 +178,8 @@ class FightUi(ProgramUi, Protocol):
 
 
 class RunKwargs(TypedDict, total=False):
+    """The keyword arguments used by the FightHandler.run family of functions."""
+
     timeout_generator: float | None
     space_generator: int | None
     cpus_generator: int
@@ -330,6 +332,17 @@ class FightHandler:
         return gen_result, sol_result
 
     def calculate_score(self, gen_result: GeneratorResult, sol_result: SolverResult) -> float:
+        """Calculates the score achieved by the solver in this fight.
+
+        Both results need to contain all instance and/or solution data required.
+
+        Args:
+            gen_result: The generator's result.
+            sol_result: The solver's result
+
+        Returns:
+            A number in [0, 1] with higher numbers meaning the solver performed better.
+        """
         assert gen_result.instance is not None
         assert sol_result.solution is not None
         if self.problem.with_solution:
@@ -656,6 +669,8 @@ class FightHistory(Encodable):
 
     @dataclass
     class Fight:
+        """The full data of a single fight."""
+
         score: float
         generator: GeneratorResult
         solver: SolverResult | None
@@ -666,7 +681,7 @@ class FightHistory(Encodable):
     gen_sols: set[Role]
     sol_sols: set[Role]
 
-    def encode(self, target: Path, role: Role) -> None:
+    def encode(self, target: Path, role: Role) -> None:  # noqa: D102
         target.mkdir()
         for i, fight in enumerate(self.history):
             fight_dir = target / str(i)
@@ -688,7 +703,6 @@ class FightHistory(Encodable):
 
 class Improving(Battle):
     """Class that executes an improving battle."""
-
 
     class Config(Battle.Config):
         """Config options for Improving battles."""
@@ -720,7 +734,12 @@ class Improving(Battle):
         """
         if config.instance_size < min_size:
             raise ValueError(f"size {config.instance_size} is smaller than the smallest valid size, {min_size}.")
-        history = FightHistory(scores=config.scores, instances=config.instances, gen_sols=config.generator_solutions, sol_sols=config.solver_solutions)
+        history = FightHistory(
+            scores=config.scores,
+            instances=config.instances,
+            gen_sols=config.generator_solutions,
+            sol_sols=config.solver_solutions,
+        )
         for i in range(config.num_fights):
             ui.update_battle_data(self.UiData(round=i + 1))
             plain_fight, gen, sol = await fight.run(
@@ -737,7 +756,7 @@ class Improving(Battle):
             return 0
         else:
             weight = 1 + config.weighting / 100
-            total = sum(f.score * weight ** i for (i, f) in enumerate(self.fights))
+            total = sum(f.score * weight**i for (i, f) in enumerate(self.fights))
             quotient = (1 - weight ** len(self.fights)) / (1 - weight)
             return total / quotient
 
