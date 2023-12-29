@@ -3,15 +3,17 @@
 This module contains the :class:`Battle` class, which speciefies how each type of battle is fought and scored,
 some basic battle types, and related classed.
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from importlib.metadata import entry_points
 from abc import abstractmethod
 from inspect import isclass
 from itertools import count
+from pathlib import Path
 from types import EllipsisType
 from typing import (
     TYPE_CHECKING,
+    Annotated,
     Any,
     ClassVar,
     Iterable,
@@ -25,6 +27,7 @@ from typing import (
     overload,
 )
 from typing_extensions import TypedDict
+from annotated_types import Ge
 
 from pydantic import (
     ConfigDict,
@@ -56,6 +59,7 @@ from algobattle.util import (
     EncodableModel,
     ExceptionInfo,
     BaseModel,
+    Role,
 )
 
 
@@ -640,6 +644,101 @@ class Averaged(Battle):
             return 0
         else:
             return sum(f.score for f in self.fights) / len(self.fights)
+
+    @staticmethod
+    def format_score(score: float) -> str:  # noqa: D102
+        return format(score, ".0%")
+
+
+@dataclass
+class FightHistory(Encodable):
+    """A dictionary that can be encoded/decoded with each encodable being placed at the location its key specifies."""
+
+    @dataclass
+    class Fight:
+        score: float
+        generator: GeneratorResult
+        solver: SolverResult | None
+
+    history: list[Fight] = field(default_factory=list, init=False)
+    scores: set[Role]
+    instances: set[Role]
+    gen_sols: set[Role]
+    sol_sols: set[Role]
+
+    def encode(self, target: Path, role: Role) -> None:
+        target.mkdir()
+        for i, fight in enumerate(self.history):
+            fight_dir = target / str(i)
+            fight_dir.mkdir()
+            if role in self.scores:
+                fight_dir.joinpath("score.txt").write_text(str(fight.score))
+            if fight.generator.instance and role in self.instances:
+                fight.generator.instance.encode(fight_dir / "instance", role)
+            if fight.generator.solution and role in self.gen_sols:
+                fight.generator.solution.encode(fight_dir / "generator_solution", role)
+            if fight.solver and fight.solver.solution and role in self.sol_sols:
+                fight.solver.solution.encode(fight_dir / "solver_solution", role)
+
+    @classmethod
+    def decode(cls, source: Path, max_size: int, role: Role) -> Self:
+        """We cannot decode this since we don't know the type of each instance/solution."""
+        raise NotImplementedError
+
+
+class Improving(Battle):
+    """Class that executes an improving battle."""
+
+
+    class Config(Battle.Config):
+        """Config options for Improving battles."""
+
+        type: Literal["Improving"] = "Improving"
+
+        instance_size: int = 25
+        """Instance size that will be fought at."""
+        num_fights: int = 20
+        """Number of fights that will be fought."""
+        weighting: Annotated[int, Ge(1)] = 10
+        """How much each successive fight should be weighted more than the previous."""
+        scores: set[Role] = {Role.generator, Role.solver}
+        """Who to show each fight's scores to."""
+        instances: set[Role] = {Role.generator, Role.solver}
+        """Who to show the instances to."""
+        generator_solutions: set[Role] = {Role.generator}
+        """Who to show the generator's solutions to, if the problem requires them."""
+        solver_solutions: set[Role] = {Role.solver}
+        """Who to show the solver's solutions to."""
+
+    class UiData(Battle.UiData):  # noqa: D106
+        round: int
+
+    async def run_battle(self, fight: FightHandler, config: Config, min_size: int, ui: BattleUi) -> None:
+        """Execute an improving battle.
+
+        This simple battle type just executes `iterations` many fights after each other at size `instance_size`.
+        """
+        if config.instance_size < min_size:
+            raise ValueError(f"size {config.instance_size} is smaller than the smallest valid size, {min_size}.")
+        history = FightHistory(scores=config.scores, instances=config.instances, gen_sols=config.generator_solutions, sol_sols=config.solver_solutions)
+        for i in range(config.num_fights):
+            ui.update_battle_data(self.UiData(round=i + 1))
+            plain_fight, gen, sol = await fight.run(
+                config.instance_size,
+                generator_battle_input=history,
+                solver_battle_input=history,
+                with_results=True,
+            )
+            history.history.append(FightHistory.Fight(plain_fight.score, gen, sol))
+
+    def score(self, config: Config) -> float:
+        """Averages the score of each fight."""
+        if len(self.fights) == 0:
+            return 0
+        else:
+            return sum(f.score * (1 + config.weighting / 100) ** i for (i, f) in enumerate(self.fights)) / len(
+                self.fights
+            )
 
     @staticmethod
     def format_score(score: float) -> str:  # noqa: D102
