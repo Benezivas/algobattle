@@ -379,7 +379,7 @@ Solver ran successfully
 This tells us that the combination of our problem description
 with a small, hand-crafted instance behaves as expected. It is at this
 stage where most of the errors in the code come to light. You
-can use the log files written into the `results` folder to assist debug
+can use the log files written into the `results` folder to assist
 you in debugging your code. You may find at this stage that it does
 pay off to write detailed `ValidationError` exception messages.
 
@@ -387,12 +387,12 @@ Just because our single, hand-crafted test ran through, this does not
 mean that our code is without any conceptual errors. Especially when
 giving your problem file to other people, who will likely spend much more
 time dissecting your code and descriptions to learn how to write their
-own programs, all issues with your code will come to light.
+own programs, many unexpected issues with your code may come to light.
 
 To mitigate some of the reports of illegal inputs that are nevertheless
 accepted by your code, legal inputs that are rejected by your code, or worst
--- code that crashes your validation code -- it is a good idea to write some
-unit tests.
+-- code that crashes your validation code -- it is a good idea to write a few
+unittests.
 
 We do not want to dive into too much detail on how you could test your
 code, how much coverage may be desirable and related topics, as this
