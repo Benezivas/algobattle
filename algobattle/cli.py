@@ -176,9 +176,9 @@ def run_match(
 ) -> Match:
     """Runs a match using the config found at the provided path and displays it to the cli."""
     config = AlgobattleConfig.from_file(path)
-    result = Match()
+    result = Match(config=config)
     try:
-        with CliUi() if ui else EmptyUi() as ui_obj:
+        with CliUi(result, config) if ui else EmptyUi() as ui_obj:
             run_async_fn(result.run, config, ui_obj)
     except DockerNotRunning:
         console.print("[error]Could not connect to the Docker Daemon.[/] Is Docker running?")
@@ -188,7 +188,7 @@ def run_match(
     finally:
         try:
             if config.project.points > 0 and result.active_teams:
-                points = result.calculate_points(config.project.points)
+                points = result.calculate_points()
                 leaderboard = Table(
                     Column("Team", justify="center"),
                     Column("Points", justify="right"),
@@ -783,11 +783,11 @@ class BattlePanel(Group):
 class CliUi(Live, Ui):
     """Ui that uses rich to draw to the console."""
 
-    match: Match
-
-    def __init__(self) -> None:
+    def __init__(self, match: Match, config: AlgobattleConfig) -> None:
         self.build: BuildView | None = None
         self.battle_panels: dict[Matchup, BattlePanel] = {}
+        self.match = match
+        self.config = config
         super().__init__(None, refresh_per_second=10, transient=True, console=console)
 
     def __enter__(self) -> Self:
@@ -795,13 +795,13 @@ class CliUi(Live, Ui):
 
     def _update_renderable(self) -> None:
         if self.build is None:
-            renderable = Group(self.display_match(self.match), *self.battle_panels.values())
+            renderable = Group(self.display_match(self.match, self.config.match), *self.battle_panels.values())
         else:
             renderable = self.build
         self.update(Panel(renderable, title=f"[orange1]Algobattle {pkg_version('algobattle_base')}"))
 
     @staticmethod
-    def display_match(match: Match) -> RenderableType:
+    def display_match(match: Match, config: MatchConfig) -> RenderableType:
         """Formats the match data into a table that can be printed to the terminal."""
         table = Table(
             Column("Generating", justify="center"),
@@ -811,7 +811,7 @@ class CliUi(Live, Ui):
         )
         for matchup, battle in match.battles.items():
             if battle.runtime_error is None:
-                res = battle.format_score(battle.score())
+                res = battle.format_score(battle.score(config.battle))
             else:
                 res = ":warning:"
             table.add_row(matchup.generator, matchup.solver, res)
