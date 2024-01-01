@@ -35,7 +35,7 @@ following file structure:
 
 ``` { .sh .no-copy }
 .
-└─ Our Mockup Problem
+└─ 2D Knapsack
    ├─ generator/
    │  ├─ .gitignore
    │  ├─ Dockerfile
@@ -100,21 +100,23 @@ instance = {
         [1, 3],
         [4, 3],
         [3, 3],
-        [4, 2],
-        [1, 1]
+        [3, 2],
+        [1, 3]
     ]
 }
 
 solution = {
     'packing': {
         0: [0, 0, 'unrotated'],
-        3: [1, 0, 'rotated'],
-        4: [0, 3, 'unrotated']
+        3: [1, 0, 'unrotated'],
+        4: [1, 2, 'rotated']
     }
 }
 
+
 Path("/output/instance.json").write_text(json.dumps(instance))
 Path("/output/solution.json").write_text(json.dumps(solution))
+
 ```
 
 We made sure that the solution is not unique for the given instance
@@ -288,6 +290,12 @@ We are almost done writing the problem class. The next step is to tell
 the framework what the quality of a solution is, i.e. which values it
 should compare when given two solutions to determine which is the better one.
 
+For this, we overwrite the `score` method. We have access to the solution
+via the `self` argument, access to the instance via the `instance` argument
+and can even decide to judge the certificate solution of the generator and
+a solvers solution differently, via the `role` argument, e.g. to give the
+solver some additional slack.
+
 ```python
     @maximize
     def score(self, instance: Instance, role: Role) -> float:
@@ -297,11 +305,204 @@ should compare when given two solutions to determine which is the better one.
         return area
 ```
 
+You can find the complete contents of the `problem.py` at the end of this
+tutorial section.
+
 ## Best Practice: Writing Tests
+Now that we have created a problem file, it is time to see if it
+does what we want it to do. The most straightforward sanity check
+is to run the mock generator and solver that we have written
+previously.
+
+///note
+If you did not generate the problem folder as we did in this tutorial,
+make sure that a team is entered in the `algobattle.toml` file that
+utilizes the solver and generator that we wrote!
+///
+
+For this, we can use the `algobattle test` command. This command
+builds the generators and solvers of the configured teams and
+executes a single run of them at the minimum size that was configured
+for the problem.
+
+Running this command does however produce an issue:
+```console
+~ algobattle test
+Testing programs of team Rats
+Generator built successfully
+Generator didn't run successfully
+Solver built successfully
+Cannot test running the solver
+You can find detailed error messages at results/test-2024-01-01_12-35-10.json
+```
+
+So what went wrong? Looking into the log files reveals the issue.
+
+```json
+{
+    "Rats": {
+        "generator_run": {
+            "type": "ValidationError",
+            "message": "Instance is too large.",
+            "detail": "Generated: 5, maximum: 1"
+        }
+    }
+} 
+```
+
+We wrote a generator and solver that run on an instance with five items,
+but proclaimed in the `problem.py` that any instance with at least one 
+item is valid:
+
+```python
+Problem(
+    name="2D Knapsack",
+    min_size=1,
+    instance_cls=Instance,
+    solution_cls=Solution,
+)
+```
+
+Should we thus change our generator and solver? We do not have to,
+as the `algobattle test` command allows us to run the test on a specific
+instance size:
+
+```console
+~ algobattle test --size 5
+Testing programs of team Rats
+Generator built successfully
+Generator ran successfully
+Solver built successfully
+Solver ran successfully
+```
+
+This tells us that the combination of our problem description
+with a small, hand-crafted instance behaves as expected. It is at this
+stage where most of the errors in the code come to light. You
+can use the log files written into the `results` folder to assist debug
+you in debugging your code. You may find at this stage that it does
+pay off to write detailed `ValidationError` exception messages.
+
+Just because our single, hand-crafted test ran through, this does not
+mean that our code is without any conceptual errors. Especially when
+giving your problem file to other people, who will likely spend much more
+time dissecting your code and descriptions to learn how to write their
+own programs, all issues with your code will come to light.
+
+To mitigate some of the reports of illegal inputs that are nevertheless
+accepted by your code, legal inputs that are rejected by your code, or worst
+-- code that crashes your validation code -- it is a good idea to write some
+unit tests.
+
+We do not want to dive into too much detail on how you could test your
+code, how much coverage may be desirable and related topics, as this
+goes well beyond the scope of this tutorial. Testing code is a topic
+about which volumes have been written by authors who are much more
+knowledgable about the topic as we could claim to be.
+
+Thus, we only talk about how to best interface the problem that we
+have designed, so that you can then use this knowledge to write
+your own tests. We use the `unittest` module from the standard library
+for this part of the tutorial.
+
+We create a file `tests.py` in the `2D Knapsack` folder, with generic
+scaffolding.
+
+```py title="tests.py"
+"""Tests for the 2D Knapsack problem."""
+import unittest
+
+from algobattle.util import Role
+
+from problem import Instance, Solution, ValidationError
+
+
+class Tests(unittest.TestCase):
+    """Tests for the 2D Knapsack problem solution class."""
+
+    ...
+
+
+if __name__ == "__main__":
+    unittest.main()
+```
+
+You can then access all additional helper methods that you may have
+added to the `Instance` and `Solution` classes as you would normally do.
+
+If you would like to test the validation methods, i.e. `validate_instance`
+and `validate_solution`, you could do so as follows.
+
+Assume, just for the sake of being able to give an example, that we would have
+added a `validate_instance` method to the `Instance` class with the following,
+rather nonsensical content:
+
+```python
+# This method is just for demonstration purposes.
+def validate_instance(self) -> None:
+    super().validate_instance()
+    if self.height != 1:
+        raise ValidationError("The knapsack is not of height 1!?")
+```
+
+This rather silly method raises a validation error whenever the
+height of the knapsacks is unequal to one.
+
+```python
+# Sample test for the validate_instance method
+def test_knapsack_height_not_silly(self):
+    with self.assertRaises(ValidationError):
+        faulty_instance = Instance.model_validate({"height": 2, "width": 1, "items": [(1, 1)]})
+        faulty_instance.validate_instance()
+
+# Sample test for the validate_solution method
+def test_item_overlap(self):
+    instance = Instance(height=1, width=1, items=[(1, 1), (1, 1)])
+    with self.assertRaises(ValidationError):
+        faulty_solution = Solution.model_validate({"packing": {0: (0, 0, "unrotated"), 1: (0, 0, "unrotated")}})
+        faulty_solution.validate_solution(instance, Role.generator)
+```
+
+You can test the `size` function of the `Instance` class
+and the `score` function of the `Solution` class as you would test any other
+method.
+
+If you use the `unittest` module, you can then run these tests by
+executing `python -m unittest` in the `2D Knapsack` folder.
 
 ## Writing a Description
 
+We are done writing code for the problem. Now, it is a good idea
+to write a description file that tells the users that should work
+on the problem what it is about. This includes explaining the general
+idea and, more importantly, how the expected I/O is defined.
+
+We recommend creating a file in the `2D Knapsack` folder named `description.md`,
+as this file name is automatically picked up by the packaging step 
+that we will handle in the next step.
+
+///note
+If you use the `algobattle-web` framework, the contents of this file
+will be displayed to your users when they click on the respective
+problem tab.
+///
+
 ## Packaging Everything Together
+
+Now that our code is tested and documented, we are ready to hand it out!
+For this, we can again use the `algobattle` cli, which wraps up the
+`problem.py`, the `algobattle.toml` and the `description.md` into a file
+that others can work on.
+
+```console
+~ algobattle package problem
+Packaged Algobattle project into /path/to/working/dir/2D Knapsack/2d_knapsack.algo
+```
+
+///note
+The `algobattle.toml` gets truncated during the packaging step. Only the `[match]`
+entries remain.
+///
 
 ## The Completed problem.py File
 This is the final content of the `problem.py` that we have created.
