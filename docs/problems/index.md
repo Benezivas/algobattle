@@ -2,7 +2,7 @@
 ## Creating Problems for Others
 
 When starting off with `algobattle`, especially when using the
-[algobatle-web](https://github.com/Benezivas/algobattle-web) framework, you may
+[algobattle-web](https://github.com/Benezivas/algobattle-web) framework, you may
 first want to use ready-made problem files to get familiar using
 `algobattle`. We have collected a few of such ready-made problem files in a
 [repository](https://github.com/Benezivas/algobattle-problems) for you.
@@ -76,7 +76,7 @@ We recommend reading this tutorial in sequence, but you can skip
 over sections that seem clear to you.
 
 We assume throughout this part of the tutorial that the default `iterated`
-battle class is used -- which is the case if you do not explicitely configure it
+battle class is used -- which is the case if you do not explicitly configure it
 to be something else.
 
 Here are the steps that we will be going through.

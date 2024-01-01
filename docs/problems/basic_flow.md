@@ -40,7 +40,7 @@ handle any deviation from the format that we expect. Luckily, the framework
 does most of the heavy lifting for this, as we will see soon.
 
 If the instance is formatted in accordance to our specification, our code next
-needs to check the certifiate solution. As with the instance, we first need to
+needs to check the certificate solution. As with the instance, we first need to
 check if the solution is well-formatted. As an additional step, we need to check
 if the certificate contains a valid solution for the given instance.
 

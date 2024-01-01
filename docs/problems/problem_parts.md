@@ -1,7 +1,7 @@
 # The Problem File Structure
 ## What does a Problem File Look Like?
 In the previous section, we gave a very high-level explanation of the
-interaction between a problem and the framework.  Let us create a new mockup
+interaction between a problem and the framework.  Let us create a new mock-up
 problem to see what we are expected to implement.  We can either copy the files
 of an existing problem and modify them, or let `algobattle` create a new problem
 template for us. For the sake of clarity, we do the latter by executing 
@@ -132,7 +132,7 @@ However, only because a key is given does not mean that the corresponding
 *value* is of the expected form. This is where a parser has to come into play.
 Luckily, we build heavily on the [pydantic](https://docs.pydantic.dev/latest/)
 python library to do this job for us. As a small example, we could parse the
-two aformentioned keys as follows:
+two aforementioned keys as follows:
 
 ```python
 class Instance(InstanceModel):
@@ -157,7 +157,7 @@ That is the parsing done! Note that the `SizeIndex` field tells the framework
 that no edge label should exceed the size of the instance.
 
 There are two things left to do. Maybe the instance should have some semantic
-constraints that cannot be easily checked by simple typechecking. If this is the
+constraints that cannot be easily checked by simple type-checking. If this is the
 case, you can add a method `validate_instance` to the `Instance` class to do
 just that:
 

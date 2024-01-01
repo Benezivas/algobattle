@@ -80,7 +80,7 @@ to a three-tuple, as described.
 
 ## Writing a Mock Generator and Solver
 Before we start writing any problem code, we write a mock generator and a mock
-solver. This helps us do plausability checks while writing the actual problem file
+solver. This helps us do plausibility checks while writing the actual problem file
 and is not required for the finished problem file.
 
 We start with filling in the generator.
@@ -153,7 +153,7 @@ We provide the complete content of the `problem.py` at the end of this section.
 ///
 
 Our first approach uses only very rough type annotations for our expected keys
-and does a lot of the validation of the instance explicitely.
+and does a lot of the validation of the instance explicitly.
 
 ```python
 """The 2D Knapsack problem module."""
@@ -255,7 +255,7 @@ class Solution(SolutionModel[Instance]):
 This of course does not at all ensure that the given solution is valid, yet.
 We did not yet check whether items overlap or extend beyond the boundaries
 of the knapsack. Since these checks are arguably beyond the scope of simple
-type checking, we implement these tests explicitely in the `validate_solution`
+type checking, we implement these tests explicitly in the `validate_solution`
 method. For convenience, we import the `itertools` library.
 
 ```python
@@ -398,7 +398,7 @@ We do not want to dive into too much detail on how you could test your
 code, how much coverage may be desirable and related topics, as this
 goes well beyond the scope of this tutorial. Testing code is a topic
 about which volumes have been written by authors who are much more
-knowledgable about the topic as we could claim to be.
+knowledgeable about the topic as we could claim to be.
 
 Thus, we only talk about how to best interface the problem that we
 have designed, so that you can then use this knowledge to write
