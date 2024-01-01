@@ -3,21 +3,19 @@
 This module contains the :class:`Battle` class, which speciefies how each type of battle is fought and scored,
 some basic battle types, and related classed.
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
-from functools import wraps
 from importlib.metadata import entry_points
 from abc import abstractmethod
 from inspect import isclass
 from itertools import count
+from pathlib import Path
 from types import EllipsisType
 from typing import (
     TYPE_CHECKING,
+    Annotated,
     Any,
-    Awaitable,
-    Callable,
     ClassVar,
-    Concatenate,
     Iterable,
     Literal,
     ParamSpec,
@@ -25,7 +23,11 @@ from typing import (
     Self,
     TypeAlias,
     TypeVar,
+    Unpack,
+    overload,
 )
+from typing_extensions import TypedDict
+from annotated_types import Ge
 
 from pydantic import (
     ConfigDict,
@@ -37,7 +39,10 @@ from pydantic import (
     ValidatorFunctionWrapHandler,
 )
 from pydantic_core import CoreSchema
-from pydantic_core.core_schema import tagged_union_schema, with_info_wrap_validator_function
+from pydantic_core.core_schema import (
+    tagged_union_schema,
+    with_info_wrap_validator_function,
+)
 
 from algobattle.program import (
     Generator,
@@ -54,6 +59,7 @@ from algobattle.util import (
     EncodableModel,
     ExceptionInfo,
     BaseModel,
+    Role,
 )
 
 
@@ -67,7 +73,6 @@ the new battle type directly.
 """
 T = TypeVar("T")
 P = ParamSpec("P")
-RunFight: TypeAlias = "Callable[Concatenate[FightHandler, P], Awaitable[Fight]]"
 Type = type
 
 
@@ -172,15 +177,19 @@ class FightUi(ProgramUi, Protocol):
         """Informs the ui that the fight has finished running and has been added to the battle's `.fight_results`."""
 
 
-def _save_result(func: "RunFight[P]") -> "RunFight[P]":
-    @wraps(func)
-    async def inner(self: "FightHandler", *args: P.args, **kwargs: P.kwargs) -> Fight:
-        res = await func(self, *args, **kwargs)
-        self.battle.fights.append(res)
-        self.ui.end_fight()
-        return res
+class RunKwargs(TypedDict, total=False):
+    """The keyword arguments used by the FightHandler.run family of functions."""
 
-    return inner
+    timeout_generator: float | None
+    space_generator: int | None
+    cpus_generator: int
+    timeout_solver: float | None
+    space_solver: int | None
+    cpus_solver: int
+    generator_battle_input: Encodable
+    solver_battle_input: Encodable
+    generator_battle_output: type[Encodable]
+    solver_battle_output: type[Encodable]
 
 
 @dataclass
@@ -195,22 +204,33 @@ class FightHandler:
     set_cpus: str | None
     log_config: ProgramLogConfigView
 
-    @_save_result
+    @overload
     async def run(
         self,
         max_size: int,
         *,
-        timeout_generator: float | None | EllipsisType = ...,
-        space_generator: int | None | EllipsisType = ...,
-        cpus_generator: int | EllipsisType = ...,
-        timeout_solver: float | None | EllipsisType = ...,
-        space_solver: int | None | EllipsisType = ...,
-        cpus_solver: int | EllipsisType = ...,
-        generator_battle_input: Encodable | None = None,
-        solver_battle_input: Encodable | None = None,
-        generator_battle_output: type[Encodable] | None = None,
-        solver_battle_output: type[Encodable] | None = None,
+        with_results: Literal[False] = False,
+        **kwargs: Unpack[RunKwargs],
     ) -> Fight:
+        ...
+
+    @overload
+    async def run(
+        self,
+        max_size: int,
+        *,
+        with_results: Literal[True],
+        **kwargs: Unpack[RunKwargs],
+    ) -> tuple[Fight, GeneratorResult, SolverResult | None]:
+        ...
+
+    async def run(
+        self,
+        max_size: int,
+        *,
+        with_results: bool = False,
+        **kwargs: Unpack[RunKwargs],
+    ) -> Fight | tuple[Fight, GeneratorResult, SolverResult | None]:
         """Execute a single fight of a battle.
 
         First the generator will be run and its output parsed. Then the solver will be given the created instance
@@ -234,10 +254,48 @@ class FightHandler:
             solver_battle_input: Additional data the solver will be provided with.
             generator_battle_output: Class used to parse additional data the generator outputs into a python object.
             solver_battle_output: Class used to parse additional data the solver outputs into a python object.
+            with_results: Whether to return the raw result objects.
 
         Returns:
-            The resulting info about the executed fight.
+            The resulting info about the executed fight, and the results if the flag has been set.
         """
+        gen_result, sol_result = await self.run_raw(max_size=max_size, **kwargs)
+        if gen_result.instance is None or gen_result.solution is None:
+            score = 1
+        elif sol_result is None or sol_result.solution is None:
+            score = 0
+        else:
+            score = self.calculate_score(gen_result, sol_result)
+        fight = Fight.from_results(
+            score=score,
+            max_size=max_size,
+            generator=gen_result,
+            solver=sol_result,
+            config=self.log_config,
+        )
+        self.battle.fights.append(fight)
+        self.ui.end_fight()
+        if with_results:
+            return fight, gen_result, sol_result
+        else:
+            return fight
+
+    async def run_raw(
+        self,
+        max_size: int,
+        *,
+        timeout_generator: float | None | EllipsisType = ...,
+        space_generator: int | None | EllipsisType = ...,
+        cpus_generator: int | EllipsisType = ...,
+        timeout_solver: float | None | EllipsisType = ...,
+        space_solver: int | None | EllipsisType = ...,
+        cpus_solver: int | EllipsisType = ...,
+        generator_battle_input: Encodable | None = None,
+        solver_battle_input: Encodable | None = None,
+        generator_battle_output: type[Encodable] | None = None,
+        solver_battle_output: type[Encodable] | None = None,
+    ) -> tuple[GeneratorResult, SolverResult | None]:
+        """Runs a fight and returns the unprocessed results."""
         min_size = self.problem.min_size
         if max_size < min_size:
             raise ValueError(
@@ -257,13 +315,7 @@ class FightHandler:
             ui=ui,
         )
         if gen_result.error is not None:
-            return Fight.from_results(
-                score=1,
-                max_size=max_size,
-                generator=gen_result,
-                solver=None,
-                config=self.log_config,
-            )
+            return gen_result, None
         assert gen_result.instance is not None
 
         sol_result = await self.solver.run(
@@ -277,12 +329,22 @@ class FightHandler:
             set_cpus=self.set_cpus,
             ui=ui,
         )
-        if sol_result.error is not None:
-            return Fight.from_results(
-                score=0, max_size=max_size, generator=gen_result, solver=sol_result, config=self.log_config
-            )
-        assert sol_result.solution is not None
+        return gen_result, sol_result
 
+    def calculate_score(self, gen_result: GeneratorResult, sol_result: SolverResult) -> float:
+        """Calculates the score achieved by the solver in this fight.
+
+        Both results need to contain all instance and/or solution data required.
+
+        Args:
+            gen_result: The generator's result.
+            sol_result: The solver's result
+
+        Returns:
+            A number in [0, 1] with higher numbers meaning the solver performed better.
+        """
+        assert gen_result.instance is not None
+        assert sol_result.solution is not None
         if self.problem.with_solution:
             assert gen_result.solution is not None
             score = self.problem.score(
@@ -290,14 +352,7 @@ class FightHandler:
             )
         else:
             score = self.problem.score(gen_result.instance, solution=sol_result.solution)
-        score = max(0, min(1, float(score)))
-        return Fight.from_results(
-            score=score,
-            max_size=max_size,
-            generator=gen_result,
-            solver=sol_result,
-            config=self.log_config,
-        )
+        return max(0, min(1, float(score)))
 
 
 # We need this to be here to prevent an import cycle between match.py and battle.py
@@ -439,7 +494,7 @@ class Battle(BaseModel):
         return super().__pydantic_init_subclass__(**kwargs)
 
     @abstractmethod
-    def score(self) -> float:
+    def score(self, config: _BattleConfig) -> float:
         """Calculates the score the solver has achieved during this battle.
 
         Should always be a nonnegative float, with higher values indicating a better performance of the solver.
@@ -560,7 +615,7 @@ class Iterated(Battle):
                         self.results[-1] = size
             note = "Cap reached, resetting instance size"
 
-    def score(self) -> float:
+    def score(self, config: Config) -> float:
         """Averages the highest instance size reached in each round."""
         return 0 if len(self.results) == 0 else sum(self.results) / len(self.results)
 
@@ -596,12 +651,113 @@ class Averaged(Battle):
             ui.update_battle_data(self.UiData(round=i + 1))
             await fight.run(config.instance_size)
 
-    def score(self) -> float:
+    def score(self, config: Config) -> float:
         """Averages the score of each fight."""
         if len(self.fights) == 0:
             return 0
         else:
             return sum(f.score for f in self.fights) / len(self.fights)
+
+    @staticmethod
+    def format_score(score: float) -> str:  # noqa: D102
+        return format(score, ".0%")
+
+
+@dataclass
+class FightHistory(Encodable):
+    """A dictionary that can be encoded/decoded with each encodable being placed at the location its key specifies."""
+
+    @dataclass
+    class Fight:
+        """The full data of a single fight."""
+
+        score: float
+        generator: GeneratorResult
+        solver: SolverResult | None
+
+    history: list[Fight] = field(default_factory=list, init=False)
+    scores: set[Role]
+    instances: set[Role]
+    gen_sols: set[Role]
+    sol_sols: set[Role]
+
+    def encode(self, target: Path, role: Role) -> None:  # noqa: D102
+        target.mkdir()
+        for i, fight in enumerate(self.history):
+            fight_dir = target / str(i)
+            fight_dir.mkdir()
+            if role in self.scores:
+                fight_dir.joinpath("score.txt").write_text(str(fight.score))
+            if fight.generator.instance and role in self.instances:
+                fight.generator.instance.encode(fight_dir / "instance", role)
+            if fight.generator.solution and role in self.gen_sols:
+                fight.generator.solution.encode(fight_dir / "generator_solution", role)
+            if fight.solver and fight.solver.solution and role in self.sol_sols:
+                fight.solver.solution.encode(fight_dir / "solver_solution", role)
+
+    @classmethod
+    def decode(cls, source: Path, max_size: int, role: Role) -> Self:
+        """We cannot decode this since we don't know the type of each instance/solution."""
+        raise NotImplementedError
+
+
+class Improving(Battle):
+    """Class that executes an improving battle."""
+
+    class Config(Battle.Config):
+        """Config options for Improving battles."""
+
+        type: Literal["Improving"] = "Improving"
+
+        instance_size: int = 25
+        """Instance size that will be fought at."""
+        num_fights: int = 20
+        """Number of fights that will be fought."""
+        weighting: Annotated[float, Ge(0)] = 1.1
+        """How much each successive fight should be weighted more than the previous."""
+        scores: set[Role] = {Role.generator, Role.solver}
+        """Who to show each fight's scores to."""
+        instances: set[Role] = {Role.generator, Role.solver}
+        """Who to show the instances to."""
+        generator_solutions: set[Role] = {Role.generator}
+        """Who to show the generator's solutions to, if the problem requires them."""
+        solver_solutions: set[Role] = {Role.solver}
+        """Who to show the solver's solutions to."""
+
+    class UiData(Battle.UiData):  # noqa: D106
+        round: int
+
+    async def run_battle(self, fight: FightHandler, config: Config, min_size: int, ui: BattleUi) -> None:
+        """Execute an improving battle.
+
+        This simple battle type just executes `iterations` many fights after each other at size `instance_size`.
+        """
+        if config.instance_size < min_size:
+            raise ValueError(f"size {config.instance_size} is smaller than the smallest valid size, {min_size}.")
+        history = FightHistory(
+            scores=config.scores,
+            instances=config.instances,
+            gen_sols=config.generator_solutions,
+            sol_sols=config.solver_solutions,
+        )
+        for i in range(config.num_fights):
+            ui.update_battle_data(self.UiData(round=i + 1))
+            plain_fight, gen, sol = await fight.run(
+                config.instance_size,
+                generator_battle_input=history,
+                solver_battle_input=history,
+                with_results=True,
+            )
+            history.history.append(FightHistory.Fight(plain_fight.score, gen, sol))
+
+    def score(self, config: Config) -> float:
+        """Averages the score of each fight."""
+        if len(self.fights) == 0:
+            return 0
+        else:
+            total = sum(f.score * config.weighting**i for (i, f) in enumerate(self.fights))
+            quotient = (1 - config.weighting ** len(self.fights)) / (1 - config.weighting)
+            return total / quotient
 
     @staticmethod
     def format_score(score: float) -> str:  # noqa: D102

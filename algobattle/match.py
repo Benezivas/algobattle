@@ -1,5 +1,5 @@
 """Module defining how a match is run."""
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from functools import cached_property
 from itertools import combinations
@@ -74,15 +74,15 @@ class MatchupStr:
 class Match(BaseModel):
     """The Result of a whole Match."""
 
-    active_teams: list[str] = field(default_factory=list)
-    excluded_teams: dict[str, ExceptionInfo] = field(default_factory=dict)
+    config: "AlgobattleConfig" = Field(exclude=True)
+    active_teams: list[str] = Field(default_factory=list)
+    excluded_teams: dict[str, ExceptionInfo] = Field(default_factory=dict)
     battles: dict[MatchupStr, SerializeAsAny[Battle]] = Field(default_factory=dict)
 
     async def _run_battle(
         self,
         battle: Battle,
         matchup: Matchup,
-        config: "AlgobattleConfig",
         problem: Problem,
         cpus: list[str | None],
         ui: "Ui",
@@ -99,12 +99,12 @@ class Match(BaseModel):
                 battle=battle,
                 ui=battle_ui,
                 set_cpus=set_cpus,
-                log_config=config.project.log_program_io,
+                log_config=self.config.project.log_program_io,
             )
             try:
                 await battle.run_battle(
                     handler,
-                    config.match.battle,
+                    self.config.match.battle,
                     problem.min_size,
                     battle_ui,
                 )
@@ -115,7 +115,6 @@ class Match(BaseModel):
 
     async def run(
         self,
-        config: "AlgobattleConfig",
         ui: "Ui | None" = None,
     ) -> Self:
         """Runs a match with the given config settings and problem type.
@@ -129,7 +128,7 @@ class Match(BaseModel):
         """
         if ui is None:
             ui = EmptyUi()
-        ui.match = self
+        config = self.config
         problem = config.loaded_problem
 
         with await TeamHandler.build(config.teams, problem, config.as_prog_config(), ui) as teams:
@@ -148,10 +147,10 @@ class Match(BaseModel):
                 for matchup in teams.matchups:
                     battle = battle_cls()
                     self.battles[MatchupStr.make(matchup)] = battle
-                    tg.start_soon(self._run_battle, battle, matchup, config, problem, match_cpus, ui, limiter)
+                    tg.start_soon(self._run_battle, battle, matchup, problem, match_cpus, ui, limiter)
         return self
 
-    def calculate_points(self, total_points_per_team: int) -> dict[str, float]:
+    def calculate_points(self) -> dict[str, float]:
         """Calculate the number of points each team scored.
 
         Every team scores between 0 and `total_points_per_team` points.
@@ -159,6 +158,7 @@ class Match(BaseModel):
         The other teams each get points based on how well they did against each other team compared to how well that
         other team did against them.
         """
+        total_points_per_team = self.config.project.points
         points = {team: 0.0 for team in self.active_teams + list(self.excluded_teams)}
         if len(self.active_teams) == 0:
             return points
@@ -174,14 +174,16 @@ class Match(BaseModel):
                 second_res = self.battles[MatchupStr(first, second)]
             except KeyError:
                 continue
-            total_score = max(0, first_res.score()) + max(0, second_res.score())
+            total_score = max(0, first_res.score(self.config.match.battle)) + max(
+                0, second_res.score(self.config.match.battle)
+            )
             if total_score == 0:
                 # Default values for proportions, assuming no team manages to solve anything
                 first_ratio = 0.5
                 second_ratio = 0.5
             else:
-                first_ratio = first_res.score() / total_score
-                second_ratio = second_res.score() / total_score
+                first_ratio = first_res.score(self.config.match.battle) / total_score
+                second_ratio = second_res.score(self.config.match.battle) / total_score
 
             points[first] += round(points_per_matchup * first_ratio, 1)
             points[second] += round(points_per_matchup * second_ratio, 1)
