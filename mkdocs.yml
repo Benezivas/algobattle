@@ -119,8 +119,9 @@ nav:
   - Instructor's Corner:
     - instructor/index.md
     - instructor/teaching_english.md
-    - instructor/problem_basic.md
-    - instructor/problem_advanced.md
+    - Creating Problems:
+      - instructor/problem/intro.md
+      - instructor/problem/problem_file.md
     - instructor/battles.md
     - instructor/web.md
     - problems/characteristics.md
