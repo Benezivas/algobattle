@@ -103,14 +103,20 @@ extra_javascript:
 
 nav:
   - Home: index.md
-  - Student Tutorial:
+  - Tutorial:
     - tutorial/index.md
     - tutorial/installation.md
     - tutorial/getting_started.md
     - tutorial/programs.md
     - tutorial/match.md
     - tutorial/summary.md
-  - Instructor Tutorial:
+  - Advanced Topics:
+    - advanced/index.md
+    - advanced/config.md
+    - advanced/battle_types.md
+    - advanced/docker.md
+    - advanced/problems.md
+  - Instructor's Corner:
     - instructor/index.md
     - instructor/teaching_english.md
     - instructor/problem_basic.md
@@ -121,12 +127,6 @@ nav:
     - problems/basic_flow.md
     - problems/problem_parts.md
     - problems/2dkp.md
-  - Advanced Topics:
-    - advanced/index.md
-    - advanced/config.md
-    - advanced/battle_types.md
-    - advanced/docker.md
-    - advanced/problems.md
   - API Reference:
     - api/index.md
     - api/battle.md
