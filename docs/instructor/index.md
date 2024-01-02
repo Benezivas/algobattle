@@ -1,8 +1,8 @@
-# Instructor Tutorial
+# Instructor's Corner
 
-This tutorial is aimed at instructors who want to run an Algobattle lab course. It covers how you can structure the
-course and detailed info on how to interact with the framework. Individual pages are largely independent of each other
-and can be read in sequence or used as a reference as needed.
+This section is all about the stuff behind the scenes. It covers how you can structure the course and detailed info on
+how to interact with the framework. Individual pages are largely independent of each other and can be read in sequence
+or used as a reference as needed.
 
 ## Overview
 
