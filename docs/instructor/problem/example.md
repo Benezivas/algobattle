@@ -1,8 +1,12 @@
-# The 2D Knapsack Problem
+# A Complex Example
 ## The 2D Knapsack Problem
 In this section, we implement the so called 2D Knapsack Problem in its entirety,
 starting from scratch and ending with a packaged problem archive that
 can be handed out to others.
+
+!!! abstract "Usage of Complex Features"
+    In parts of this we will use rather advanced features of Algobattle. We recommend looking up the more detailed
+    explanations of anything you're unsure about in its corresponding section.
 
 To start, let us define the problem. We are given a two-dimensional, rectangular
 space with an integer length and width, each of size at least one. We now

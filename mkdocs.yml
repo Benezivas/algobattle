@@ -122,6 +122,10 @@ nav:
     - Creating Problems:
       - instructor/problem/intro.md
       - instructor/problem/problem_file.md
+      - instructor/problem/advanced.md
+      - instructor/problem/annotations.md
+      - instructor/problem/io.md
+      - instructor/problem/example.md
     - instructor/battles.md
     - instructor/web.md
     - problems/characteristics.md
