@@ -1,7 +1,7 @@
-# Lehrkonzept Praktikum "Algorithmic Battle"
+# Praktikum Lehrkonzept
 
 !!! info "Diese Seite ist auch auf Englisch verfügbar"
-    [Sprache wechseln :gb:](english.md){ .md-button }
+    [Sprache wechseln :gb:](teaching_english.md){ .md-button }
 
 ## Grundlegendes
 

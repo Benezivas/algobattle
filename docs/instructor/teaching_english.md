@@ -1,7 +1,7 @@
-# Teaching Concept Lab Course "Algorithmic Battle"
+# Lab Course Teaching Concept
 
 !!! info "This page also is available in German"
-    [Switch language :de:](german.md){ .md-button }
+    [Switch language :de:](teaching_german.md){ .md-button }
 
 ## Basics
 
