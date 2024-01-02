@@ -10,7 +10,7 @@ first want to use ready-made problem files to get familiar using
 After familiarizing yourself with the flow of the `algobattle` tool, you may
 next want to write your own problems. If you have peeked into the files of any
 ready-made problems, you may have noticed that they are very slim! As an
-example, the following is essentially all of the code that makes the `pairsum`
+example, the following is essentially all the code that makes the `pairsum`
 problem run, which is discussed in the [tutorial of the `algobattle`
 tool](tutorial/index.md).
 
@@ -65,7 +65,7 @@ This tutorial aims to prepare you to start writing your own problems. It is
 aimed at instructors that want to learn how to prepare tasks for their students.
 
 The tutorial sections build on each other and are best read in sequence. We
-assume that you have already read the (tutorial for users)[tutorial/index.md],
+assume that you have already read the [tutorial for users](tutorial/index.md),
 have a basic understanding of theoretical computer science and have basic
 knowledge of the Python language.
 
