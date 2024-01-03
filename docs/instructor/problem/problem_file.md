@@ -414,7 +414,7 @@ class Solution(SolutionModel[Instance]):
             raise ValidationError("Solution elements don't have the same sum.")
 
 
-Pairsum = Problem(
+Problem(
     name="Pairsum",
     min_size=4,
     instance_cls=Instance,

@@ -66,6 +66,9 @@ markdown_extensions:
   - pymdownx.inlinehilite
   - pymdownx.details
   - pymdownx.superfences
+  - pymdownx.caret
+  - pymdownx.mark
+  - pymdownx.tilde
   - pymdownx.blocks.tab:
       alternate_style: true
   - pymdownx.blocks.admonition:
