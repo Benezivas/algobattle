@@ -179,7 +179,7 @@ def run_match(
     result = Match(config=config)
     try:
         with CliUi(result, config) if ui else EmptyUi() as ui_obj:
-            run_async_fn(result.run, config, ui_obj)
+            run_async_fn(result.run, ui_obj)
     except DockerNotRunning:
         console.print("[error]Could not connect to the Docker Daemon.[/] Is Docker running?")
         save = False
