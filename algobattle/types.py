@@ -346,7 +346,7 @@ def In(attribute: AttributeReference) -> AttributeReferenceValidator:
     """Specifies that the value should be `in` some collection."""
 
     def validator(val: Any, attr: Any) -> Any:
-        if not (val in attr):
+        if val not in attr:
             raise ValueError(f"Value is not contained in collection {attribute}.")
         return val
 
