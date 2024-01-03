@@ -174,7 +174,7 @@ ScoreFunction = ScoreFunctionWithSol[InstanceT, SolutionT] | ScoreFunctionNoSol[
 
 
 @overload
-def default_score(instance: Instance, *, solution: Solution[Instance]) -> float:
+def default_score(instance: Instance, *, solution: Solution[Any]) -> float:
     ...
 
 
