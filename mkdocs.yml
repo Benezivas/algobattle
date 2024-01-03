@@ -129,7 +129,8 @@ nav:
       - instructor/problem/advanced.md
       - instructor/problem/annotations.md
       - instructor/problem/io.md
-    - instructor/battles.md
+    - Advanced Topics:
+      - instructor/battles.md
   - API Reference:
     - api/index.md
     - api/battle.md
