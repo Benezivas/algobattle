@@ -313,7 +313,7 @@ the validation function also receives the value of a referenced attribute.
     This is an advanced feature and will make most sense to you if you already understand 
     [validation context](https://docs.pydantic.dev/latest/concepts/validators/#validation-context).
 
-Algobattle will include certain useful data in the validation context. The full list of available keys are:
+Algobattle will include certain useful data in the validation context. The full list of available keys is:
 
 `max_size`
 : Contains the maximum allowed instance size of the current fight. Will always be present.
