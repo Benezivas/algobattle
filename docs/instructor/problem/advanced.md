@@ -21,6 +21,38 @@ dependencies = [
 When initializing the project Algobattle will then make sure that the needed libraries are installed on the user's
 machine.
 
+## Hiding Parts of the Instance
+
+Sometimes we want the generator to give us some data we need to verify the instance, but don't want the solver to see
+this. For example, consider the problem of finding the longest path in a graph with a vertex cover (1) of a specific
+size. The best way to verify that the instance graph actually contains such a vertex cover is to have it be part of the
+instance data. But we want the solver to only have access to the information that it exists, not which exact vertices
+are in it.
+{.annotate}
+
+1. A vertex cover is a subset of vertices such that all other vertices in the graph have an edge to a vertex in it.
+
+We can use this using the `Field` construct from Pydantic. It is a simple marker object that lets us configure various
+properties of specific fields. One of these settings is the `exclude` key, which tells Pydantic to exclude this field
+when serializing the object into json. It will still be parsed and validated normally when reading json data and
+creating the Python object. We can use it either as the default value of the attribute, or as `Annotated[...]` metadata.
+
+/// example
+In this class
+```py
+from pydantic import Field
+
+class Instance(InstanceModel):
+    """An instance of the Some Example problem."""
+
+    normal_attribute: int
+    hidden: float = Field(exclude=True)
+    also_hidden: Annotated[str, Field(exclude=True)]
+```
+the first attribute `normal_attribute` will be the only that is included in the output that the solver sees. All three
+attributes are required to be in the instance data the generator creates and will be available on the Python object.
+///
+
 ## Using the Algobattle Graph Classes
 
 Since many problems use graphs as the foundation of their instances we provide several utility classes to make working
