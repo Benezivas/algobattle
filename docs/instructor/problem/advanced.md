@@ -37,21 +37,27 @@ properties of specific fields. One of these settings is the `exclude` key, which
 when serializing the object into json. It will still be parsed and validated normally when reading json data and
 creating the Python object. We can use it either as the default value of the attribute, or as `Annotated[...]` metadata.
 
-/// example
-In this class
-```py
-from pydantic import Field
+!!! example
+    In this class
 
-class Instance(InstanceModel):
-    """An instance of the Some Example problem."""
+    ```py
+    from pydantic import Field
 
-    normal_attribute: int
-    hidden: float = Field(exclude=True)
-    also_hidden: Annotated[str, Field(exclude=True)]
-```
-the first attribute `normal_attribute` will be the only that is included in the output that the solver sees. All three
-attributes are required to be in the instance data the generator creates and will be available on the Python object.
-///
+    class Instance(InstanceModel):
+        """An instance of the Some Example problem."""
+
+        normal_attribute: int
+        hidden: float = Field(exclude=True)
+        also_hidden: Annotated[str, Field(exclude=True)]
+    ```
+
+    the first attribute `normal_attribute` will be the only that is included in the output that the solver sees. All three
+    attributes are required to be in the instance data the generator creates and will be available on the Python object.
+
+
+!!! tip
+    The `Field` specifier lets you do many more things than this! Read the excellently written
+    [Pydantic documentation](https://docs.pydantic.dev/latest/concepts/fields) to see more use cases.
 
 ## Using the Algobattle Graph Classes
 
@@ -67,40 +73,39 @@ vertices respectively. They will also ensure proper validation, with `DirectedGr
 `UndirectedGraph` accepting only those that contain no self loops and where edges are interpreted as being
 directionless. Both graph's size is the number of vertices in it.
 
-///example | Reachability
-An implementation of the Reachability (1) problem's instance class might look
-something like this:
-{.annotate}
+!!! example "Reachability"
+    An implementation of the Reachability (1) problem's instance class might look
+    something like this:
+    {.annotate}
 
-1. Given a graph and two vertices in it, is there a path between them?
+    1. Given a graph and two vertices in it, is there a path between them?
 
-```py
-class Instance(DirectedGraph):
-    """An instance of a Reachability problem."""
+    ```py
+    class Instance(DirectedGraph):
+        """An instance of a Reachability problem."""
 
-    start: Vertex
-    end: Vertex
-```
+        start: Vertex
+        end: Vertex
+    ```
 
-Which is equivalent to
+    Which is equivalent to
 
-```py
-class Instance(InstanceModel):
-    """An instance of a Reachability problem."""
+    ```py
+    class Instance(InstanceModel):
+        """An instance of a Reachability problem."""
 
-    num_vertices: u64
-    edges: Annotated[list[tuple[SizeIndex, SizeIndex]], UniqueItems]
+        num_vertices: u64
+        edges: Annotated[list[tuple[SizeIndex, SizeIndex]], UniqueItems]
 
-    start: Vertex
-    end: Vertex
+        start: Vertex
+        end: Vertex
 
-    @property
-    def size(self) -> int:
-        """A graph's size is the number of vertices in it."""
-        return self.num_vertices
+        @property
+        def size(self) -> int:
+            """A graph's size is the number of vertices in it."""
+            return self.num_vertices
 
-```
-///
+    ```
 
 !!! tip "Associated Annotation Types"
     As you can see in the example above, we also provide several types that are useful in type annotations of graph
@@ -111,28 +116,27 @@ If you want the problem instance to also contain additional information associat
 you can use the `VertexWeights` and `EdgeWeights` mix ins. These are added as an additional parent class and must be
 indexed with the type of the weights you want to use.
 
-///example | Labelled Vertices and Weighted Edges
-Say your problem wants to label each vertex with the name of a city and each edge with the distance it represents. This
-would be done like this:
+!!! example "Labelled Vertices and Weighted Edges"
+    Say your problem wants to label each vertex with the name of a city and each edge with the distance it represents. This
+    would be done like this:
 
-```py
-class Instance(DirectedGraph, VertexWeights[str], EdgeWeights[float]):
+    ```py
+    class Instance(DirectedGraph, VertexWeights[str], EdgeWeights[float]):
 
-    ...
-```
+        ...
+    ```
 
-Both are encoded as lists of the weights where the nth entry corresponds to the weight of the nth vertex or edge.
-I.e. the above is equivalent to
+    Both are encoded as lists of the weights where the nth entry corresponds to the weight of the nth vertex or edge.
+    I.e. the above is equivalent to
 
-```py
-class Instance(DirectedGraph):
+    ```py
+    class Instance(DirectedGraph):
 
-    vertex_weights: Annotated[list[str], SizeLen]
-    edge_weights: Annotated[list[float], EdgeLen]
+        vertex_weights: Annotated[list[str], SizeLen]
+        edge_weights: Annotated[list[float], EdgeLen]
 
-    ...
-```
-///
+        ...
+    ```
 
 ## Comparing Floats
 

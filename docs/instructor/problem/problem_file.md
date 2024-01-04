@@ -303,9 +303,10 @@ the actual type. This is a Python construct that lets us add some metadata to a 
 will instruct Algobattle (again using Pydantic) to also validate that the items in the wrapped collection are different
 from each other.
 
-!!! tip "Advanced Type Annotations"
-    There are many more type annotations you can use. We explain how to use them in more detail in the [advanced types]
-    section.
+!!! tip "Annotated Metadata"
+    Using the `Annotated[...]` construct to add metadata is a powerful way to define validation, but can also be very
+    confusing to people new to the Python type system. We go over it in much more detail in the
+    [advanced types](annotations.md#advanced-type-annotations) section.
 
 We also need to check that the first two numbers actually have the same sum as the second two. This is best done with
 a custom validation method:
