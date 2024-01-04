@@ -2,7 +2,7 @@
 
 !!! abstract "Brush up on the basics"
     This page assumes you're already familiar with the basics of how Algobattle works. If that's not you yet, you can
-    read up on it in the [student tutorial](tutorial/getting_started.md).
+    read up on it in the [student tutorial](../../tutorial/getting_started.md).
 
 In each Algobattle course the student teams are given a few problems that they will then need to solve. This means that
 we need to first come up with what those problems are and then how to tell Algobattle about them.
