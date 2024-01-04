@@ -2,6 +2,69 @@
 
 This page is a loose collection of various more advanced features of the problem creation process.
 
+## Submodels
+
+So far we've just used tuples to group multiple pieces of data together. For example, we defined an edge as just a tuple
+of two vertices. This works great for very simple types when it's clear what each element of the tuple means, but can
+become very confusing quickly. Let's say we want to define a problem where rectangles are placed in a 2D coordinate
+system. These are then defined by four integers: width, height, and x and y position. We could now define the instances
+like this
+
+```py
+class Instance(InstanceModel):
+
+    rectangles: list[tuple[int, int, int, int]]
+```
+
+but we, and more importantly our students, will then have to always remember the order we put those numbers in. To
+prevent bugs caused by this we can also define a helper class that inherits from `BaseModel` in `algobattle.util`.
+This will then not have the instance or solution specific stuff added, but will also allow us to create json validation
+specifications just like in those classes.
+
+```py
+from algobattle.util import BaseModel
+
+
+class Rectangle(BaseModel):
+
+    x: int
+    y: int
+    width: int
+    height: int
+
+
+class Instance(InstanceModel):
+
+    rectangles: list[Rectangle]
+```
+
+!!! warning
+    The Pydantic package also exports a class called `BaseModel` which offers similar functionality. Always
+    inherit from the class Algobattle provides since it includes additional settings that are important for everything
+    to function correctly.
+
+Pydantic then expects a json object at the places where you use these types with keys and values matching the attributes
+found in the class. For example, a valid instance json file for the above class can look like this:
+
+```json title="instance.json"
+{
+    "rectanlges": [
+        {
+            "x": 3,
+            "y": 2,
+            "width": 5,
+            "height": 2
+        },
+        {
+            "x": 0,
+            "height": 17
+            "width": 5,
+            "y": -2,
+        }
+    ]
+}
+```
+
 ## External Dependencies
 
 You may want to import some additional python libraries to use in your problem file, such as
