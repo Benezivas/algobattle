@@ -191,6 +191,11 @@ class Instance(InstanceModel):
 
 1. Always remember to add imports at the top of the file for everything you use from an external module.
 
+!!! tip "Integer Types"
+    The `algobattle.types` module contains predefined types for all commonly found integer types. These are `u64`,
+    `u32`, `u16` for unsigned integers that fit in 64, 32, and 16 bits and `i64`, `i32`, `i16` for the corresponding
+    signed variants.
+
 But there also are some properties that we cannot validate by just using one of the predefined types. The easiest way
 to do that is to implement the `validate_instance` method. It will be called after all the basic properties of the
 types have been validated and can then perform more complicated checks. For example, if we wanted to also add the
