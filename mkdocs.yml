@@ -71,6 +71,8 @@ markdown_extensions:
   - pymdownx.tilde
   - pymdownx.blocks.tab:
       alternate_style: true
+  - pymdownx.tabbed:
+      alternate_style: true
   - pymdownx.blocks.admonition:
       types:
       - note
