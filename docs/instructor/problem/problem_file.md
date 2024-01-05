@@ -1,4 +1,4 @@
-# Making a Problem File
+# Creating a Problem File
 
 Algobattle uses _Problem files_ to specify all the details of a problem formally, i.e. what instances and solutions
 should look like, how to score them, how to decode and encode them, etc. These are Python files and leave a lot of room
