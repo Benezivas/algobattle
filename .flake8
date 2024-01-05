@@ -11,4 +11,6 @@ ignore = D105, D401, E302, W503
 exclude =
     .git,
     __pycache__,
+    .project,
+    docs/src
 ignore_decorators=inherit_docs
