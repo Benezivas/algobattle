@@ -353,23 +353,27 @@ class FightHistoryEncoding(TestCase):
                     self.assertEqual(decoded, first if num == 0 else second)
 
     def test_encode_witness(self) -> None:
+        instance = self.history.history[0].generator.instance
+        assert isinstance(instance, TestInstance)
         first = self.history.history[0].generator.solution
         second = self.history.history[1].generator.solution
         with TempDir() as target:
             for num, folder, should_exist in self._encode_attr(target, "gen_sols"):
                 self.assertEqual(folder.joinpath("generator_solution.json").exists(), should_exist)
                 if should_exist:
-                    decoded = TestSolution.decode(folder / "generator_solution.json", 25, Role.generator)
+                    decoded = TestSolution.decode(folder / "generator_solution.json", 25, Role.generator, instance)
                     self.assertEqual(decoded, first if num == 0 else second)
 
     def test_encode_solution(self) -> None:
+        instance = self.history.history[0].generator.instance
+        assert isinstance(instance, TestInstance)
         first = cast(SolverResult, self.history.history[0].solver).solution
         second = cast(SolverResult, self.history.history[1].solver).solution
         with TempDir() as target:
             for num, folder, should_exist in self._encode_attr(target, "sol_sols"):
                 self.assertEqual(folder.joinpath("solver_solution.json").exists(), should_exist)
                 if should_exist:
-                    decoded = TestSolution.decode(folder / "solver_solution.json", 25, Role.generator)
+                    decoded = TestSolution.decode(folder / "solver_solution.json", 25, Role.generator, instance)
                     self.assertEqual(decoded, first if num == 0 else second)
 
 
