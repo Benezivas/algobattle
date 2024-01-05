@@ -96,7 +96,7 @@ As you can see this class inherits from the `InstanceModel` utility class, which
     [`Instance`](../../api/problem.md#algobattle.problem.Instance) class and implement the
     [`Encodable`](../../api/util.md#algobattle.util.Encodable) protocol, but doing so manually is much more
     complicated and not needed for most problems. We will see how to use these classes in the
-    [Advanced I/O Formats] guide.
+    [arbitrary i/o formats](io.md) guide.
 
 !!! tip "Pydantic"
     Pydantic is a very powerful library with excellent support for many use cases. This can also make it harder to
