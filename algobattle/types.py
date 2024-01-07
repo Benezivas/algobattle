@@ -416,7 +416,7 @@ Vertex = SizeIndex
 """Type for vertices, encoded as numbers `0 <= v < instance.num_vertices`."""
 
 
-Edge = IndexInto[InstanceRef.edges]
+Edge = Annotated[int, IndexInto[InstanceRef.edges]]
 """Type for edges, encoded as indices into `instance.edges`."""
 
 
@@ -510,11 +510,43 @@ class EdgeWeights(DirectedGraph, BaseModel, Generic[Weight]):
 
     edge_weights: Annotated[list[Weight], EdgeLen]
 
+    @cached_property
+    def edges_with_weights(self) -> Iterator[tuple[tuple[Vertex, Vertex], Weight]]:
+        """Iterate over all edges and their weights."""
+
+        return zip(self.edges, self.edge_weights)
+
+    @cache
+    def weight(self, edge: Edge | tuple[Vertex, Vertex]) -> Weight:
+        """Returns the weight of an edge.
+        
+        Raises KeyError if the given edge does not exist.
+        """
+
+        if isinstance(edge, tuple):
+            try:
+                edge = self.edges.index(edge)
+            except ValueError:
+                if isinstance(self, UndirectedGraph):
+                    try:
+                        edge = self.edges.index((edge[1], edge[0]))
+                    except ValueError:
+                        raise KeyError
+                else:
+                    raise KeyError
+
+        return self.edge_weights[edge]
 
 class VertexWeights(DirectedGraph, BaseModel, Generic[Weight]):
     """Mixin for graphs with weighted vertices."""
 
     vertex_weights: Annotated[list[Weight], SizeLen]
+
+    @cached_property
+    def vertices_with_weights(self) -> Iterator[tuple[Vertex, Weight]]:
+        """Iterate over all edges and their weights."""
+
+        return enumerate(self.vertex_weights)
 
 
 @dataclass(frozen=True, slots=True)
