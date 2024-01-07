@@ -38,7 +38,9 @@ from pydantic_core.core_schema import (
 )
 
 from algobattle.util import (
+    EncodableBase,
     EncodableModel,
+    EncodableModelBase,
     Role,
     Encodable,
     import_file_as_module,
@@ -70,12 +72,12 @@ InstanceT = TypeVar("InstanceT", bound=Instance, contravariant=True)
 P = ParamSpec("P")
 
 
-class Solution(Encodable, Generic[InstanceT], ABC):
+class Solution(EncodableBase, Generic[InstanceT], ABC):
     """A proposed solution for an instance of this problem."""
 
     @classmethod
     @abstractmethod
-    def decode(cls, source: Path, max_size: int, role: Role, instance: InstanceT | None = None) -> Self:  # noqa: D102
+    def decode(cls, source: Path, max_size: int, role: Role, instance: InstanceT) -> Self:  # noqa: D102
         raise NotImplementedError
 
     def validate_solution(self, instance: InstanceT, role: Role) -> None:
@@ -174,7 +176,7 @@ ScoreFunction = ScoreFunctionWithSol[InstanceT, SolutionT] | ScoreFunctionNoSol[
 
 
 @overload
-def default_score(instance: Instance, *, solution: Solution[Instance]) -> float:
+def default_score(instance: Instance, *, solution: Solution[Any]) -> float:
     ...
 
 
@@ -507,7 +509,7 @@ InstanceRef = AttributeReferenceMaker("instance")
 SolutionRef = AttributeReferenceMaker("solution")
 
 
-class InstanceSolutionModel(EncodableModel):
+class InstanceSolutionModel(EncodableModelBase):
     """Base class for Instance and solution models."""
 
     @classmethod
@@ -550,19 +552,17 @@ class InstanceSolutionModel(EncodableModel):
         return False
 
 
-class InstanceModel(Instance, InstanceSolutionModel, ABC):
+class InstanceModel(InstanceSolutionModel, EncodableModel, Instance, ABC):
     """An instance that can easily be parsed to/from a json file."""
 
     pass
 
 
-class SolutionModel(Solution[InstanceT], InstanceSolutionModel, ABC):
+class SolutionModel(InstanceSolutionModel, Solution[InstanceT], ABC):
     """A solution that can easily be parsed to/from a json file."""
 
     @classmethod
-    def decode(cls, source: Path, max_size: int, role: Role, instance: InstanceT | None = None) -> Self:
+    def decode(cls, source: Path, max_size: int, role: Role, instance: InstanceT) -> Self:
         """Uses pydantic to create a python object from a `.json` file."""
-        context: dict[str, Any] = {"max_size": max_size, "role": role}
-        if instance is not None:
-            context["instance"] = instance
-        return cls._decode(source, **context)
+        context: dict[str, Any] = {"max_size": max_size, "role": role, "instance": instance}
+        return cls._decode(cls, source, **context)

@@ -544,7 +544,9 @@ class Generator(Program):
                     )
                 if self.problem.with_solution:
                     try:
-                        solution = self.problem.solution_cls.decode(io.output / "solution", max_size, self.role)
+                        solution = self.problem.solution_cls.decode(
+                            io.output / "solution", max_size, self.role, instance
+                        )
                     except EncodingError:
                         raise
                     except Exception as e:

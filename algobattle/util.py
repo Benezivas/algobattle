@@ -29,36 +29,18 @@ class Role(StrEnum):
     solver = "solver"
 
 
-T = TypeVar("T")
-
-
 class BaseModel(PydandticBaseModel):
     """Base class for all pydantic models."""
 
     model_config = ConfigDict(extra="forbid", from_attributes=True, hide_input_in_errors=True)
 
 
-class Encodable(ABC):
-    """Represents data that docker containers can interact with."""
+T = TypeVar("T")
+ModelT = TypeVar("ModelT", bound=BaseModel)
 
-    @classmethod
-    @abstractmethod
-    def decode(cls, source: Path, max_size: int, role: Role) -> Self:
-        """Decodes the data found at the given path into a python object.
 
-        Args:
-            source: Path to data that can be used to construct an instance of this class. May either point to a folder
-                or a single file. The expected type of path should be consistent with the result of :meth:`.encode`.
-            max_size: Maximum size the current battle allows.
-            role: Role of the program that generated this data.
-
-        Raises:
-            EncodingError: If the data cannot be decoded into an instance.
-
-        Returns:
-            The decoded object.
-        """
-        raise NotImplementedError
+class EncodableBase(ABC):
+    """Base for Encodable and Solution."""
 
     @abstractmethod
     def encode(self, target: Path, role: Role) -> None:
@@ -89,26 +71,44 @@ class Encodable(ABC):
         return None
 
 
-class EncodableModel(BaseModel, Encodable, ABC):
-    """Problem data that can easily be encoded into and decoded from json files."""
+class Encodable(EncodableBase, ABC):
+    """Represents data that docker containers can interact with."""
 
     @classmethod
-    def _decode(cls, source: Path, **context: Any) -> Self:
+    @abstractmethod
+    def decode(cls, source: Path, max_size: int, role: Role) -> Self:
+        """Decodes the data found at the given path into a python object.
+
+        Args:
+            source: Path to data that can be used to construct an instance of this class. May either point to a folder
+                or a single file. The expected type of path should be consistent with the result of :meth:`.encode`.
+            max_size: Maximum size the current battle allows.
+            role: Role of the program that generated this data.
+
+        Raises:
+            EncodingError: If the data cannot be decoded into an instance.
+
+        Returns:
+            The decoded object.
+        """
+        raise NotImplementedError
+
+
+class EncodableModelBase(BaseModel, EncodableBase, ABC):
+    """Base class for EncodableModel and SolutionModel."""
+
+    @staticmethod
+    def _decode(model_cls: type[ModelT], source: Path, **context: Any) -> ModelT:
         """Internal method used by .decode to let Solutions also accept the corresponding instance."""
         if not source.with_suffix(".json").is_file():
             raise EncodingError("The json file does not exist.")
         try:
             with open(source.with_suffix(".json"), "r") as f:
-                return cls.model_validate_json(f.read(), context=context)
+                return model_cls.model_validate_json(f.read(), context=context)
         except PydanticValidationError as e:
             raise EncodingError("Json data does not fit the schema.", detail=str(e))
         except Exception as e:
             raise EncodingError("Unknown error while decoding the data.", detail=str(e))
-
-    @classmethod
-    def decode(cls, source: Path, max_size: int, role: Role) -> Self:
-        """Uses pydantic to create a python object from a `.json` file."""
-        return cls._decode(source, max_size=max_size, role=role)
 
     def encode(self, target: Path, role: Role) -> None:
         """Uses pydantic to create a json representation of the object at the targeted file."""
@@ -122,6 +122,15 @@ class EncodableModel(BaseModel, Encodable, ABC):
     def io_schema(cls) -> str:
         """Uses pydantic to generate a json schema for this class."""
         return json.dumps(cls.model_json_schema(), indent=4)
+
+
+class EncodableModel(EncodableModelBase, ABC):
+    """Problem data that can easily be encoded into and decoded from json files."""
+
+    @classmethod
+    def decode(cls, source: Path, max_size: int, role: Role) -> Self:
+        """Uses pydantic to create a python object from a `.json` file."""
+        return cls._decode(cls, source, max_size=max_size, role=role)
 
 
 @dataclass
