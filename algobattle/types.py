@@ -1,5 +1,6 @@
 """Utility types used to easily define Problems."""
 from dataclasses import dataclass
+from functools import cache, cached_property
 from sys import float_info
 from typing import (
     Annotated,
@@ -411,6 +412,14 @@ class SizeLen:
 # * Graph classes
 
 
+Vertex = SizeIndex
+"""Type for vertices, encoded as numbers `0 <= v < instance.num_vertices`."""
+
+
+Edge = IndexInto[InstanceRef.edges]
+"""Type for edges, encoded as indices into `instance.edges`."""
+
+
 class DirectedGraph(InstanceModel):
     """Base instance class for problems on directed graphs."""
 
@@ -422,6 +431,22 @@ class DirectedGraph(InstanceModel):
         """A graph's size is the number of vertices in it."""
         return self.num_vertices
 
+    @cached_property
+    def edge_set(self) -> set[tuple[Vertex, Vertex]]:
+        """The set of edges in this graph."""
+
+        return set(self.edges)
+
+    @cache
+    def neighbors(self, vertex: Vertex, direction: Literal["all", "outgoing", "incoming"] = "all") -> set[Vertex]:
+        """The neighbors of a vertex."""
+
+        res = set[Vertex]()
+        if direction in {"all", "outgoing"}:
+            res |= set(v for (u, v) in self.edges if u == vertex)
+        if direction in {"all", "incoming"}:
+            res |= set(v for (v, u) in self.edges if u == vertex)
+        return res
 
 class UndirectedGraph(DirectedGraph):
     """Base instance class for problems on undirected graphs."""
@@ -440,13 +465,21 @@ class UndirectedGraph(DirectedGraph):
         if any(edge[::-1] in edge_set for edge in self.edges):
             raise ValidationError("Undirected graph contains back and forth edges between two vertices.")
 
+    @cached_property
+    def edge_set(self) -> set[tuple[Vertex, Vertex]]:
+        """The set of edges in this graph.
+        
+        Normalized to contain every edge in both directions.
+        """
 
-Vertex = SizeIndex
-"""Type for vertices, encoded as numbers `0 <= v < instance.num_vertices`."""
+        return set(self.edges) | set((v, u) for (u, v) in self.edges)
 
+    @cache
+    def neighbors(self, vertex: Vertex, direction: Literal["all", "outgoing", "incoming"] = "all") -> set[Vertex]:
+        """The neighbors of a vertex."""
+        # more efficient specialization
 
-Edge = IndexInto[InstanceRef.edges]
-"""Type for edges, encoded as indices into `instance.edges`."""
+        return set(v for (u, v) in self.edge_set if u == vertex)
 
 
 class EdgeLen:
