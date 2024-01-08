@@ -25,6 +25,7 @@ from annotated_types import (
     SupportsLt,
     SupportsMod,
 )
+from itertools import pairwise
 
 from pydantic import GetCoreSchemaHandler, GetJsonSchemaHandler
 from pydantic.json_schema import JsonSchemaValue
@@ -63,6 +64,7 @@ __all__ = (
     "DirectedGraph",
     "UndirectedGraph",
     "Edge",
+    "Path",
     "EdgeLen",
     "EdgeWeights",
     "VertexWeights",
@@ -418,6 +420,17 @@ Vertex = SizeIndex
 
 Edge = Annotated[int, IndexInto[InstanceRef.edges]]
 """Type for edges, encoded as indices into `instance.edges`."""
+
+
+def path_in_graph(path: list[Vertex], edge_set: set[tuple[Vertex, Vertex]]):
+    """Checks that a path actually exists in the graph."""
+
+    for edge in pairwise(path):
+        if edge not in edge_set:
+            raise ValueError(f"The edge {edge} does not exist in the graph.")
+
+
+Path = Annotated[list[Vertex], AttributeReferenceValidator(path_in_graph, InstanceRef.edge_set)]
 
 
 class DirectedGraph(InstanceModel):
