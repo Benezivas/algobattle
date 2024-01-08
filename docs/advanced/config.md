@@ -1,6 +1,6 @@
 # Settings
 
-You can configure Algobattle in a lot of different ways, so it does exactly what you want it to do
+You can configure Algobattle in a lot of different ways, so that it does exactly what you want it to do.
 
 !!! question "Unsure about TOML syntax?"
     TOML syntax can be a bit confusing if you're unfamiliar with it, a full explanation of it can be found on

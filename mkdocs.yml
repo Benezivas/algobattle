@@ -66,7 +66,12 @@ markdown_extensions:
   - pymdownx.inlinehilite
   - pymdownx.details
   - pymdownx.superfences
+  - pymdownx.caret
+  - pymdownx.mark
+  - pymdownx.tilde
   - pymdownx.blocks.tab:
+      alternate_style: true
+  - pymdownx.tabbed:
       alternate_style: true
   - pymdownx.blocks.admonition:
       types:
@@ -89,8 +94,8 @@ markdown_extensions:
       base_path: docs/src
   - attr_list
   - pymdownx.emoji:
-      emoji_index: !!python/name:materialx.emoji.twemoji
-      emoji_generator: !!python/name:materialx.emoji.to_svg
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
 
 
 extra_css:
@@ -115,10 +120,20 @@ nav:
     - advanced/config.md
     - advanced/battle_types.md
     - advanced/docker.md
+    - advanced/problems.md
+  - Instructor's Corner:
+    - instructor/index.md
+    - instructor/teaching_english.md
+    - Creating Problems:
+      - instructor/problem/intro.md
+      - instructor/problem/problem_file.md
+      - instructor/problem/example.md
+      - instructor/problem/advanced.md
+      - instructor/problem/annotations.md
+      - instructor/problem/io.md
   - API Reference:
     - api/index.md
     - api/battle.md
     - api/problem.md
     - api/util.md
-  - Teaching Concept: teaching_concept/english.md
 

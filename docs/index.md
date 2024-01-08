@@ -13,10 +13,24 @@ The teams then battle against each other, generating instances for other teams, 
 generated for them. Each team then is evaluated on its performance and is awarded points.
 
 
-## Usage
+## Where to start reading
 
-The best place to start learning more about Algobattle is by reading through [the tutorial](tutorial/index.md).
+The Algobattle documentation is aimed at two different groups of people: students participating in lab courses, and
+instructors running them. In order to keep everything short and sweet we've structured our documentation so that
+everyone can easily focus just on what they need to learn about.
 
+For everyone, the best place to start learning more about Algobattle is by reading through
+[the tutorial](tutorial/index.md). It contains everything you need to know to use the framework and start working with
+it. Students won't necessarily need anything further to participate in the course, but may later run into things they
+can best look up in the [advanced section](advanced/index.md).
+
+After finishing the tutorial we then recommend instructors to go through the topics in the
+[instructor's corner](instructor/index.md). This will get you up to speed to run an Algobattle lab course on your own.
+
+!!! tip "Just want a broad overview?"
+    If you're not yet interested in reading all the nitty-gritty and just want a basic idea of how such a Lab course
+    works to decide if you want to run one yourself, the [teaching concept](instructor/teaching_english.md) is ideal
+    for you!
 
 ## Requirements
 

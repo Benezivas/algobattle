@@ -18,8 +18,8 @@ docker container that only needs to adhere to an I/O structure of your
 choice (by default, in the form of `json`-files.)
 
 If you are interested in how to use the framework for a
-lab course of your own, please consult our
-[teaching concept](https://www.algobattle.org/docs/teaching_concept/english).
+lab course of your own, please consult the teaching concept in
+the [documentation](https://www.algobattle.org/docs/).
 # Installation and Usage
 This project is developed and tested on all major operating systems.
 

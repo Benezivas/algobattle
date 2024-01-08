@@ -135,7 +135,7 @@ The filled in settings so far all just are paths to where Algobattle can find ce
 more things you can configure, but we're happy with the default values for now.
 
 /// tip
-If you're curious what exactly everything in here means you can read the [config docs](/advanced/config.md). But for
+If you're curious what exactly everything in here means you can read the [config docs](../advanced/config.md). But for
 now we recommend staying here since things will be much clearer after you're familiar with things here.
 ///
 
