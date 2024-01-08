@@ -424,7 +424,6 @@ Edge = Annotated[int, IndexInto[InstanceRef.edges]]
 
 def path_in_graph(path: list[Vertex], edge_set: set[tuple[Vertex, Vertex]]):
     """Checks that a path actually exists in the graph."""
-
     for edge in pairwise(path):
         if edge not in edge_set:
             raise ValueError(f"The edge {edge} does not exist in the graph.")
@@ -447,19 +446,18 @@ class DirectedGraph(InstanceModel):
     @cached_property
     def edge_set(self) -> set[tuple[Vertex, Vertex]]:
         """The set of edges in this graph."""
-
         return set(self.edges)
 
     @cache
     def neighbors(self, vertex: Vertex, direction: Literal["all", "outgoing", "incoming"] = "all") -> set[Vertex]:
         """The neighbors of a vertex."""
-
         res = set[Vertex]()
         if direction in {"all", "outgoing"}:
             res |= set(v for (u, v) in self.edges if u == vertex)
         if direction in {"all", "incoming"}:
             res |= set(v for (v, u) in self.edges if u == vertex)
         return res
+
 
 class UndirectedGraph(DirectedGraph):
     """Base instance class for problems on undirected graphs."""
@@ -481,10 +479,9 @@ class UndirectedGraph(DirectedGraph):
     @cached_property
     def edge_set(self) -> set[tuple[Vertex, Vertex]]:
         """The set of edges in this graph.
-        
+
         Normalized to contain every edge in both directions.
         """
-
         return set(self.edges) | set((v, u) for (u, v) in self.edges)
 
     @cache
@@ -526,16 +523,14 @@ class EdgeWeights(DirectedGraph, BaseModel, Generic[Weight]):
     @cached_property
     def edges_with_weights(self) -> Iterator[tuple[tuple[Vertex, Vertex], Weight]]:
         """Iterate over all edges and their weights."""
-
         return zip(self.edges, self.edge_weights)
 
     @cache
     def weight(self, edge: Edge | tuple[Vertex, Vertex]) -> Weight:
         """Returns the weight of an edge.
-        
+
         Raises KeyError if the given edge does not exist.
         """
-
         if isinstance(edge, tuple):
             try:
                 edge = self.edges.index(edge)
@@ -550,6 +545,7 @@ class EdgeWeights(DirectedGraph, BaseModel, Generic[Weight]):
 
         return self.edge_weights[edge]
 
+
 class VertexWeights(DirectedGraph, BaseModel, Generic[Weight]):
     """Mixin for graphs with weighted vertices."""
 
@@ -558,7 +554,6 @@ class VertexWeights(DirectedGraph, BaseModel, Generic[Weight]):
     @cached_property
     def vertices_with_weights(self) -> Iterator[tuple[Vertex, Weight]]:
         """Iterate over all edges and their weights."""
-
         return enumerate(self.vertex_weights)
 
 
