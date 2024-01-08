@@ -34,7 +34,7 @@ The last size where the solving team still was correct becomes that team's score
 
 !!! info "More details"
     The process described above is the best way to explain this battle type, but it's not actually precisely how it
-    works. You can find the actual process description in our [battle types](/advanced/battle_types.md) page.
+    works. You can find the actual process description in our [battle types](../advanced/battle_types.md) page.
 
 
 ## Let's get started
@@ -57,7 +57,7 @@ little while. During this step Algobattle gets all the programs ready for execut
     Yes I can :wink:. The actual details of this are somewhat complicated if you're not familiar with Docker (and if
     you are, you'll have already figured our what's going on) so we recommend skipping over this for now. We recommend
     skipping over the details here for now and if you still want to learn more later you can check out the
-    [advanced guide on Docker](/advanced/docker.md#building-images).
+    [advanced guide on Docker](../advanced/docker.md#building-images).
 
 During this the interface will look something like this
 
@@ -104,7 +104,7 @@ still running at the moment.
 ### Battle data
 
 On the right we see some data specific to the battle type. If you want to learn what the Iterated type displays here,
-check out its documentation in the [battle types page](/advanced/battle_types.md#iterated).
+check out its documentation in the [battle types page](../advanced/battle_types.md#iterated).
 
 ### Most recent fights
 

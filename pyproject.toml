@@ -19,13 +19,13 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "docker~=6.1.3",
-    "pydantic~=2.4.0",
-    "anyio~=4.0.0",
-    "typer[all]~=0.9.0",
-    "typing-extensions~=4.8.0",
-    "tomlkit~=0.12.1",
-    "jinja2~=3.1.2",
+    "docker>=7.0.0",
+    "pydantic>=2.5.3",
+    "anyio>=4.2.0",
+    "typer[all]>=0.9.0",
+    "typing-extensions>=4.9.0",
+    "tomlkit>=0.12.3",
+    "jinja2>=3.1.2",
 ]
 
 [project.urls]
@@ -35,14 +35,14 @@ Repository = "https://github.com/Benezivas/algobattle"
 
 [project.optional-dependencies]
 dev = [
-    "black~=23.7.0",
-    "flake8~=6.0.0",
-    "flake8-docstrings~=1.7.0",
-    "mkdocs~=1.4.3",
-    "mkdocs-material~=9.1.18",
-    "pymdown-extensions~=10.0.1",
-    "mkdocstrings[python]~=0.22.0",
-    "mdx_include~=1.4.2",
+    "black>=23.12.1",
+    "flake8>=6.1.0",
+    "flake8-docstrings>=1.7.0",
+    "mkdocs>=1.5.3",
+    "mkdocs-material>=9.5.3",
+    "pymdown-extensions>=10.7",
+    "mkdocstrings[python]>=0.24.0",
+    "mdx-include>=1.4.2",
 ]
 
 [project.scripts]
