@@ -172,7 +172,7 @@ directionless. Both graph's size is the number of vertices in it.
 
 !!! tip "Associated Annotation Types"
     As you can see in the example above, we also provide several types that are useful in type annotations of graph
-    problems such as `Vertex` or `Edge`. These are documented in more detail in the
+    problems such as `Vertex`, `Edge`, or `Path`. How these function is explained in more detail in the
     [advanced annotations](annotations.md) section.
 
 If you want the problem instance to also contain additional information associated with each vertex and/or each edge
@@ -200,6 +200,11 @@ indexed with the type of the weights you want to use.
 
         ...
     ```
+
+!!! tip
+    These classes also contain some utility methods to easily perform common graph operations. For example,
+    `UndirectedGraph.edge_set` contains all edges in both directions, and the `neighbors` methods lets you quickly
+    access a vertex's neighbours.
 
 ## Comparing Floats
 
