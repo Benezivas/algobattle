@@ -4,7 +4,6 @@ Provides a command line interface to start matches and observe them. See `battle
 """
 from enum import StrEnum
 from functools import cached_property
-import json
 import operator
 from os import environ
 from pathlib import Path
