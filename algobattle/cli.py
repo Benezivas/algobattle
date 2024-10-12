@@ -4,7 +4,6 @@ Provides a command line interface to start matches and observe them. See `battle
 """
 from enum import StrEnum
 from functools import cached_property
-import json
 import operator
 from os import environ
 from pathlib import Path
@@ -21,7 +20,7 @@ import shutil
 from anyio import run as run_async_fn
 from click import Choice
 from click.core import Parameter
-from pydantic import Field, ValidationError
+from pydantic import Field, TypeAdapter, ValidationError
 from typer import Typer, Argument, Option, Abort, get_app_dir, launch
 from rich.console import Group, RenderableType, Console
 from rich.live import Live
@@ -516,7 +515,7 @@ def test(
     config = AlgobattleConfig.from_file(project)
     all_errors: dict[str, TestErrors] = {}
 
-    for team in config.teams.keys():
+    for team in config.teams:
         res = test_team(config, team, size)
         if not res.ok():
             all_errors[team] = res
@@ -524,7 +523,7 @@ def test(
     if all_errors:
         err_path = config.project.results.joinpath(f"test-{timestamp()}.json")
         config.project.results.mkdir(parents=True, exist_ok=True)
-        err_path.write_text(json.dumps(all_errors, indent=4))
+        err_path.write_bytes(TypeAdapter(dict[str, TestErrors]).dump_json(all_errors, indent=2, exclude_defaults=True))
         console.print(f"You can find detailed error messages at {err_path}")
         return "error"
     else:
